@@ -73,7 +73,7 @@ pulldown-cmark = { version = "0.13", default-features = false, features = ["html
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream", "json"] }
 futures = "0.3"
 uuid = { version = "1", features = ["v4", "serde"] }
-base64 = "0.22"
+base64 = "0.23"
 hmac = "0.12"
 sha2 = "0.10"
 pbkdf2 = "0.12"
