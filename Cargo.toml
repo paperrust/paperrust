@@ -78,7 +78,7 @@ hmac = "0.12"
 sha2 = "0.10"
 pbkdf2 = "0.12"
 flate2 = "1"
-rand = "0.8"
+rand = "0.10"
 redis = { version = "0.27", features = ["tokio-comp", "connection-manager"] }
 regex = "1"
 percent-encoding = "2"
