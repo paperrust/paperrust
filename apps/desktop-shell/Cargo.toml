@@ -23,7 +23,7 @@ path = "src/main.rs"
 [workspace]
 
 [build-dependencies]
-tauri-build = { version = "=2.7.4", features = [] }
+tauri-build = { version = "=2.7.5", features = [] }
 
 [dependencies]
 paperrust-desktop = { path = "../desktop" }
