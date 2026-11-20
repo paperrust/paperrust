@@ -1,0 +1,430 @@
+/* Selection field with dropdown list (NgSelect.svelte; same classes also in the replica in
+   StoragePathEditDialog and InputDocumentLink). Structure and colors in one file. */
+
+/* ---- Basic structure ---- */
+
+.ng-select {
+  position: relative;
+  display: block;
+  box-sizing: border-box;
+}
+
+.ng-select div,
+.ng-select input,
+.ng-select span {
+  box-sizing: border-box;
+}
+
+/* ---- Field ---- */
+
+/* Height and rounding as variable so that filter menus can make them smaller */
+.ng-select .ng-select-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: var(--ng-select-height, 36px);
+  overflow: hidden;
+  outline: none;
+  cursor: default;
+  color: #333;
+  background-color: #ffffff;
+  border: 1px solid #ccc;
+  border-radius: var(--ng-select-border-radius, 4px);
+}
+
+.ng-select .ng-select-container:hover {
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
+}
+
+.ng-select.ng-select-single .ng-select-container {
+  height: var(--ng-select-height, 36px);
+}
+
+/* Open: put field above the list, border darker at the top, corners towards the list angular */
+.ng-select.ng-select-opened .ng-select-container {
+  z-index: 1001;
+}
+
+.ng-select.ng-select-opened > .ng-select-container {
+  background: #ffffff;
+  border-color: rgb(70%, 70%, 70%) #ccc rgb(85%, 85%, 85%);
+}
+
+.ng-select.ng-select-opened > .ng-select-container:hover {
+  box-shadow: none;
+}
+
+.ng-select.ng-select-opened.ng-select-top > .ng-select-container {
+  border-top-right-radius: 0;
+  border-top-left-radius: 0;
+}
+
+.ng-select.ng-select-opened.ng-select-bottom > .ng-select-container {
+  border-bottom-right-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.ng-select.ng-select-focused:not(.ng-select-opened) > .ng-select-container {
+  border-color: #007eff;
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.075), 0 0 0 3px rgba(0, 126, 255, 0.1);
+}
+
+/* must come after the rule for "open" (same weight) */
+.ng-select.ng-select-disabled > .ng-select-container {
+  background-color: #f9f9f9;
+}
+
+/* ---- Value range ---- */
+
+.ng-select .ng-select-container .ng-value-container {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  padding-left: 10px;
+}
+
+.ng-select .ng-select-container .ng-value-container .ng-placeholder {
+  color: #999999;
+}
+
+.ng-select .ng-has-value .ng-placeholder {
+  display: none;
+}
+
+.ng-select.ng-select-disabled .ng-select-container .ng-value-container .ng-placeholder,
+.ng-select.ng-select-disabled .ng-select-container .ng-value-container .ng-value {
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+}
+
+/* ---- Search input ---- */
+
+/* only visible if the field is searchable */
+.ng-select .ng-select-container .ng-value-container .ng-input {
+  opacity: 0;
+}
+
+.ng-select.ng-select-searchable .ng-select-container .ng-value-container .ng-input {
+  opacity: 1;
+}
+
+.ng-select:not(.ng-select-searchable) .ng-select-container .ng-value-container .ng-input {
+  pointer-events: none;
+}
+
+.ng-select .ng-select-container .ng-value-container .ng-input > input {
+  box-sizing: content-box;
+  width: 100%;
+  padding: 0;
+  background: none transparent;
+  border: 0 none;
+  box-shadow: none;
+  outline: none;
+  cursor: default;
+}
+
+.ng-select .ng-select-container .ng-value-container .ng-input > input[readonly] {
+  -webkit-user-select: unset;
+  user-select: unset;
+  width: 0;
+  padding: 0;
+}
+
+/* ---- Single selection ---- */
+
+.ng-select.ng-select-single .ng-select-container .ng-value-container,
+.ng-select.ng-select-single .ng-select-container .ng-value-container .ng-value {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Input lies above the selected value */
+.ng-select.ng-select-single .ng-select-container .ng-value-container .ng-input {
+  position: absolute;
+  top: 5px;
+  left: 0;
+  width: 100%;
+  padding-left: 10px;
+  padding-right: 50px;
+}
+
+/* ---- Multiple selection (values as chips) ---- */
+
+.ng-select.ng-select-multiple .ng-select-container .ng-value-container {
+  flex-wrap: wrap;
+  padding-top: 5px;
+  padding-left: 7px;
+}
+
+.ng-select.ng-select-multiple .ng-select-container .ng-value-container .ng-placeholder {
+  position: absolute;
+  z-index: 1;
+  top: 5px;
+  padding-bottom: 5px;
+  padding-left: 3px;
+}
+
+.ng-select.ng-select-multiple .ng-select-container .ng-value-container .ng-value {
+  margin-right: 5px;
+  margin-bottom: 5px;
+  font-size: 0.9em;
+  white-space: nowrap;
+  color: #333;
+  background-color: rgb(92%, 95.9529411765%, 100%);
+  border-radius: 2px;
+}
+
+.ng-select.ng-select-multiple .ng-select-container .ng-value-container .ng-value .ng-value-label {
+  display: inline-block;
+  padding: 1px 5px;
+}
+
+/* Remove cross on the left in the chip */
+.ng-select.ng-select-multiple .ng-select-container .ng-value-container .ng-value .ng-value-icon {
+  display: inline-block;
+  padding: 1px 5px;
+  cursor: pointer;
+}
+
+.ng-select.ng-select-multiple .ng-select-container .ng-value-container .ng-value .ng-value-icon:hover {
+  background-color: rgb(82%, 90.8941176471%, 100%);
+}
+
+.ng-select.ng-select-multiple .ng-select-container .ng-value-container .ng-value .ng-value-icon.left {
+  border-right: 1px solid rgb(72%, 85.8352941176%, 100%);
+}
+
+.ng-select.ng-select-multiple .ng-select-container .ng-value-container .ng-input {
+  flex: 1;
+  z-index: 2;
+  padding: 0 0 3px 3px;
+}
+
+.ng-select.ng-select-multiple .ng-select-container .ng-value-container .ng-input > input {
+  color: #000000;
+}
+
+/* locked: chip with gray outline, without cross */
+.ng-select.ng-select-multiple.ng-select-disabled > .ng-select-container .ng-value-container .ng-value {
+  background-color: #f9f9f9;
+  border: 1px solid rgb(90%, 90%, 90%);
+}
+
+.ng-select.ng-select-multiple.ng-select-disabled > .ng-select-container .ng-value-container .ng-value .ng-value-label {
+  padding: 0 5px;
+}
+
+.ng-select.ng-select-multiple.ng-select-disabled > .ng-select-container .ng-value-container .ng-value .ng-value-icon {
+  display: none;
+}
+
+/* ---- Clear cross ---- */
+
+.ng-select .ng-clear-wrapper {
+  position: relative;
+  width: 17px;
+  color: #999999;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.ng-select .ng-clear-wrapper:focus {
+  outline: none;
+}
+
+.ng-select .ng-clear-wrapper .ng-clear {
+  display: inline-block;
+  font-size: 18px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.ng-select .ng-clear-wrapper:hover .ng-clear,
+.ng-select .ng-clear-wrapper:focus .ng-clear {
+  color: #d0021b;
+}
+
+/* ---- Arrow (triangle made of border) ---- */
+
+.ng-select .ng-arrow-wrapper {
+  position: relative;
+  width: 25px;
+  padding-right: 5px;
+  text-align: center;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.ng-select.ng-select-disabled .ng-arrow-wrapper {
+  cursor: default;
+}
+
+.ng-select .ng-arrow-wrapper .ng-arrow {
+  position: relative;
+  display: inline-block;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  border-style: solid;
+  border-width: 5px 5px 2.5px;
+  border-color: #999999 rgba(0, 0, 0, 0) rgba(0, 0, 0, 0);
+}
+
+/* open: triangle points up */
+.ng-select.ng-select-opened > .ng-select-container .ng-arrow {
+  top: -2px;
+  border-width: 0 5px 5px;
+  border-color: rgba(0, 0, 0, 0) rgba(0, 0, 0, 0) #999999;
+}
+
+.ng-select.ng-select-opened > .ng-select-container .ng-arrow:hover {
+  border-color: rgba(0, 0, 0, 0) rgba(0, 0, 0, 0) #333333;
+}
+
+/* same weight as "open": must come after it */
+.ng-select .ng-arrow-wrapper:hover .ng-arrow {
+  border-top-color: #666666;
+}
+
+/* ---- Dropdown list ---- */
+
+/* invisible until the panel gets its inline style opacity: 1 */
+.ng-dropdown-panel {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  opacity: 0;
+  background-color: #ffffff;
+  border: 1px solid #ccc;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
+}
+
+.cdk-overlay-pane .ng-dropdown-panel {
+  position: relative;
+  inset: auto;
+}
+
+/* connects to the field with 1px overlap */
+.ng-dropdown-panel.ng-select-bottom {
+  margin-top: -1px;
+  border-top-color: rgb(90%, 90%, 90%);
+  border-bottom-right-radius: var(--ng-select-border-radius, 4px);
+  border-bottom-left-radius: var(--ng-select-border-radius, 4px);
+}
+
+.ng-dropdown-panel.ng-select-top {
+  margin-bottom: -1px;
+  border-bottom-color: rgb(90%, 90%, 90%);
+  border-top-right-radius: var(--ng-select-border-radius, 4px);
+  border-top-left-radius: var(--ng-select-border-radius, 4px);
+}
+
+.ng-dropdown-panel .ng-dropdown-panel-items {
+  display: block;
+  box-sizing: border-box;
+  height: auto;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+/* same element as the list: scroll vertically only */
+.ng-dropdown-panel .scroll-host {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  overflow-y: auto;
+}
+
+/* ---- Entries ---- */
+
+.ng-dropdown-panel .ng-dropdown-panel-items .ng-option {
+  display: block;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  color: rgba(0, 0, 0, 0.87);
+  background-color: #ffffff;
+}
+
+/* empty label keeps row height */
+.ng-dropdown-panel .ng-dropdown-panel-items .ng-option .ng-option-label:empty::before {
+  content: "\200b";
+}
+
+.ng-dropdown-panel.ng-select-bottom .ng-dropdown-panel-items .ng-option:last-child {
+  border-bottom-right-radius: var(--ng-select-border-radius, 4px);
+  border-bottom-left-radius: var(--ng-select-border-radius, 4px);
+}
+
+.ng-dropdown-panel.ng-select-top .ng-dropdown-panel-items .ng-option:first-child {
+  border-top-right-radius: var(--ng-select-border-radius, 4px);
+  border-top-left-radius: var(--ng-select-border-radius, 4px);
+}
+
+.ng-dropdown-panel .ng-dropdown-panel-items .ng-option.ng-option-selected,
+.ng-dropdown-panel .ng-dropdown-panel-items .ng-option.ng-option-selected.ng-option-marked {
+  color: #333;
+  background-color: rgb(92%, 95.9529411765%, 100%);
+}
+
+.ng-dropdown-panel .ng-dropdown-panel-items .ng-option.ng-option-selected .ng-option-label,
+.ng-dropdown-panel .ng-dropdown-panel-items .ng-option.ng-option-selected.ng-option-marked .ng-option-label {
+  font-weight: 600;
+}
+
+.ng-dropdown-panel .ng-dropdown-panel-items .ng-option.ng-option-marked {
+  background-color: rgb(96%, 97.9764705882%, 100%);
+  color: #333;
+}
+
+.ng-dropdown-panel .ng-dropdown-panel-items .ng-option.ng-option-disabled {
+  color: #cccccc;
+}
+
+/* ---- screen readers only ---- */
+
+.ng-visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  border: 0;
+  white-space: nowrap;
+}
+
+/* ---- Precedence as before ----
+   The color rules above used to be in the global stylesheet before these global adjustments.
+   Now they come later; these copies (same selectors) keep the old result. */
+
+.paperless-input-select .ng-select .ng-select-container .ng-value-container .ng-input {
+  top: 7px;
+}
+
+.paperless-input-tags .ng-select.ng-select-multiple .ng-select-container .ng-value-container .ng-value {
+  background-color: transparent;
+  border-color: transparent;
+}
+
+.ng-select .ng-select-container .ng-value-container .ng-input > input:focus {
+  color: var(--bs-body-color);
+}
+
+[data-bs-theme="dark"] .ng-select-multiple .ng-select-container .ng-value-container .ng-value {
+  background-color: var(--pr-bg-alt);
+  color: var(--bs-body-color);
+}
+
+[data-bs-theme="dark"] .ng-select-multiple .ng-select-container .ng-value-container .ng-value .ng-value-icon.left {
+  border-color: var(--pr-bg-alt);
+}

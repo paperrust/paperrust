@@ -1,0 +1,85 @@
+# cargo-fuzz targets for the file readers and parsers (docs/RELEASE-GATE.md section 4).
+# Own workspace (not part of the main workspace), same CARGO_TARGET_DIR.
+#   CARGO_TARGET_DIR=…/target cargo +nightly fuzz run <target> -s none -a -- -max_total_time=…
+# Procedure and evaluation: fuzz/run.sh, result results/release/security/fuzz/.
+[package]
+name = "paperrust-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+license = "GPL-3.0-only"
+
+[package.metadata]
+cargo-fuzz = true
+
+[workspace]
+members = [".", "sancov-coff"]
+
+[dependencies]
+libfuzzer-sys = "0.4"
+sancov-coff = { path = "sancov-coff" }
+pl-parsers = { path = "../crates/pl-parsers" }
+pl-ocr = { path = "../crates/pl-ocr" }
+pl-docfilter = { path = "../crates/pl-docfilter" }
+pl-authz = { path = "../crates/pl-authz" }
+pl-core = { path = "../crates/pl-core" }
+pl-templating = { path = "../crates/pl-templating" }
+pl-cli = { path = "../crates/pl-cli" }
+chrono = "0.4"
+chrono-tz = "0.10"
+sea-query = "*"
+serde_json = "1"
+futures = "0.3"
+tempfile = "3"
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "pdf_text"
+path = "fuzz_targets/pdf_text.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "office"
+path = "fuzz_targets/office.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "mail"
+path = "fuzz_targets/mail.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "image"
+path = "fuzz_targets/image.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "zip_import"
+path = "fuzz_targets/zip_import.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "docfilter"
+path = "fuzz_targets/docfilter.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "templating"
+path = "fuzz_targets/templating.rs"
+test = false
+doc = false
+bench = false

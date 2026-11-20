@@ -1,0 +1,5 @@
+/* Message <ngb-toast> (Toast.svelte): own element, therefore display as block. */
+
+ngb-toast {
+  display: block;
+}

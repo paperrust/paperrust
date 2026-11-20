@@ -1,0 +1,22 @@
+{
+  "django": {
+    "status": 400,
+    "body": {
+      "document": [
+        "File type application/octet-stream not supported"
+      ]
+    },
+    "plan": [],
+    "files": {}
+  },
+  "rust": {
+    "status": 400,
+    "body": {
+      "document": [
+        "File type application/octet-stream not supported"
+      ]
+    },
+    "plan": [],
+    "files": {}
+  }
+}

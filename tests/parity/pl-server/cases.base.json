@@ -1,0 +1,210 @@
+{
+ "crate": "pl-server",
+ "generated_by": "tests/parity/harness/gen_base_catalog.py (do not edit; add cases.json instead)",
+ "vars": {},
+ "cases": [
+  {
+   "id": "server.api-root",
+   "route": "api.root",
+   "method": "GET",
+   "path": "/api/",
+   "users": [
+    "admin",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "none"
+   ]
+  },
+  {
+   "id": "server.schema",
+   "route": "schema",
+   "method": "GET",
+   "path": "/api/schema/",
+   "users": [
+    "admin",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "compare": "status+headers"
+  },
+  {
+   "id": "server.schema-view",
+   "route": "schema.view",
+   "method": "GET",
+   "path": "/api/schema/view/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "compare": "status+headers"
+  },
+  {
+   "id": "server.favicon",
+   "route": "favicon",
+   "method": "GET",
+   "path": "/favicon.ico",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "server.assets",
+   "route": "assets",
+   "method": "GET",
+   "path": "/assets/logo.svg",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "server.index",
+   "route": "index",
+   "method": "GET",
+   "path": "/",
+   "users": [
+    "anon",
+    "admin@session"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "compare": "status+headers"
+  },
+  {
+   "id": "server.index-deep",
+   "route": "index",
+   "method": "GET",
+   "path": "/documents/1/details",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "compare": "status+headers"
+  },
+  {
+   "id": "server.accounts-login",
+   "route": "accounts.login",
+   "method": "GET",
+   "path": "/accounts/login/",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "server.unknown-api",
+   "route": "api.unknown",
+   "method": "GET",
+   "path": "/api/does_not_exist/",
+   "users": [
+    "admin",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "server.unknown-api-deep",
+   "route": "api.unknown",
+   "method": "GET",
+   "path": "/api/documents/1/does_not_exist/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "server.trailing-slash",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "server.options",
+   "route": "documents.list",
+   "method": "OPTIONS",
+   "path": "/api/documents/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "server.head",
+   "route": "documents.list",
+   "method": "HEAD",
+   "path": "/api/documents/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "server.admin",
+   "route": "admin",
+   "method": "GET",
+   "path": "/admin/",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "compare": "status+headers"
+  },
+  {
+   "id": "server.headless-config",
+   "route": "auth.headless",
+   "method": "GET",
+   "path": "/api/auth/headless/browser/v1/config",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "server.ws-plain-get",
+   "route": "ws.status",
+   "method": "GET",
+   "path": "/ws/status/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "compare": "status"
+  }
+ ]
+}

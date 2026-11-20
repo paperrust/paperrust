@@ -1,0 +1,16 @@
+/* Home page: grid of main column and side column (Dashboard.svelte). */
+
+.dashboard-grid {
+  padding-bottom: 2rem;
+}
+
+/* Side column sticks below the header bar */
+.col-sidebar .row {
+  top: 4.75rem;
+}
+
+@media (min-width: 1200px) {
+  .dashboard-main {
+    padding-right: 1rem;
+  }
+}

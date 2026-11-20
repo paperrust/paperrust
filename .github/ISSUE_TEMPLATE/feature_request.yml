@@ -1,0 +1,35 @@
+name: Feature request
+description: Suggest an improvement or a new feature.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do, and what makes it hard today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How could PaperRust solve it?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Workarounds or other solutions you considered.
+  - type: dropdown
+    id: ngx
+    attributes:
+      label: Does paperless-ngx have this feature?
+      options:
+        - "No"
+        - "Yes – PaperRust behaves differently or lacks it"
+        - "I don't know"
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context

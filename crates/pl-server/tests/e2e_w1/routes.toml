@@ -1,0 +1,68 @@
+# PaperRust route switch (owned by the server agent / coordinator).
+#
+# Each Rust route has a stable id (see `routes()` of the crates and docs/contract/*.md).
+# Value: "rust" = served by PaperRust, "django" = proxied to Django (the default).
+# Unknown ids are a startup error. Activate a route only when its parity diff is 0.
+#
+# Example:
+#   "tags.list" = "rust"
+
+[routes]
+
+# Wave 1, read paths with proven parity (coordinator 2026-11-08). Write paths follow after the harness write run.
+"correspondents.list" = "rust"
+"correspondents.retrieve" = "rust"
+"document_types.list" = "rust"
+"document_types.retrieve" = "rust"
+"tags.list" = "rust"
+"tags.retrieve" = "rust"
+"storage_paths.list" = "rust"
+"storage_paths.retrieve" = "rust"
+"workflows.list" = "rust"
+"workflows.retrieve" = "rust"
+"workflow_triggers.list" = "rust"
+"workflow_triggers.retrieve" = "rust"
+"workflow_actions.list" = "rust"
+"workflow_actions.retrieve" = "rust"
+"mail_accounts.list" = "rust"
+"mail_accounts.retrieve" = "rust"
+"mail_rules.list" = "rust"
+"mail_rules.retrieve" = "rust"
+"processed_mail.list" = "rust"
+"processed_mail.retrieve" = "rust"
+"custom_fields.list" = "rust"
+"custom_fields.retrieve" = "rust"
+"saved_views.list" = "rust"
+"saved_views.retrieve" = "rust"
+"share_links.list" = "rust"
+"share_links.retrieve" = "rust"
+"logs.list" = "rust"
+"logs.retrieve" = "rust"
+"statistics.get" = "rust"
+"config.list" = "rust"
+"config.retrieve" = "rust"
+"tasks.list" = "rust"
+"tasks.retrieve" = "rust"
+"tasks.summary" = "rust"
+"tasks.status_counts" = "rust"
+"tasks.active" = "rust"
+"users.list" = "rust"
+"users.retrieve" = "rust"
+"groups.list" = "rust"
+"groups.retrieve" = "rust"
+"profile.get" = "rust"
+"ui_settings.get" = "rust"
+
+# Documents, read (coder 3b: 1745/1746 identical; more_like_id is delegated to Django)
+"documents.list" = "rust"
+"documents.retrieve" = "rust"
+"documents.root" = "rust"
+"documents.notes.list" = "rust"
+"documents.share_links" = "rust"
+"documents.history" = "rust"
+"documents.next_asn" = "rust"
+"documents.selection_data" = "rust"
+"trash.list" = "rust"
+
+# W1 E2E
+"documents.post_document" = "rust"

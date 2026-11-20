@@ -1,0 +1,18 @@
+From: Heidi <heidi@example.org>
+Subject: Signed message with a rather long subject so that folding would normally apply here
+Date: Mon, 13 Jan 2025 15:00:00 +0100
+Content-Type: multipart/signed; protocol="application/pgp-signature"; micalg=pgp-sha256; boundary="sig"
+
+--sig
+Content-Type: text/plain
+X-Very-Long-Inner-Header: one two three four five six seven eight nine ten eleven twelve thirteen
+
+signed text
+--sig
+Content-Type: application/pgp-signature; name="signature.asc"
+Content-Disposition: attachment; filename="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+xyz
+-----END PGP SIGNATURE-----
+--sig--

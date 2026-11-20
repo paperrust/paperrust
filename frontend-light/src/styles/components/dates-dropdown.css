@@ -1,0 +1,37 @@
+/* Date filter in the filter bar (DatesDropdown.svelte). */
+
+.date-dropdown {
+  --bs-dropdown-min-width: 22rem;
+  white-space: nowrap;
+}
+
+/* Checkmark column of the quick selection */
+.selected-icon {
+  min-width: 1em;
+  min-height: 1em;
+}
+
+.select-item .selected-icon {
+  line-height: 2em;
+}
+
+.input-group-sm .form-control {
+  font-size: 0.875rem;
+}
+
+/* Icon changes on hover/focus */
+.focus-variants .variant-focused,
+.focus-variants:hover .variant-unfocused,
+.focus-variants:focus .variant-unfocused {
+  display: none;
+}
+
+.focus-variants:hover .variant-focused,
+.focus-variants:focus .variant-focused {
+  display: block;
+}
+
+/* Footer of the calendar (Today / Close) */
+.btn-group-xs > .btn {
+  border-radius: 0.15rem;
+}

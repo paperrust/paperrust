@@ -1,0 +1,22 @@
+{
+  "django": {
+    "status": 400,
+    "body": {
+      "degrees": [
+        "degrees must be a multiple of 90"
+      ]
+    },
+    "plan": [],
+    "files": {}
+  },
+  "rust": {
+    "status": 400,
+    "body": {
+      "degrees": [
+        "degrees must be a multiple of 90"
+      ]
+    },
+    "plan": [],
+    "files": {}
+  }
+}

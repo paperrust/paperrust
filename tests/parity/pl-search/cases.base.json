@@ -1,0 +1,314 @@
+{
+ "crate": "pl-search",
+ "generated_by": "tests/parity/harness/gen_base_catalog.py (do not edit; add cases.json instead)",
+ "vars": {
+  "doc_id": {
+   "get": "/api/documents/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1,
+    "fields": "id"
+   }
+  },
+  "tag_id": {
+   "get": "/api/tags/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1
+   }
+  }
+ },
+ "cases": [
+  {
+   "id": "search.global",
+   "route": "search.global",
+   "method": "GET",
+   "path": "/api/search/",
+   "query": {
+    "query": "a"
+   },
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "search.global.db_only",
+   "route": "search.global",
+   "method": "GET",
+   "path": "/api/search/",
+   "query": {
+    "query": "a",
+    "db_only": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "search.global.short",
+   "route": "search.global",
+   "method": "GET",
+   "path": "/api/search/",
+   "query": {
+    "query": "a"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "search.global.missing",
+   "route": "search.global",
+   "method": "GET",
+   "path": "/api/search/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "search.global.long",
+   "route": "search.global",
+   "method": "GET",
+   "path": "/api/search/",
+   "query": {
+    "query": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "search.autocomplete",
+   "route": "search.autocomplete",
+   "method": "GET",
+   "path": "/api/search/autocomplete/",
+   "query": {
+    "term": "a"
+   },
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "search.autocomplete.limit",
+   "route": "search.autocomplete",
+   "method": "GET",
+   "path": "/api/search/autocomplete/",
+   "query": {
+    "term": "th",
+    "limit": 5
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "search.autocomplete.limit-invalid",
+   "route": "search.autocomplete",
+   "method": "GET",
+   "path": "/api/search/autocomplete/",
+   "query": {
+    "term": "th",
+    "limit": "x"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "search.autocomplete.missing",
+   "route": "search.autocomplete",
+   "method": "GET",
+   "path": "/api/search/autocomplete/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "search.documents.query",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "query": "the",
+    "page": 1,
+    "page_size": 25,
+    "truncate_content": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "search.documents.query-ordering-score",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "query": "the",
+    "ordering": "-score"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "search.documents.query-page2",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "query": "a",
+    "page": 2,
+    "page_size": 5
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "search.documents.query-syntax-error",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "query": "title:("
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "search.documents.query-date-range",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "query": "created:[2020 to"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "search.documents.more_like",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "more_like_id": "${doc_id}",
+    "page": 1,
+    "page_size": 10
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "search.documents.more_like-unknown",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "more_like_id": 999999999
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "search.documents.more_like-invalid",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "more_like_id": "abc"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "search.documents.query-with-filter",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "query": "a",
+    "tags__id__all": "${tag_id}"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  }
+ ]
+}

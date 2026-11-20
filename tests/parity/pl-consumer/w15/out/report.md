@@ -1,0 +1,5 @@
+# W15-Parität
+gleich: 344, bekannt: 2, Unterschiede: 0
+
+- **known** doc/9002.content: upstream `"Dies ist ein born-digital PDF mit ausreichend Text, um die Grenze von fuenfzig Zeichen sicher zu\r\nueberschreiten. Rechnung vom 06.01.2025."` vs rust `"Dies ist ein born-digital PDF mit ausreichend Text, um die Grenze von fuenfzig Zeichen sicher zu\nueberschreiten. Rechnung vom 06.01.2025."` – PDF-Textebene: pdftotext der Windows-Referenz liefert \r\n-Zeilenenden, pl-parsers \n (Textextraktion, nicht Aufgabenlogik; wie pl-consumer-Fälle barcode_asn)
+- **known** audit/9002: upstream `[[1, "2026-11-05 W15 pdf", {"content": ["old pdf", "Dies ist ein born-digital PDF mit ausreichend Text, um die Grenze von fuenfzig Zeichen sicher zu\r\nueberschreiten. Rechnung vom 06.01.2025."]}, {"reason": "Update document content"}]]` vs rust `[[1, "2026-11-05 W15 pdf", {"content": ["old pdf", "Dies ist ein born-digital PDF mit ausreichend Text, um die Grenze von fuenfzig Zeichen sicher zu\nueberschreiten. Rechnung vom 06.01.2025."]}, {"reason": "Update document content"}]]` – Folge von content

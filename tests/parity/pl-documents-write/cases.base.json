@@ -1,0 +1,468 @@
+{
+ "crate": "pl-documents-write",
+ "generated_by": "tests/parity/harness/gen_base_catalog.py (do not edit; add cases.json instead)",
+ "vars": {
+  "doc_id": {
+   "get": "/api/documents/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1,
+    "fields": "id"
+   }
+  },
+  "doc_id_last": {
+   "get": "/api/documents/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "-id",
+    "page_size": 1,
+    "fields": "id"
+   }
+  },
+  "tag_id": {
+   "get": "/api/tags/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1
+   }
+  }
+ },
+ "cases": [
+  {
+   "id": "trash.list.default",
+   "route": "trash.list",
+   "method": "GET",
+   "path": "/api/trash/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "trash.list.page1",
+   "route": "trash.list",
+   "method": "GET",
+   "path": "/api/trash/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "trash.list.listall",
+   "route": "trash.list",
+   "method": "GET",
+   "path": "/api/trash/",
+   "query": {
+    "page": 1,
+    "page_size": 100000
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "trash.list.page2",
+   "route": "trash.list",
+   "method": "GET",
+   "path": "/api/trash/",
+   "query": {
+    "page": 2,
+    "page_size": 1
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "trash.list.page-too-high",
+   "route": "trash.list",
+   "method": "GET",
+   "path": "/api/trash/",
+   "query": {
+    "page": 99999,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "trash.list.page-invalid",
+   "route": "trash.list",
+   "method": "GET",
+   "path": "/api/trash/",
+   "query": {
+    "page": "abc"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "trash.list.page-zero",
+   "route": "trash.list",
+   "method": "GET",
+   "path": "/api/trash/",
+   "query": {
+    "page": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "trash.list.page-size-invalid",
+   "route": "trash.list",
+   "method": "GET",
+   "path": "/api/trash/",
+   "query": {
+    "page_size": "x"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "trash.list.page-size-zero",
+   "route": "trash.list",
+   "method": "GET",
+   "path": "/api/trash/",
+   "query": {
+    "page_size": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "trash.list.page-size-huge",
+   "route": "trash.list",
+   "method": "GET",
+   "path": "/api/trash/",
+   "query": {
+    "page_size": 10000000
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "trash.list.ordering-unknown",
+   "route": "trash.list",
+   "method": "GET",
+   "path": "/api/trash/",
+   "query": {
+    "ordering": "does_not_exist"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "trash.list.auth",
+   "route": "trash.list",
+   "method": "GET",
+   "path": "/api/trash/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "anon",
+    "badtoken",
+    "inactive",
+    "admin@session",
+    "admin@basic"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "trash.list.apiver",
+   "route": "trash.list",
+   "method": "GET",
+   "path": "/api/trash/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "none",
+    "99",
+    "abc"
+   ]
+  },
+  {
+   "id": "documents_write.post_document.get",
+   "route": "documents.post_document",
+   "method": "GET",
+   "path": "/api/documents/post_document/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents_write.bulk_edit.get",
+   "route": "documents.bulk_edit",
+   "method": "GET",
+   "path": "/api/documents/bulk_edit/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents_write.bulk_edit.invalid",
+   "route": "documents.bulk_edit",
+   "method": "POST",
+   "path": "/api/documents/bulk_edit/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "json": {
+    "documents": [],
+    "method": "nope",
+    "parameters": {}
+   }
+  },
+  {
+   "id": "documents_write.bulk_edit.missing",
+   "route": "documents.bulk_edit",
+   "method": "POST",
+   "path": "/api/documents/bulk_edit/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "json": {}
+  },
+  {
+   "id": "documents_write.delete.invalid",
+   "route": "documents.delete",
+   "method": "POST",
+   "path": "/api/documents/delete/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "json": {
+    "documents": "x"
+   }
+  },
+  {
+   "id": "documents_write.rotate.invalid",
+   "route": "documents.rotate",
+   "method": "POST",
+   "path": "/api/documents/rotate/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "json": {
+    "documents": [
+     999999999
+    ],
+    "degrees": 45
+   }
+  },
+  {
+   "id": "documents_write.merge.invalid",
+   "route": "documents.merge",
+   "method": "POST",
+   "path": "/api/documents/merge/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "json": {}
+  },
+  {
+   "id": "documents_write.email.invalid",
+   "route": "documents.email",
+   "method": "POST",
+   "path": "/api/documents/email/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "json": {}
+  },
+  {
+   "id": "documents_write.trash.invalid-action",
+   "route": "trash.action",
+   "method": "POST",
+   "path": "/api/trash/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "json": {
+    "action": "nope"
+   }
+  },
+  {
+   "id": "documents_write.patch-title",
+   "route": "documents.partial_update",
+   "method": "GET",
+   "path": "/api/documents/${doc_id}/",
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PATCH",
+     "path": "/api/documents/${doc_id}/",
+     "json": {
+      "title": "parity patched"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/api/documents/${doc_id}/",
+     "query": {
+      "full_perms": "true"
+     }
+    }
+   ]
+  },
+  {
+   "id": "documents_write.bulk-add-tag",
+   "route": "documents.bulk_edit",
+   "method": "GET",
+   "path": "/api/documents/bulk_edit/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/documents/bulk_edit/",
+     "json": {
+      "documents": [
+       "${doc_id}"
+      ],
+      "method": "add_tag",
+      "parameters": {
+       "tag": "${tag_id}"
+      }
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/api/documents/${doc_id}/"
+    }
+   ]
+  },
+  {
+   "id": "documents_write.delete-to-trash",
+   "route": "documents.destroy",
+   "method": "GET",
+   "path": "/api/documents/${doc_id_last}/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "DELETE",
+     "path": "/api/documents/${doc_id_last}/"
+    },
+    {
+     "method": "GET",
+     "path": "/api/trash/",
+     "query": {
+      "page": 1,
+      "page_size": 25
+     }
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,24 @@
+{#- External login (OIDC): one POST form per provider. `sso_auto`: submit the first form immediately. -#}
+{%- if socialaccount_providers %}
+    {%- if not DISABLE_REGULAR_LOGIN %}
+    <div class="divider">{{ t("auth.login.or_external") }}</div>
+    {%- endif %}
+    <ul class="providers">
+      {%- for provider in socialaccount_providers %}
+      <li>
+        <form {% if loop.first %}id="social-login" {% endif %}method="post" action="{{ provider.href }}">
+          {{ csrf_input }}
+          <button type="submit" class="btn btn-quiet">{{ provider.name }}</button>
+        </form>
+      </li>
+      {%- endfor %}
+    </ul>
+    {%- if sso_auto and REDIRECT_LOGIN_TO_SSO and GET.loggedout != "1" %}
+    <script>
+      (function () {
+        var form = document.getElementById("social-login");
+        if (form) { form.submit(); }
+      })();
+    </script>
+    {%- endif %}
+{%- endif %}

@@ -1,0 +1,46 @@
+[package]
+name = "pl-guard"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+# Protection against ransomware (docs/contract/pl-guard.md, docs/user/ransomware.md):
+# * guard for the media folder (file system events + sampling), read-only mode, alarm
+# * encrypted, deduplicated backups (local/network share or S3 with Object Lock), restore
+[dependencies]
+pl-core.workspace = true
+pl-authz.workspace = true
+pl-queue.workspace = true
+pl-accounts.workspace = true
+axum.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+chrono.workspace = true
+tracing.workspace = true
+futures.workspace = true
+sha2.workspace = true
+hmac.workspace = true
+base64.workspace = true
+flate2.workspace = true
+reqwest.workspace = true
+quick-xml.workspace = true
+percent-encoding.workspace = true
+url.workspace = true
+bytes.workspace = true
+tokio-util.workspace = true
+rand.workspace = true
+tempfile.workspace = true
+# Not in [workspace.dependencies] (CORE-REQUEST), pinned to fixed versions:
+# age: encryption of the backup (X25519 + ChaCha20-Poly1305, passphrase via scrypt), MIT OR Apache-2.0
+age = { version = "=0.11.1", default-features = false }
+# notify: File system events (inotify/ReadDirectoryChangesW/kqueue), CC0-1.0
+notify.workspace = true
+# md-5: Content-MD5 for S3 PUTs with Object Lock (required by AWS), MIT OR Apache-2.0
+md-5 = "=0.10.6"
+
+[dev-dependencies]
+tower = { workspace = true, features = ["util"] }
+http-body-util.workspace = true

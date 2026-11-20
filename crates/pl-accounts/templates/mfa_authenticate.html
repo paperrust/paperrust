@@ -1,0 +1,18 @@
+{% extends "layout.html" %}
+{% set page_title = t("auth.page.mfa") %}
+{% block body %}
+    <p class="muted">{{ t("auth.mfa.intro") }}</p>
+    <form id="form-account" method="post">
+      {{ csrf_input }}
+      <div class="field">
+        <label for="inputCode">{{ t("auth.field.code") }}</label>
+        <input type="text" name="code" id="inputCode" autocomplete="one-time-code" autocorrect="off" autocapitalize="none" spellcheck="false" required autofocus>
+      </div>
+      <button class="btn" type="submit">{{ t("auth.mfa.submit") }}</button>
+      <button class="btn btn-quiet" type="submit" form="logout-from-stage">{{ t("auth.mfa.cancel") }}</button>
+    </form>
+    <form id="logout-from-stage" method="post" action="{{ urls.account_logout }}">
+      <input type="hidden" name="next" value="{{ urls.account_login }}">
+      {{ csrf_input }}
+    </form>
+{% endblock %}

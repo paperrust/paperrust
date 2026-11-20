@@ -1,0 +1,22 @@
+{
+  "django": {
+    "status": 400,
+    "body": {
+      "password": [
+        "This field is required."
+      ]
+    },
+    "plan": [],
+    "files": {}
+  },
+  "rust": {
+    "status": 400,
+    "body": {
+      "password": [
+        "This field is required."
+      ]
+    },
+    "plan": [],
+    "files": {}
+  }
+}

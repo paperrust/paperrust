@@ -1,0 +1,92 @@
+# PaperRust – parity run against paperless-ngx v3.4.2 (manual).
+#
+# Sets up the reference in containers (scripts/parity-reference-docker.sh):
+#   - official image ghcr.io/paperless-ngx/paperless-ngx:3.4.2, web server only (granian, no Celery
+#     worker – tasks are not executed, as in the Windows reference)
+#   - PostgreSQL 18 and Valkey as containers, bound to 127.0.0.1 only
+#   - deterministic test data from reference/seed.py, full-text index, snapshot for write cases
+# Then PaperRust (debug build) runs standalone next to it on :8080 (Valkey only serves the reference)
+# and the harness compares A (Django) with B (PaperRust): tests/parity/harness/run_parity.py.
+#
+# Differences to the Windows reference (reference/README.md): Linux instead of Windows (paths,
+# server_os, glibc collation en_US.utf8 instead of ICU en-US), uvloop, official image instead of a
+# venv. Deviations caused only by this are not PaperRust bugs – if needed, add a rule with a reason
+# to tests/parity/accepted.json.
+
+name: Parity
+
+on:
+  workflow_dispatch:
+    inputs:
+      crate:
+        description: "Only these catalogues (tests/parity/<crate>), empty = all"
+        required: false
+        default: ""
+      writes:
+        description: "Run write cases (snapshot reset between A and B)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  parity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - run: rustup toolchain install --profile minimal
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: parity
+      - name: Build PaperRust (debug)
+        run: cargo build --locked -p pl-server --bin paperrust
+      - name: Start reference (paperless-ngx v3.4.2 + PostgreSQL 18 + Valkey)
+        run: bash scripts/parity-reference-docker.sh up
+      - name: Start PaperRust (B)
+        run: |
+          eval "$(bash scripts/parity-reference-docker.sh env)"
+          mkdir -p results/logs
+          nohup target/debug/paperrust serve > results/logs/parity-b.log 2>&1 < /dev/null &
+          echo $! > results/logs/parity-b.pid
+          for _ in $(seq 1 60); do
+            curl -sf http://127.0.0.1:8080/__rs/health && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:8080/__rs/health
+      - name: Harness
+        env:
+          # inputs only via the environment (no expressions directly in the script)
+          IN_CRATE: ${{ inputs.crate }}
+          IN_WRITES: ${{ inputs.writes }}
+        run: |
+          eval "$(bash scripts/parity-reference-docker.sh env)"
+          args=(--results-dir results/parity/ci)
+          if [[ -n "$IN_CRATE" ]]; then args+=(--crate "$IN_CRATE"); fi
+          if [[ "$IN_WRITES" != "true" ]]; then args+=(--no-write); fi
+          python3 tests/parity/harness/run_parity.py "${args[@]}"
+      - name: Logs
+        if: always()
+        run: |
+          docker logs --tail 200 prref-web || true
+          tail -n 200 results/logs/parity-b.log || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: parity-results
+          path: |
+            results/parity/ci/
+            results/logs/parity-b.log
+          retention-days: 14
+      - name: Clean up
+        if: always()
+        run: |
+          kill "$(cat results/logs/parity-b.pid)" 2>/dev/null || true
+          bash scripts/parity-reference-docker.sh down

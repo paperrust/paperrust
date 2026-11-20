@@ -1,0 +1,6 @@
+/* Notice box <ngb-alert> (MailAccountEditDialog, UploadStatusTray, WelcomeWidget):
+   own element, therefore display as block. */
+
+ngb-alert {
+  display: block;
+}

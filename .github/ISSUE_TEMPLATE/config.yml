@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/paperrust/paperrust/blob/main/SECURITY.md
+    about: Please do not open public issues for security problems – follow SECURITY.md to report privately.
+  - name: Documentation
+    url: https://github.com/paperrust/paperrust/blob/main/docs/user/en/README.md
+    about: Installation, switching from paperless-ngx, configuration and troubleshooting.
+  - name: Bugs in paperless-ngx
+    url: https://github.com/paperless-ngx/paperless-ngx/issues
+    about: PaperRust is independent; problems in paperless-ngx itself belong there.

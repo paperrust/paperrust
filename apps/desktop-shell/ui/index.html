@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PaperRust</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <img class="logo" src="logo.svg" alt="">
+    <h1>PaperRust</h1>
+
+    <section id="status-view">
+      <div class="spinner" aria-hidden="true"></div>
+      <p id="stage" role="status">Wird gestartet …</p>
+    </section>
+
+    <section id="error-view" hidden>
+      <h2 id="error-title">PaperRust konnte nicht starten</h2>
+      <p class="error" id="error" role="alert"></p>
+      <p class="advice" id="advice"></p>
+      <p class="hint">Details: <a href="#" id="log-link">Log öffnen</a> · <a href="#" id="logs-dir">Log-Ordner</a></p>
+      <div class="buttons">
+        <button type="button" id="quit" class="secondary">Beenden</button>
+        <button type="button" id="error-settings" class="secondary" hidden>Einstellungen</button>
+        <button type="button" id="retry">Erneut versuchen</button>
+      </div>
+    </section>
+
+    <section id="switch-view" hidden>
+      <h2>Umstieg von paperless-ngx</h2>
+      <p class="verdict"><span class="vbadge" id="switch-badge"></span> <span id="switch-title"></span></p>
+      <div class="spinner" id="switch-spinner" aria-hidden="true"></div>
+      <ul class="summary" id="switch-summary" role="status"></ul>
+      <p class="hint" id="switch-hint"></p>
+      <div class="buttons">
+        <button type="button" id="switch-report" class="secondary">Ganzen Bericht öffnen</button>
+        <button type="button" id="switch-open">PaperRust öffnen</button>
+      </div>
+    </section>
+
+    <section id="offline-view" hidden>
+      <h2>Server nicht erreichbar</h2>
+      <p><strong id="offline-profile"></strong> <span class="hint" id="offline-url"></span></p>
+      <p class="error" id="offline-error" role="alert"></p>
+      <p class="hint" id="offline-last"></p>
+      <p class="hint" id="offline-next" role="status"></p>
+      <div class="buttons">
+        <button type="button" id="offline-settings" class="secondary">Einstellungen</button>
+        <button type="button" id="offline-retry">Erneut versuchen</button>
+      </div>
+    </section>
+
+    <section id="sso-view" hidden>
+      <h2>Anmeldung über einen anderen Dienst</h2>
+      <p>Der Server möchte die Anmeldung an <strong id="sso-origin"></strong> weiterleiten (z.&nbsp;B. Single Sign-on).</p>
+      <p class="hint">Nur erlauben, wenn du diesen Anmeldedienst kennst. Die Erlaubnis gilt nur für dieses Server-Profil.</p>
+      <div class="buttons">
+        <button type="button" id="sso-cancel" class="secondary">Abbrechen</button>
+        <button type="button" id="sso-browser" class="secondary">Im Browser öffnen</button>
+        <button type="button" id="sso-allow">Erlauben</button>
+      </div>
+    </section>
+
+    <form id="setup-form" hidden autocomplete="off">
+      <h2 id="setup-title">Willkommen</h2>
+      <p id="setup-intro">Wie soll diese PaperRust-Installation beginnen?</p>
+
+      <fieldset id="mode-choice" class="choices">
+        <legend class="sr-only">Art der Einrichtung</legend>
+        <p class="group-title" id="group-local" hidden>Auf diesem Computer</p>
+        <label class="choice" id="choice-fresh"><input type="radio" name="mode" value="fresh" checked>
+          <span><strong>Neu beginnen</strong><small>Leeres Archiv, ohne Anmeldung auf diesem Computer.</small></span></label>
+        <label class="choice" id="choice-import"><input type="radio" name="mode" value="import">
+          <span><strong>paperless-ngx-Export importieren</strong><small>Ordner oder ZIP aus <code>document_exporter</code> – Dokumente, Benutzer, Tags …</small></span></label>
+        <label class="choice" id="choice-migrate" hidden><input type="radio" name="mode" value="migrate-db">
+          <span><strong>Bestehende Datenbank übernehmen</strong><small>SQLite, MariaDB/MySQL oder PostgreSQL von paperless-ngx 2.20 oder 3.x.</small></span></label>
+        <p class="group-title" id="group-remote" hidden>Oder</p>
+        <label class="choice" id="choice-remote" hidden><input type="radio" name="mode" value="remote">
+          <span><strong>Mit einem Server verbinden</strong><small>PaperRust- oder paperless-ngx-Server im Netz. Anmeldung und Oberfläche kommen vom Server, auf diesem Computer läuft keine Datenbank.</small></span></label>
+      </fieldset>
+
+      <div id="fields-fresh" class="fields">
+        <p class="hint">Kein Konto und kein Passwort nötig: PaperRust meldet dich auf diesem Computer automatisch an. Für den Zugriff von anderen Geräten im Netz kannst du später im Profil ein Passwort setzen.</p>
+      </div>
+
+      <div id="fields-import" class="fields" hidden>
+        <label>Export-Ordner oder ZIP-Datei
+          <input name="source_import" placeholder="C:\Users\…\paperless-export" spellcheck="false">
+        </label>
+        <p class="hint">Im Explorer: Ordner bzw. Datei mit Umschalt+Rechtsklick → „Als Pfad kopieren“ und hier einfügen. Die Benutzer aus dem Export melden sich danach mit ihren bisherigen Passwörtern an.</p>
+      </div>
+
+      <div id="fields-migrate" class="fields" hidden>
+        <label>Quell-Datenbank
+          <input name="source_db" placeholder="sqlite:///C:/paperless/data/db.sqlite3" spellcheck="false">
+        </label>
+        <label>Alter Medienordner (optional)
+          <input name="media" placeholder="C:\paperless\media" spellcheck="false">
+        </label>
+        <p class="hint">Die Quelle wird nur gelesen. Ohne Medienordner fehlen die Dateien, bis sie nach <code>media\</code> im Datenordner kopiert sind. Bei paperless-ngx 2.x braucht PaperRust den Medienordner auch, um die Prüfsummen neu zu berechnen.</p>
+      </div>
+
+      <div id="fields-remote" class="fields" hidden>
+        <label>Adresse des Servers
+          <input name="server_url" placeholder="https://paperrust.example.ch" spellcheck="false" inputmode="url">
+        </label>
+        <label>Name (optional)
+          <input name="profile_name" maxlength="60" placeholder="z. B. Büro">
+        </label>
+        <p class="hint" id="remote-info" hidden></p>
+        <div id="http-confirm" class="confirm" hidden>
+          <p class="warn" id="http-message"></p>
+          <label class="check"><input type="checkbox" name="allow_http"> Ich verstehe das Risiko – unverschlüsselt verbinden</label>
+        </div>
+        <div id="tls-confirm" class="confirm" hidden>
+          <p class="warn" id="tls-message"></p>
+          <dl class="cert">
+            <dt>Ausgestellt für</dt><dd id="cert-subject"></dd>
+            <dt>Ausgestellt von</dt><dd id="cert-issuer"></dd>
+            <dt>Gültig bis</dt><dd id="cert-until"></dd>
+            <dt>SHA-256-Fingerabdruck</dt><dd><code id="cert-fp"></code></dd>
+          </dl>
+          <p class="hint">Vergleiche den Fingerabdruck mit dem auf dem Server (z.&nbsp;B. <code>openssl x509 -noout -fingerprint -sha256 -in cert.pem</code>). Stimmt er, vertraut PaperRust genau diesem Zertifikat – nur für dieses Profil, ohne Eintrag im Zertifikatsspeicher von Windows. Ändert es sich, wird die Verbindung abgelehnt. Besser ist ein Zertifikat einer bekannten Stelle (z.&nbsp;B. Let’s Encrypt).</p>
+          <label class="check"><input type="checkbox" name="tls_ok"> Fingerabdruck verglichen – diesem Zertifikat vertrauen</label>
+        </div>
+      </div>
+
+      <p class="error" id="form-error" role="alert"></p>
+      <div class="buttons">
+        <button type="button" id="cancel" class="secondary">Abbrechen</button>
+        <button type="submit" id="submit">Einrichten</button>
+      </div>
+    </form>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

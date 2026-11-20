@@ -1,0 +1,52 @@
+{
+  "django": {
+    "status": 400,
+    "body": {
+      "operations": {
+        "0": {
+          "page": [
+            "Ensure this value is greater than or equal to 1."
+          ],
+          "rotate": [
+            "rotate must be a multiple of 90"
+          ],
+          "doc": [
+            "Ensure this value is greater than or equal to 0."
+          ]
+        },
+        "1": {
+          "non_field_errors": [
+            "Invalid data. Expected a dictionary, but got str."
+          ]
+        }
+      }
+    },
+    "plan": [],
+    "files": {}
+  },
+  "rust": {
+    "status": 400,
+    "body": {
+      "operations": {
+        "0": {
+          "page": [
+            "Ensure this value is greater than or equal to 1."
+          ],
+          "rotate": [
+            "rotate must be a multiple of 90"
+          ],
+          "doc": [
+            "Ensure this value is greater than or equal to 0."
+          ]
+        },
+        "1": {
+          "non_field_errors": [
+            "Invalid data. Expected a dictionary, but got str."
+          ]
+        }
+      }
+    },
+    "plan": [],
+    "files": {}
+  }
+}

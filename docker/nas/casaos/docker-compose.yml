@@ -1,0 +1,157 @@
+# PaperRust – CasaOS-App (Format des CasaOS-AppStore: compose + x-casaos).
+# Installieren: CasaOS -> App Store -> "Benutzerdefinierte Installation" (+) -> Import -> diese Datei,
+# dann die mit "ÄNDERN" markierten Werte setzen. Anleitung: docker/nas/README.md
+# CasaOS setzt $PUID, $PGID, $TZ und $AppID selbst ein. Image-Name: docker/nas/set-image.sh <image>.
+name: paperrust
+
+services:
+  paperrust:
+    image: ghcr.io/paperrust/paperrust:latest
+    container_name: paperrust
+    restart: unless-stopped
+    depends_on:
+      paperrust-db:
+        condition: service_healthy
+    # startet als root, übernimmt PUID/PGID, gibt die Rechte danach ab
+    user: "0:0"
+    ports:
+      - target: 8000
+        published: "8000"
+        protocol: tcp
+    volumes:
+      - type: bind
+        source: /DATA/AppData/$AppID/data
+        target: /usr/src/paperless/data
+      - type: bind
+        source: /DATA/AppData/$AppID/media
+        target: /usr/src/paperless/media
+      - type: bind
+        source: /DATA/AppData/$AppID/consume
+        target: /usr/src/paperless/consume
+      - type: bind
+        source: /DATA/AppData/$AppID/export
+        target: /usr/src/paperless/export
+    environment:
+      PUID: $PUID
+      PGID: $PGID
+      PAPERRUST_TIME_ZONE: $TZ
+      PAPERRUST_SECRET_KEY: change-me-long-random-string   # ÄNDERN
+      PAPERRUST_DBHOST: paperrust-db
+      PAPERRUST_DBNAME: paperless
+      PAPERRUST_DBUSER: paperless
+      PAPERRUST_DBPASS: change-me-db-password             # ÄNDERN (wie POSTGRES_PASSWORD)
+      PAPERRUST_ADMIN_USER: admin
+      PAPERRUST_ADMIN_PASSWORD: change-me-admin-password  # ÄNDERN
+      PAPERRUST_OCR_LANGUAGE: deu+eng
+      PAPERRUST_CONSUMER_POLLING_INTERVAL: "10"
+    stop_grace_period: 45s
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/paperrust-healthcheck"]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 5
+    x-casaos:
+      envs:
+        - container: PAPERRUST_SECRET_KEY
+          description:
+            en_us: Long random string (keep the same value when moving from paperless-ngx)
+            de_de: Lange Zufallszeichenkette (beim Umstieg von paperless-ngx denselben Wert)
+        - container: PAPERRUST_DBPASS
+          description:
+            en_us: Database password (same as POSTGRES_PASSWORD of paperrust-db)
+            de_de: Datenbank-Passwort (wie POSTGRES_PASSWORD von paperrust-db)
+        - container: PAPERRUST_ADMIN_USER
+          description:
+            en_us: First administrator (created on start if missing)
+            de_de: Erster Administrator (wird beim Start angelegt, falls er fehlt)
+        - container: PAPERRUST_ADMIN_PASSWORD
+          description:
+            en_us: Password of the first administrator
+            de_de: Passwort des ersten Administrators
+        - container: PAPERRUST_OCR_LANGUAGE
+          description:
+            en_us: OCR languages (image contains eng deu fra ita spa)
+            de_de: OCR-Sprachen (im Image eng deu fra ita spa)
+      ports:
+        - container: "8000"
+          description:
+            en_us: Web UI
+            de_de: Weboberfläche
+      volumes:
+        - container: /usr/src/paperless/data
+          description:
+            en_us: Search index, classifier, logs
+            de_de: Suchindex, Klassifikator, Protokolle
+        - container: /usr/src/paperless/media
+          description:
+            en_us: Documents (originals, archive, thumbnails)
+            de_de: Dokumente (Originale, Archiv, Vorschaubilder)
+        - container: /usr/src/paperless/consume
+          description:
+            en_us: Consumption folder (scanner drop)
+            de_de: Eingangsordner (Scanner)
+        - container: /usr/src/paperless/export
+          description:
+            en_us: Backup export (document_exporter)
+            de_de: Sicherungs-Export (document_exporter)
+
+  paperrust-db:
+    image: docker.io/library/postgres:17
+    container_name: paperrust-db
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: /DATA/AppData/$AppID/pgdata
+        target: /var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: paperless
+      POSTGRES_USER: paperless
+      POSTGRES_PASSWORD: change-me-db-password            # ÄNDERN (wie PAPERRUST_DBPASS)
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paperless -d paperless"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    x-casaos:
+      envs:
+        - container: POSTGRES_PASSWORD
+          description:
+            en_us: Database password
+            de_de: Datenbank-Passwort
+
+x-casaos:
+  architectures:
+    - amd64
+    - arm64
+  main: paperrust
+  index: /
+  port_map: "8000"
+  scheme: http
+  store_app_id: paperrust
+  category: Documents
+  author: PaperRust
+  developer: PaperRust
+  icon: https://raw.githubusercontent.com/paperrust/paperrust/main/docs/design/assets/png/icon-512.png
+  tagline:
+    en_us: Fast, lean paperless-ngx replacement – scan, OCR, search your documents
+    de_de: Schneller, schlanker paperless-ngx-Ersatz – Dokumente scannen, erkennen, finden
+  description:
+    en_us: |
+      PaperRust is a drop-in replacement for paperless-ngx v3.4.2 (same web UI, API and database)
+      in one container instead of five: no Redis, Tika or Gotenberg – only PostgreSQL.
+      Update: in CasaOS, open the app settings and pull the new image (or "Check then update").
+    de_de: |
+      PaperRust ersetzt paperless-ngx v3.4.2 (gleiche Oberfläche, API und Datenbank) mit einem
+      Container statt fünf: kein Redis, Tika oder Gotenberg – nur PostgreSQL.
+      Aktualisieren: in CasaOS die App-Einstellungen öffnen und das neue Image laden.
+  title:
+    en_us: PaperRust
+  tips:
+    before_install:
+      en_us: |
+        Change PAPERRUST_SECRET_KEY, both database passwords (they must match) and
+        PAPERRUST_ADMIN_PASSWORD before installing.
+      de_de: |
+        Vor der Installation PAPERRUST_SECRET_KEY, beide Datenbank-Passwörter (müssen gleich sein)
+        und PAPERRUST_ADMIN_PASSWORD ändern.

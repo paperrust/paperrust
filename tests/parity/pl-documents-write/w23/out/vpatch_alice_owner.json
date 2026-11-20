@@ -1,0 +1,26 @@
+{
+  "django": {
+    "status": 200,
+    "body": {
+      "id": 203,
+      "added": "2025-11-02T08:21:00Z",
+      "version_label": "Alice",
+      "checksum": "fde1bc6a6521659d117d402b36c994af5bb0ccb4e814c42d4ad26dd6a3649ee9",
+      "is_root": false
+    },
+    "plan": [],
+    "files": {}
+  },
+  "rust": {
+    "status": 200,
+    "body": {
+      "id": 203,
+      "added": "2025-11-02T08:21:00Z",
+      "version_label": "Alice",
+      "checksum": "fde1bc6a6521659d117d402b36c994af5bb0ccb4e814c42d4ad26dd6a3649ee9",
+      "is_root": false
+    },
+    "plan": [],
+    "files": {}
+  }
+}

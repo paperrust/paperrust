@@ -1,0 +1,11 @@
+[package]
+name = "pl-envlive"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+# Process-wide overlay of the environment with the values saved in the UI
+# (docs/SETTINGS.md §2.1, §8). No dependencies, so that lightweight crates (pl-ocr, pl-pdfops,
+# pl-templating) can also read live without pulling in pl-core.
+[dependencies]

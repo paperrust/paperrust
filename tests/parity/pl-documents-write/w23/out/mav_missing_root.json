@@ -1,0 +1,22 @@
+{
+  "django": {
+    "status": 400,
+    "body": {
+      "root_document_id": [
+        "This field is required."
+      ]
+    },
+    "plan": [],
+    "files": {}
+  },
+  "rust": {
+    "status": 400,
+    "body": {
+      "root_document_id": [
+        "This field is required."
+      ]
+    },
+    "plan": [],
+    "files": {}
+  }
+}

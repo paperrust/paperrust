@@ -1,0 +1,1360 @@
+{
+ "crate": "pl-fields-views",
+ "cases": [
+  {
+   "id": "w2.cf.create.all-types",
+   "route": "custom_fields.create",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/custom_fields/",
+     "json": {
+      "name": "w2-string",
+      "data_type": "string"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/custom_fields/",
+     "json": {
+      "name": "w2-url",
+      "data_type": "url"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/custom_fields/",
+     "json": {
+      "name": "w2-date",
+      "data_type": "date"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/custom_fields/",
+     "json": {
+      "name": "w2-boolean",
+      "data_type": "boolean"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/custom_fields/",
+     "json": {
+      "name": "w2-integer",
+      "data_type": "integer"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/custom_fields/",
+     "json": {
+      "name": "w2-float",
+      "data_type": "float"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/custom_fields/",
+     "json": {
+      "name": "w2-monetary",
+      "data_type": "monetary"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/custom_fields/",
+     "json": {
+      "name": "w2-documentlink",
+      "data_type": "documentlink"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/custom_fields/",
+     "json": {
+      "name": "w2-longtext",
+      "data_type": "longtext"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/custom_fields/",
+     "json": {
+      "name": "w2-money-eur",
+      "data_type": "monetary",
+      "extra_data": {
+       "default_currency": "EUR"
+      }
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/custom_fields/",
+     "json": {
+      "name": "w2-money-bad",
+      "data_type": "monetary",
+      "extra_data": {
+       "default_currency": "EU"
+      }
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/custom_fields/",
+     "json": {
+      "name": "w2-money-null",
+      "data_type": "monetary",
+      "extra_data": {
+       "default_currency": null
+      }
+     }
+    },
+    {
+     "sql": "select id, name, data_type, extra_data, created from documents_customfield order by id"
+    },
+    {
+     "sql": "select l.id, l.action, ct.app_label || '.' || ct.model as model, l.object_pk, l.object_id, l.object_repr, l.changes, l.changes_text, l.actor_id, l.remote_addr, l.additional_data, l.timestamp, l.cid is not null as has_cid, l.actor_email, l.serialized_data from auditlog_logentry l join django_content_type ct on ct.id = l.content_type_id where l.id > 918 order by l.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.cf.create.validation",
+   "route": "custom_fields.create",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/custom_fields/",
+     "json": {
+      "name": "Invoice amount",
+      "data_type": "string"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/custom_fields/",
+     "json": {
+      "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "data_type": "string"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/custom_fields/",
+     "json": {
+      "name": "nt"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/custom_fields/",
+     "json": {
+      "name": "sel-empty",
+      "data_type": "select",
+      "extra_data": {
+       "select_options": []
+      }
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/custom_fields/",
+     "json": {
+      "name": "sel-dupe",
+      "data_type": "select",
+      "extra_data": {
+       "select_options": [
+        {
+         "label": "A",
+         "id": "x"
+        },
+        {
+         "label": "B",
+         "id": "x"
+        }
+       ]
+      }
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/custom_fields/",
+     "json": {
+      "name": "sel-nolabel",
+      "data_type": "select",
+      "extra_data": {
+       "select_options": [
+        {
+         "id": "x"
+        }
+       ]
+      }
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/custom_fields/",
+     "json": {
+      "name": "sel-strings",
+      "data_type": "select",
+      "extra_data": {
+       "select_options": [
+        "A",
+        "B"
+       ]
+      }
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/custom_fields/",
+     "json": {
+      "name": "sel-blank",
+      "data_type": "select",
+      "extra_data": {
+       "select_options": [
+        {
+         "label": ""
+        }
+       ]
+      }
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/custom_fields/",
+     "json": {
+      "name": "ed-list",
+      "data_type": "string",
+      "extra_data": [
+       1
+      ]
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/custom_fields/",
+     "data": "{bad",
+     "content_type": "application/json"
+    },
+    {
+     "sql": "select id, name, data_type, extra_data, created from documents_customfield order by id"
+    }
+   ]
+  },
+  {
+   "id": "w2.cf.create.form",
+   "route": "custom_fields.create",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/custom_fields/",
+     "form": {
+      "name": "w2-form",
+      "data_type": "integer"
+     }
+    },
+    {
+     "sql": "select id, name, data_type, extra_data, created from documents_customfield order by id"
+    }
+   ]
+  },
+  {
+   "id": "w2.cf.create.denied",
+   "route": "custom_fields.create",
+   "users": [
+    "user2",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/custom_fields/",
+     "json": {
+      "name": "w2-den",
+      "data_type": "string"
+     }
+    },
+    {
+     "sql": "select id, name, data_type, extra_data, created from documents_customfield order by id"
+    }
+   ]
+  },
+  {
+   "id": "w2.cf.update.state",
+   "route": "custom_fields.partial_update",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PATCH",
+     "path": "/api/custom_fields/1/",
+     "json": {
+      "name": "Renamed string"
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/custom_fields/1/",
+     "json": {
+      "data_type": "integer"
+     }
+    },
+    {
+     "method": "PUT",
+     "path": "/api/custom_fields/2/",
+     "json": {
+      "name": "url-put",
+      "data_type": "url"
+     }
+    },
+    {
+     "method": "PUT",
+     "path": "/api/custom_fields/2/",
+     "json": {
+      "name": "url-put2"
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/custom_fields/999/",
+     "json": {
+      "name": "nope"
+     }
+    },
+    {
+     "sql": "select id, name, data_type, extra_data, created from documents_customfield order by id"
+    },
+    {
+     "sql": "select l.id, l.action, ct.app_label || '.' || ct.model as model, l.object_pk, l.object_id, l.object_repr, l.changes, l.changes_text, l.actor_id, l.remote_addr, l.additional_data, l.timestamp, l.cid is not null as has_cid, l.actor_email, l.serialized_data from auditlog_logentry l join django_content_type ct on ct.id = l.content_type_id where l.id > 918 order by l.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.cf.update.select-options",
+   "route": "custom_fields.partial_update",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "GET",
+     "path": "/api/custom_fields/${cf_select_id}/"
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/custom_fields/${cf_select_id}/",
+     "json": {
+      "extra_data": {
+       "select_options": [
+        {
+         "label": "Only",
+         "id": "only-1"
+        }
+       ]
+      }
+     }
+    },
+    {
+     "sql": "select id, name, data_type, extra_data, created from documents_customfield order by id"
+    },
+    {
+     "sql": "select id, document_id, field_id, value_text, value_bool, value_url, value_date, value_int, value_float, value_monetary, value_document_ids, value_select, value_long_text, deleted_at from documents_customfieldinstance order by id"
+    },
+    {
+     "sql": "select id, task_type, trigger_source, status, owner_id, input_data from documents_paperlesstask where id > 12 order by id"
+    }
+   ]
+  },
+  {
+   "id": "w2.cf.update.monetary-currency",
+   "route": "custom_fields.partial_update",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/custom_fields/",
+     "json": {
+      "name": "w2-m",
+      "data_type": "monetary"
+     },
+     "capture": {
+      "m": "id"
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/custom_fields/${m}/",
+     "json": {
+      "extra_data": {
+       "default_currency": "CHF"
+      }
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/custom_fields/${m}/",
+     "json": {
+      "extra_data": {
+       "default_currency": "chf"
+      }
+     }
+    },
+    {
+     "sql": "select id, name, data_type, extra_data, created from documents_customfield order by id"
+    }
+   ]
+  },
+  {
+   "id": "w2.cf.update.denied",
+   "route": "custom_fields.partial_update",
+   "users": [
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PATCH",
+     "path": "/api/custom_fields/1/",
+     "json": {
+      "name": "hijack"
+     }
+    },
+    {
+     "sql": "select id, name, data_type, extra_data, created from documents_customfield order by id"
+    }
+   ]
+  },
+  {
+   "id": "w2.cf.destroy.state",
+   "route": "custom_fields.destroy",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "DELETE",
+     "path": "/api/custom_fields/7/"
+    },
+    {
+     "method": "DELETE",
+     "path": "/api/custom_fields/7/"
+    },
+    {
+     "method": "DELETE",
+     "path": "/api/custom_fields/5/"
+    },
+    {
+     "sql": "select id, name, data_type, extra_data, created from documents_customfield order by id"
+    },
+    {
+     "sql": "select id, document_id, field_id, value_text, value_bool, value_url, value_date, value_int, value_float, value_monetary, value_document_ids, value_select, value_long_text, deleted_at from documents_customfieldinstance order by id"
+    },
+    {
+     "sql": "select v.id, v.name, v.sort_field, v.sort_reverse, v.page_size, v.display_mode, v.display_fields, v.owner_id, v.icon, (select coalesce(json_agg(json_build_array(r.rule_type, r.value) order by r.id), '[]') from documents_savedviewfilterrule r where r.saved_view_id = v.id) as rules from documents_savedview v order by v.id"
+    },
+    {
+     "sql": "select l.id, l.action, ct.app_label || '.' || ct.model as model, l.object_pk, l.object_id, l.object_repr, l.changes, l.changes_text, l.actor_id, l.remote_addr, l.additional_data, l.timestamp, l.cid is not null as has_cid, l.actor_email, l.serialized_data from auditlog_logentry l join django_content_type ct on ct.id = l.content_type_id where l.id > 918 order by l.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.cf.destroy.denied",
+   "route": "custom_fields.destroy",
+   "users": [
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "DELETE",
+     "path": "/api/custom_fields/1/"
+    },
+    {
+     "sql": "select id, name, data_type, extra_data, created from documents_customfield order by id"
+    }
+   ]
+  },
+  {
+   "id": "w2.sv.create.state",
+   "route": "saved_views.create",
+   "users": [
+    "admin",
+    "user1",
+    "user2"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/saved_views/",
+     "json": {
+      "name": "w2-view",
+      "sort_field": "custom_field_1",
+      "sort_reverse": false,
+      "filter_rules": [
+       {
+        "rule_type": 6,
+        "value": "3"
+       },
+       {
+        "rule_type": 0,
+        "value": "abc"
+       }
+      ],
+      "display_fields": [
+       "title",
+       "custom_field_1",
+       "note"
+      ],
+      "display_mode": "table",
+      "page_size": 50,
+      "icon": "star"
+     }
+    },
+    {
+     "sql": "select v.id, v.name, v.sort_field, v.sort_reverse, v.page_size, v.display_mode, v.display_fields, v.owner_id, v.icon, (select coalesce(json_agg(json_build_array(r.rule_type, r.value) order by r.id), '[]') from documents_savedviewfilterrule r where r.saved_view_id = v.id) as rules from documents_savedview v order by v.id"
+    },
+    {
+     "sql": "select ct.model, o.object_pk, o.user_id as who, 'u' as kind, p.codename from guardian_userobjectpermission o join auth_permission p on p.id = o.permission_id join django_content_type ct on ct.id = o.content_type_id union all select ct.model, o.object_pk, o.group_id, 'g', p.codename from guardian_groupobjectpermission o join auth_permission p on p.id = o.permission_id join django_content_type ct on ct.id = o.content_type_id order by 1, 2, 4, 3, 5"
+    }
+   ]
+  },
+  {
+   "id": "w2.sv.create.set-permissions",
+   "route": "saved_views.create",
+   "users": [
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/saved_views/",
+     "json": {
+      "name": "w2-shared",
+      "sort_reverse": true,
+      "filter_rules": [],
+      "set_permissions": {
+       "view": {
+        "users": [
+         4
+        ],
+        "groups": [
+         2
+        ]
+       },
+       "change": {
+        "users": [],
+        "groups": [
+         1
+        ]
+       }
+      }
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/api/saved_views/",
+     "user": "user2"
+    },
+    {
+     "sql": "select v.id, v.name, v.sort_field, v.sort_reverse, v.page_size, v.display_mode, v.display_fields, v.owner_id, v.icon, (select coalesce(json_agg(json_build_array(r.rule_type, r.value) order by r.id), '[]') from documents_savedviewfilterrule r where r.saved_view_id = v.id) as rules from documents_savedview v order by v.id"
+    },
+    {
+     "sql": "select ct.model, o.object_pk, o.user_id as who, 'u' as kind, p.codename from guardian_userobjectpermission o join auth_permission p on p.id = o.permission_id join django_content_type ct on ct.id = o.content_type_id union all select ct.model, o.object_pk, o.group_id, 'g', p.codename from guardian_groupobjectpermission o join auth_permission p on p.id = o.permission_id join django_content_type ct on ct.id = o.content_type_id order by 1, 2, 4, 3, 5"
+    }
+   ]
+  },
+  {
+   "id": "w2.sv.create.owner",
+   "route": "saved_views.create",
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/saved_views/",
+     "json": {
+      "name": "w2-owner",
+      "sort_reverse": true,
+      "filter_rules": [],
+      "owner": 4
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/saved_views/",
+     "json": {
+      "name": "w2-owner-null",
+      "sort_reverse": true,
+      "filter_rules": [],
+      "owner": null
+     }
+    },
+    {
+     "sql": "select v.id, v.name, v.sort_field, v.sort_reverse, v.page_size, v.display_mode, v.display_fields, v.owner_id, v.icon, (select coalesce(json_agg(json_build_array(r.rule_type, r.value) order by r.id), '[]') from documents_savedviewfilterrule r where r.saved_view_id = v.id) as rules from documents_savedview v order by v.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.sv.create.validation",
+   "route": "saved_views.create",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/saved_views/",
+     "json": {
+      "name": "x"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/saved_views/",
+     "json": {
+      "sort_reverse": true,
+      "filter_rules": []
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/saved_views/",
+     "json": {
+      "name": "x",
+      "sort_reverse": true,
+      "filter_rules": [
+       {
+        "rule_type": 999,
+        "value": "1"
+       }
+      ]
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/saved_views/",
+     "json": {
+      "name": "x",
+      "sort_reverse": true,
+      "filter_rules": [
+       {
+        "value": "1"
+       }
+      ]
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/saved_views/",
+     "json": {
+      "name": "x",
+      "sort_reverse": true,
+      "filter_rules": "nope"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/saved_views/",
+     "json": {
+      "name": "x",
+      "sort_reverse": true,
+      "filter_rules": [],
+      "display_fields": [
+       "bogus"
+      ]
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/saved_views/",
+     "json": {
+      "name": "x",
+      "sort_reverse": true,
+      "filter_rules": [],
+      "display_fields": [
+       "custom_field_999"
+      ]
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/saved_views/",
+     "json": {
+      "name": "x",
+      "sort_reverse": true,
+      "filter_rules": [],
+      "display_mode": "huge"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/saved_views/",
+     "json": {
+      "name": "x",
+      "sort_reverse": true,
+      "filter_rules": [],
+      "page_size": -1
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/saved_views/",
+     "json": {
+      "name": "x",
+      "sort_reverse": true,
+      "filter_rules": [],
+      "page_size": 100001
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/saved_views/",
+     "json": {
+      "name": "x",
+      "sort_reverse": "maybe",
+      "filter_rules": []
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/saved_views/",
+     "json": {
+      "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "sort_reverse": true,
+      "filter_rules": []
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/saved_views/",
+     "json": {
+      "name": "x",
+      "sort_reverse": true,
+      "filter_rules": [],
+      "owner": 999
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/saved_views/",
+     "json": {
+      "name": "x",
+      "sort_reverse": true,
+      "filter_rules": [],
+      "set_permissions": {
+       "view": {
+        "users": [
+         999
+        ]
+       }
+      }
+     }
+    },
+    {
+     "sql": "select v.id, v.name, v.sort_field, v.sort_reverse, v.page_size, v.display_mode, v.display_fields, v.owner_id, v.icon, (select coalesce(json_agg(json_build_array(r.rule_type, r.value) order by r.id), '[]') from documents_savedviewfilterrule r where r.saved_view_id = v.id) as rules from documents_savedview v order by v.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.sv.create.denied",
+   "route": "saved_views.create",
+   "users": [
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/saved_views/",
+     "json": {
+      "name": "d",
+      "sort_reverse": true,
+      "filter_rules": []
+     }
+    },
+    {
+     "sql": "select v.id, v.name, v.sort_field, v.sort_reverse, v.page_size, v.display_mode, v.display_fields, v.owner_id, v.icon, (select coalesce(json_agg(json_build_array(r.rule_type, r.value) order by r.id), '[]') from documents_savedviewfilterrule r where r.saved_view_id = v.id) as rules from documents_savedview v order by v.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.sv.update.state",
+   "route": "saved_views.partial_update",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PATCH",
+     "path": "/api/saved_views/1/",
+     "json": {
+      "name": "Inbox 2",
+      "filter_rules": [
+       {
+        "rule_type": 3,
+        "value": "5"
+       }
+      ]
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/saved_views/2/",
+     "json": {
+      "display_fields": []
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/saved_views/4/",
+     "json": {
+      "page_size": null,
+      "sort_field": null
+     }
+    },
+    {
+     "method": "PUT",
+     "path": "/api/saved_views/5/",
+     "json": {
+      "name": "put",
+      "sort_reverse": false,
+      "filter_rules": []
+     }
+    },
+    {
+     "method": "PUT",
+     "path": "/api/saved_views/5/",
+     "json": {
+      "name": "put-incomplete"
+     }
+    },
+    {
+     "sql": "select v.id, v.name, v.sort_field, v.sort_reverse, v.page_size, v.display_mode, v.display_fields, v.owner_id, v.icon, (select coalesce(json_agg(json_build_array(r.rule_type, r.value) order by r.id), '[]') from documents_savedviewfilterrule r where r.saved_view_id = v.id) as rules from documents_savedview v order by v.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.sv.update.own",
+   "route": "saved_views.partial_update",
+   "users": [
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PATCH",
+     "path": "/api/saved_views/3/",
+     "json": {
+      "name": "Alice home 2",
+      "owner": 4
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/saved_views/3/",
+     "json": {
+      "name": "after-transfer"
+     }
+    },
+    {
+     "sql": "select v.id, v.name, v.sort_field, v.sort_reverse, v.page_size, v.display_mode, v.display_fields, v.owner_id, v.icon, (select coalesce(json_agg(json_build_array(r.rule_type, r.value) order by r.id), '[]') from documents_savedviewfilterrule r where r.saved_view_id = v.id) as rules from documents_savedview v order by v.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.sv.update.set-permissions",
+   "route": "saved_views.partial_update",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PATCH",
+     "path": "/api/saved_views/1/",
+     "json": {
+      "set_permissions": {
+       "view": {
+        "users": [
+         3
+        ],
+        "groups": []
+       },
+       "change": {
+        "users": [
+         3
+        ],
+        "groups": []
+       }
+      }
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/saved_views/1/",
+     "json": {
+      "name": "by-alice"
+     },
+     "user": "user1"
+    },
+    {
+     "sql": "select v.id, v.name, v.sort_field, v.sort_reverse, v.page_size, v.display_mode, v.display_fields, v.owner_id, v.icon, (select coalesce(json_agg(json_build_array(r.rule_type, r.value) order by r.id), '[]') from documents_savedviewfilterrule r where r.saved_view_id = v.id) as rules from documents_savedview v order by v.id"
+    },
+    {
+     "sql": "select ct.model, o.object_pk, o.user_id as who, 'u' as kind, p.codename from guardian_userobjectpermission o join auth_permission p on p.id = o.permission_id join django_content_type ct on ct.id = o.content_type_id union all select ct.model, o.object_pk, o.group_id, 'g', p.codename from guardian_groupobjectpermission o join auth_permission p on p.id = o.permission_id join django_content_type ct on ct.id = o.content_type_id order by 1, 2, 4, 3, 5"
+    }
+   ]
+  },
+  {
+   "id": "w2.sv.destroy.state",
+   "route": "saved_views.destroy",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "DELETE",
+     "path": "/api/saved_views/2/"
+    },
+    {
+     "method": "DELETE",
+     "path": "/api/saved_views/2/"
+    },
+    {
+     "sql": "select v.id, v.name, v.sort_field, v.sort_reverse, v.page_size, v.display_mode, v.display_fields, v.owner_id, v.icon, (select coalesce(json_agg(json_build_array(r.rule_type, r.value) order by r.id), '[]') from documents_savedviewfilterrule r where r.saved_view_id = v.id) as rules from documents_savedview v order by v.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.sv.destroy.own",
+   "route": "saved_views.destroy",
+   "users": [
+    "user1",
+    "user2"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "DELETE",
+     "path": "/api/saved_views/3/"
+    },
+    {
+     "method": "DELETE",
+     "path": "/api/saved_views/5/"
+    },
+    {
+     "sql": "select v.id, v.name, v.sort_field, v.sort_reverse, v.page_size, v.display_mode, v.display_fields, v.owner_id, v.icon, (select coalesce(json_agg(json_build_array(r.rule_type, r.value) order by r.id), '[]') from documents_savedviewfilterrule r where r.saved_view_id = v.id) as rules from documents_savedview v order by v.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.sl.create.state",
+   "route": "share_links.create",
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/share_links/",
+     "json": {
+      "document": 1,
+      "file_version": "archive"
+     },
+     "compare": "status"
+    },
+    {
+     "method": "POST",
+     "path": "/api/share_links/",
+     "json": {
+      "document": 1,
+      "expiration": "2030-05-01T12:00:00Z",
+      "file_version": "original"
+     },
+     "compare": "status"
+    },
+    {
+     "method": "POST",
+     "path": "/api/share_links/",
+     "json": {
+      "document": 1
+     },
+     "compare": "status"
+    },
+    {
+     "sql": "select id, deleted_at is not null as deleted, created, expiration, length(slug) as slug_len, file_version, document_id, owner_id from documents_sharelink order by id"
+    }
+   ]
+  },
+  {
+   "id": "w2.sl.create.validation",
+   "route": "share_links.create",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/share_links/",
+     "json": {}
+    },
+    {
+     "method": "POST",
+     "path": "/api/share_links/",
+     "json": {
+      "document": 1,
+      "file_version": "thumb"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/share_links/",
+     "json": {
+      "document": "x"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/share_links/",
+     "json": {
+      "document": 1,
+      "expiration": "soon"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/share_links/",
+     "json": {
+      "document": 196
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/share_links/",
+     "json": {
+      "document": 201
+     }
+    },
+    {
+     "sql": "select id, deleted_at is not null as deleted, created, expiration, length(slug) as slug_len, file_version, document_id, owner_id from documents_sharelink order by id"
+    }
+   ]
+  },
+  {
+   "id": "w2.sl.create.foreign",
+   "route": "share_links.create",
+   "users": [
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/share_links/",
+     "json": {
+      "document": 1
+     },
+     "compare": "status"
+    },
+    {
+     "sql": "select id, deleted_at is not null as deleted, created, expiration, length(slug) as slug_len, file_version, document_id, owner_id from documents_sharelink order by id"
+    }
+   ]
+  },
+  {
+   "id": "w2.sl.destroy.state",
+   "route": "share_links.destroy",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "DELETE",
+     "path": "/api/share_links/1/"
+    },
+    {
+     "method": "DELETE",
+     "path": "/api/share_links/1/"
+    },
+    {
+     "method": "DELETE",
+     "path": "/api/share_links/999/"
+    },
+    {
+     "method": "GET",
+     "path": "/api/share_links/"
+    },
+    {
+     "sql": "select id, deleted_at is not null as deleted, created, expiration, length(slug) as slug_len, file_version, document_id, owner_id from documents_sharelink order by id"
+    }
+   ]
+  },
+  {
+   "id": "w2.sl.destroy.foreign",
+   "route": "share_links.destroy",
+   "users": [
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "DELETE",
+     "path": "/api/share_links/1/"
+    },
+    {
+     "method": "DELETE",
+     "path": "/api/share_links/4/"
+    },
+    {
+     "method": "DELETE",
+     "path": "/api/share_links/5/"
+    },
+    {
+     "sql": "select id, deleted_at is not null as deleted, created, expiration, length(slug) as slug_len, file_version, document_id, owner_id from documents_sharelink order by id"
+    }
+   ]
+  },
+  {
+   "id": "w2.slb.create.state",
+   "route": "share_link_bundles.create",
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/share_link_bundles/",
+     "json": {
+      "document_ids": [
+       3,
+       1,
+       2
+      ],
+      "file_version": "original",
+      "expiration_days": 3
+     },
+     "compare": "status"
+    },
+    {
+     "sql": "select b.id, b.created, b.expiration, length(b.slug) as slug_len, b.file_version, b.status, b.size_bytes, b.last_error, b.file_path, b.built_at, b.owner_id, (select coalesce(array_agg(d.document_id order by d.document_id), '{}') from documents_sharelinkbundle_documents d where d.sharelinkbundle_id = b.id) as docs from documents_sharelinkbundle b order by b.id"
+    },
+    {
+     "sql": "select id, task_type, trigger_source, status, owner_id, input_data from documents_paperlesstask where id > 12 order by id"
+    }
+   ]
+  },
+  {
+   "id": "w2.slb.create.foreign",
+   "route": "share_link_bundles.create",
+   "users": [
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/share_link_bundles/",
+     "json": {
+      "document_ids": [
+       1,
+       999999
+      ]
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/share_link_bundles/",
+     "json": {
+      "document_ids": [
+       1
+      ]
+     }
+    },
+    {
+     "sql": "select b.id, b.created, b.expiration, length(b.slug) as slug_len, b.file_version, b.status, b.size_bytes, b.last_error, b.file_path, b.built_at, b.owner_id, (select coalesce(array_agg(d.document_id order by d.document_id), '{}') from documents_sharelinkbundle_documents d where d.sharelinkbundle_id = b.id) as docs from documents_sharelinkbundle b order by b.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.slb.destroy.rebuild",
+   "route": "share_link_bundles.destroy",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/share_link_bundles/",
+     "json": {
+      "document_ids": [
+       3
+      ]
+     },
+     "capture": {
+      "b": "id"
+     },
+     "compare": "status"
+    },
+    {
+     "method": "POST",
+     "path": "/api/share_link_bundles/${b}/rebuild/",
+     "compare": "status"
+    },
+    {
+     "method": "POST",
+     "path": "/api/share_link_bundles/${b}/rebuild/",
+     "user": "user2"
+    },
+    {
+     "method": "DELETE",
+     "path": "/api/share_link_bundles/${b}/",
+     "user": "user2"
+    },
+    {
+     "method": "DELETE",
+     "path": "/api/share_link_bundles/${b}/"
+    },
+    {
+     "method": "DELETE",
+     "path": "/api/share_link_bundles/${b}/"
+    },
+    {
+     "sql": "select b.id, b.created, b.expiration, length(b.slug) as slug_len, b.file_version, b.status, b.size_bytes, b.last_error, b.file_path, b.built_at, b.owner_id, (select coalesce(array_agg(d.document_id order by d.document_id), '{}') from documents_sharelinkbundle_documents d where d.sharelinkbundle_id = b.id) as docs from documents_sharelinkbundle b order by b.id"
+    },
+    {
+     "sql": "select id, task_type, trigger_source, status, owner_id, input_data from documents_paperlesstask where id > 12 order by id"
+    }
+   ]
+  }
+ ]
+}

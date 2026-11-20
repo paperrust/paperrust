@@ -1,0 +1,18 @@
+{
+  "django": {
+    "status": 415,
+    "body": {
+      "detail": "Unsupported media type \"application/json\" in request."
+    },
+    "plan": [],
+    "files": {}
+  },
+  "rust": {
+    "status": 415,
+    "body": {
+      "detail": "Unsupported media type \"application/json\" in request."
+    },
+    "plan": [],
+    "files": {}
+  }
+}

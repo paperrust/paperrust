@@ -1,0 +1,40 @@
+/* Progress display of the uploads at the bottom right (UploadStatusTray.svelte). */
+
+:host ::deep pngx-bs-icon svg {
+  margin-top: -3px;
+}
+
+/* List and card: above the content, slightly translucent */
+.consumer-status-list {
+  max-height: 60vh;
+  z-index: 1030;
+}
+
+.consumer-status-card {
+  background-color: rgba(var(--bs-body-bg-rgb), 0.95) !important;
+}
+
+/* per file a note with file name, progress lies as an area behind it */
+.alert-heading {
+  font-size: 80%;
+  font-weight: bold;
+}
+
+.progress {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: auto;
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+}
+
+.btn-open {
+  line-height: 1;
+}
+
+.btn-open pngx-bs-icon {
+  margin-top: -1px;
+}

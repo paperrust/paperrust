@@ -1,0 +1,34 @@
+{
+  "django": {
+    "status": 400,
+    "body": {
+      "degrees": [
+        "This field may not be null."
+      ],
+      "source_mode": [
+        "This field may not be null."
+      ],
+      "from_webui": [
+        "This field may not be null."
+      ]
+    },
+    "plan": [],
+    "files": {}
+  },
+  "rust": {
+    "status": 400,
+    "body": {
+      "degrees": [
+        "This field may not be null."
+      ],
+      "source_mode": [
+        "This field may not be null."
+      ],
+      "from_webui": [
+        "This field may not be null."
+      ]
+    },
+    "plan": [],
+    "files": {}
+  }
+}

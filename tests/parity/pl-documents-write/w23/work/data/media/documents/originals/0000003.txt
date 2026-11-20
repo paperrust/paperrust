@@ -1,0 +1,10 @@
+Bank Statement Swisscom 003
+Reference REF-00003
+From: Swisscom
+Apotheke Versicherung Zahlung Budget Strom Vermieter Lohn Reparatur Miete Jahresbericht Bestellung Mieter Miete Lieferung Zoll.
+Garantie Vertrag Gas Versicherung Police Saldo Überweisung Mahnung Garantie Sitzung fällig Zürich Rente.
+Mitgliedschaft Fahrzeug Vermieter Gemeinde Gemeinde Gemeinde Überweisung Gemeinde Vertrag Zahlung Darlehen Kündigung.
+Arzt Wasser Bestellung Garantie Mieter Vertrag.
+Krankenkasse Fahrzeug Grundstück Kontoauszug Zinsen Kontoauszug Rezept Kündigung.
+Arbeitgeber Gutschrift Grundstück Saldo Zürich Kaution Budget.
+Grundstück Rente fällig Budget Vermieter Strom Steuer Wasser Fahrzeug Protokoll.

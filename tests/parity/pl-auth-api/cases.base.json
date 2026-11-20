@@ -1,0 +1,1034 @@
+{
+ "crate": "pl-auth-api",
+ "generated_by": "tests/parity/harness/gen_base_catalog.py (do not edit; add cases.json instead)",
+ "vars": {
+  "group_id": {
+   "get": "/api/groups/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1
+   }
+  },
+  "user_id": {
+   "get": "/api/users/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1
+   }
+  }
+ },
+ "cases": [
+  {
+   "id": "users.list.default",
+   "route": "users.list",
+   "method": "GET",
+   "path": "/api/users/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "users.list.page1",
+   "route": "users.list",
+   "method": "GET",
+   "path": "/api/users/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "users.list.listall",
+   "route": "users.list",
+   "method": "GET",
+   "path": "/api/users/",
+   "query": {
+    "page": 1,
+    "page_size": 100000
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "users.list.page2",
+   "route": "users.list",
+   "method": "GET",
+   "path": "/api/users/",
+   "query": {
+    "page": 2,
+    "page_size": 1
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "users.list.page-too-high",
+   "route": "users.list",
+   "method": "GET",
+   "path": "/api/users/",
+   "query": {
+    "page": 99999,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "users.list.page-invalid",
+   "route": "users.list",
+   "method": "GET",
+   "path": "/api/users/",
+   "query": {
+    "page": "abc"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "users.list.page-zero",
+   "route": "users.list",
+   "method": "GET",
+   "path": "/api/users/",
+   "query": {
+    "page": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "users.list.page-size-invalid",
+   "route": "users.list",
+   "method": "GET",
+   "path": "/api/users/",
+   "query": {
+    "page_size": "x"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "users.list.page-size-zero",
+   "route": "users.list",
+   "method": "GET",
+   "path": "/api/users/",
+   "query": {
+    "page_size": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "users.list.page-size-huge",
+   "route": "users.list",
+   "method": "GET",
+   "path": "/api/users/",
+   "query": {
+    "page_size": 10000000
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "users.list.ordering-unknown",
+   "route": "users.list",
+   "method": "GET",
+   "path": "/api/users/",
+   "query": {
+    "ordering": "does_not_exist"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "users.list.ordering+username",
+   "route": "users.list",
+   "method": "GET",
+   "path": "/api/users/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "username"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "users.list.ordering-username",
+   "route": "users.list",
+   "method": "GET",
+   "path": "/api/users/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-username"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "users.list.full-perms",
+   "route": "users.list",
+   "method": "GET",
+   "path": "/api/users/",
+   "query": {
+    "full_perms": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "users.list.full-perms-0",
+   "route": "users.list",
+   "method": "GET",
+   "path": "/api/users/",
+   "query": {
+    "full_perms": "0"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "users.list.extra0",
+   "route": "users.list",
+   "method": "GET",
+   "path": "/api/users/",
+   "query": {
+    "username__icontains": "a"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "users.list.extra1",
+   "route": "users.list",
+   "method": "GET",
+   "path": "/api/users/",
+   "query": {
+    "username__iexact": "admin"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "users.list.auth",
+   "route": "users.list",
+   "method": "GET",
+   "path": "/api/users/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "anon",
+    "badtoken",
+    "inactive",
+    "admin@session",
+    "admin@basic"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "users.list.apiver",
+   "route": "users.list",
+   "method": "GET",
+   "path": "/api/users/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "none",
+    "99",
+    "abc"
+   ]
+  },
+  {
+   "id": "users.detail",
+   "route": "users.retrieve",
+   "method": "GET",
+   "path": "/api/users/${user_id}/",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "users.detail-unknown",
+   "route": "users.retrieve",
+   "method": "GET",
+   "path": "/api/users/999999999/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "users.detail-nonint",
+   "route": "users.retrieve",
+   "method": "GET",
+   "path": "/api/users/abc/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "users.detail-anon",
+   "route": "users.retrieve",
+   "method": "GET",
+   "path": "/api/users/${user_id}/",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "users.detail-noslash",
+   "route": "users.retrieve",
+   "method": "GET",
+   "path": "/api/users/${user_id}",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "follow": false
+  },
+  {
+   "id": "groups.list.default",
+   "route": "groups.list",
+   "method": "GET",
+   "path": "/api/groups/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "groups.list.page1",
+   "route": "groups.list",
+   "method": "GET",
+   "path": "/api/groups/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "groups.list.listall",
+   "route": "groups.list",
+   "method": "GET",
+   "path": "/api/groups/",
+   "query": {
+    "page": 1,
+    "page_size": 100000
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "groups.list.page2",
+   "route": "groups.list",
+   "method": "GET",
+   "path": "/api/groups/",
+   "query": {
+    "page": 2,
+    "page_size": 1
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "groups.list.page-too-high",
+   "route": "groups.list",
+   "method": "GET",
+   "path": "/api/groups/",
+   "query": {
+    "page": 99999,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "groups.list.page-invalid",
+   "route": "groups.list",
+   "method": "GET",
+   "path": "/api/groups/",
+   "query": {
+    "page": "abc"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "groups.list.page-zero",
+   "route": "groups.list",
+   "method": "GET",
+   "path": "/api/groups/",
+   "query": {
+    "page": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "groups.list.page-size-invalid",
+   "route": "groups.list",
+   "method": "GET",
+   "path": "/api/groups/",
+   "query": {
+    "page_size": "x"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "groups.list.page-size-zero",
+   "route": "groups.list",
+   "method": "GET",
+   "path": "/api/groups/",
+   "query": {
+    "page_size": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "groups.list.page-size-huge",
+   "route": "groups.list",
+   "method": "GET",
+   "path": "/api/groups/",
+   "query": {
+    "page_size": 10000000
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "groups.list.ordering-unknown",
+   "route": "groups.list",
+   "method": "GET",
+   "path": "/api/groups/",
+   "query": {
+    "ordering": "does_not_exist"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "groups.list.ordering+name",
+   "route": "groups.list",
+   "method": "GET",
+   "path": "/api/groups/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "name"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "groups.list.ordering-name",
+   "route": "groups.list",
+   "method": "GET",
+   "path": "/api/groups/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-name"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "groups.list.name-filter",
+   "route": "groups.list",
+   "method": "GET",
+   "path": "/api/groups/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "name",
+    "name__icontains": "a",
+    "full_perms": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "groups.list.name-filter-empty",
+   "route": "groups.list",
+   "method": "GET",
+   "path": "/api/groups/",
+   "query": {
+    "name__icontains": ""
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "groups.list.name-filter-unicode",
+   "route": "groups.list",
+   "method": "GET",
+   "path": "/api/groups/",
+   "query": {
+    "name__icontains": "ä"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "groups.list.name-iexact",
+   "route": "groups.list",
+   "method": "GET",
+   "path": "/api/groups/",
+   "query": {
+    "name__iexact": "A"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "groups.list.name-istartswith",
+   "route": "groups.list",
+   "method": "GET",
+   "path": "/api/groups/",
+   "query": {
+    "name__istartswith": "a"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "groups.list.name-iendswith",
+   "route": "groups.list",
+   "method": "GET",
+   "path": "/api/groups/",
+   "query": {
+    "name__iendswith": "e"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "groups.list.full-perms",
+   "route": "groups.list",
+   "method": "GET",
+   "path": "/api/groups/",
+   "query": {
+    "full_perms": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "groups.list.full-perms-0",
+   "route": "groups.list",
+   "method": "GET",
+   "path": "/api/groups/",
+   "query": {
+    "full_perms": "0"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "groups.list.auth",
+   "route": "groups.list",
+   "method": "GET",
+   "path": "/api/groups/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "anon",
+    "badtoken",
+    "inactive",
+    "admin@session",
+    "admin@basic"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "groups.list.apiver",
+   "route": "groups.list",
+   "method": "GET",
+   "path": "/api/groups/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "none",
+    "99",
+    "abc"
+   ]
+  },
+  {
+   "id": "groups.detail",
+   "route": "groups.retrieve",
+   "method": "GET",
+   "path": "/api/groups/${group_id}/",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "groups.detail-unknown",
+   "route": "groups.retrieve",
+   "method": "GET",
+   "path": "/api/groups/999999999/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "groups.detail-nonint",
+   "route": "groups.retrieve",
+   "method": "GET",
+   "path": "/api/groups/abc/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "groups.detail-anon",
+   "route": "groups.retrieve",
+   "method": "GET",
+   "path": "/api/groups/${group_id}/",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "groups.detail-noslash",
+   "route": "groups.retrieve",
+   "method": "GET",
+   "path": "/api/groups/${group_id}",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "follow": false
+  },
+  {
+   "id": "profile",
+   "route": "profile",
+   "method": "GET",
+   "path": "/api/profile/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "leak_allow": [
+    "token"
+   ]
+  },
+  {
+   "id": "profile.session",
+   "route": "profile",
+   "method": "GET",
+   "path": "/api/profile/",
+   "users": [
+    "admin@session",
+    "admin@basic"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "leak_allow": [
+    "token"
+   ]
+  },
+  {
+   "id": "profile.totp",
+   "route": "profile.totp",
+   "method": "GET",
+   "path": "/api/profile/totp/",
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "compare": "status"
+  },
+  {
+   "id": "profile.social_account_providers",
+   "route": "profile.social_account_providers",
+   "method": "GET",
+   "path": "/api/profile/social_account_providers/",
+   "users": [
+    "admin",
+    "user1",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "profile.generate_auth_token.get",
+   "route": "profile.generate_auth_token",
+   "method": "GET",
+   "path": "/api/profile/generate_auth_token/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "profile.disconnect_social_account.get",
+   "route": "profile.disconnect_social_account",
+   "method": "GET",
+   "path": "/api/profile/disconnect_social_account/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "ui_settings",
+   "route": "ui_settings",
+   "method": "GET",
+   "path": "/api/ui_settings/",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "ui_settings.session",
+   "route": "ui_settings",
+   "method": "GET",
+   "path": "/api/ui_settings/",
+   "users": [
+    "admin@session"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "token.get",
+   "route": "token",
+   "method": "GET",
+   "path": "/api/token/",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "token.bad-credentials",
+   "route": "token",
+   "method": "POST",
+   "path": "/api/token/",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "json": {
+    "username": "no-such-user",
+    "password": "wrong"
+   }
+  },
+  {
+   "id": "token.missing-fields",
+   "route": "token",
+   "method": "POST",
+   "path": "/api/token/",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "json": {}
+  },
+  {
+   "id": "ui_settings.auth",
+   "route": "ui_settings",
+   "method": "GET",
+   "path": "/api/ui_settings/",
+   "users": [
+    "anon",
+    "badtoken",
+    "inactive",
+    "admin@session",
+    "admin@basic"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "ui_settings.apiver",
+   "route": "ui_settings",
+   "method": "GET",
+   "path": "/api/ui_settings/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "none",
+    "99",
+    "abc"
+   ]
+  }
+ ]
+}

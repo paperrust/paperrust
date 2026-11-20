@@ -1,0 +1,6 @@
+/* Dialog "Share links" (ShareLinksDialog.svelte). */
+
+/* Hint "Copied!" next to the link */
+.copied-badge {
+  right: 15em;
+}

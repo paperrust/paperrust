@@ -1,0 +1,106 @@
+{
+  "django": {
+    "status": 200,
+    "body": "<uuid0>",
+    "plan": [
+      {
+        "kind": "task",
+        "task": {
+          "task": "documents.tasks.consume_file",
+          "args": [],
+          "kwargs": {
+            "input_doc": {
+              "source": 2,
+              "original_file": "<scratch>/kaputt.pdf",
+              "root_document_id": 8,
+              "original_path": null,
+              "mailrule_id": null,
+              "mime_type": "application/octet-stream"
+            },
+            "overrides": {
+              "filename": null,
+              "title": null,
+              "correspondent_id": null,
+              "document_type_id": null,
+              "tag_ids": null,
+              "storage_path_id": null,
+              "created": null,
+              "asn": null,
+              "owner_id": 2,
+              "view_users": null,
+              "view_groups": null,
+              "change_users": null,
+              "change_groups": null,
+              "custom_fields": null,
+              "skip_asn_if_exists": false,
+              "version_label": null,
+              "actor_id": 2,
+              "remote_ocr": false,
+              "barcodes": null
+            }
+          },
+          "trigger_source": "web_ui",
+          "link": [],
+          "link_error": []
+        }
+      }
+    ],
+    "files": {
+      "kaputt.pdf": {
+        "error": "PdfError"
+      }
+    }
+  },
+  "rust": {
+    "status": 200,
+    "body": "<uuid0>",
+    "plan": [
+      {
+        "kind": "task",
+        "task": {
+          "task": "documents.tasks.consume_file",
+          "args": [],
+          "kwargs": {
+            "input_doc": {
+              "source": 2,
+              "mime_type": "application/octet-stream",
+              "mailrule_id": null,
+              "original_file": "<scratch>/kaputt.pdf",
+              "original_path": null,
+              "root_document_id": 8
+            },
+            "overrides": {
+              "asn": null,
+              "title": null,
+              "created": null,
+              "tag_ids": null,
+              "actor_id": 2,
+              "barcodes": null,
+              "filename": null,
+              "owner_id": 2,
+              "remote_ocr": false,
+              "view_users": null,
+              "view_groups": null,
+              "change_users": null,
+              "change_groups": null,
+              "custom_fields": null,
+              "version_label": null,
+              "storage_path_id": null,
+              "correspondent_id": null,
+              "document_type_id": null,
+              "skip_asn_if_exists": false
+            }
+          },
+          "trigger_source": "web_ui",
+          "link": [],
+          "link_error": []
+        }
+      }
+    ],
+    "files": {
+      "kaputt.pdf": {
+        "error": "PdfError"
+      }
+    }
+  }
+}

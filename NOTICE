@@ -1,0 +1,80 @@
+PaperRust
+Copyright (C) 2026 the PaperRust contributors
+
+PaperRust basiert auf paperless-ngx (https://github.com/paperless-ngx/paperless-ngx), GPL-3.0,
+© die paperless-ngx-Autoren.
+PaperRust is based on paperless-ngx (https://github.com/paperless-ngx/paperless-ngx), GPL-3.0,
+(c) the paperless-ngx authors.
+
+paperless-ngx itself is based on paperless-ng and Paperless (GPL-3.0, (c) their respective authors).
+
+This program is free software: you can redistribute it and/or modify it under the terms of the
+GNU General Public License version 3 as published by the Free Software Foundation
+(SPDX: GPL-3.0-only). It is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+See the file LICENSE for the full license text.
+
+What PaperRust takes from paperless-ngx (v3.4.2, git submodule `upstream/`, unmodified):
+- behaviour and business logic, ported from Python to Rust (each ported file names its upstream
+  source in its header comment, see UPSTREAM_MAP.md),
+- the database schema (Django migrations), reproduced in crates/pl-dbmigrate/schema and crates/pl-cli,
+- the layout, styles and translation texts of its web UI (upstream/src-ui), which PaperRust's own
+  Svelte UI (frontend-light/) was modelled on; the Angular UI itself is no longer shipped
+  (retired 2026-11-13, see docs/FRONTEND-PARITY.md),
+- parts of the user documentation (docs/user/), adapted.
+
+The light web UI (frontend-light/) uses its own stylesheets, not those of paperless-ngx. It uses
+Bootstrap and Bootstrap Icons (MIT) as npm packages.
+
+PaperRust is an independent project. It is not affiliated with, endorsed by or supported by the
+paperless-ngx project or its authors. "Rust" is a trademark of the Rust Foundation; PaperRust is
+not endorsed by the Rust Foundation.
+
+PDF tools (crates/pl-pdftools, program paperrust-pdftool) use components of PdfCraft
+(https://github.com/storytold/pdfcraft, revision 0f22627bff6cde9930817e891290f653d882bbda),
+licensed MIT OR Apache-2.0, (c) the PdfCraft contributors: pdfcraft-cos, -redact, -optimize,
+-annot, -edit, -model and their internal dependencies, plus PdfCraft's patched copies of hayro-jbig2
+and hayro-syntax (vendor/ in the same repository; hayro: MIT OR Apache-2.0). They are used as
+unmodified git dependencies at that revision (not vendored here). PaperRust uses them under the
+MIT license terms (GPL-3.0 compatible). "PdfCraft", "ArtCraft" and their logos are trademarks of
+their owners; PaperRust is not affiliated with or endorsed by them.
+
+Office to PDF conversion (crates/pl-pdftools feature "office", program paperrust-pdftool) uses
+components of WordCraft (https://github.com/storytold/wordcraft, revision
+a4b898f820eb28626865292fd037a155e4a07aef), licensed MIT OR Apache-2.0, (c) 2026 ArtCraft Team and the
+WordCraft contributors: wordcraft-doc, -docx, -docbin (Word 97-2003 .doc), -formats, -pdf and their
+internal dependencies (wordcraft-geom, -fonts, -layout, -metafile), plus craft-pdf, craft-proof and the
+patched krilla from craft-libs (https://github.com/storytold/craft-libs, revisions
+6e03f65bf45181db77ba6229716e6624db9eb25b and 01315d9c92b5b0e69082d35ca56099461a1efd45, MIT OR
+Apache-2.0; krilla originally by the krilla authors, MIT OR Apache-2.0) and, for wordcraft-docbin, the
+craft-libs packages craft-doc-binary, craft-cfb, craft-codepage, craft-wordmodel, craft-math and
+craft-xml (revision 75c70fa6a786240eb853e6267e25fc445f510cd0, MIT OR Apache-2.0). Only the document model, the importers and the PDF export are used – not
+WordCraft's user interface. They are unmodified git dependencies at those revisions (not vendored);
+PaperRust uses them under the MIT license terms (GPL-3.0 compatible). The license texts are in
+crates/pl-pdftools/licenses/wordcraft/.
+WordCraft compiles in the fonts Source Sans 3, Source Serif 4 (Adobe), Inter (The Inter Project
+Authors) and JetBrains Mono (JetBrains) under the SIL Open Font License 1.1; their license texts are
+in crates/pl-pdftools/licenses/wordcraft/OFL-*.txt. "WordCraft", "ArtCraft" and their logos are
+trademarks of their owners; PaperRust is not affiliated with or endorsed by them and does not use
+their branding.
+
+HEIC/HEIF photos (crates/pl-pdftools feature "heif", program paperrust-pdftool) are decoded with
+craft-heif from craft-libs (https://github.com/storytold/craft-libs, revision
+6e03f65bf45181db77ba6229716e6624db9eb25b, MIT OR Apache-2.0), which uses heic-rs 0.1.4
+(https://crates.io/crates/heic-rs, MIT OR Apache-2.0, (c) the heic-rs authors), an independent
+implementation of HEIF (ISO/IEC 23008-12) and of the HEVC decoding process (ITU-T H.265) written from
+the published specifications. heic-rs does not grant any patent licence to the HEVC standard itself.
+Both are unmodified dependencies used under the MIT license terms (GPL-3.0 compatible); the heic-rs
+license text and its notice are in crates/pl-pdftools/licenses/heic-rs/, the craft-libs license text
+in crates/pl-pdftools/licenses/wordcraft/LICENSE-MIT-craft-libs.
+
+Relative date words in filters (crates/pl-docfilter/src/relative_dp_data.rs) are generated by
+tools/gen_relative_dateparser.py from the language data of dateparser 1.4.3
+(https://github.com/scrapinghub/dateparser, BSD-3-Clause, (c) Scrapinghub), which itself builds on
+Unicode CLDR data (Unicode License v3). The data is used unmodified in content and converted to Rust;
+the BSD-3-Clause and Unicode license texts apply to that file.
+
+Third-party components (Rust crates, and for the desktop app PostgreSQL, Tesseract, PDFium, Tauri)
+keep their own licenses. A complete THIRD-PARTY-NOTICES collection will be generated for releases
+(cargo about / cargo deny plus the license files of the bundled binaries, see docs/DESKTOP.md,
+section "Lizenzen").

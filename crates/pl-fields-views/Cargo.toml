@@ -1,0 +1,30 @@
+[package]
+name = "pl-fields-views"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+pl-core.workspace = true
+pl-authz.workspace = true
+# W14: build_share_link_bundle (worker) uses paths/file names/ZIP writer from pl-files
+pl-files.workspace = true
+tokio.workspace = true
+axum.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+sea-query.workspace = true
+sea-query-binder.workspace = true
+chrono.workspace = true
+chrono-tz.workspace = true
+rand.workspace = true
+uuid.workspace = true
+regex.workspace = true
+url.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tower.workspace = true
+reqwest.workspace = true

@@ -1,0 +1,22 @@
+{
+  "django": {
+    "status": 400,
+    "body": {
+      "non_field_errors": [
+        "documents is required unless all is true."
+      ]
+    },
+    "plan": [],
+    "files": {}
+  },
+  "rust": {
+    "status": 400,
+    "body": {
+      "non_field_errors": [
+        "documents is required unless all is true."
+      ]
+    },
+    "plan": [],
+    "files": {}
+  }
+}

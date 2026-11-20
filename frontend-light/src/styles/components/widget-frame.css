@@ -1,0 +1,36 @@
+/* Frame of a home page tile: card with header row (WidgetFrame.svelte). */
+
+/* Soft fade-in on appearance */
+@keyframes pr-entry-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.fade.show {
+  animation: pr-entry-fade 160ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade.show {
+    animation: none;
+  }
+}
+
+.card {
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--bs-border-color) 68%, transparent);
+}
+
+.card .card-header {
+  padding: 0.9rem 1rem;
+  border-bottom-color: color-mix(in srgb, var(--bs-border-color) 55%, transparent);
+}
+
+.card .card-body {
+  padding: 1rem;
+}
+
+/* Handle for moving */
+pngx-bs-icon {
+  cursor: move;
+}

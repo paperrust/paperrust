@@ -1,0 +1,37 @@
+/* One entry in the selection list of a filter menu (ToggleableDropdownButton.svelte). */
+
+/* Column for checkmark / dash / cross */
+.selected-icon {
+  min-width: 1em;
+  min-height: 1em;
+}
+
+/* Name, for nested tags indented per level */
+.name-cell {
+  padding-left: calc((var(--depth) - 2) * 1rem);
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Angle before sub-tags */
+.name-cell .indicator {
+  display: inline-block;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-left: 1px solid var(--bs-secondary);
+  border-bottom: 1px solid var(--bs-secondary);
+  margin-right: 0.25rem;
+  margin-left: 0.5rem;
+}
+
+pngx-tag {
+  font-size: 1rem;
+}
+
+/* Hit count on the right */
+.badge {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+}

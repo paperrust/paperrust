@@ -1,0 +1,18 @@
+{
+ "_doc": "pl-documents: akzeptierte Abweichungen. Format: tests/parity/harness/plharness/rules.py.",
+ "rules": [
+  {
+   "name": "next-asn-counts-trash",
+   "reason": "next_asn zählt den Papierkorb mit (MAX über alle Dokumente inkl. gelöschter), damit die vorgeschlagene ASN nicht mit einem Papierkorb-Dokument kollidiert. Seed: Papierkorb-Dokument 200 hat ASN 1200.",
+   "ref": "docs/contract/pl-documents.md#known-differences (11. next_asn zählt den Papierkorb mit)",
+   "case": "documents.next_asn@*",
+   "kind": [
+    "value"
+   ],
+   "path": "\\$",
+   "a": 1195,
+   "b": 1201,
+   "target": "b"
+  }
+ ]
+}

@@ -1,0 +1,1690 @@
+{
+ "upstream": "paperless-ngx v3.4.2",
+ "libmagic": 548,
+ "time_zone": "Europe/Zurich",
+ "supported_extensions": {
+  "no_tika": [
+   ".asm",
+   ".bat",
+   ".bmp",
+   ".c",
+   ".cc",
+   ".cod",
+   ".cpp",
+   ".cppm",
+   ".cs",
+   ".csh",
+   ".cshader",
+   ".csv",
+   ".cxx",
+   ".def",
+   ".dib",
+   ".doc",
+   ".docx",
+   ".dot",
+   ".dsh",
+   ".dshader",
+   ".eml",
+   ".filters",
+   ".fx",
+   ".gif",
+   ".gitattributes",
+   ".gitignore",
+   ".gitmodules",
+   ".gsh",
+   ".gshader",
+   ".h",
+   ".heic",
+   ".hh",
+   ".hlsl",
+   ".hlsli",
+   ".hpp",
+   ".hsh",
+   ".hshader",
+   ".hxx",
+   ".i",
+   ".idl",
+   ".inc",
+   ".inl",
+   ".ipp",
+   ".ixx",
+   ".jfif",
+   ".jpe",
+   ".jpeg",
+   ".jpg",
+   ".jsproj",
+   ".ksh",
+   ".lst",
+   ".mak",
+   ".map",
+   ".mht",
+   ".mhtml",
+   ".mk",
+   ".nws",
+   ".odg",
+   ".odh",
+   ".odl",
+   ".odp",
+   ".ods",
+   ".odt",
+   ".pdf",
+   ".pl",
+   ".png",
+   ".pot",
+   ".ppa",
+   ".pps",
+   ".ppsx",
+   ".ppt",
+   ".pptx",
+   ".psh",
+   ".pshader",
+   ".pwz",
+   ".rc",
+   ".rc2",
+   ".rct",
+   ".res",
+   ".rgs",
+   ".rtf",
+   ".s",
+   ".sln",
+   ".slnf",
+   ".slnx",
+   ".srf",
+   ".srt",
+   ".tif",
+   ".tiff",
+   ".tlh",
+   ".tli",
+   ".tt",
+   ".txt",
+   ".user",
+   ".vb",
+   ".vsh",
+   ".vshader",
+   ".webp",
+   ".wiz",
+   ".xlb",
+   ".xls",
+   ".xlsx"
+  ],
+  "tika": [
+   ".asm",
+   ".bat",
+   ".bmp",
+   ".c",
+   ".cc",
+   ".cod",
+   ".cpp",
+   ".cppm",
+   ".cs",
+   ".csh",
+   ".cshader",
+   ".csv",
+   ".cxx",
+   ".def",
+   ".dib",
+   ".doc",
+   ".docx",
+   ".dot",
+   ".dsh",
+   ".dshader",
+   ".eml",
+   ".filters",
+   ".fx",
+   ".gif",
+   ".gitattributes",
+   ".gitignore",
+   ".gitmodules",
+   ".gsh",
+   ".gshader",
+   ".h",
+   ".heic",
+   ".hh",
+   ".hlsl",
+   ".hlsli",
+   ".hpp",
+   ".hsh",
+   ".hshader",
+   ".hxx",
+   ".i",
+   ".idl",
+   ".inc",
+   ".inl",
+   ".ipp",
+   ".ixx",
+   ".jfif",
+   ".jpe",
+   ".jpeg",
+   ".jpg",
+   ".jsproj",
+   ".ksh",
+   ".lst",
+   ".mak",
+   ".map",
+   ".mht",
+   ".mhtml",
+   ".mk",
+   ".nws",
+   ".odg",
+   ".odh",
+   ".odl",
+   ".odp",
+   ".ods",
+   ".odt",
+   ".pdf",
+   ".pl",
+   ".png",
+   ".pot",
+   ".ppa",
+   ".pps",
+   ".ppsx",
+   ".ppt",
+   ".pptx",
+   ".psh",
+   ".pshader",
+   ".pwz",
+   ".rc",
+   ".rc2",
+   ".rct",
+   ".res",
+   ".rgs",
+   ".rtf",
+   ".s",
+   ".sln",
+   ".slnf",
+   ".slnx",
+   ".srf",
+   ".srt",
+   ".tif",
+   ".tiff",
+   ".tlh",
+   ".tli",
+   ".tt",
+   ".txt",
+   ".user",
+   ".vb",
+   ".vsh",
+   ".vshader",
+   ".webp",
+   ".wiz",
+   ".xlb",
+   ".xls",
+   ".xlsx"
+  ]
+ },
+ "default_extension": {
+  "no_tika": {
+   "application/json": ".json",
+   "application/octet-stream": ".bin",
+   "application/pdf": ".pdf",
+   "application/vnd.oasis.opendocument.graphics": "",
+   "application/vnd.oasis.opendocument.presentation": "",
+   "application/vnd.oasis.opendocument.spreadsheet": "",
+   "application/vnd.oasis.opendocument.text": "",
+   "application/vnd.openxmlformats-officedocument.presentationml.presentation": "",
+   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "",
+   "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "",
+   "application/zip": ".zip",
+   "image/bmp": ".bmp",
+   "image/gif": ".gif",
+   "image/heic": ".heic",
+   "image/jpeg": ".jpg",
+   "image/png": ".png",
+   "image/tiff": ".tif",
+   "image/webp": ".webp",
+   "image/x-tga": "",
+   "inode/x-empty": "",
+   "message/rfc822": ".eml",
+   "text/csv": ".csv",
+   "text/html": ".html",
+   "text/plain": ".txt",
+   "text/rtf": "",
+   "text/x-c": "",
+   "text/x-script.python": "",
+   "text/xml": ".xml"
+  },
+  "tika": {
+   "application/json": ".json",
+   "application/octet-stream": ".bin",
+   "application/pdf": ".pdf",
+   "application/vnd.oasis.opendocument.graphics": ".odg",
+   "application/vnd.oasis.opendocument.presentation": ".odp",
+   "application/vnd.oasis.opendocument.spreadsheet": ".ods",
+   "application/vnd.oasis.opendocument.text": ".odt",
+   "application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
+   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
+   "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+   "application/zip": ".zip",
+   "image/bmp": ".bmp",
+   "image/gif": ".gif",
+   "image/heic": ".heic",
+   "image/jpeg": ".jpg",
+   "image/png": ".png",
+   "image/tiff": ".tif",
+   "image/webp": ".webp",
+   "image/x-tga": "",
+   "inode/x-empty": "",
+   "message/rfc822": ".eml",
+   "text/csv": ".csv",
+   "text/html": ".html",
+   "text/plain": ".txt",
+   "text/rtf": ".rtf",
+   "text/x-c": "",
+   "text/x-script.python": "",
+   "text/xml": ".xml"
+  }
+ },
+ "files": {
+  "binary_garbage.bin": {
+   "mime": "image/x-tga",
+   "parser_no_tika": null,
+   "parser_tika": null,
+   "text_read": "\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~��������������������������������������������������������������������������������������������������������������������������������\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~��������������������������������������������������������������������������������������������������������������������������������\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~��������������������������������������������������������������������������������������������������������������������������������\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~��������������������������������������������������������������������������������������������������������������������������������"
+  },
+  "code_like.txt": {
+   "mime": "text/x-c",
+   "parser_no_tika": null,
+   "parser_tika": null,
+   "text_read": "#include <stdio.h>\nint main(void) {\n  return 0;\n}\n"
+  },
+  "crlf.txt": {
+   "mime": "text/plain",
+   "parser_no_tika": "TextDocumentParser",
+   "parser_tika": "TextDocumentParser",
+   "text_read": "Zeile eins\r\nZeile zwei\r\n\r\nEnde\r\n"
+  },
+  "data.csv": {
+   "mime": "text/csv",
+   "parser_no_tika": "TextDocumentParser",
+   "parser_tika": "TextDocumentParser",
+   "text_read": "name,betrag,datum\nAlice,12.50,2024-01-02\nBob,7.00,2024-02-03\nCarol,3.25,2024-03-04\n"
+  },
+  "empty.txt": {
+   "mime": "inode/x-empty",
+   "parser_no_tika": null,
+   "parser_tika": null,
+   "text_read": ""
+  },
+  "image.bmp": {
+   "mime": "image/bmp",
+   "parser_no_tika": "RasterisedDocumentParser",
+   "parser_tika": "RasterisedDocumentParser"
+  },
+  "image.gif": {
+   "mime": "image/gif",
+   "parser_no_tika": "RasterisedDocumentParser",
+   "parser_tika": "RasterisedDocumentParser"
+  },
+  "image.heic": {
+   "mime": "image/heic",
+   "parser_no_tika": "RasterisedDocumentParser",
+   "parser_tika": "RasterisedDocumentParser"
+  },
+  "image.jpg": {
+   "mime": "image/jpeg",
+   "parser_no_tika": "RasterisedDocumentParser",
+   "parser_tika": "RasterisedDocumentParser"
+  },
+  "image.png": {
+   "mime": "image/png",
+   "parser_no_tika": "RasterisedDocumentParser",
+   "parser_tika": "RasterisedDocumentParser"
+  },
+  "image.tif": {
+   "mime": "image/tiff",
+   "parser_no_tika": "RasterisedDocumentParser",
+   "parser_tika": "RasterisedDocumentParser"
+  },
+  "image.webp": {
+   "mime": "image/webp",
+   "parser_no_tika": "RasterisedDocumentParser",
+   "parser_tika": "RasterisedDocumentParser"
+  },
+  "image_le.tif": {
+   "mime": "image/tiff",
+   "parser_no_tika": "RasterisedDocumentParser",
+   "parser_tika": "RasterisedDocumentParser"
+  },
+  "json_like.txt": {
+   "mime": "application/json",
+   "parser_no_tika": null,
+   "parser_tika": null,
+   "text_read": "{\"a\": 1, \"b\": [1, 2, 3], \"c\": \"text\"}\n"
+  },
+  "latin1.txt": {
+   "mime": "text/plain",
+   "parser_no_tika": "TextDocumentParser",
+   "parser_tika": "TextDocumentParser",
+   "text_read": "Lateinisch: Gr��e, Stra�e, caf�\n"
+  },
+  "long_lines.txt": {
+   "mime": "text/plain",
+   "parser_no_tika": "TextDocumentParser",
+   "parser_tika": "TextDocumentParser",
+   "text_read": "Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort Wort \n"
+  },
+  "mail_attachments.eml": {
+   "mime": "message/rfc822",
+   "parser_no_tika": "MailDocumentParser",
+   "parser_tika": "MailDocumentParser",
+   "mail": {
+    "text": "Subject: Anhänge und\r\n mehr\n\nFrom: Müller <hans.mueller@example.ch>\n\nTo: Empfänger <empf@example.ch>\n\nBCC: geheim@example.ch\n\nAttachments: rechnung.pdf (32 Bytes),  (8 Bytes), grösse liste.bin (1.95 KiB), notizè.txt (12 Bytes)\n\n\n\nSiehe Anhang.",
+    "date": "2025-01-08T10:00:00+01:00",
+    "metadata": [
+     {
+      "namespace": "",
+      "prefix": "",
+      "key": "attachments",
+      "value": "rechnung.pdf(32 Bytes), (8 Bytes), grösse liste.bin(1.95 KiB), notizè.txt(12 Bytes)"
+     },
+     {
+      "namespace": "",
+      "prefix": "",
+      "key": "date",
+      "value": "2025-01-08 10:00:00 UTC+01:00"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "bcc",
+      "value": "geheim@example.ch"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "content-type",
+      "value": "multipart/mixed; boundary=MIXED"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "date",
+      "value": "Wed, 8 Jan 2025 10:00:00 +0100 (CET)"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "from",
+      "value": "=?iso-8859-1?Q?M=FCller?= Hans <hans.mueller@example.ch>"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "mime-version",
+      "value": "1.0"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "received",
+      "value": "from mx.example.com by mail.example.com; Wed, 8 Jan 2025 10:00:00 +0100"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "x-custom",
+      "value": "wert1, wert2"
+     }
+    ],
+    "html_len": 0,
+    "html": "",
+    "plain": "Siehe Anhang.",
+    "attachments": [
+     {
+      "filename": "rechnung.pdf",
+      "size": 32,
+      "content_id": ""
+     },
+     {
+      "filename": "",
+      "size": 8,
+      "content_id": "logo@cid"
+     },
+     {
+      "filename": "grösse liste.bin",
+      "size": 2000,
+      "content_id": ""
+     },
+     {
+      "filename": "notizè.txt",
+      "size": 12,
+      "content_id": ""
+     }
+    ]
+   }
+  },
+  "mail_bad_charset.eml": {
+   "mime": "message/rfc822",
+   "parser_no_tika": "MailDocumentParser",
+   "parser_tika": "MailDocumentParser",
+   "mail": {
+    "text": "Subject: abc def\n\nFrom: a@example.com\n\nTo: b@example.com\n\n\n\nGrüße",
+    "date": "1900-01-01T00:00:00+01:00",
+    "metadata": [
+     {
+      "namespace": "",
+      "prefix": "",
+      "key": "attachments",
+      "value": ""
+     },
+     {
+      "namespace": "",
+      "prefix": "",
+      "key": "date",
+      "value": "1900-01-01 00:00:00 CET"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "content-transfer-encoding",
+      "value": "base64"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "content-type",
+      "value": "text/plain; charset=x-unknown-charset"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "date",
+      "value": "Mon, 32 Jan 2024 10:00:00 +0100"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "from",
+      "value": "a@example.com"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "subject",
+      "value": "=?x-unknown?Q?abc?= def"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "to",
+      "value": "b@example.com"
+     }
+    ],
+    "html_len": 0,
+    "html": "",
+    "plain": "Grüße",
+    "attachments": []
+   }
+  },
+  "mail_digest.eml": {
+   "mime": "message/rfc822",
+   "parser_no_tika": "MailDocumentParser",
+   "parser_tika": "MailDocumentParser",
+   "mail": {
+    "text": "Subject: Digest\n\nFrom: digest@example.com\n\nTo: list@example.com\n\nAttachments:  (43 Bytes),  (44 Bytes)\n\n\n\nErsterZweiter",
+    "date": "2024-11-05T10:00:00-05:00",
+    "metadata": [
+     {
+      "namespace": "",
+      "prefix": "",
+      "key": "attachments",
+      "value": "(43 Bytes), (44 Bytes)"
+     },
+     {
+      "namespace": "",
+      "prefix": "",
+      "key": "date",
+      "value": "2024-11-05 10:00:00 UTC-05:00"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "content-type",
+      "value": "multipart/digest; boundary=D"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "date",
+      "value": "5 Nov 2024 10:00 EST"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "from",
+      "value": "digest@example.com"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "subject",
+      "value": "Digest"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "to",
+      "value": "list@example.com"
+     }
+    ],
+    "html_len": 0,
+    "html": "",
+    "plain": "ErsterZweiter",
+    "attachments": [
+     {
+      "filename": "",
+      "size": 43,
+      "content_id": ""
+     },
+     {
+      "filename": "",
+      "size": 44,
+      "content_id": ""
+     }
+    ]
+   }
+  },
+  "mail_edge_headers.eml": {
+   "mime": "message/rfc822",
+   "parser_no_tika": "MailDocumentParser",
+   "parser_tika": "MailDocumentParser",
+   "mail": {
+    "text": "Subject: Teil eins und zwei normal\n\nFrom: Müller, Hans (Chef) <hans@example.ch>\n\nTo: a@example.com, b@example.com, C, D <cd@example.com>, zweite@example.com\n\nCC: nur Kommentar <x@example.com>\n\nAttachments: laänger_name.dat (10 Bytes), Grüße.txt (6 Bytes),  (50 Bytes)\n\nHTML content: TIKAHTML22\n\nPreis: 10€ äInnen-Text",
+    "date": "2024-03-31T02:30:00+01:00",
+    "metadata": [
+     {
+      "namespace": "",
+      "prefix": "",
+      "key": "attachments",
+      "value": "laänger_name.dat(10 Bytes), Grüße.txt(6 Bytes), (50 Bytes)"
+     },
+     {
+      "namespace": "",
+      "prefix": "",
+      "key": "date",
+      "value": "2024-03-31 02:30:00 CET"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "bcc",
+      "value": "undisclosed-recipients:;"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "cc",
+      "value": "(nur Kommentar) x@example.com"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "content-type",
+      "value": "multipart/mixed; boundary=\"=_outer\""
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "date",
+      "value": "31 Mar 2024 02:30:00 -0000"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "subject",
+      "value": "=?utf-8?Q?Teil_eins?=\r\n =?utf-8?B?IHVuZCB6d2Vp?= normal"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "to",
+      "value": "a@example.com,\r\n b@example.com, \"C, D\" <cd@example.com>, zweite@example.com"
+     }
+    ],
+    "html_len": 22,
+    "html": "<p>Preis: 10&euro;</p>",
+    "plain": "Preis: 10€ äInnen-Text",
+    "attachments": [
+     {
+      "filename": "laänger_name.dat",
+      "size": 10,
+      "content_id": ""
+     },
+     {
+      "filename": "Grüße.txt",
+      "size": 6,
+      "content_id": ""
+     },
+     {
+      "filename": "",
+      "size": 50,
+      "content_id": ""
+     }
+    ]
+   }
+  },
+  "mail_forward.eml": {
+   "mime": "message/rfc822",
+   "parser_no_tika": "MailDocumentParser",
+   "parser_tika": "MailDocumentParser",
+   "mail": {
+    "text": "Subject: Fwd: Innere Nachricht\n\nFrom: Weiterleiter <fwd@example.com>\n\nTo: ziel@example.com\n\nAttachments:  (277 Bytes), liste.csv (7 Bytes)\n\n\n\nSiehe weitergeleitete Nachricht.Innerer Text.",
+    "date": "2025-01-12T23:59:59+05:30",
+    "metadata": [
+     {
+      "namespace": "",
+      "prefix": "",
+      "key": "attachments",
+      "value": "(277 Bytes), liste.csv(7 Bytes)"
+     },
+     {
+      "namespace": "",
+      "prefix": "",
+      "key": "date",
+      "value": "2025-01-12 23:59:59 UTC+05:30"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "content-type",
+      "value": "multipart/mixed; boundary=OUTER"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "date",
+      "value": "Sun, 12 Jan 2025 23:59:59 +0530"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "delivered-to",
+      "value": "fwd@example.com"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "from",
+      "value": "Weiterleiter <fwd@example.com>"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "subject",
+      "value": "Fwd: Innere Nachricht"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "to",
+      "value": "ziel@example.com"
+     }
+    ],
+    "html_len": 0,
+    "html": "",
+    "plain": "Siehe weitergeleitete Nachricht.Innerer Text.",
+    "attachments": [
+     {
+      "filename": "",
+      "size": 277,
+      "content_id": ""
+     },
+     {
+      "filename": "liste.csv",
+      "size": 7,
+      "content_id": ""
+     }
+    ]
+   }
+  },
+  "mail_html_alt.eml": {
+   "mime": "message/rfc822",
+   "parser_no_tika": "MailDocumentParser",
+   "parser_tika": "MailDocumentParser",
+   "mail": {
+    "text": "Subject: Ihre Bestellung Ä 123\n\nFrom: Shop, Online <shop@example.org>\n\nTo: kunde@example.net\n\nCC: Team <team@example.org>, Jürg <juerg@example.org>\n\nHTML content: TIKAHTML157\n\nVielen Dank für Ihre Bestellung. Lange Zeile mit weichem Umbruch.",
+    "date": "2025-01-07T18:30:05+00:00",
+    "metadata": [
+     {
+      "namespace": "",
+      "prefix": "",
+      "key": "attachments",
+      "value": ""
+     },
+     {
+      "namespace": "",
+      "prefix": "",
+      "key": "date",
+      "value": "2025-01-07 18:30:05 UTC"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "cc",
+      "value": "Team <team@example.org>, =?utf-8?Q?J=C3=BCrg?= <juerg@example.org>"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "content-type",
+      "value": "multipart/alternative; boundary=\"ALT-BOUNDARY\""
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "date",
+      "value": "Tue, 07 Jan 2025 18:30:05 +0000"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "from",
+      "value": "\"Shop, Online\" <shop@example.org>"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "mime-version",
+      "value": "1.0"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "subject",
+      "value": "=?utf-8?B?SWhyZSBCZXN0ZWxsdW5nIMOEIDEyMw==?="
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "to",
+      "value": "kunde@example.net"
+     }
+    ],
+    "html_len": 157,
+    "html": "<html><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"></head><body><p>Vielen Dank f&uuml;r Ihre <b>Bestellung</b>.</p></body></html>",
+    "plain": "Vielen Dank für Ihre Bestellung.\nLange Zeile mit weichem Umbruch.",
+    "attachments": []
+   }
+  },
+  "mail_latin1_body.eml": {
+   "mime": "message/rfc822",
+   "parser_no_tika": "MailDocumentParser",
+   "parser_tika": "MailDocumentParser",
+   "mail": {
+    "text": "Subject: Latin\n\nFrom: a@example.com\n\nTo: b@example.com\n\n\n\nGrüße und Ende",
+    "date": "2024-10-26T23:59:00+02:00",
+    "metadata": [
+     {
+      "namespace": "",
+      "prefix": "",
+      "key": "attachments",
+      "value": ""
+     },
+     {
+      "namespace": "",
+      "prefix": "",
+      "key": "date",
+      "value": "2024-10-26 23:59:00 CEST"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "content-transfer-encoding",
+      "value": "8bit"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "content-type",
+      "value": "text/plain; charset=\"ISO-8859-1\""
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "date",
+      "value": "Sat, 26 Oct 2024 23:59:00"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "from",
+      "value": "a@example.com"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "subject",
+      "value": "Latin"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "to",
+      "value": "b@example.com"
+     }
+    ],
+    "html_len": 0,
+    "html": "",
+    "plain": "Grüße  und   Ende\n",
+    "attachments": []
+   }
+  },
+  "mail_mime_first.eml": {
+   "mime": "text/plain",
+   "parser_no_tika": "TextDocumentParser",
+   "parser_tika": "TextDocumentParser",
+   "text_read": "MIME-Version: 1.0\nDate: Thu, 9 Jan 2025 07:05:00 -0000\nFrom: noreply@example.com\nTo: \nSubject: Ohne Empfaenger\nContent-Type: text/plain\n\nNur\tTabs\tund\n\n\nLeerzeilen.\n",
+   "mail": {
+    "text": "Subject: Ohne Empfaenger\n\nFrom: noreply@example.com\n\nTo: \n\n\n\nNur Tabs und Leerzeilen.",
+    "date": "2025-01-09T07:05:00+01:00",
+    "metadata": [
+     {
+      "namespace": "",
+      "prefix": "",
+      "key": "attachments",
+      "value": ""
+     },
+     {
+      "namespace": "",
+      "prefix": "",
+      "key": "date",
+      "value": "2025-01-09 07:05:00 CET"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "content-type",
+      "value": "text/plain"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "date",
+      "value": "Thu, 9 Jan 2025 07:05:00 -0000"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "from",
+      "value": "noreply@example.com"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "mime-version",
+      "value": "1.0"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "subject",
+      "value": "Ohne Empfaenger"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "to",
+      "value": ""
+     }
+    ],
+    "html_len": 0,
+    "html": "",
+    "plain": "Nur\tTabs\tund\n\n\nLeerzeilen.\n",
+    "attachments": []
+   }
+  },
+  "mail_no_boundary.eml": {
+   "mime": "message/rfc822",
+   "parser_no_tika": "MailDocumentParser",
+   "parser_tika": "MailDocumentParser",
+   "mail": {
+    "text": "Subject: Ohne Grenze\n\nFrom: a@example.com\n\nTo: b@example.com\n\n\n\n",
+    "date": "2024-07-02T12:00:00+02:00",
+    "metadata": [
+     {
+      "namespace": "",
+      "prefix": "",
+      "key": "attachments",
+      "value": ""
+     },
+     {
+      "namespace": "",
+      "prefix": "",
+      "key": "date",
+      "value": "2024-07-02 12:00:00 UTC+02:00"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "content-type",
+      "value": "multipart/mixed"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "date",
+      "value": "Tue, 2 Jul 2024 12:00:00 +0200"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "from",
+      "value": "a@example.com"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "subject",
+      "value": "Ohne Grenze"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "to",
+      "value": "b@example.com"
+     }
+    ],
+    "html_len": 0,
+    "html": "",
+    "plain": "",
+    "attachments": []
+   }
+  },
+  "mail_no_date.eml": {
+   "mime": "message/rfc822",
+   "parser_no_tika": "MailDocumentParser",
+   "parser_tika": "MailDocumentParser",
+   "mail": {
+    "text": "Subject: Kein Datum\n\nFrom: Ohne Datum <nodate@example.com>\n\nTo: x@example.com\n\n\n\nText.",
+    "date": "1900-01-01T00:00:00+01:00",
+    "metadata": [
+     {
+      "namespace": "",
+      "prefix": "",
+      "key": "attachments",
+      "value": ""
+     },
+     {
+      "namespace": "",
+      "prefix": "",
+      "key": "date",
+      "value": "1900-01-01 00:00:00 CET"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "from",
+      "value": "Ohne Datum <nodate@example.com>"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "subject",
+      "value": "Kein Datum"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "to",
+      "value": "x@example.com"
+     }
+    ],
+    "html_len": 0,
+    "html": "",
+    "plain": "Text.\n",
+    "attachments": []
+   }
+  },
+  "mail_no_from.eml": {
+   "mime": "message/rfc822",
+   "parser_no_tika": "MailDocumentParser",
+   "parser_tika": "MailDocumentParser",
+   "mail": {
+    "parse_error": "Could not parse <path>: Could not parse <path>: Missing 'from'",
+    "metadata": []
+   }
+  },
+  "mail_simple.eml": {
+   "mime": "message/rfc822",
+   "parser_no_tika": "MailDocumentParser",
+   "parser_tika": "MailDocumentParser",
+   "mail": {
+    "text": "Subject: Einfache Nachricht\n\nFrom: Alice Example <alice@example.com>\n\nTo: Bob <bob@example.com>, carol@example.com\n\n\n\nHallo Bob, das ist ein Test mit Ümlauten. Gruss Alice",
+    "date": "2025-01-06T09:15:00+01:00",
+    "metadata": [
+     {
+      "namespace": "",
+      "prefix": "",
+      "key": "attachments",
+      "value": ""
+     },
+     {
+      "namespace": "",
+      "prefix": "",
+      "key": "date",
+      "value": "2025-01-06 09:15:00 UTC+01:00"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "content-transfer-encoding",
+      "value": "8bit"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "content-type",
+      "value": "text/plain; charset=utf-8"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "date",
+      "value": "Mon, 06 Jan 2025 09:15:00 +0100"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "from",
+      "value": "Alice Example <alice@example.com>"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "message-id",
+      "value": "<simple-1@example.com>"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "mime-version",
+      "value": "1.0"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "return-path",
+      "value": "<sender@example.com>"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "subject",
+      "value": "Einfache Nachricht"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "to",
+      "value": "Bob <bob@example.com>, carol@example.com"
+     }
+    ],
+    "html_len": 0,
+    "html": "",
+    "plain": "Hallo Bob,\r\n\r\n  das ist   ein Test mit Ümlauten.\r\n\r\nGruss\r\nAlice\r\n",
+    "attachments": []
+   }
+  },
+  "mail_summer.eml": {
+   "mime": "message/rfc822",
+   "parser_no_tika": "MailDocumentParser",
+   "parser_tika": "MailDocumentParser",
+   "mail": {
+    "text": "Subject: Sommerzeit\n\nFrom: Sommer <sommer@example.com>\n\nTo: a@example.com\n\n\n\nText.",
+    "date": "2024-07-01T14:00:00+00:00",
+    "metadata": [
+     {
+      "namespace": "",
+      "prefix": "",
+      "key": "attachments",
+      "value": ""
+     },
+     {
+      "namespace": "",
+      "prefix": "",
+      "key": "date",
+      "value": "2024-07-01 14:00:00 UTC"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "date",
+      "value": "1 Jul 2024 14:00 GMT"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "from",
+      "value": "Sommer <sommer@example.com>"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "subject",
+      "value": "Sommerzeit"
+     },
+     {
+      "namespace": "",
+      "prefix": "header",
+      "key": "to",
+      "value": "a@example.com"
+     }
+    ],
+    "html_len": 0,
+    "html": "",
+    "plain": "Text.\n",
+    "attachments": []
+   }
+  },
+  "notes.md": {
+   "mime": "text/plain",
+   "parser_no_tika": "TextDocumentParser",
+   "parser_tika": "TextDocumentParser",
+   "text_read": "# Ueberschrift\n\nEin *Absatz* mit **Fett** und [Link](https://example.com).\n\n- Punkt 1\n- Punkt 2\n"
+  },
+  "nul_bytes.txt": {
+   "mime": "application/octet-stream",
+   "parser_no_tika": null,
+   "parser_tika": null,
+   "text_read": "Text mit NUL Bytes und mehr Text danach\n"
+  },
+  "office.odg": {
+   "mime": "application/vnd.oasis.opendocument.graphics",
+   "parser_no_tika": null,
+   "parser_tika": "TikaDocumentParser"
+  },
+  "office.odp": {
+   "mime": "application/vnd.oasis.opendocument.presentation",
+   "parser_no_tika": null,
+   "parser_tika": "TikaDocumentParser"
+  },
+  "office.ods": {
+   "mime": "application/vnd.oasis.opendocument.spreadsheet",
+   "parser_no_tika": null,
+   "parser_tika": "TikaDocumentParser"
+  },
+  "office.odt": {
+   "mime": "application/vnd.oasis.opendocument.text",
+   "parser_no_tika": null,
+   "parser_tika": "TikaDocumentParser"
+  },
+  "office.ppsx": {
+   "mime": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+   "parser_no_tika": null,
+   "parser_tika": "TikaDocumentParser"
+  },
+  "office.pptx": {
+   "mime": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+   "parser_no_tika": null,
+   "parser_tika": "TikaDocumentParser"
+  },
+  "office.rtf": {
+   "mime": "text/rtf",
+   "parser_no_tika": null,
+   "parser_tika": "TikaDocumentParser",
+   "text_read": "{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0 Arial;}}{\\info{\\title RTF Titel}{\\author Erika}}{\\*\\generator Hand;}\\f0\\fs24 Erster Absatz mit Umlaut: \\'fc\\'e4\\par\nZweiter\\tab Absatz mit \\b fett\\b0  und Unicode \\u8364?.\\par\n{\\pict\\pngblip 89504e47}Ende\\line Zeile\\par}\n"
+  },
+  "office.xlsx": {
+   "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "parser_no_tika": null,
+   "parser_tika": "TikaDocumentParser"
+  },
+  "office_late_word.docx": {
+   "mime": "application/octet-stream",
+   "parser_no_tika": null,
+   "parser_tika": null
+  },
+  "office_lo_order.docx": {
+   "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+   "parser_no_tika": null,
+   "parser_tika": "TikaDocumentParser"
+  },
+  "office_not_zip.docx": {
+   "mime": "text/plain",
+   "parser_no_tika": "TextDocumentParser",
+   "parser_tika": "TextDocumentParser",
+   "text_read": "Kein ZIP, nur Text.\n"
+  },
+  "office_truncated.docx": {
+   "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+   "parser_no_tika": null,
+   "parser_tika": "TikaDocumentParser"
+  },
+  "office_word_order.docx": {
+   "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+   "parser_no_tika": null,
+   "parser_tika": "TikaDocumentParser"
+  },
+  "office_zipbomb.docx": {
+   "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+   "parser_no_tika": null,
+   "parser_tika": "TikaDocumentParser"
+  },
+  "one_line_no_newline.txt": {
+   "mime": "text/plain",
+   "parser_no_tika": "TextDocumentParser",
+   "parser_tika": "TextDocumentParser",
+   "text_read": "Nur eine Zeile ohne Zeilenende"
+  },
+  "page.html": {
+   "mime": "text/html",
+   "parser_no_tika": null,
+   "parser_tika": null,
+   "text_read": "<!DOCTYPE html>\n<html><head><title>Testseite</title><style>p{color:red}</style><script>var x = 1;</script></head>\n<body><h1>Kopf</h1><p>Erster&nbsp;Absatz &amp; mehr &lt;Text&gt; &#252; &#x00E4;</p>\n<div>Zweiter<br>Block</div><ul><li>A</li><li>B</li></ul></body></html>\n"
+  },
+  "pdf_empty_page.pdf": {
+   "mime": "application/pdf",
+   "parser_no_tika": "RasterisedDocumentParser",
+   "parser_tika": "RasterisedDocumentParser",
+   "pdf_page_count": 1,
+   "pdf_tagged": false,
+   "pdf_metadata": []
+  },
+  "pdf_encrypted_empty_user.pdf": {
+   "mime": "application/pdf",
+   "parser_no_tika": "RasterisedDocumentParser",
+   "parser_tika": "RasterisedDocumentParser",
+   "pdf_page_count": 1,
+   "pdf_tagged": false,
+   "pdf_metadata": []
+  },
+  "pdf_encrypted_password.pdf": {
+   "mime": "application/pdf",
+   "parser_no_tika": "RasterisedDocumentParser",
+   "parser_tika": "RasterisedDocumentParser",
+   "pdf_page_count": null,
+   "pdf_tagged": false,
+   "pdf_metadata": []
+  },
+  "pdf_garbage.pdf": {
+   "mime": "text/plain",
+   "parser_no_tika": "TextDocumentParser",
+   "parser_tika": "TextDocumentParser",
+   "text_read": "Das ist kein PDF, nur Text mit .pdf-Endung.\n",
+   "pdf_page_count": null,
+   "pdf_tagged": false,
+   "pdf_metadata": []
+  },
+  "pdf_garbage_binary.pdf": {
+   "mime": "application/octet-stream",
+   "parser_no_tika": null,
+   "parser_tika": null,
+   "pdf_page_count": null,
+   "pdf_tagged": false,
+   "pdf_metadata": []
+  },
+  "pdf_leading_junk.pdf": {
+   "mime": "application/octet-stream",
+   "parser_no_tika": null,
+   "parser_tika": null,
+   "pdf_page_count": 1,
+   "pdf_tagged": false,
+   "pdf_metadata": []
+  },
+  "pdf_multipage.pdf": {
+   "mime": "application/pdf",
+   "parser_no_tika": "RasterisedDocumentParser",
+   "parser_tika": "RasterisedDocumentParser",
+   "pdf_page_count": 3,
+   "pdf_tagged": false,
+   "pdf_metadata": []
+  },
+  "pdf_short_text.pdf": {
+   "mime": "application/pdf",
+   "parser_no_tika": "RasterisedDocumentParser",
+   "parser_tika": "RasterisedDocumentParser",
+   "pdf_page_count": 1,
+   "pdf_tagged": false,
+   "pdf_metadata": []
+  },
+  "pdf_tagged.pdf": {
+   "mime": "application/pdf",
+   "parser_no_tika": "RasterisedDocumentParser",
+   "parser_tika": "RasterisedDocumentParser",
+   "pdf_page_count": 1,
+   "pdf_tagged": true,
+   "pdf_metadata": []
+  },
+  "pdf_text.pdf": {
+   "mime": "application/pdf",
+   "parser_no_tika": "RasterisedDocumentParser",
+   "parser_tika": "RasterisedDocumentParser",
+   "pdf_page_count": 1,
+   "pdf_tagged": false,
+   "pdf_metadata": []
+  },
+  "pdf_truncated.pdf": {
+   "mime": "application/pdf",
+   "parser_no_tika": "RasterisedDocumentParser",
+   "parser_tika": "RasterisedDocumentParser",
+   "pdf_page_count": 1,
+   "pdf_tagged": false,
+   "pdf_metadata": []
+  },
+  "pdf_xmp.pdf": {
+   "mime": "application/pdf",
+   "parser_no_tika": "RasterisedDocumentParser",
+   "parser_tika": "RasterisedDocumentParser",
+   "pdf_page_count": 1,
+   "pdf_tagged": false,
+   "pdf_metadata": [
+    {
+     "namespace": "http://purl.org/dc/elements/1.1/",
+     "prefix": "dc",
+     "key": "title",
+     "value": "Mit XMP"
+    },
+    {
+     "namespace": "http://purl.org/dc/elements/1.1/",
+     "prefix": "dc",
+     "key": "creator",
+     "value": "Autor Eins Autor Zwei"
+    },
+    {
+     "namespace": "http://purl.org/dc/elements/1.1/",
+     "prefix": "dc",
+     "key": "description",
+     "value": "Beschreibung"
+    },
+    {
+     "namespace": "http://ns.adobe.com/xap/1.0/",
+     "prefix": "xmp",
+     "key": "CreatorTool",
+     "value": "gen_samples.py"
+    },
+    {
+     "namespace": "http://ns.adobe.com/pdf/1.3/",
+     "prefix": "pdf",
+     "key": "Producer",
+     "value": "fpdf2"
+    },
+    {
+     "namespace": "http://ns.adobe.com/xap/1.0/",
+     "prefix": "xmp",
+     "key": "CreateDate",
+     "value": "2025-01-06T08:00:00+00:00"
+    }
+   ]
+  },
+  "plain.zip": {
+   "mime": "application/zip",
+   "parser_no_tika": null,
+   "parser_tika": null
+  },
+  "plain_utf8.txt": {
+   "mime": "text/plain",
+   "parser_no_tika": "TextDocumentParser",
+   "parser_tika": "TextDocumentParser",
+   "text_read": "Rechnung Nr. 4711\nGrüße aus Zürich – Straße\n\nBetrag: 12,50 €\n"
+  },
+  "python_like.txt": {
+   "mime": "text/x-script.python",
+   "parser_no_tika": null,
+   "parser_tika": null,
+   "text_read": "#!/usr/bin/env python3\nimport os\nprint(os.getcwd())\n"
+  },
+  "semicolon.csv": {
+   "mime": "text/plain",
+   "parser_no_tika": "TextDocumentParser",
+   "parser_tika": "TextDocumentParser",
+   "text_read": "Name;Betrag;Datum\nMüller;12,50;02.01.2024\nMeier;7,00;03.02.2024\nHuber;3,25;04.03.2024\n"
+  },
+  "utf16be_bom.txt": {
+   "mime": "text/plain",
+   "parser_no_tika": "TextDocumentParser",
+   "parser_tika": "TextDocumentParser",
+   "text_read": "UTF-16 BE Text äöü\n"
+  },
+  "utf16le_bom.txt": {
+   "mime": "text/plain",
+   "parser_no_tika": "TextDocumentParser",
+   "parser_tika": "TextDocumentParser",
+   "text_read": "UTF-16 LE Text äöü\r\nZweite Zeile\r\n"
+  },
+  "utf8_bom.txt": {
+   "mime": "text/plain",
+   "parser_no_tika": "TextDocumentParser",
+   "parser_tika": "TextDocumentParser",
+   "text_read": "BOM-Text mit Ümlaut\n"
+  },
+  "xml_doc.xml": {
+   "mime": "text/xml",
+   "parser_no_tika": null,
+   "parser_tika": null,
+   "text_read": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root><item>Wert</item></root>\n"
+  }
+ },
+ "mime_probes": {
+  "bash_shebang": "text/x-shellscript",
+  "bmp_bad_header": "text/plain",
+  "c1_bytes": "text/plain",
+  "c_char": "text/x-c",
+  "c_comment": "text/plain",
+  "c_define": "text/x-c",
+  "c_include_late": "text/x-c",
+  "c_main": "text/plain",
+  "c_struct": "text/x-c",
+  "cfb_empty": "application/x-ole-storage",
+  "csv_crlf": "text/csv",
+  "csv_inconsistent": "text/plain",
+  "csv_no_final_eol": "text/csv",
+  "csv_one_line": "text/plain",
+  "csv_quoted": "text/csv",
+  "csv_tab": "text/plain",
+  "csv_three_lines": "text/csv",
+  "csv_twelve_lines": "text/plain",
+  "csv_two_lines": "text/csv",
+  "ctrl_0x01": "application/octet-stream",
+  "ctrl_0x1c": "application/octet-stream",
+  "ctrl_0x7f": "application/octet-stream",
+  "ctrl_bel": "text/plain",
+  "ctrl_esc": "text/plain",
+  "ctrl_formfeed": "text/plain",
+  "diff": "text/x-diff",
+  "env_node": "text/javascript",
+  "ftyp_avif": "image/avif",
+  "ftyp_heix": "image/heic",
+  "ftyp_mif1": "image/heif",
+  "german_invoice": "text/plain",
+  "gzip": "application/gzip",
+  "html_a_href": "text/html",
+  "html_body": "text/plain",
+  "html_br": "text/plain",
+  "html_comment": "text/plain",
+  "html_div": "text/plain",
+  "html_doctype": "text/html",
+  "html_doctype_lower_late": "text/html",
+  "html_h1": "text/plain",
+  "html_head": "text/html",
+  "html_html": "text/html",
+  "html_late": "text/plain",
+  "html_p": "text/plain",
+  "html_script": "text/html",
+  "html_style": "text/html",
+  "html_table": "text/html",
+  "html_title": "text/html",
+  "html_upper": "text/html",
+  "ini": "text/plain",
+  "java": "text/plain",
+  "javascript": "text/plain",
+  "jpeg_short": "image/jpeg",
+  "json_array": "application/json",
+  "json_invalid": "application/json",
+  "json_ndjson": "application/x-ndjson",
+  "json_number": "text/plain",
+  "json_string": "text/plain",
+  "mail_arc_first": "text/plain",
+  "mail_authres_first": "text/plain",
+  "mail_content_type_first": "text/plain",
+  "mail_date_first": "message/rfc822",
+  "mail_delivered_to": "message/rfc822",
+  "mail_dkim_first": "text/plain",
+  "mail_from_lower": "text/plain",
+  "mail_from_nospace": "message/rfc822",
+  "mail_leading_blank": "text/plain",
+  "mail_mbox": "application/mbox",
+  "mail_messageid_first": "text/plain",
+  "mail_mozilla_first": "text/plain",
+  "mail_received_lower": "text/plain",
+  "mail_reply_to_first": "text/plain",
+  "mail_return_path_lower": "message/rfc822",
+  "mail_subject_first": "message/rfc822",
+  "mail_to_first": "message/rfc822",
+  "mail_xheader_first": "text/plain",
+  "makefile": "text/x-makefile",
+  "markdown_heading": "text/plain",
+  "only_newlines": "text/plain",
+  "only_spaces": "text/plain",
+  "pdf_bom": "application/pdf",
+  "pdf_late_header": "application/pdf",
+  "pdf_space": "application/pdf",
+  "pem_cert": "application/x-pem-file",
+  "perl_shebang": "text/x-perl",
+  "pgp": "application/pgp-encrypted",
+  "php": "text/x-php",
+  "png_sig_only": "text/plain",
+  "postscript": "application/postscript",
+  "python_class": "text/x-script.python",
+  "python_def": "text/x-script.python",
+  "python_import": "text/plain",
+  "riff_wave": "audio/x-wav",
+  "rtf_lower": "text/rtf",
+  "sh_shebang": "text/x-shellscript",
+  "single_byte": "application/octet-stream",
+  "svg_plain": "image/svg+xml",
+  "tex": "text/x-tex",
+  "tiff_be": "image/tiff",
+  "troff": "text/troff",
+  "utf16le_nobom": "application/octet-stream",
+  "utf8_bad_cont": "text/plain",
+  "vcalendar": "text/calendar",
+  "vcard": "text/vcard",
+  "xhtml": "application/xhtml+xml",
+  "xml_no_decl": "text/plain",
+  "xml_svg": "image/svg+xml",
+  "zip_customxml_first": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "zip_docprops_first_only": "application/zip",
+  "zip_empty": "application/zip",
+  "zip_epub": "application/epub+zip",
+  "zip_jar": "application/zip",
+  "zip_odf_formula": "application/vnd.oasis.opendocument.formula",
+  "zip_ods_template": "application/vnd.oasis.opendocument.spreadsheet-template",
+  "zip_odt_deflated_mimetype": "application/zip",
+  "zip_odt_not_first": "application/zip",
+  "zip_odt_template": "application/vnd.oasis.opendocument.text-template",
+  "zip_ooxml_big_first": "application/zip",
+  "zip_ooxml_big_second": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "zip_ooxml_fifth": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "zip_ooxml_first_word": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "zip_ooxml_ppt_fourth": "application/zip",
+  "zip_ooxml_second_word": "application/zip",
+  "zip_ooxml_visio": "application/vnd.ms-visio.drawing.main+xml",
+  "zip_ooxml_xl_third": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+ },
+ "mimetypes_default_all_extensions": {
+  "application/csv": [],
+  "application/msword": [
+   ".doc",
+   ".dot",
+   ".wiz"
+  ],
+  "application/pdf": [
+   ".pdf"
+  ],
+  "application/vnd.ms-excel": [
+   ".xls",
+   ".xlb"
+  ],
+  "application/vnd.ms-powerpoint": [
+   ".ppt",
+   ".pot",
+   ".ppa",
+   ".pps",
+   ".pwz"
+  ],
+  "application/vnd.oasis.opendocument.graphics": [],
+  "application/vnd.oasis.opendocument.presentation": [],
+  "application/vnd.oasis.opendocument.spreadsheet": [],
+  "application/vnd.oasis.opendocument.text": [],
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation": [],
+  "application/vnd.openxmlformats-officedocument.presentationml.slideshow": [],
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [],
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [],
+  "image/bmp": [
+   ".bmp"
+  ],
+  "image/gif": [
+   ".gif"
+  ],
+  "image/heic": [
+   ".heic"
+  ],
+  "image/jpeg": [
+   ".jpg",
+   ".jpe",
+   ".jpeg"
+  ],
+  "image/png": [
+   ".png"
+  ],
+  "image/tiff": [
+   ".tiff",
+   ".tif"
+  ],
+  "image/webp": [],
+  "message/rfc822": [
+   ".eml",
+   ".mht",
+   ".mhtml",
+   ".nws"
+  ],
+  "text/csv": [
+   ".csv"
+  ],
+  "text/plain": [
+   ".txt",
+   ".bat",
+   ".c",
+   ".h",
+   ".ksh",
+   ".pl",
+   ".srt"
+  ],
+  "text/rtf": []
+ },
+ "mimetypes_default_guess_extension": {
+  "application/csv": null,
+  "application/json": ".json",
+  "application/msword": ".doc",
+  "application/octet-stream": ".bin",
+  "application/pdf": ".pdf",
+  "application/vnd.ms-excel": ".xls",
+  "application/vnd.ms-powerpoint": ".ppt",
+  "application/vnd.oasis.opendocument.graphics": null,
+  "application/vnd.oasis.opendocument.presentation": null,
+  "application/vnd.oasis.opendocument.spreadsheet": null,
+  "application/vnd.oasis.opendocument.text": null,
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation": null,
+  "application/vnd.openxmlformats-officedocument.presentationml.slideshow": null,
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": null,
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": null,
+  "application/zip": ".zip",
+  "image/bmp": ".bmp",
+  "image/gif": ".gif",
+  "image/heic": ".heic",
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+  "image/tiff": ".tiff",
+  "image/webp": null,
+  "image/x-tga": null,
+  "inode/x-empty": null,
+  "message/rfc822": ".eml",
+  "text/csv": ".csv",
+  "text/html": ".html",
+  "text/plain": ".txt",
+  "text/rtf": null,
+  "text/x-c": null,
+  "text/x-script.python": null,
+  "text/xml": ".xml"
+ }
+}

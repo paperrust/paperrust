@@ -1,0 +1,18 @@
+{
+  "django": {
+    "status": 403,
+    "body": {
+      "detail": "You do not have permission to perform this action."
+    },
+    "plan": [],
+    "files": {}
+  },
+  "rust": {
+    "status": 403,
+    "body": {
+      "detail": "You do not have permission to perform this action."
+    },
+    "plan": [],
+    "files": {}
+  }
+}

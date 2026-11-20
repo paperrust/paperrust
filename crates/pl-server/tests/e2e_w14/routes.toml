@@ -1,0 +1,11 @@
+# W14 E2E (PgQueue): task dispatch via pl_core::tasks::send_task to the Rust worker.
+[routes]
+"tasks.list" = "rust"
+"tasks.retrieve" = "rust"
+"tasks.run" = "rust"
+"share_link_bundles.list" = "rust"
+"share_link_bundles.create" = "rust"
+"share_link_bundles.retrieve" = "rust"
+"share_link_bundles.rebuild" = "rust"
+"tags.list" = "rust"
+"documents.post_document" = "rust"

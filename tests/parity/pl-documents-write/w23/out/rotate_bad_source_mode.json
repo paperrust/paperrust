@@ -1,0 +1,22 @@
+{
+  "django": {
+    "status": 400,
+    "body": {
+      "source_mode": [
+        "Invalid source_mode"
+      ]
+    },
+    "plan": [],
+    "files": {}
+  },
+  "rust": {
+    "status": 400,
+    "body": {
+      "source_mode": [
+        "Invalid source_mode"
+      ]
+    },
+    "plan": [],
+    "files": {}
+  }
+}

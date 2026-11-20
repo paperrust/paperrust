@@ -1,0 +1,29 @@
+/* Filter menu with search field and selection list, e.g. tags or correspondents (FilterableDropdown.svelte). */
+
+.dropdown-menu {
+  min-width: 250px;
+}
+
+/* Long lists scroll within the menu */
+.dropdown-menu .items {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.dropdown-menu button:disabled {
+  opacity: 0.2;
+}
+
+/* Hint row at the end of the list */
+.list-group-item-note {
+  line-height: 1;
+}
+
+.list-group-item-note small {
+  font-size: 0.65rem;
+}
+
+/* Open menu: outline buttons with white text */
+.show .btn-outline-primary {
+  color: #fff;
+}

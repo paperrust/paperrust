@@ -1,0 +1,89 @@
+# PaperRust im Mehrprozessbetrieb: HTTP-Prozess und Worker getrennt, gemeinsamer Cache in PostgreSQL.
+#
+# Nur nötig, wenn Webserver und Worker getrennt skaliert/neu gestartet werden sollen. Für die
+# meisten Installationen reicht docker-compose.postgres.yml (ein Prozess).
+#
+# Warum PAPERRUST_CACHE=postgres: Sonst nutzt jeder Prozess einen eigenen, prozesslokalen Cache.
+# Laufen mehrere Prozesse für dieselbe Installation, teilen sie dann weder Login-Drossel noch
+# TOTP-Replay-Sperre noch Cache-Invalidierung (PaperRust warnt beim Start). Mit postgres liegt der
+# Cache in der UNLOGGED-Tabelle paperrust_cache derselben Datenbank. Die Aufgaben-Warteschlange
+# liegt ohnehin in PostgreSQL (paperrust_task_queue). Redis/Valkey wird nicht gebraucht.
+#
+#   cd docker
+#   docker compose -f docker-compose.multiprocess.yml build
+#   docker compose -f docker-compose.multiprocess.yml up -d
+#
+# Ausführlich: docs/user/installation.md#docker
+
+x-paperrust: &paperrust
+  image: ${PAPERRUST_IMAGE:-paperrust/paperrust:local}
+  restart: unless-stopped
+  volumes:
+    - data:/usr/src/paperless/data
+    - media:/usr/src/paperless/media
+    - ./export:/usr/src/paperless/export
+    - ./consume:/usr/src/paperless/consume
+  env_file: docker-compose.env
+  environment:
+    PAPERRUST_DBENGINE: postgresql
+    PAPERRUST_DBHOST: db
+    PAPERRUST_DBNAME: paperless
+    PAPERRUST_DBUSER: paperless
+    PAPERRUST_DBPASS: paperless
+    PAPERRUST_CACHE: postgres
+  stop_grace_period: 45s
+
+services:
+  db:
+    image: docker.io/library/postgres:17
+    restart: unless-stopped
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: paperless
+      POSTGRES_USER: paperless
+      POSTGRES_PASSWORD: paperless
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paperless -d paperless"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # HTTP: API, Oberfläche, /ws/status/ – führt beim Start migrate/Index-Prüfung aus
+  web:
+    <<: *paperrust
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    command: ["serve", "--no-worker"]
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  # Worker + Zeitplaner + Eingangsordner, ohne HTTP. Mehrere Instanzen sind möglich
+  # (docker compose up -d --scale worker=2); Aufgaben werden über PostgreSQL verteilt.
+  worker:
+    <<: *paperrust
+    command: ["serve", "--worker-only"]
+    environment:
+      PAPERRUST_DBENGINE: postgresql
+      PAPERRUST_DBHOST: db
+      PAPERRUST_DBNAME: paperless
+      PAPERRUST_DBUSER: paperless
+      PAPERRUST_DBPASS: paperless
+      PAPERRUST_CACHE: postgres
+      # migrate/Index macht der web-Dienst; der Worker startet erst, wenn web gesund ist
+      PAPERRUST_INIT: "no"
+    depends_on:
+      web:
+        condition: service_healthy
+    # kein HTTP-Server -> der Image-Healthcheck auf /__rs/health passt nicht
+    healthcheck:
+      disable: true
+
+volumes:
+  data:
+  media:
+  pgdata:

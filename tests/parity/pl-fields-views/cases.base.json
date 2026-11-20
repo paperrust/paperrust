@@ -1,0 +1,1761 @@
+{
+ "crate": "pl-fields-views",
+ "generated_by": "tests/parity/harness/gen_base_catalog.py (do not edit; add cases.json instead)",
+ "vars": {
+  "custom_field_id": {
+   "get": "/api/custom_fields/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1
+   }
+  },
+  "doc_id": {
+   "get": "/api/documents/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1,
+    "fields": "id"
+   }
+  },
+  "saved_view_id": {
+   "get": "/api/saved_views/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1
+   }
+  },
+  "share_link_bundle_id": {
+   "get": "/api/share_link_bundles/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1
+   }
+  },
+  "share_link_id": {
+   "get": "/api/share_links/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1
+   }
+  }
+ },
+ "cases": [
+  {
+   "id": "custom_fields.list.default",
+   "route": "custom_fields.list",
+   "method": "GET",
+   "path": "/api/custom_fields/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "custom_fields.list.page1",
+   "route": "custom_fields.list",
+   "method": "GET",
+   "path": "/api/custom_fields/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "custom_fields.list.listall",
+   "route": "custom_fields.list",
+   "method": "GET",
+   "path": "/api/custom_fields/",
+   "query": {
+    "page": 1,
+    "page_size": 100000
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "custom_fields.list.page2",
+   "route": "custom_fields.list",
+   "method": "GET",
+   "path": "/api/custom_fields/",
+   "query": {
+    "page": 2,
+    "page_size": 1
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "custom_fields.list.page-too-high",
+   "route": "custom_fields.list",
+   "method": "GET",
+   "path": "/api/custom_fields/",
+   "query": {
+    "page": 99999,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "custom_fields.list.page-invalid",
+   "route": "custom_fields.list",
+   "method": "GET",
+   "path": "/api/custom_fields/",
+   "query": {
+    "page": "abc"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "custom_fields.list.page-zero",
+   "route": "custom_fields.list",
+   "method": "GET",
+   "path": "/api/custom_fields/",
+   "query": {
+    "page": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "custom_fields.list.page-size-invalid",
+   "route": "custom_fields.list",
+   "method": "GET",
+   "path": "/api/custom_fields/",
+   "query": {
+    "page_size": "x"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "custom_fields.list.page-size-zero",
+   "route": "custom_fields.list",
+   "method": "GET",
+   "path": "/api/custom_fields/",
+   "query": {
+    "page_size": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "custom_fields.list.page-size-huge",
+   "route": "custom_fields.list",
+   "method": "GET",
+   "path": "/api/custom_fields/",
+   "query": {
+    "page_size": 10000000
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "custom_fields.list.ordering-unknown",
+   "route": "custom_fields.list",
+   "method": "GET",
+   "path": "/api/custom_fields/",
+   "query": {
+    "ordering": "does_not_exist"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "custom_fields.list.ordering+name",
+   "route": "custom_fields.list",
+   "method": "GET",
+   "path": "/api/custom_fields/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "name"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "custom_fields.list.ordering-name",
+   "route": "custom_fields.list",
+   "method": "GET",
+   "path": "/api/custom_fields/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-name"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "custom_fields.list.name-filter",
+   "route": "custom_fields.list",
+   "method": "GET",
+   "path": "/api/custom_fields/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "name",
+    "name__icontains": "a",
+    "full_perms": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "custom_fields.list.name-filter-empty",
+   "route": "custom_fields.list",
+   "method": "GET",
+   "path": "/api/custom_fields/",
+   "query": {
+    "name__icontains": ""
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "custom_fields.list.name-filter-unicode",
+   "route": "custom_fields.list",
+   "method": "GET",
+   "path": "/api/custom_fields/",
+   "query": {
+    "name__icontains": "ä"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "custom_fields.list.name-iexact",
+   "route": "custom_fields.list",
+   "method": "GET",
+   "path": "/api/custom_fields/",
+   "query": {
+    "name__iexact": "A"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "custom_fields.list.name-istartswith",
+   "route": "custom_fields.list",
+   "method": "GET",
+   "path": "/api/custom_fields/",
+   "query": {
+    "name__istartswith": "a"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "custom_fields.list.name-iendswith",
+   "route": "custom_fields.list",
+   "method": "GET",
+   "path": "/api/custom_fields/",
+   "query": {
+    "name__iendswith": "e"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "custom_fields.list.full-perms",
+   "route": "custom_fields.list",
+   "method": "GET",
+   "path": "/api/custom_fields/",
+   "query": {
+    "full_perms": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "custom_fields.list.full-perms-0",
+   "route": "custom_fields.list",
+   "method": "GET",
+   "path": "/api/custom_fields/",
+   "query": {
+    "full_perms": "0"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "custom_fields.list.getfew",
+   "route": "custom_fields.list",
+   "method": "GET",
+   "path": "/api/custom_fields/",
+   "query": {
+    "id__in": "${custom_field_id}",
+    "ordering": "-id",
+    "page_size": 1000
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "custom_fields.list.id",
+   "route": "custom_fields.list",
+   "method": "GET",
+   "path": "/api/custom_fields/",
+   "query": {
+    "id": "${custom_field_id}"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "custom_fields.list.id-in-invalid",
+   "route": "custom_fields.list",
+   "method": "GET",
+   "path": "/api/custom_fields/",
+   "query": {
+    "id__in": "a,b"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "custom_fields.list.id-in-empty",
+   "route": "custom_fields.list",
+   "method": "GET",
+   "path": "/api/custom_fields/",
+   "query": {
+    "id__in": ""
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "custom_fields.list.auth",
+   "route": "custom_fields.list",
+   "method": "GET",
+   "path": "/api/custom_fields/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "anon",
+    "badtoken",
+    "inactive",
+    "admin@session",
+    "admin@basic"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "custom_fields.list.apiver",
+   "route": "custom_fields.list",
+   "method": "GET",
+   "path": "/api/custom_fields/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "none",
+    "99",
+    "abc"
+   ]
+  },
+  {
+   "id": "custom_fields.detail",
+   "route": "custom_fields.retrieve",
+   "method": "GET",
+   "path": "/api/custom_fields/${custom_field_id}/",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "custom_fields.detail-unknown",
+   "route": "custom_fields.retrieve",
+   "method": "GET",
+   "path": "/api/custom_fields/999999999/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "custom_fields.detail-nonint",
+   "route": "custom_fields.retrieve",
+   "method": "GET",
+   "path": "/api/custom_fields/abc/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "custom_fields.detail-anon",
+   "route": "custom_fields.retrieve",
+   "method": "GET",
+   "path": "/api/custom_fields/${custom_field_id}/",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "custom_fields.detail-noslash",
+   "route": "custom_fields.retrieve",
+   "method": "GET",
+   "path": "/api/custom_fields/${custom_field_id}",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "follow": false
+  },
+  {
+   "id": "saved_views.list.default",
+   "route": "saved_views.list",
+   "method": "GET",
+   "path": "/api/saved_views/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "saved_views.list.page1",
+   "route": "saved_views.list",
+   "method": "GET",
+   "path": "/api/saved_views/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "saved_views.list.listall",
+   "route": "saved_views.list",
+   "method": "GET",
+   "path": "/api/saved_views/",
+   "query": {
+    "page": 1,
+    "page_size": 100000
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "saved_views.list.page2",
+   "route": "saved_views.list",
+   "method": "GET",
+   "path": "/api/saved_views/",
+   "query": {
+    "page": 2,
+    "page_size": 1
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "saved_views.list.page-too-high",
+   "route": "saved_views.list",
+   "method": "GET",
+   "path": "/api/saved_views/",
+   "query": {
+    "page": 99999,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "saved_views.list.page-invalid",
+   "route": "saved_views.list",
+   "method": "GET",
+   "path": "/api/saved_views/",
+   "query": {
+    "page": "abc"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "saved_views.list.page-zero",
+   "route": "saved_views.list",
+   "method": "GET",
+   "path": "/api/saved_views/",
+   "query": {
+    "page": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "saved_views.list.page-size-invalid",
+   "route": "saved_views.list",
+   "method": "GET",
+   "path": "/api/saved_views/",
+   "query": {
+    "page_size": "x"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "saved_views.list.page-size-zero",
+   "route": "saved_views.list",
+   "method": "GET",
+   "path": "/api/saved_views/",
+   "query": {
+    "page_size": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "saved_views.list.page-size-huge",
+   "route": "saved_views.list",
+   "method": "GET",
+   "path": "/api/saved_views/",
+   "query": {
+    "page_size": 10000000
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "saved_views.list.ordering-unknown",
+   "route": "saved_views.list",
+   "method": "GET",
+   "path": "/api/saved_views/",
+   "query": {
+    "ordering": "does_not_exist"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "saved_views.list.ordering+name",
+   "route": "saved_views.list",
+   "method": "GET",
+   "path": "/api/saved_views/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "name"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "saved_views.list.ordering-name",
+   "route": "saved_views.list",
+   "method": "GET",
+   "path": "/api/saved_views/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-name"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "saved_views.list.full-perms",
+   "route": "saved_views.list",
+   "method": "GET",
+   "path": "/api/saved_views/",
+   "query": {
+    "full_perms": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "saved_views.list.full-perms-0",
+   "route": "saved_views.list",
+   "method": "GET",
+   "path": "/api/saved_views/",
+   "query": {
+    "full_perms": "0"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "saved_views.list.auth",
+   "route": "saved_views.list",
+   "method": "GET",
+   "path": "/api/saved_views/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "anon",
+    "badtoken",
+    "inactive",
+    "admin@session",
+    "admin@basic"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "saved_views.list.apiver",
+   "route": "saved_views.list",
+   "method": "GET",
+   "path": "/api/saved_views/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "none",
+    "99",
+    "abc"
+   ]
+  },
+  {
+   "id": "saved_views.detail",
+   "route": "saved_views.retrieve",
+   "method": "GET",
+   "path": "/api/saved_views/${saved_view_id}/",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "saved_views.detail-unknown",
+   "route": "saved_views.retrieve",
+   "method": "GET",
+   "path": "/api/saved_views/999999999/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "saved_views.detail-nonint",
+   "route": "saved_views.retrieve",
+   "method": "GET",
+   "path": "/api/saved_views/abc/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "saved_views.detail-anon",
+   "route": "saved_views.retrieve",
+   "method": "GET",
+   "path": "/api/saved_views/${saved_view_id}/",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "saved_views.detail-noslash",
+   "route": "saved_views.retrieve",
+   "method": "GET",
+   "path": "/api/saved_views/${saved_view_id}",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "follow": false
+  },
+  {
+   "id": "share_links.list.default",
+   "route": "share_links.list",
+   "method": "GET",
+   "path": "/api/share_links/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "share_links.list.page1",
+   "route": "share_links.list",
+   "method": "GET",
+   "path": "/api/share_links/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "share_links.list.listall",
+   "route": "share_links.list",
+   "method": "GET",
+   "path": "/api/share_links/",
+   "query": {
+    "page": 1,
+    "page_size": 100000
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "share_links.list.page2",
+   "route": "share_links.list",
+   "method": "GET",
+   "path": "/api/share_links/",
+   "query": {
+    "page": 2,
+    "page_size": 1
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_links.list.page-too-high",
+   "route": "share_links.list",
+   "method": "GET",
+   "path": "/api/share_links/",
+   "query": {
+    "page": 99999,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_links.list.page-invalid",
+   "route": "share_links.list",
+   "method": "GET",
+   "path": "/api/share_links/",
+   "query": {
+    "page": "abc"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_links.list.page-zero",
+   "route": "share_links.list",
+   "method": "GET",
+   "path": "/api/share_links/",
+   "query": {
+    "page": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_links.list.page-size-invalid",
+   "route": "share_links.list",
+   "method": "GET",
+   "path": "/api/share_links/",
+   "query": {
+    "page_size": "x"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_links.list.page-size-zero",
+   "route": "share_links.list",
+   "method": "GET",
+   "path": "/api/share_links/",
+   "query": {
+    "page_size": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_links.list.page-size-huge",
+   "route": "share_links.list",
+   "method": "GET",
+   "path": "/api/share_links/",
+   "query": {
+    "page_size": 10000000
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_links.list.ordering-unknown",
+   "route": "share_links.list",
+   "method": "GET",
+   "path": "/api/share_links/",
+   "query": {
+    "ordering": "does_not_exist"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_links.list.ordering+created",
+   "route": "share_links.list",
+   "method": "GET",
+   "path": "/api/share_links/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "created"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_links.list.ordering-created",
+   "route": "share_links.list",
+   "method": "GET",
+   "path": "/api/share_links/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-created"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_links.list.ordering+expiration",
+   "route": "share_links.list",
+   "method": "GET",
+   "path": "/api/share_links/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "expiration"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_links.list.ordering-expiration",
+   "route": "share_links.list",
+   "method": "GET",
+   "path": "/api/share_links/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-expiration"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_links.list.ordering+document__title",
+   "route": "share_links.list",
+   "method": "GET",
+   "path": "/api/share_links/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "document__title"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_links.list.ordering-document__title",
+   "route": "share_links.list",
+   "method": "GET",
+   "path": "/api/share_links/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-document__title"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_links.list.extra0",
+   "route": "share_links.list",
+   "method": "GET",
+   "path": "/api/share_links/",
+   "query": {
+    "created__date__gt": "2000-01-01"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_links.list.extra1",
+   "route": "share_links.list",
+   "method": "GET",
+   "path": "/api/share_links/",
+   "query": {
+    "expiration__isnull": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_links.list.auth",
+   "route": "share_links.list",
+   "method": "GET",
+   "path": "/api/share_links/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "anon",
+    "badtoken",
+    "inactive",
+    "admin@session",
+    "admin@basic"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_links.list.apiver",
+   "route": "share_links.list",
+   "method": "GET",
+   "path": "/api/share_links/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "none",
+    "99",
+    "abc"
+   ]
+  },
+  {
+   "id": "share_links.detail",
+   "route": "share_links.retrieve",
+   "method": "GET",
+   "path": "/api/share_links/${share_link_id}/",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "share_links.detail-unknown",
+   "route": "share_links.retrieve",
+   "method": "GET",
+   "path": "/api/share_links/999999999/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_links.detail-nonint",
+   "route": "share_links.retrieve",
+   "method": "GET",
+   "path": "/api/share_links/abc/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_links.detail-anon",
+   "route": "share_links.retrieve",
+   "method": "GET",
+   "path": "/api/share_links/${share_link_id}/",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_links.detail-noslash",
+   "route": "share_links.retrieve",
+   "method": "GET",
+   "path": "/api/share_links/${share_link_id}",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "follow": false
+  },
+  {
+   "id": "share_link_bundles.list.default",
+   "route": "share_link_bundles.list",
+   "method": "GET",
+   "path": "/api/share_link_bundles/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "share_link_bundles.list.page1",
+   "route": "share_link_bundles.list",
+   "method": "GET",
+   "path": "/api/share_link_bundles/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "share_link_bundles.list.listall",
+   "route": "share_link_bundles.list",
+   "method": "GET",
+   "path": "/api/share_link_bundles/",
+   "query": {
+    "page": 1,
+    "page_size": 100000
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "share_link_bundles.list.page2",
+   "route": "share_link_bundles.list",
+   "method": "GET",
+   "path": "/api/share_link_bundles/",
+   "query": {
+    "page": 2,
+    "page_size": 1
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_link_bundles.list.page-too-high",
+   "route": "share_link_bundles.list",
+   "method": "GET",
+   "path": "/api/share_link_bundles/",
+   "query": {
+    "page": 99999,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_link_bundles.list.page-invalid",
+   "route": "share_link_bundles.list",
+   "method": "GET",
+   "path": "/api/share_link_bundles/",
+   "query": {
+    "page": "abc"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_link_bundles.list.page-zero",
+   "route": "share_link_bundles.list",
+   "method": "GET",
+   "path": "/api/share_link_bundles/",
+   "query": {
+    "page": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_link_bundles.list.page-size-invalid",
+   "route": "share_link_bundles.list",
+   "method": "GET",
+   "path": "/api/share_link_bundles/",
+   "query": {
+    "page_size": "x"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_link_bundles.list.page-size-zero",
+   "route": "share_link_bundles.list",
+   "method": "GET",
+   "path": "/api/share_link_bundles/",
+   "query": {
+    "page_size": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_link_bundles.list.page-size-huge",
+   "route": "share_link_bundles.list",
+   "method": "GET",
+   "path": "/api/share_link_bundles/",
+   "query": {
+    "page_size": 10000000
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_link_bundles.list.ordering-unknown",
+   "route": "share_link_bundles.list",
+   "method": "GET",
+   "path": "/api/share_link_bundles/",
+   "query": {
+    "ordering": "does_not_exist"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_link_bundles.list.ordering+created",
+   "route": "share_link_bundles.list",
+   "method": "GET",
+   "path": "/api/share_link_bundles/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "created"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_link_bundles.list.ordering-created",
+   "route": "share_link_bundles.list",
+   "method": "GET",
+   "path": "/api/share_link_bundles/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-created"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_link_bundles.list.ordering+expiration",
+   "route": "share_link_bundles.list",
+   "method": "GET",
+   "path": "/api/share_link_bundles/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "expiration"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_link_bundles.list.ordering-expiration",
+   "route": "share_link_bundles.list",
+   "method": "GET",
+   "path": "/api/share_link_bundles/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-expiration"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_link_bundles.list.ordering+status",
+   "route": "share_link_bundles.list",
+   "method": "GET",
+   "path": "/api/share_link_bundles/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "status"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_link_bundles.list.ordering-status",
+   "route": "share_link_bundles.list",
+   "method": "GET",
+   "path": "/api/share_link_bundles/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-status"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_link_bundles.list.extra0",
+   "route": "share_link_bundles.list",
+   "method": "GET",
+   "path": "/api/share_link_bundles/",
+   "query": {
+    "documents": "${doc_id}"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_link_bundles.list.extra1",
+   "route": "share_link_bundles.list",
+   "method": "GET",
+   "path": "/api/share_link_bundles/",
+   "query": {
+    "documents": "x"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_link_bundles.list.extra2",
+   "route": "share_link_bundles.list",
+   "method": "GET",
+   "path": "/api/share_link_bundles/",
+   "query": {
+    "status": "ready"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_link_bundles.list.auth",
+   "route": "share_link_bundles.list",
+   "method": "GET",
+   "path": "/api/share_link_bundles/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "anon",
+    "badtoken",
+    "inactive",
+    "admin@session",
+    "admin@basic"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_link_bundles.list.apiver",
+   "route": "share_link_bundles.list",
+   "method": "GET",
+   "path": "/api/share_link_bundles/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "none",
+    "99",
+    "abc"
+   ]
+  },
+  {
+   "id": "share_link_bundles.detail",
+   "route": "share_link_bundles.retrieve",
+   "method": "GET",
+   "path": "/api/share_link_bundles/${share_link_bundle_id}/",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "share_link_bundles.detail-unknown",
+   "route": "share_link_bundles.retrieve",
+   "method": "GET",
+   "path": "/api/share_link_bundles/999999999/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_link_bundles.detail-nonint",
+   "route": "share_link_bundles.retrieve",
+   "method": "GET",
+   "path": "/api/share_link_bundles/abc/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_link_bundles.detail-anon",
+   "route": "share_link_bundles.retrieve",
+   "method": "GET",
+   "path": "/api/share_link_bundles/${share_link_bundle_id}/",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "share_link_bundles.detail-noslash",
+   "route": "share_link_bundles.retrieve",
+   "method": "GET",
+   "path": "/api/share_link_bundles/${share_link_bundle_id}",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "follow": false
+  }
+ ]
+}

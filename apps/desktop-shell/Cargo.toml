@@ -1,0 +1,78 @@
+# PaperRust Desktop – Tauri 2 shell (window, splash, tray, first-start form, single instance).
+#
+# Deliberately an **own workspace** (empty `[workspace]` table, own Cargo.lock): Tauri brings
+# ~400 crates (WebView2/WebKit bindings, windows, muda, tray-icon …). This keeps the
+# root `Cargo.lock` and the builds of all other agents untouched. Adoption into the root workspace
+# is CORE-REQUEST 5 (docs/DESKTOP.md); until then:
+#   cd apps/desktop-shell && cargo build -j 1   (CARGO_TARGET_DIR as everywhere)
+#
+# All versions pinned exactly (as of 2026-11-09, latest 2.x without pre-releases).
+[package]
+name = "paperrust-desktop-shell"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-only"
+publish = false
+rust-version = "1.90"
+description = "PaperRust Desktop: Tauri-2-Hülle um den Supervisor paperrust-desktop"
+
+[[bin]]
+name = "paperrust-app"
+path = "src/main.rs"
+
+[workspace]
+
+[build-dependencies]
+tauri-build = { version = "=2.7.4", features = [] }
+
+[dependencies]
+paperrust-desktop = { path = "../desktop" }
+tauri = { version = "=2.12.5", features = ["tray-icon", "image-png"] }
+tauri-plugin-single-instance = "=2.5.5"
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros"] }
+tracing = "0.1"
+# Remote mode 2a (docs/REMOTE-APP.md §6): server detection, reachability, fetch certificate.
+# Same version as the root workspace (0.12, rustls); additionally the certificates of the
+# operating system (own company CA that WebView2 also trusts).
+reqwest = { version = "=0.12.28", default-features = false, features = ["rustls-tls", "rustls-tls-native-roots"] }
+serde_json = "1"
+url = "2.5"
+sha2 = "0.10"
+base64 = "0.22"
+# read/write `app.toml` (as apps/desktop).
+toml = { version = "1.2.0", default-features = false, features = ["parse", "display", "serde", "std"] }
+# Automatic updates (Z4, docs/DESKTOP.md §23): signature check (minisign/Ed25519, signed
+# version), target platform, download. Without `zip` (the NSIS installer is signed directly) and without
+# `system-proxy`. reqwest 0.13/base64 0.23/infer are already in the lock via tauri.
+tauri-plugin-updater = { version = "=2.14.1", default-features = false, features = ["rustls-tls"] }
+semver = "1"
+# The plugin's download (reqwest 0.13, `rustls-no-provider`) needs a process-wide
+# crypto provider; same version/feature as in the plugin (ring), no new package.
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
+# P5 (mode 2b/3): client core – SQLite replica, sync, `prapi://` gateway, token in the
+# keychain (docs/contract/pl-sync-client.md). Path dependency into the root workspace.
+pl-sync-client = { path = "../../crates/pl-sync-client" }
+
+# Spike TLS (REMOTE-APP §4): WebView2 `ServerCertificateErrorDetected` for confirmed, pinned
+# self-signed certificates. Same versions as wry/tauri (no additional crates).
+[target.'cfg(windows)'.dependencies]
+webview2-com = "=0.39.1"
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_System_Threading"] }
+windows-core = "0.62"
+
+[dev-dependencies]
+# Test runtime (MockRuntime) for the updater tests with the real plugin.
+tauri = { version = "=2.12.5", features = ["tray-icon", "image-png", "test"] }
+rcgen = { version = "0.13", default-features = false, features = ["ring", "pem"] }
+
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"

@@ -1,0 +1,19 @@
+From: frank@example.org
+To: paperless@example.org
+Subject: Fwd: original
+Date: Sat, 11 Jan 2025 13:00:00 +0100
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="b1"
+
+--b1
+Content-Type: text/plain
+
+see below
+--b1
+Content-Type: message/rfc822
+
+From: orig@example.org
+Subject: original
+
+original body
+--b1--

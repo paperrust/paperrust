@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<!--
+  PostgreSQL 17 für PaperRust – Unraid-Vorlage. Wer schon einen PostgreSQL-Container hat, legt dort
+  nur Datenbank + Benutzer "paperless" an und braucht diese Vorlage nicht.
+  Nutzung: nach /boot/config/plugins/dockerMan/templates-user/my-paperrust-postgres.xml kopieren.
+  Hinweis: Der Port wird nur gebraucht, wenn PaperRust die DB über die Unraid-IP erreicht
+  (Standard-Bridge). In einem eigenen Docker-Netz (docker network create paperrust, bei beiden
+  Containern "Network Type: Custom: paperrust") genügt PAPERRUST_DBHOST=paperrust-postgres ohne Port.
+-->
+<Container version="2">
+  <Name>paperrust-postgres</Name>
+  <Repository>docker.io/library/postgres:17</Repository>
+  <Registry>https://hub.docker.com/_/postgres</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>bash</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/paperrust/paperrust/issues</Support>
+  <Project>https://www.postgresql.org/</Project>
+  <Overview>PostgreSQL 17 als Datenbank für PaperRust. / PostgreSQL 17 database for PaperRust.</Overview>
+  <Category>Tools: Productivity:</Category>
+  <WebUI/>
+  <TemplateURL/>
+  <Icon>https://raw.githubusercontent.com/docker-library/docs/master/postgres/logo.png</Icon>
+  <ExtraParams>--health-cmd "pg_isready -U paperless -d paperless" --health-interval 10s --health-timeout 5s --health-retries 10</ExtraParams>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+  <Config Name="Port" Target="5432" Default="5432" Mode="tcp" Description="PostgreSQL-Port (links: Port auf dem Unraid-Server; 5432 belegt? z. B. 5433)" Type="Port" Display="always" Required="true" Mask="false">5432</Config>
+  <Config Name="Data" Target="/var/lib/postgresql/data" Default="/mnt/user/appdata/paperrust/pgdata" Mode="rw" Description="Datenbankdateien (Cache-Pool empfohlen)" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/paperrust/pgdata</Config>
+  <Config Name="POSTGRES_DB" Target="POSTGRES_DB" Default="paperless" Mode="" Description="Datenbank" Type="Variable" Display="advanced" Required="true" Mask="false">paperless</Config>
+  <Config Name="POSTGRES_USER" Target="POSTGRES_USER" Default="paperless" Mode="" Description="Benutzer" Type="Variable" Display="advanced" Required="true" Mask="false">paperless</Config>
+  <Config Name="POSTGRES_PASSWORD" Target="POSTGRES_PASSWORD" Default="" Mode="" Description="Passwort (dasselbe in PaperRust als DB password eintragen)" Type="Variable" Display="always" Required="true" Mask="true"/>
+</Container>

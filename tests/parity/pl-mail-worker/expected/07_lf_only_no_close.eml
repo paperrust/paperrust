@@ -1,0 +1,20 @@
+From: Grace <grace@example.org>
+Subject: LF only and no close boundary
+Date: Sun, 12 Jan 2025 14:00:00 +0100
+Content-Type: multipart/mixed; boundary=zz
+
+--zz
+Content-Type: text/plain
+
+part one
+--zz
+Content-Type: application/pdf
+Content-Disposition: attachment; filename=scan.PDF
+
+%PDF-1.4
+1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj
+2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj
+3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj
+trailer<</Root 1 0 R>>
+%%EOF
+--zz--

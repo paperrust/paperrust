@@ -1,0 +1,141 @@
+/* PaperRust design – design tokens (docs/DESIGN2.md §2). Single source for colors, typography, spacing.
+   Contrasts (≥ 4.5:1 for text) are checked by tools/contrast-design2.test.mjs against exactly this file.
+   Light = :root, dark = [data-theme="dark"] or system with [data-theme="auto"]. */
+:root {
+  /* Colors – light */
+  --d2-bg: #f6f5f3;
+  --d2-surface: #ffffff;
+  --d2-surface-2: #f1efec;
+  --d2-surface-3: #e8e5e1;
+  --d2-border: #dedad5;
+  --d2-border-strong: #b9b3ab;
+  --d2-text: #1e1c1a;
+  --d2-text-2: #57524c;
+  --d2-text-3: #6b655e;
+  --d2-accent: #b7410e;
+  --d2-accent-hover: #9c370b;
+  --d2-accent-text: #a63b0d;
+  --d2-accent-soft: #fbede6;
+  --d2-on-accent: #ffffff;
+  --d2-ok: #1e7a46;
+  --d2-ok-soft: #e5f4ea;
+  --d2-warn: #8a5a00;
+  --d2-warn-soft: #fbf1dc;
+  --d2-danger: #b42318;
+  --d2-danger-soft: #fdecea;
+  --d2-info: #1d5fa8;
+  --d2-info-soft: #e7f0fa;
+  --d2-overlay: rgba(20, 18, 16, 0.45);
+  --d2-shadow-1: 0 1px 2px rgba(30, 28, 26, 0.06), 0 1px 3px rgba(30, 28, 26, 0.08);
+  --d2-shadow-2: 0 8px 24px rgba(30, 28, 26, 0.14), 0 2px 6px rgba(30, 28, 26, 0.08);
+
+  /* Typography (Inter, steps 12/13/14/16/20/24) */
+  --d2-font: 'Inter Variable', Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --d2-mono: ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', Consolas, monospace;
+  --d2-fs-xs: 0.75rem;
+  --d2-fs-sm: 0.8125rem;
+  --d2-fs-md: 0.875rem;
+  --d2-fs-lg: 1rem;
+  --d2-fs-xl: 1.25rem;
+  --d2-fs-2xl: 1.5rem;
+  --d2-lh: 1.45;
+
+  /* Spacing (4-point grid) and radii */
+  --d2-s1: 4px;
+  --d2-s2: 8px;
+  --d2-s3: 12px;
+  --d2-s4: 16px;
+  --d2-s5: 24px;
+  --d2-s6: 32px;
+  --d2-r1: 6px;
+  --d2-r2: 10px;
+  --d2-r-pill: 999px;
+
+  /* Grid of the UI (fixed dimensions, nothing shifts) */
+  --d2-header-h: 52px;
+  --d2-nav-w: 232px;
+  --d2-rail-w: 64px;
+  --d2-tabbar-h: 56px;
+  --d2-list-w: 380px;
+  --d2-meta-w: 340px;
+  --d2-control-h: 32px;
+  --d2-row-h: 56px;
+  /* Density (Settings → Appearance): affects only rows of lists and tables, not controls */
+  --d2-row-pad-y: 8px; /* List row top/bottom */
+  --d2-item-h: 32px; /* Entry in navigation, menu, area list */
+  --d2-cell-py: 0.5rem; /* Table cell top/bottom */
+  color-scheme: light;
+}
+
+/* Rust sparingly (docs/DESIGN2-ENTWIRREN.md §7): --d2-accent only for primary button, active selection and focus.
+   Links in text use --d2-link (no rust). */
+:root {
+  --d2-link: var(--d2-info);
+}
+
+:root[data-density='compact'] {
+  --d2-row-h: 44px;
+  --d2-row-pad-y: 4px;
+  --d2-item-h: 28px;
+  --d2-cell-py: 0.25rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme='auto'] {
+    --d2-bg: #141311;
+    --d2-surface: #1c1b19;
+    --d2-surface-2: #252320;
+    --d2-surface-3: #302d29;
+    --d2-border: #36332e;
+    --d2-border-strong: #5a554e;
+    --d2-text: #f2efeb;
+    --d2-text-2: #c9c3bb;
+    --d2-text-3: #a39c93;
+    --d2-accent: #b7410e;
+    --d2-accent-hover: #cc4c15;
+    --d2-accent-text: #f08a5d;
+    --d2-accent-soft: #3a2117;
+    --d2-on-accent: #ffffff;
+    --d2-ok: #5cc98a;
+    --d2-ok-soft: #173323;
+    --d2-warn: #e8b24a;
+    --d2-warn-soft: #3a2c10;
+    --d2-danger: #f28b82;
+    --d2-danger-soft: #3d1a17;
+    --d2-info: #7fb2ef;
+    --d2-info-soft: #172a40;
+    --d2-overlay: rgba(0, 0, 0, 0.6);
+    --d2-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --d2-shadow-2: 0 8px 24px rgba(0, 0, 0, 0.5);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --d2-bg: #141311;
+  --d2-surface: #1c1b19;
+  --d2-surface-2: #252320;
+  --d2-surface-3: #302d29;
+  --d2-border: #36332e;
+  --d2-border-strong: #5a554e;
+  --d2-text: #f2efeb;
+  --d2-text-2: #c9c3bb;
+  --d2-text-3: #a39c93;
+  --d2-accent: #b7410e;
+  --d2-accent-hover: #cc4c15;
+  --d2-accent-text: #f08a5d;
+  --d2-accent-soft: #3a2117;
+  --d2-on-accent: #ffffff;
+  --d2-ok: #5cc98a;
+  --d2-ok-soft: #173323;
+  --d2-warn: #e8b24a;
+  --d2-warn-soft: #3a2c10;
+  --d2-danger: #f28b82;
+  --d2-danger-soft: #3d1a17;
+  --d2-info: #7fb2ef;
+  --d2-info-soft: #172a40;
+  --d2-overlay: rgba(0, 0, 0, 0.6);
+  --d2-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --d2-shadow-2: 0 8px 24px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+}

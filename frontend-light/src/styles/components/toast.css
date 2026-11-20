@@ -1,0 +1,112 @@
+/* Single message (Toast.svelte): as a popup or as a row in the notification list. */
+
+::deep .toast-body {
+  position: relative;
+}
+
+/* Base colors; --pr-toast-accent colors icon and action button per level */
+.toast {
+  --pr-toast-accent: var(--pr-toast-info);
+  background-color: var(--pr-toast-bg);
+  color: var(--bs-body-color);
+  overflow: hidden;
+}
+
+.toast.toast-success {
+  --pr-toast-accent: var(--pr-toast-success);
+  background-color: var(--pr-toast-success-bg);
+  border-color: color-mix(in srgb, var(--pr-toast-success) 30%, transparent);
+}
+
+.toast.toast-error {
+  --pr-toast-accent: var(--pr-toast-error);
+  background-color: var(--pr-toast-error-bg);
+  border-color: color-mix(in srgb, var(--pr-toast-error) 35%, transparent);
+}
+
+.toast-icon {
+  color: var(--pr-toast-accent);
+}
+
+.toast-content {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Close cross: small and pale, more distinct on hover */
+.toast .btn-close {
+  font-size: 0.6rem;
+  margin-top: 0.3rem;
+  margin-left: 0.75rem !important;
+  opacity: 0.45;
+}
+
+.toast:hover .btn-close {
+  opacity: 0.85;
+}
+
+/* Row in the notification list: full width, without border and shadow.
+   Order matters: error color must beat row and hover color. */
+.toast.toast-list-item {
+  width: 100%;
+  max-width: none;
+  background-color: var(--pr-toast-row-bg);
+  border: 0;
+  box-shadow: none;
+}
+
+.toast.toast-list-item:hover {
+  background-color: var(--pr-toast-row-hover-bg);
+}
+
+.toast.toast-list-item.toast-error {
+  background-color: var(--pr-toast-error-bg);
+}
+
+.toast.toast-list-item ::deep .toast-body {
+  padding: 0.625rem 0.75rem;
+}
+
+.toast.toast-list-item .toast-time {
+  margin-top: 0.1rem;
+}
+
+/* unread: small dot before the time */
+.toast.toast-list-item.toast-new .toast-time::before {
+  content: "";
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-right: 0.4rem;
+  vertical-align: 0.05rem;
+  border-radius: 50%;
+  background-color: var(--pr-toast-info);
+}
+
+/* Action button in the accent color, only lightly tinted */
+.toast-action {
+  --bs-btn-padding-y: .1rem;
+  --bs-btn-padding-x: .6rem;
+  --bs-btn-font-size: .8rem;
+  --bs-btn-font-weight: 600;
+  --bs-btn-color: var(--pr-toast-accent);
+  --bs-btn-bg: color-mix(in srgb, var(--pr-toast-accent) 14%, transparent);
+  --bs-btn-border-color: transparent;
+  --bs-btn-hover-color: var(--pr-toast-accent);
+  --bs-btn-hover-bg: color-mix(in srgb, var(--pr-toast-accent) 24%, transparent);
+  --bs-btn-hover-border-color: transparent;
+  --bs-btn-active-color: var(--pr-toast-accent);
+  --bs-btn-active-bg: color-mix(in srgb, var(--pr-toast-accent) 30%, transparent);
+  --bs-btn-active-border-color: transparent;
+}
+
+/* Remaining time as a thin line at the bottom edge */
+.progress {
+  height: 2px;
+  background-color: transparent;
+}
+
+.progress ::deep .progress-bar {
+  background-color: var(--bs-secondary-color);
+  opacity: 0.5;
+}

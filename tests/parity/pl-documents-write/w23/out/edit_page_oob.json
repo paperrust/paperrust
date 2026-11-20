@@ -1,0 +1,22 @@
+{
+  "django": {
+    "status": 400,
+    "body": {
+      "non_field_errors": [
+        "Page 9 is out of bounds for document with 3 pages."
+      ]
+    },
+    "plan": [],
+    "files": {}
+  },
+  "rust": {
+    "status": 400,
+    "body": {
+      "non_field_errors": [
+        "Page 9 is out of bounds for document with 3 pages."
+      ]
+    },
+    "plan": [],
+    "files": {}
+  }
+}

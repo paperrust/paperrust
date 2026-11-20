@@ -1,0 +1,17 @@
+{% extends "layout.html" %}
+{% set page_title = t("auth.page.confirm_email") %}
+{% block body %}
+    {%- if confirmation and can_confirm %}
+    <p>{{ t("auth.confirm.text", EMAIL=email, USER=user_display) }}</p>
+    <form method="post" action="{{ action_url }}">
+      {{ csrf_input }}
+      {{ redirect_field }}
+      <button class="btn" type="submit">{{ t("auth.confirm.submit") }}</button>
+    </form>
+    {%- elif confirmation %}
+    <p>{{ t("auth.confirm.taken", EMAIL=email) }}</p>
+    {%- else %}
+    <p>{{ t("auth.confirm.invalid") }}</p>
+    <a class="btn btn-quiet" href="{{ urls.account_login }}">{{ t("auth.common.to_login") }}</a>
+    {%- endif %}
+{% endblock %}

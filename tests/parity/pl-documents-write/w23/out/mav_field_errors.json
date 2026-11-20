@@ -1,0 +1,34 @@
+{
+  "django": {
+    "status": 400,
+    "body": {
+      "documents": [
+        "Some documents in documents don't exist or were specified twice."
+      ],
+      "root_document_id": [
+        "This field is required."
+      ],
+      "version_label": [
+        "Ensure this field has no more than 64 characters."
+      ]
+    },
+    "plan": [],
+    "files": {}
+  },
+  "rust": {
+    "status": 400,
+    "body": {
+      "documents": [
+        "Some documents in documents don't exist or were specified twice."
+      ],
+      "root_document_id": [
+        "This field is required."
+      ],
+      "version_label": [
+        "Ensure this field has no more than 64 characters."
+      ]
+    },
+    "plan": [],
+    "files": {}
+  }
+}

@@ -1,0 +1,7 @@
+{"users": [
+  {"name": "admin",    "username": "admin", "password": "admin", "token": "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a001", "role": "superuser"},
+  {"name": "user1",    "username": "alice", "password": "alice", "token": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a002", "role": "user"},
+  {"name": "user2",    "username": "bob",   "password": "bob",   "token": "b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b003", "role": "user"},
+  {"name": "noperm",   "username": "carol", "password": "carol", "token": "c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c004", "role": "no model perms"},
+  {"name": "inactive", "username": "dave",  "password": "dave",  "token": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d005", "role": "is_active=false"}
+]}

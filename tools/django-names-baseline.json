@@ -1,0 +1,202 @@
+{
+ "pl-accounts": {
+  "documents_document": 2
+ },
+ "pl-ai": {
+  "documents_correspondent": 2,
+  "documents_customfield": 2,
+  "documents_customfieldinstance": 1,
+  "documents_document": 14,
+  "documents_document_tags": 6,
+  "documents_documenttype": 2,
+  "documents_note": 1,
+  "documents_storagepath": 2,
+  "documents_tag": 6
+ },
+ "pl-auth-api": {
+  "documents_correspondent": 1,
+  "documents_document": 1,
+  "documents_documenttype": 1,
+  "documents_note": 1,
+  "documents_storagepath": 1,
+  "documents_tag": 1,
+  "guardian_groupobjectpermission": 1,
+  "guardian_userobjectpermission": 1
+ },
+ "pl-authz": {
+  "documents_correspondent": 1,
+  "documents_customfield": 1,
+  "documents_document": 4,
+  "documents_documenttype": 1,
+  "documents_note": 1,
+  "documents_storagepath": 1,
+  "documents_tag": 4,
+  "guardian_groupobjectpermission": 5,
+  "guardian_userobjectpermission": 5
+ },
+ "pl-cli": {
+  "documents_correspondent": 3,
+  "documents_customfieldinstance": 1,
+  "documents_document": 19,
+  "documents_document_tags": 5,
+  "documents_documenttype": 2,
+  "documents_storagepath": 2,
+  "documents_tag": 14,
+  "guardian_groupobjectpermission": 1,
+  "guardian_userobjectpermission": 1
+ },
+ "pl-consumer": {
+  "documents_correspondent": 17,
+  "documents_customfield": 3,
+  "documents_customfieldinstance": 8,
+  "documents_document": 28,
+  "documents_document_tags": 7,
+  "documents_documenttype": 11,
+  "documents_note": 1,
+  "documents_storagepath": 8,
+  "documents_tag": 22,
+  "guardian_groupobjectpermission": 4,
+  "guardian_userobjectpermission": 4
+ },
+ "pl-core": {
+  "documents_tag": 2
+ },
+ "pl-docfilter": {
+  "documents_correspondent": 1,
+  "documents_customfield": 2,
+  "documents_customfieldinstance": 4,
+  "documents_document": 10,
+  "documents_document_tags": 2,
+  "documents_documenttype": 1,
+  "documents_note": 2,
+  "documents_storagepath": 1,
+  "documents_tag": 1,
+  "guardian_groupobjectpermission": 1,
+  "guardian_userobjectpermission": 1
+ },
+ "pl-documents": {
+  "documents_correspondent": 2,
+  "documents_customfield": 3,
+  "documents_customfieldinstance": 4,
+  "documents_document": 14,
+  "documents_document_tags": 2,
+  "documents_documenttype": 1,
+  "documents_note": 2,
+  "documents_storagepath": 1,
+  "documents_tag": 3
+ },
+ "pl-documents-write": {
+  "documents_correspondent": 6,
+  "documents_customfield": 4,
+  "documents_customfieldinstance": 18,
+  "documents_document": 71,
+  "documents_document_tags": 13,
+  "documents_documenttype": 4,
+  "documents_note": 7,
+  "documents_storagepath": 4,
+  "documents_tag": 8,
+  "guardian_groupobjectpermission": 3,
+  "guardian_userobjectpermission": 3
+ },
+ "pl-fields-views": {
+  "documents_customfield": 6,
+  "documents_customfieldinstance": 4,
+  "documents_document": 11
+ },
+ "pl-files": {
+  "documents_correspondent": 1,
+  "documents_document": 4
+ },
+ "pl-guard": {
+  "documents_document": 6,
+  "documents_tag": 1
+ },
+ "pl-indexer": {
+  "documents_correspondent": 1,
+  "documents_customfield": 1,
+  "documents_customfieldinstance": 2,
+  "documents_document": 5,
+  "documents_document_tags": 1,
+  "documents_documenttype": 1,
+  "documents_note": 1,
+  "documents_storagepath": 1,
+  "documents_tag": 1,
+  "guardian_groupobjectpermission": 1,
+  "guardian_userobjectpermission": 1
+ },
+ "pl-labels": {
+  "documents_document": 7
+ },
+ "pl-mail": {
+  "documents_correspondent": 7,
+  "documents_document": 1,
+  "documents_documenttype": 3,
+  "documents_tag": 3,
+  "guardian_groupobjectpermission": 5,
+  "guardian_userobjectpermission": 5
+ },
+ "pl-objects": {
+  "documents_correspondent": 2,
+  "documents_customfield": 1,
+  "documents_customfieldinstance": 1,
+  "documents_document": 16,
+  "documents_document_tags": 6,
+  "documents_documenttype": 2,
+  "documents_storagepath": 3,
+  "documents_tag": 12
+ },
+ "pl-search": {
+  "documents_customfield": 1,
+  "documents_document": 6,
+  "documents_tag": 1,
+  "guardian_groupobjectpermission": 2,
+  "guardian_userobjectpermission": 2
+ },
+ "pl-server": {
+  "documents_correspondent": 3,
+  "documents_customfield": 3,
+  "documents_document": 4,
+  "documents_document_tags": 2,
+  "documents_documenttype": 3,
+  "documents_storagepath": 3,
+  "documents_tag": 4
+ },
+ "pl-store": {
+  "documents_correspondent": 2,
+  "documents_customfield": 3,
+  "documents_customfieldinstance": 5,
+  "documents_document": 24,
+  "documents_document_tags": 5,
+  "documents_documenttype": 2,
+  "documents_note": 2,
+  "documents_storagepath": 2,
+  "documents_tag": 2,
+  "guardian_groupobjectpermission": 2,
+  "guardian_userobjectpermission": 2
+ },
+ "pl-sync": {
+  "guardian_groupobjectpermission": 1,
+  "guardian_userobjectpermission": 1
+ },
+ "pl-system": {
+  "documents_document": 3,
+  "documents_document_tags": 1
+ },
+ "pl-timeline": {
+  "documents_correspondent": 1,
+  "documents_customfield": 2,
+  "documents_customfieldinstance": 3,
+  "documents_document": 9,
+  "documents_document_tags": 2,
+  "documents_documenttype": 2,
+  "documents_storagepath": 1,
+  "documents_tag": 1
+ },
+ "pl-workflows": {
+  "documents_correspondent": 1,
+  "documents_customfield": 1,
+  "documents_documenttype": 1,
+  "documents_storagepath": 1,
+  "documents_tag": 1
+ }
+}

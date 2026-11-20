@@ -1,0 +1,36 @@
+{
+ "rules": [
+  {
+   "name": "random-slug",
+   "reason": "slug = get_random_string(50) ist zufällig (A und B erzeugen verschiedene Werte)",
+   "ref": "docs/contract/pl-fields-views.md#gemeinsames-verhalten-alle-routen",
+   "case": "s*.create*",
+   "kind": "value",
+   "path": ".*\\.slug"
+  },
+  {
+   "name": "random-select-option-id",
+   "reason": "fehlende Select-Options-IDs werden zufällig erzeugt (get_random_string(16))",
+   "ref": "docs/contract/pl-fields-views.md#1-custom-fields--apicustom_fields",
+   "case": "cf.create.select_generated_ids*",
+   "kind": "value",
+   "path": ".*\\.select_options\\[\\d+\\]\\.id"
+  },
+  {
+   "name": "bundle-expiration-now",
+   "reason": "expiration = timezone.now() + expiration_days (Zeitpunkt der Anfrage)",
+   "ref": "docs/contract/pl-fields-views.md#4-share-link-bundles--apishare_link_bundles",
+   "case": "slb.create.flow*",
+   "kind": "value",
+   "path": ".*\\.expiration"
+  },
+  {
+   "name": "w2-random-slug",
+   "reason": "slug = get_random_string(50) ist zufällig (W2-Fälle mit Share-Link-Anlage)",
+   "ref": "docs/contract/pl-fields-views.md#gemeinsames-verhalten-alle-routen",
+   "case": "w2.sl.*",
+   "kind": "value",
+   "path": ".*\\.slug"
+  }
+ ]
+}

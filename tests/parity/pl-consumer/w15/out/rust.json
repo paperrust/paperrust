@@ -1,0 +1,37 @@
+{
+  "media_root": "<repo>\\crates\\pl-consumer\\../..\\tests/parity/pl-consumer/w15\\out/rs_root\\media",
+  "steps": {
+    "reprocess_text": {
+      "ok": true
+    },
+    "reprocess_pdf": {
+      "ok": true
+    },
+    "reprocess_archive": {
+      "ok": true
+    },
+    "reprocess_missing": {
+      "ok": false,
+      "error_type": "DoesNotExist",
+      "error": "Document matching query does not exist."
+    },
+    "scheduled_1": {
+      "ok": true
+    },
+    "scheduled_2": {
+      "ok": true
+    },
+    "bulk_update": {
+      "ok": true
+    }
+  },
+  "tasks": [
+    {
+      "task": "documents.tasks.apply_ai_suggestions",
+      "kwargs": {
+        "action_id": 9002,
+        "document_id": 9011
+      }
+    }
+  ]
+}

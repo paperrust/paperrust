@@ -1,0 +1,4 @@
+# pnpm 11: build scripts only for approved packages (otherwise ERR_PNPM_IGNORED_BUILDS in a fresh clone).
+# @parcel/watcher comes optionally via sass (only sass --watch); not needed -> do not build.
+allowBuilds:
+  '@parcel/watcher': false

@@ -1,0 +1,28 @@
+{
+  "django": {
+    "status": 400,
+    "body": {
+      "update_document": [
+        "Must be a valid boolean."
+      ],
+      "include_metadata": [
+        "This field may not be null."
+      ]
+    },
+    "plan": [],
+    "files": {}
+  },
+  "rust": {
+    "status": 400,
+    "body": {
+      "update_document": [
+        "Must be a valid boolean."
+      ],
+      "include_metadata": [
+        "This field may not be null."
+      ]
+    },
+    "plan": [],
+    "files": {}
+  }
+}

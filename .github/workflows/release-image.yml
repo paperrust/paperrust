@@ -1,0 +1,124 @@
+# PaperRust – build and publish the multi-arch image (linux/amd64 + linux/arm64).
+#
+# PREPARED, NOT ACTIVE: the workflow does nothing as long as the repository variable PAPERRUST_IMAGE
+# is not set (Settings -> Secrets and variables -> Actions -> Variables), e.g.
+# "ghcr.io/<org>/paperrust". For ghcr.io in the same account GITHUB_TOKEN is enough
+# (packages: write). For Docker Hub additionally the secrets REGISTRY_USERNAME / REGISTRY_TOKEN and
+# PAPERRUST_IMAGE="docker.io/<org>/paperrust".
+#
+# Procedure ("push by digest"): one native runner per architecture builds and uploads only the layers
+# (without a tag); then one job combines both digests into a manifest with the tags x.y.z, x.y,
+# latest (or edge for a manual run).
+
+name: Release-Image
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-image-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: vars.PAPERRUST_IMAGE != ''
+    name: Build linux/${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: docker/setup-buildx-action@v3
+      - name: Log in (ghcr.io with GITHUB_TOKEN, otherwise secrets)
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ startsWith(vars.PAPERRUST_IMAGE, 'ghcr.io/') && 'ghcr.io' || 'docker.io' }}
+          username: ${{ startsWith(vars.PAPERRUST_IMAGE, 'ghcr.io/') && github.actor || secrets.REGISTRY_USERNAME }}
+          password: ${{ startsWith(vars.PAPERRUST_IMAGE, 'ghcr.io/') && secrets.GITHUB_TOKEN || secrets.REGISTRY_TOKEN }}
+      - name: Version
+        id: v
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          [[ "$GITHUB_REF_TYPE" == tag ]] || v="0.0.0-edge"
+          echo "version=$v" >>"$GITHUB_OUTPUT"
+      - name: Build + push (digest only)
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          build-args: |
+            VCS_REF=${{ github.sha }}
+            PAPERRUST_VERSION=${{ steps.v.outputs.version }}
+          outputs: type=image,name=${{ vars.PAPERRUST_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha,scope=paperrust-image-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=paperrust-image-${{ matrix.arch }}
+      - name: Remember digest
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          d="${{ steps.build.outputs.digest }}"
+          touch "$RUNNER_TEMP/digests/${d#sha256:}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          retention-days: 1
+
+  manifest:
+    if: vars.PAPERRUST_IMAGE != ''
+    name: Multi-arch manifest + tags
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: digest-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/digests
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ startsWith(vars.PAPERRUST_IMAGE, 'ghcr.io/') && 'ghcr.io' || 'docker.io' }}
+          username: ${{ startsWith(vars.PAPERRUST_IMAGE, 'ghcr.io/') && github.actor || secrets.REGISTRY_USERNAME }}
+          password: ${{ startsWith(vars.PAPERRUST_IMAGE, 'ghcr.io/') && secrets.GITHUB_TOKEN || secrets.REGISTRY_TOKEN }}
+      - name: Tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ vars.PAPERRUST_IMAGE }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' && !contains(github.ref_name, '-') }}
+            type=raw,value=edge,enable=${{ github.ref_type != 'tag' }}
+      - name: Create manifest
+        working-directory: ${{ runner.temp }}/digests
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<<"$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ vars.PAPERRUST_IMAGE }}@sha256:%s ' *)
+      - name: Verify
+        run: docker buildx imagetools inspect "${{ vars.PAPERRUST_IMAGE }}:${{ steps.meta.outputs.version }}"

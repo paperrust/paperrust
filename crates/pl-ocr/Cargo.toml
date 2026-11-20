@@ -1,0 +1,41 @@
+[package]
+name = "pl-ocr"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+# values from the UI (docs/SETTINGS.md §8)
+pl-envlive.workspace = true
+# E14: text extraction with reading order like `pdftotext -layout` (pl-parsers `pdftext`); pl-parsers
+# depends on no pl-* crate, so no cycle.
+pl-parsers.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+flate2.workspace = true
+sha2.workspace = true
+chrono.workspace = true
+# Pinned versions from [workspace.dependencies]: lopdf (like pl-parsers), image (PNG/JPEG/TIFF/BMP/
+# GIF/WebP), libloading (PDFium dynamic), tiff (multi-page TIFFs, same version as under image).
+lopdf.workspace = true
+image.workspace = true
+libloading.workspace = true
+tiff.workspace = true
+# Remote OCR (Azure Document Intelligence, src/remote.rs): HTTPS client, own runtime per call.
+reqwest.workspace = true
+tokio.workspace = true
+base64.workspace = true
+url.workspace = true
+
+# Windows.Media.Ocr (optional via PAPERRUST_OCR_ENGINE). windows-rs: MIT OR Apache-2.0; only the
+# required WinRT namespaces (short build time). Same version as windows-core in the lockfile.
+[target.'cfg(windows)'.dependencies]
+windows = { version = "=0.62.2", features = ["Foundation", "Foundation_Collections", "Globalization", "Graphics_Imaging", "Media_Ocr", "Storage_Streams"] }
+
+[dev-dependencies]
+tempfile.workspace = true
+# render test pages with a system font (tests/preprocess_e2e.rs)
+ab_glyph.workspace = true

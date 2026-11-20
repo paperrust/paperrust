@@ -1,0 +1,50 @@
+{
+  "django": {
+    "status": 200,
+    "body": {
+      "result": "OK"
+    },
+    "plan": [
+      {
+        "kind": "task",
+        "task": {
+          "task": "documents.tasks.bulk_update_documents",
+          "args": [],
+          "kwargs": {
+            "document_ids": [
+              8
+            ]
+          },
+          "trigger_source": "system",
+          "link": [],
+          "link_error": []
+        }
+      }
+    ],
+    "files": {}
+  },
+  "rust": {
+    "status": 200,
+    "body": {
+      "result": "OK"
+    },
+    "plan": [
+      {
+        "kind": "task",
+        "task": {
+          "task": "documents.tasks.bulk_update_documents",
+          "args": [],
+          "kwargs": {
+            "document_ids": [
+              8
+            ]
+          },
+          "trigger_source": "system",
+          "link": [],
+          "link_error": []
+        }
+      }
+    ],
+    "files": {}
+  }
+}

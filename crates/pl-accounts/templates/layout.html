@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="{{ html_lang() }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="color-scheme" content="light dark">
+<title>{{ page_title }} · {{ SITE_NAME }}</title>
+<style>
+:root {
+  --bg: #f4f6f5; --card: #fff; --ink: #1f1a17; --muted: #5b5f63; --line: #d5d9dc; --field: #fff;
+  --err-bg: #fbe9e7; --err-ink: #8a1c0b; --ok-bg: #e5f3ea; --ok-ink: #145a32; --info-bg: #e8f0f6; --info-ink: #1b4560;
+  --warn-bg: #fdf3dc; --warn-ink: #6b4a04; --r: 2px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+body { --accent: var(--pngx-primary, #b7410e); --accent-hover: var(--pngx-primary-hover, #9e380c); --link: var(--accent); }
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121315; --card: #1b1c1f; --ink: #d3d7de; --muted: #9aa1ab; --line: #34363b; --field: #121315;
+    --err-bg: #3a1a14; --err-ink: #f2b8a8; --ok-bg: #14301f; --ok-ink: #a9dcb9; --info-bg: #142735; --info-ink: #a9cbe3;
+    --warn-bg: #352a10; --warn-ink: #ead39b;
+  }
+  body { --link: color-mix(in srgb, var(--accent) 60%, #fff); }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body { background: var(--bg); color: var(--ink); font-size: 15px; line-height: 1.5; }
+.auth { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 16px; }
+.brand { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; min-height: 40px; }
+.brand-logo { height: 56px; width: auto; max-width: 260px; display: block; }
+.brand-mark { width: 26px; height: 32px; background: var(--ink); clip-path: polygon(0 0, 65% 0, 100% 28%, 100% 100%, 0 100%); position: relative; }
+.brand-mark::after { content: ""; position: absolute; right: 0; top: 0; width: 35%; height: 28%; background: var(--accent); clip-path: polygon(0 0, 100% 100%, 0 100%); }
+.brand-name { font-size: 22px; font-weight: 700; letter-spacing: .01em; }
+.card { width: 100%; max-width: 400px; background: var(--card); border: 1px solid var(--line); border-top: 3px solid var(--accent); border-radius: var(--r); padding: 28px 28px 24px; }
+h1 { font-size: 20px; font-weight: 600; margin: 0 0 14px; }
+p { margin: 0 0 14px; }
+.muted { color: var(--muted); }
+a { color: var(--link); }
+a:hover { color: var(--accent-hover); }
+.note { border-radius: var(--r); padding: 10px 12px; margin: 0 0 14px; border-left: 3px solid currentColor; }
+.note-error { background: var(--err-bg); color: var(--err-ink); }
+.note-success { background: var(--ok-bg); color: var(--ok-ink); }
+.note-info, .note-debug { background: var(--info-bg); color: var(--info-ink); }
+.note-warning { background: var(--warn-bg); color: var(--warn-ink); }
+.note p { margin: 0; }
+.field { margin: 0 0 14px; }
+.field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.field input { width: 100%; font: inherit; color: var(--ink); background: var(--field); border: 1px solid var(--line); border-radius: var(--r); padding: 9px 10px; }
+.field input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: var(--accent); }
+.btn { display: block; width: 100%; font: inherit; font-weight: 600; text-align: center; text-decoration: none; cursor: pointer; border-radius: var(--r); padding: 10px 14px; border: 1px solid var(--accent); background: var(--accent); color: #fff; }
+.btn:hover, .btn:focus-visible { background: var(--accent-hover); border-color: var(--accent-hover); color: #fff; }
+.btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.btn-quiet { background: transparent; color: var(--ink); border-color: var(--line); }
+.btn-quiet:hover, .btn-quiet:focus-visible { background: var(--bg); color: var(--ink); border-color: var(--muted); }
+.btn + .btn, .btn + form, form + form { margin-top: 10px; }
+.links { margin: 16px 0 0; text-align: center; font-size: 14px; }
+.links p { margin: 6px 0 0; }
+.divider { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; margin: 18px 0 12px; }
+.divider::before, .divider::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
+.providers { list-style: none; margin: 0; padding: 0; }
+.providers li + li { margin-top: 10px; }
+.providers form { margin: 0; }
+.foot { margin-top: 18px; font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main class="auth">
+  <header class="brand">
+    {%- if APP_LOGO %}
+    <picture>
+      {%- if APP_LOGO_DARK %}<source media="(prefers-color-scheme: dark)" srcset="{{ APP_LOGO_DARK }}">{% endif %}
+      <img class="brand-logo" src="{{ APP_LOGO }}" alt="{{ APP_TITLE or SITE_NAME }}">
+    </picture>
+    {%- else %}
+    <span class="brand-mark" aria-hidden="true"></span><span class="brand-name">{{ APP_TITLE or SITE_NAME }}</span>
+    {%- endif %}
+  </header>
+  <section class="card">
+    <h1>{{ page_title }}</h1>
+    {%- for message in messages %}
+    <div class="note note-{{ message.level_tag }}" role="status">{{ message.text }}</div>
+    {%- endfor %}
+    {%- if form_errors %}
+    <div class="note note-error" role="alert">
+      {%- for errors in form_errors %}{% for error in errors %}
+      <p>{{ error }}</p>
+      {%- endfor %}{% endfor %}
+    </div>
+    {%- elif GET.sharelink_notfound %}
+    <div class="note note-error" role="alert">{{ t("auth.share.not_found") }}</div>
+    {%- elif GET.sharelink_expired %}
+    <div class="note note-error" role="alert">{{ t("auth.share.expired") }}</div>
+    {%- endif %}
+    {% block body %}{% endblock %}
+  </section>
+  {%- block below %}{% endblock %}
+  <footer class="foot">{{ t("auth.footer.license") }}</footer>
+</main>
+</body>
+</html>

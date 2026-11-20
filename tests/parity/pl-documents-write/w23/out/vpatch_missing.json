@@ -1,0 +1,22 @@
+{
+  "django": {
+    "status": 400,
+    "body": {
+      "version_label": [
+        "This field is required."
+      ]
+    },
+    "plan": [],
+    "files": {}
+  },
+  "rust": {
+    "status": 400,
+    "body": {
+      "version_label": [
+        "This field is required."
+      ]
+    },
+    "plan": [],
+    "files": {}
+  }
+}

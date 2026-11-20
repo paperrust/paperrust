@@ -1,0 +1,627 @@
+openapi: 3.1.0
+info:
+  title: PaperRust API v2
+  version: "2"
+  description: |
+    Native API of PaperRust under /rs/api/v2 (docs/ARCHITECTURE-V2.md §3, docs/SYNC.md §3/§8,
+    contract docs/contract/pl-api-v2.md). UUID keys with `legacy_id` for v1/Angular links, `rev`
+    for optimistic locking (ETag / If-Match), cursor pagination, RFC 3339 UTC timestamps.
+servers:
+  - url: /rs/api/v2
+security:
+  - session: []
+  - token: []
+  - device: []
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: sessionid
+      description: Shared Django session; unsafe methods need X-CSRFToken (csrftoken cookie).
+    token:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: "v1 token: `Token <key>`"
+    device:
+      type: http
+      scheme: bearer
+      description: "Device token `prt_…` from POST /auth/devices"
+  parameters:
+    Uuid:
+      name: uuid
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    Cursor:
+      name: cursor
+      in: query
+      schema: {type: string}
+    Limit:
+      name: limit
+      in: query
+      schema: {type: integer, minimum: 1, maximum: 1000, default: 100}
+    IfMatch:
+      name: If-Match
+      in: header
+      schema: {type: string, example: '"7"'}
+  responses:
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+  schemas:
+    LifeAreaRules:
+      type: object
+      description: any-of rules (object uuids)
+      properties:
+        tags: {type: array, maxItems: 200, items: {type: string, format: uuid}}
+        document_types: {type: array, maxItems: 200, items: {type: string, format: uuid}}
+        storage_paths: {type: array, maxItems: 200, items: {type: string, format: uuid}}
+        correspondents: {type: array, maxItems: 200, items: {type: string, format: uuid}}
+    LifeAreaWrite:
+      type: object
+      properties:
+        uuid: {type: string, format: uuid, description: PUT only – keep identity}
+        name: {type: string, minLength: 1, maxLength: 64}
+        color: {type: string, pattern: '^#[0-9A-Fa-f]{6}$'}
+        icon: {type: string, pattern: '^[a-z0-9-]{1,32}$'}
+        order: {type: integer}
+        rules: {$ref: '#/components/schemas/LifeAreaRules'}
+    LifeArea:
+      type: object
+      properties:
+        uuid: {type: string, format: uuid}
+        scope: {type: string, enum: [user, instance]}
+        name: {type: string}
+        color: {type: string}
+        icon: {type: string}
+        order: {type: integer}
+        rules: {$ref: '#/components/schemas/LifeAreaRules'}
+        created: {type: string, format: date-time}
+        modified: {type: string, format: date-time}
+    LifeAreaList:
+      type: object
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/LifeArea'}}
+        source: {type: string, enum: [user, instance, none]}
+    Ref:
+      type: [object, "null"]
+      properties:
+        uuid: {type: string, format: uuid}
+        name: {type: [string, "null"], description: null when the caller may not see the object}
+    TimelineItem:
+      type: object
+      properties:
+        id: {type: string, description: '<doc uuid>.<kind>.<YYYYMMDD>'}
+        kind: {type: string, enum: [created, due, cancel_by, valid_from, valid_until, warranty_until]}
+        date: {type: string, format: date}
+        span: {type: [object, "null"], properties: {start: {type: string, format: date}, end: {type: string, format: date}}}
+        source: {type: string, enum: [created, custom_field, content, user]}
+        sources: {type: array, items: {type: string}}
+        confidence: {type: number}
+        field: {$ref: '#/components/schemas/Ref'}
+        phrase: {type: [string, "null"]}
+        page: {type: [integer, "null"]}
+        reminder: {type: [object, "null"], properties: {id: {type: integer}, note: {type: [string, "null"]}}}
+        document:
+          type: object
+          properties:
+            uuid: {type: string, format: uuid}
+            legacy_id: {type: integer}
+            title: {type: string}
+            created: {type: string, format: date}
+            correspondent: {$ref: '#/components/schemas/Ref'}
+            document_type: {$ref: '#/components/schemas/Ref'}
+        amount: {type: [object, "null"], properties: {value: {type: string}, currency: {type: [string, "null"]}, field: {type: string, format: uuid}}}
+        state: {type: object, properties: {done: {type: boolean}, done_at: {type: [string, "null"], format: date-time}, snoozed_until: {type: [string, "null"], format: date}}}
+    Timeline:
+      type: object
+      properties:
+        from: {type: string, format: date}
+        to: {type: string, format: date}
+        today: {type: string, format: date}
+        areas_source: {type: string, enum: [user, instance, none]}
+        extract_dates: {type: boolean}
+        truncated: {type: boolean}
+        lanes:
+          type: array
+          items:
+            type: object
+            properties:
+              key: {type: string, description: area uuid or "other"}
+              area: {oneOf: [{$ref: '#/components/schemas/LifeArea'}, {type: "null"}]}
+              count: {type: integer}
+              items: {type: array, items: {$ref: '#/components/schemas/TimelineItem'}}
+    AskCitation:
+      type: object
+      properties:
+        n: {type: integer}
+        document: {type: string, format: uuid}
+        legacy_id: {type: integer}
+        title: {type: string}
+        page: {type: [integer, "null"]}
+        snippet: {type: string}
+        source: {type: string, enum: [semantic, fulltext, both]}
+        score: {type: number}
+    AskMessage:
+      type: object
+      properties:
+        uuid: {type: string, format: uuid}
+        conversation: {type: string, format: uuid}
+        role: {type: string, enum: [assistant]}
+        question: {type: string}
+        answer: {type: [string, "null"]}
+        answer_error: {type: [string, "null"]}
+        index_state: {type: string, enum: [disabled, not_built, ready]}
+        retrieval: {type: string, enum: [hybrid, fulltext]}
+        notes: {type: array, items: {type: string}}
+        citations: {type: array, items: {$ref: '#/components/schemas/AskCitation'}}
+        actions: {type: array, items: {type: object, description: 'open_documents {label,documents,legacy_ids,query} | create_reminder {label,document,legacy_id,kind,date,phrase,request}'}}
+        created: {type: string, format: date-time}
+    AsnLabelJob:
+      type: object
+      additionalProperties: false
+      description: ASN label job (pl-labels LabelJob); missing values = defaults
+      properties:
+        preset: {type: string, description: 'preset id, or "custom" with sheet'}
+        sheet: {type: object, description: 'custom SheetLayout (mm): page_width, page_height, label_width, label_height, cols, rows, margin_left, margin_top, gap_x, gap_y, corner_radius'}
+        code: {enum: [qr, data_matrix, code128], default: qr}
+        show_text: {type: boolean, default: true}
+        prefix: {type: string, description: default PAPERLESS_CONSUMER_ASN_BARCODE_PREFIX}
+        digits: {type: integer, minimum: 1, maximum: 10, default: 5}
+        start: {type: integer, description: default next free ASN}
+        count: {type: integer, minimum: 1, maximum: 20000}
+        sheets: {type: integer, minimum: 1, maximum: 200}
+        skip: {type: array, items: {type: integer}, description: used positions on the first sheet (0-based, row-major)}
+        start_offset: {type: integer}
+        offset_x: {type: number, description: printer calibration in mm (-20..20)}
+        offset_y: {type: number}
+        outline: {type: boolean, default: false}
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [not_found, not_authenticated, permission_denied, invalid, precondition_failed,
+                     conflict, cursor_expired, not_installed, not_implemented, throttled, internal,
+                     method_not_allowed]
+            message: {type: string}
+            fields: {type: object, additionalProperties: {type: array, items: {}}}
+            current_rev: {type: integer}
+    Access:
+      type: object
+      properties:
+        can_view: {type: boolean}
+        can_change: {type: boolean}
+        can_delete: {type: boolean}
+    UserRef:
+      type: object
+      properties:
+        uuid: {type: string, format: uuid}
+        username: {type: string}
+    Matching:
+      type: object
+      properties:
+        algorithm: {type: string, enum: [none, any, all, literal, regex, fuzzy, auto]}
+        pattern: {type: string}
+        is_insensitive: {type: boolean}
+    Meta:
+      type: object
+      properties:
+        uuid: {type: string, format: uuid}
+        legacy_id: {type: integer}
+        rev: {type: integer}
+    Tag:
+      allOf:
+        - $ref: '#/components/schemas/Meta'
+        - type: object
+          properties:
+            name: {type: string}
+            color: {type: string}
+            text_color: {type: string}
+            is_inbox_tag: {type: boolean}
+            matching: {$ref: '#/components/schemas/Matching'}
+            parent: {type: [string, "null"], format: uuid}
+            owner: {oneOf: [{$ref: '#/components/schemas/UserRef'}, {type: "null"}]}
+            document_count: {type: integer}
+            access: {$ref: '#/components/schemas/Access'}
+    Document:
+      allOf:
+        - $ref: '#/components/schemas/Meta'
+        - type: object
+          properties:
+            title: {type: string}
+            created: {type: string, format: date}
+            added: {type: string, format: date-time}
+            modified: {type: string, format: date-time}
+            correspondent: {type: [string, "null"], format: uuid}
+            document_type: {type: [string, "null"], format: uuid}
+            storage_path: {type: [string, "null"], format: uuid}
+            tags: {type: array, items: {type: string, format: uuid}}
+            custom_fields:
+              type: array
+              items: {type: object, properties: {field: {type: string, format: uuid}, value: {}}}
+            asn: {type: [integer, "null"]}
+            owner: {oneOf: [{$ref: '#/components/schemas/UserRef'}, {type: "null"}]}
+            page_count: {type: [integer, "null"]}
+            mime_type: {type: string}
+            original_filename: {type: [string, "null"]}
+            notes_count: {type: integer}
+            files:
+              type: object
+              properties:
+                original: {type: object, properties: {checksum: {type: string}, size: {type: integer}}}
+                archive: {type: [object, "null"]}
+                thumbnail: {type: object, properties: {etag: {type: [string, "null"]}}}
+            access: {$ref: '#/components/schemas/Access'}
+            content: {type: string, description: "only with include=content"}
+            notes: {type: array, items: {$ref: '#/components/schemas/Note'}}
+    Note:
+      type: object
+      properties:
+        legacy_id: {type: integer}
+        note: {type: string}
+        created: {type: string, format: date-time}
+        user: {oneOf: [{$ref: '#/components/schemas/UserRef'}, {type: "null"}]}
+    Page:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items: {type: array, items: {}}
+        next_cursor: {type: [string, "null"]}
+        count: {type: integer}
+    RefSet:
+      type: object
+      properties:
+        any: {type: array, items: {type: string, format: uuid}}
+        all: {type: array, items: {type: string, format: uuid}}
+        none: {type: array, items: {type: string, format: uuid}}
+        is_null: {type: boolean}
+    DocQuery:
+      type: object
+      additionalProperties: false
+      properties:
+        filter:
+          description: >
+            Condition: one of {all:[…]}, {text:{query,field}}, {tags|correspondent|document_type|
+            storage_path|owner|custom_fields: RefSet}, {custom_field_query: v1 DSL},
+            {created|added|modified:{from,to}}, {asn:{eq,gt,lt,is_null}}, {uuids:[…]},
+            {mime_type:"…"}, {shared_by_me:true}. any/not → 501 until L1.
+          type: object
+        sort: {type: string, enum: [created, -created, added, -added, modified, -modified, title, -title, id, -id]}
+        limit: {type: integer, minimum: 1, maximum: 1000}
+        cursor: {type: string}
+        include: {type: array, items: {type: string, enum: [content, notes, sharing]}}
+        count: {type: boolean}
+paths:
+  /server:
+    get:
+      security: [{}, {session: []}, {token: []}, {device: []}]
+      summary: Server info (anonymous - product, api, features only)
+      responses:
+        "200": {description: OK}
+  /me:
+    get: {summary: Current user, responses: {"200": {description: OK}, "401": {$ref: '#/components/responses/Error'}}}
+  /ui_settings:
+    get: {summary: UI settings, responses: {"200": {description: OK}}}
+    put:
+      summary: Replace UI settings
+      requestBody: {content: {application/json: {schema: {type: object, properties: {settings: {type: object}}}}}}
+      responses: {"200": {description: OK}, "403": {$ref: '#/components/responses/Error'}}
+  /documents:
+    get:
+      summary: Document list (no filter)
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - {name: sort, in: query, schema: {type: string}}
+        - {name: include, in: query, schema: {type: string}}
+        - {name: count, in: query, schema: {type: boolean}}
+      responses: {"200": {description: Page of documents, content: {application/json: {schema: {$ref: '#/components/schemas/Page'}}}}}
+  /documents/query:
+    post:
+      summary: Query documents
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/DocQuery'}}}}
+      responses:
+        "200": {description: Page of documents, content: {application/json: {schema: {$ref: '#/components/schemas/Page'}}}}
+        "400": {$ref: '#/components/responses/Error'}
+        "501": {$ref: '#/components/responses/Error'}
+  /documents/{uuid}:
+    parameters: [{$ref: '#/components/parameters/Uuid'}]
+    get:
+      parameters: [{name: include, in: query, schema: {type: string, example: "content,notes"}}]
+      responses: {"200": {description: Document (ETag = rev), content: {application/json: {schema: {$ref: '#/components/schemas/Document'}}}}, "404": {$ref: '#/components/responses/Error'}}
+    patch:
+      parameters: [{$ref: '#/components/parameters/IfMatch'}]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                title: {type: string}
+                created: {type: string, format: date}
+                correspondent: {type: [string, "null"], format: uuid}
+                document_type: {type: [string, "null"], format: uuid}
+                storage_path: {type: [string, "null"], format: uuid}
+                tags: {type: array, items: {type: string, format: uuid}}
+                asn: {type: [integer, "null"]}
+                custom_fields: {type: array, items: {type: object}}
+                owner: {type: [string, "null"], format: uuid}
+      responses: {"200": {description: Updated}, "412": {$ref: '#/components/responses/Error'}}
+  /documents/{uuid}/notes:
+    parameters: [{$ref: '#/components/parameters/Uuid'}]
+    get: {responses: {"200": {description: Notes}}}
+    post:
+      requestBody: {content: {application/json: {schema: {type: object, properties: {note: {type: string}}}}}}
+      responses: {"201": {description: Notes after adding}}
+  /documents/{uuid}/notes/{note}:
+    parameters: [{$ref: '#/components/parameters/Uuid'}, {name: note, in: path, required: true, schema: {type: integer}}]
+    delete: {responses: {"200": {description: Notes after deleting}}}
+  /documents/{uuid}/files/{variant}:
+    parameters:
+      - $ref: '#/components/parameters/Uuid'
+      - {name: variant, in: path, required: true, schema: {type: string, enum: [original, archive, preview, thumbnail]}}
+      - {name: Range, in: header, schema: {type: string}}
+      - {name: If-Range, in: header, schema: {type: string}}
+      - {name: If-None-Match, in: header, schema: {type: string}}
+    get:
+      responses:
+        "200": {description: File}
+        "206": {description: Partial content}
+        "304": {description: Not modified}
+        "416": {description: Range not satisfiable}
+  /tags:
+    get: {parameters: [{$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/Limit'}], responses: {"200": {description: Page of tags}}}
+    post: {responses: {"201": {description: Created}}}
+  /tags/{uuid}:
+    parameters: [{$ref: '#/components/parameters/Uuid'}]
+    get: {responses: {"200": {description: Tag, content: {application/json: {schema: {$ref: '#/components/schemas/Tag'}}}}}}
+    patch: {parameters: [{$ref: '#/components/parameters/IfMatch'}], responses: {"200": {description: Updated}, "412": {$ref: '#/components/responses/Error'}}}
+    delete: {parameters: [{$ref: '#/components/parameters/IfMatch'}], responses: {"204": {description: Deleted}}}
+  /correspondents: {get: {responses: {"200": {description: Page}}}, post: {responses: {"201": {description: Created}}}}
+  /correspondents/{uuid}:
+    parameters: [{$ref: '#/components/parameters/Uuid'}]
+    get: {responses: {"200": {description: Object}}}
+    patch: {responses: {"200": {description: Updated}}}
+    delete: {responses: {"204": {description: Deleted}}}
+  /document_types: {get: {responses: {"200": {description: Page}}}, post: {responses: {"201": {description: Created}}}}
+  /document_types/{uuid}:
+    parameters: [{$ref: '#/components/parameters/Uuid'}]
+    get: {responses: {"200": {description: Object}}}
+    patch: {responses: {"200": {description: Updated}}}
+    delete: {responses: {"204": {description: Deleted}}}
+  /storage_paths: {get: {responses: {"200": {description: Page}}}}
+  /storage_paths/{uuid}: {parameters: [{$ref: '#/components/parameters/Uuid'}], get: {responses: {"200": {description: Object}}}}
+  /custom_fields: {get: {responses: {"200": {description: Page}}}}
+  /custom_fields/{uuid}: {parameters: [{$ref: '#/components/parameters/Uuid'}], get: {responses: {"200": {description: Object}}}}
+  /saved_views: {get: {responses: {"200": {description: Page}}}}
+  /saved_views/{uuid}: {parameters: [{$ref: '#/components/parameters/Uuid'}], get: {responses: {"200": {description: Object}}}}
+  /users: {get: {responses: {"200": {description: Page (needs auth.view_user)}}}}
+  /groups: {get: {responses: {"200": {description: Page (needs auth.view_group)}}}}
+  /objects/batch:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, uuids]
+              properties:
+                kind: {type: string}
+                uuids: {type: array, maxItems: 500, items: {type: string, format: uuid}}
+                include: {type: array, items: {type: string}}
+      responses: {"200": {description: '{"items":[…],"missing":[uuid…]}'}}
+  /sync/changes:
+    get:
+      summary: Change feed (501 until the P2 feed is wired)
+      parameters:
+        - {name: cursor, in: query, schema: {type: string, example: c1.1043}}
+        - {name: limit, in: query, schema: {type: integer, maximum: 1000, default: 500}}
+        - {name: kinds, in: query, schema: {type: string}}
+        - {name: embed, in: query, schema: {type: boolean, default: true}}
+        - {name: wait, in: query, schema: {type: integer, maximum: 30}}
+      responses:
+        "200": {description: '{"changes":[…],"next_cursor","has_more","perm_epoch"}'}
+        "410": {$ref: '#/components/responses/Error'}
+        "501": {$ref: '#/components/responses/Error'}
+  /sync/ids:
+    get:
+      parameters: [{name: kind, in: query, required: true, schema: {type: string}}]
+      responses: {"200": {description: '{"items":[[uuid,rev],…],"as_of_seq"}'}}
+  /sync/resolve:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                documents: {type: array, items: {type: string, format: uuid}}
+                tags: {type: array, items: {type: string, format: uuid}}
+                saved_views: {type: array, items: {type: string, format: uuid}}
+                tag_mode: {type: string, enum: [any, all]}
+      responses: {"200": {description: '{"documents":[{uuid,rev,size}],"as_of_seq"}'}}
+  /asn/presets:
+    get: {summary: ASN label sheet presets (pl-labels), responses: {"200": {description: '{"items":[SheetLayout],"default"}'}, "403": {$ref: '#/components/responses/Error'}}}
+  /asn/config:
+    get: {summary: 'ASN prefix, separator string, barcode switches, next free ASN, setup hints', responses: {"200": {description: OK}}}
+  /asn/preview:
+    post:
+      summary: SVG preview of one sheet + collisions + legibility warnings
+      parameters: [{name: page, in: query, schema: {type: integer, minimum: 0}}]
+      requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/AsnLabelJob'}}}}
+      responses: {"200": {description: '{svg,page,pages,per_sheet,count,first_asn,last_asn,first_content,last_content,sheet,skip,warnings,collisions}'}, "400": {$ref: '#/components/responses/Error'}}
+  /asn/labels:
+    post:
+      summary: Label sheet PDF; records the range in paperrust_asn_print
+      parameters:
+        - {name: record, in: query, schema: {type: boolean, default: true}}
+        - {name: allow_collisions, in: query, schema: {type: boolean, default: false}}
+      requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/AsnLabelJob'}}}}
+      responses: {"200": {description: application/pdf (headers x-paperrust-asn-first/-last/-print-id)}, "400": {$ref: '#/components/responses/Error'}, "409": {description: '{"error":{"code":"asn_collision","collisions":{documents,documents_total,printed}}}'}}
+  /asn/printed:
+    get: {summary: Printed ASN ranges (newest first), parameters: [{name: limit, in: query, schema: {type: integer, default: 100}}], responses: {"200": {description: '{"items":[PrintedRange]}'}}}
+  /asn/printed/{id}:
+    delete: {summary: Release a printed range (creator or superuser), parameters: [{name: id, in: path, required: true, schema: {type: integer}}], responses: {"204": {description: Released}, "403": {$ref: '#/components/responses/Error'}, "404": {$ref: '#/components/responses/Error'}}}
+  /asn/separator:
+    post:
+      summary: Separator sheet PDF (configured PAPERLESS_CONSUMER_BARCODE_STRING)
+      requestBody: {content: {application/json: {schema: {type: object, properties: {paper: {enum: [a4, letter]}, code: {enum: [qr, data_matrix, code128]}, copies: {type: integer, minimum: 1, maximum: 50}, lang: {enum: [de, en]}, value: {type: string, description: superusers only}}}}}}
+      responses: {"200": {description: application/pdf}, "400": {$ref: '#/components/responses/Error'}}
+  /auth/devices:
+    get: {summary: Own active devices, responses: {"200": {description: '{"items":[{uuid,name,created,last_used}]}'}}}
+    post:
+      security: [{}]
+      summary: Issue a device token (shown once)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password, device_name]
+              properties:
+                username: {type: string}
+                password: {type: string}
+                code: {type: string, description: TOTP code when MFA is enabled}
+                device_name: {type: string, maxLength: 128}
+      responses:
+        "201": {description: '{"token":"prt_…","device":{uuid,name,created,last_used}}'}
+        "400": {$ref: '#/components/responses/Error'}
+        "429": {$ref: '#/components/responses/Error'}
+        "503": {$ref: '#/components/responses/Error'}
+  /auth/devices/{uuid}:
+    parameters: [{$ref: '#/components/parameters/Uuid'}]
+    delete: {summary: Revoke own device, responses: {"204": {description: Revoked}, "404": {$ref: '#/components/responses/Error'}}}
+  # ---- PaperRust-Oberfläche (Design 2): contract docs/contract/pl-api-v2.md "PaperRust-Oberfläche" ----
+  /life-areas:
+    parameters:
+      - {name: scope, in: query, schema: {type: string, enum: [user, instance]}, description: 'omitted on GET = effective list (own, else instance default); default user for writes'}
+    get:
+      summary: Life areas (effective list or one scope)
+      responses: {"200": {description: '{"items":[LifeArea],"source":"user|instance|none"}', content: {application/json: {schema: {$ref: '#/components/schemas/LifeAreaList'}}}}}
+    put:
+      summary: Replace the whole set of a scope (instance = superuser)
+      requestBody: {content: {application/json: {schema: {type: object, required: [items], properties: {items: {type: array, maxItems: 50, items: {$ref: '#/components/schemas/LifeAreaWrite'}}}}}}}
+      responses: {"200": {description: Saved set, content: {application/json: {schema: {$ref: '#/components/schemas/LifeAreaList'}}}}, "400": {$ref: '#/components/responses/Error'}, "403": {$ref: '#/components/responses/Error'}}
+    post:
+      summary: Add one area
+      requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/LifeAreaWrite'}}}}
+      responses: {"201": {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/LifeArea'}}}}, "400": {$ref: '#/components/responses/Error'}, "403": {$ref: '#/components/responses/Error'}}
+    delete:
+      summary: Delete all areas of a scope (user → back to instance default)
+      responses: {"204": {description: Deleted}, "403": {$ref: '#/components/responses/Error'}}
+  /life-areas/suggestions:
+    get:
+      summary: Suggested areas from existing data (never stored)
+      parameters: [{name: lang, in: query, schema: {type: string, enum: [de, en], default: de}}]
+      responses: {"200": {description: '{"items":[LifeAreaWrite + reason, document_count]}'}}
+  /life-areas/{uuid}:
+    parameters: [{$ref: '#/components/parameters/Uuid'}]
+    get: {summary: One area, responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/LifeArea'}}}}, "404": {$ref: '#/components/responses/Error'}}}
+    patch:
+      summary: Partial update (own area; instance default = superuser)
+      requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/LifeAreaWrite'}}}}
+      responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/LifeArea'}}}}, "400": {$ref: '#/components/responses/Error'}, "403": {$ref: '#/components/responses/Error'}, "404": {$ref: '#/components/responses/Error'}}
+    delete: {summary: Delete area, responses: {"204": {description: Deleted}, "403": {$ref: '#/components/responses/Error'}, "404": {$ref: '#/components/responses/Error'}}}
+  /timeline:
+    get:
+      summary: Lanes per life area with dated items (permission-filtered like the document list)
+      parameters:
+        - {name: from, in: query, schema: {type: string, format: date}, description: default today-365}
+        - {name: to, in: query, schema: {type: string, format: date}, description: 'default today+365, span ≤ 3660 days'}
+        - {name: areas, in: query, schema: {type: string}, description: 'comma list of area uuids and/or "other"'}
+        - {name: kinds, in: query, schema: {type: string}, description: 'comma list of created,due,cancel_by,valid_from,valid_until,warranty_until'}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 10000, default: 2000}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Timeline'}}}}
+        "400": {$ref: '#/components/responses/Error'}
+        "403": {$ref: '#/components/responses/Error'}
+  /timeline/upcoming:
+    get:
+      summary: '"Demnächst": open deadlines in [today-overdue_days, today+days]'
+      parameters:
+        - {name: days, in: query, schema: {type: integer, minimum: 1, maximum: 366, default: 60}}
+        - {name: overdue_days, in: query, schema: {type: integer, minimum: 0, maximum: 366, default: 30}}
+        - {name: areas, in: query, schema: {type: string}}
+        - {name: include_done, in: query, schema: {type: boolean, default: false}}
+      responses: {"200": {description: '{"today","days","overdue_days","items":[TimelineItem + overdue, days_left, areas]}'}, "403": {$ref: '#/components/responses/Error'}}
+  /timeline/items/{id}/state:
+    parameters: [{name: id, in: path, required: true, schema: {type: string, example: 3f0c…-…-….due.20261130}}]
+    put:
+      summary: Mark done / snooze (per user)
+      requestBody: {content: {application/json: {schema: {type: object, properties: {done: {type: boolean}, snoozed_until: {type: [string, "null"], format: date}, snooze_days: {type: integer, minimum: 1, maximum: 366}}}}}}
+      responses: {"200": {description: '{"id","done","done_at","snoozed_until"}'}, "400": {$ref: '#/components/responses/Error'}, "404": {$ref: '#/components/responses/Error'}}
+    delete: {summary: Reset state, responses: {"204": {description: Reset}, "404": {$ref: '#/components/responses/Error'}}}
+  /timeline/reminders:
+    get: {summary: Own reminders, responses: {"200": {description: '{"items":[{id,item_id,document,legacy_id,title,kind,date,note,created}]}'}}}
+    post:
+      summary: Create a reminder (timeline deadline entry, private to the creator)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [document, date]
+              properties:
+                document: {type: string, format: uuid}
+                kind: {type: string, enum: [due, cancel_by, valid_from, valid_until, warranty_until], default: due}
+                date: {type: string, format: date}
+                note: {type: string, maxLength: 500}
+      responses: {"201": {description: Created}, "200": {description: Same reminder already exists}, "400": {$ref: '#/components/responses/Error'}, "404": {$ref: '#/components/responses/Error'}}
+  /timeline/reminders/{id}:
+    parameters: [{name: id, in: path, required: true, schema: {type: integer}}]
+    delete: {summary: Delete own reminder, responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/Error'}}}
+  /timeline/config:
+    get: {summary: 'Effective date-field mapping, extraction switch and status', responses: {"200": {description: '{"extract_dates","kinds","deadline_kinds","fields":[…],"amount_fields","extraction":{documents,extracted,stale},"backfill_running"}'}}}
+  /timeline/backfill:
+    post:
+      summary: Run content date extraction for all documents (superuser, background)
+      requestBody: {content: {application/json: {schema: {type: object, properties: {force: {type: boolean}}}}}}
+      responses: {"202": {description: '{"started":true}'}, "400": {$ref: '#/components/responses/Error'}, "403": {$ref: '#/components/responses/Error'}, "409": {$ref: '#/components/responses/Error'}}
+  /ask:
+    post:
+      summary: Ask the archive (hybrid retrieval like MCP ask_documents, answer with citations)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [question]
+              properties:
+                question: {type: string, minLength: 1, maxLength: 2000}
+                conversation: {type: [string, "null"], format: uuid}
+                documents: {type: [array, "null"], maxItems: 500, items: {type: string, format: uuid}}
+                max_passages: {type: integer, minimum: 1, maximum: 20, default: 8}
+                answer: {type: boolean, default: true}
+                stream: {type: boolean, default: false}
+                lang: {type: string, enum: [de, en], default: de, description: language of action labels}
+      responses:
+        "200":
+          description: 'JSON {"conversation","message":AskMessage} or text/event-stream (events meta, citations, delta*, actions, done | error)'
+          content:
+            application/json: {schema: {type: object, properties: {conversation: {type: string, format: uuid}, message: {$ref: '#/components/schemas/AskMessage'}}}}
+            text/event-stream: {schema: {type: string}}
+        "400": {$ref: '#/components/responses/Error'}
+        "403": {$ref: '#/components/responses/Error'}
+        "404": {$ref: '#/components/responses/Error'}
+        "429": {$ref: '#/components/responses/Error'}
+  /ask/conversations:
+    get:
+      summary: Own conversations, most recently active first
+      parameters: [{$ref: '#/components/parameters/Cursor'}, {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}]
+      responses: {"200": {description: '{"items":[{uuid,title,created,updated,message_count}],"next_cursor"}'}}
+    delete: {summary: Delete all own conversations, responses: {"204": {description: Deleted}}}
+  /ask/conversations/{uuid}:
+    parameters: [{$ref: '#/components/parameters/Uuid'}]
+    get: {summary: Conversation with messages (citations re-filtered by current visibility), responses: {"200": {description: '{uuid,title,created,updated,messages:[{uuid,role,content,citations,actions,meta,created}]}'}, "404": {$ref: '#/components/responses/Error'}}}
+    delete: {summary: Delete conversation, responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/Error'}}}

@@ -1,0 +1,129 @@
+:root {
+  --bg: #fffdf8;
+  --fg: #1f1a17;
+  --muted: #6b625c;
+  --accent: #b7410e;
+  --accent-fg: #f8f9fa;
+  --field: #ffffff;
+  --border: #d9d2cb;
+  --error: #a4190f;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1c1917;
+    --fg: #ece7e2;
+    --muted: #a8a09a;
+    --field: #262220;
+    --border: #45403c;
+    --error: #ff8a7a;
+  }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font: 15px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif;
+  display: grid;
+  place-items: center;
+}
+main { width: min(480px, 100% - 32px); text-align: center; padding: 24px 0; }
+.logo { width: 64px; height: 75px; }
+h1 { margin: 8px 0 24px; font-size: 26px; letter-spacing: .01em; }
+h2 { margin: 0 0 4px; font-size: 18px; }
+#stage { color: var(--muted); margin: 12px 0 0; }
+.spinner {
+  width: 28px; height: 28px; margin: 0 auto;
+  border: 3px solid var(--border); border-top-color: var(--accent);
+  border-radius: 50%; animation: spin .9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
+form { text-align: left; display: grid; gap: 12px; }
+form > p { margin: 0 0 4px; color: var(--muted); }
+label { display: grid; gap: 4px; font-weight: 600; font-size: 13px; }
+input {
+  font: inherit; font-weight: 400; padding: 8px 10px;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: var(--field); color: var(--fg);
+}
+input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.buttons { display: flex; gap: 8px; justify-content: flex-end; }
+button {
+  font: inherit; font-weight: 600; padding: 8px 16px; border-radius: 6px;
+  border: 1px solid var(--accent); background: var(--accent); color: var(--accent-fg); cursor: pointer;
+}
+button.secondary { background: transparent; color: var(--fg); border-color: var(--border); }
+button:disabled { opacity: .6; cursor: default; }
+.error { color: var(--error); min-height: 1.2em; margin: 0; white-space: pre-wrap; }
+.hint { color: var(--muted); font-size: 13px; }
+fieldset { border: 0; margin: 0; padding: 0; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.choices { display: grid; gap: 8px; }
+.choice {
+  display: flex; gap: 10px; align-items: flex-start; font-weight: 400; font-size: 14px;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
+}
+.choice:has(input:checked) { border-color: var(--accent); }
+.choice input { margin-top: 3px; accent-color: var(--accent); }
+.choice span { display: grid; gap: 2px; }
+.choice small { color: var(--muted); font-size: 12.5px; }
+.fields { display: grid; gap: 12px; }
+code { font-size: 12.5px; }
+#error-view { text-align: left; display: grid; gap: 10px; }
+#error-view h2 { text-align: center; }
+.advice { margin: 0; padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--field); }
+a { color: var(--accent); }
+/* Remote mode (REMOTE-APP): groups in the first start, confirmations, offline/SSO, settings */
+.group-title { margin: 6px 0 0; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.confirm { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--accent); border-radius: 8px; background: var(--field); }
+.warn { margin: 0; color: var(--error); }
+label.check { display: flex; gap: 8px; align-items: center; font-weight: 600; }
+.cert { display: grid; grid-template-columns: max-content 1fr; gap: 2px 10px; margin: 0; font-size: 13px; }
+.cert dt { color: var(--muted); }
+.cert dd { margin: 0; word-break: break-all; }
+#offline-view, #sso-view { text-align: left; display: grid; gap: 10px; }
+#offline-view h2, #sso-view h2 { text-align: center; }
+#offline-view p, #sso-view p { margin: 0; }
+body.settings { place-items: start center; }
+body.settings main { width: min(680px, 100% - 32px); text-align: left; display: grid; gap: 16px; }
+body.settings h1 { margin: 8px 0 0; }
+body.settings.busy { cursor: progress; }
+body.settings.busy button { pointer-events: none; opacity: .6; }
+.card { border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; display: grid; gap: 10px; }
+.profiles { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.profiles li { border-top: 1px solid var(--border); padding-top: 10px; display: grid; gap: 6px; }
+.profiles li:first-child { border-top: 0; padding-top: 0; }
+.profile-head { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.badge { font-size: 11.5px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
+.badge.ok { border-color: var(--accent); color: var(--accent); }
+.badge.warn { border-color: var(--error); color: var(--error); }
+.choice.disabled { opacity: .55; cursor: default; }
+.profiles .buttons { justify-content: flex-start; flex-wrap: wrap; }
+.profiles button { padding: 5px 12px; font-size: 13px; }
+/* Switch: reconciliation after the first start (SwitchView) */
+#switch-view { text-align: left; display: grid; gap: 10px; }
+#switch-view h2 { text-align: center; }
+#switch-view p { margin: 0; }
+.verdict { font-size: 16px; font-weight: 600; text-align: center; }
+.vbadge { display: inline-block; padding: 1px 8px; border-radius: 4px; color: #fff; font-size: 13px; letter-spacing: .03em; }
+.vbadge.ok { background: #2e7d32; }
+.vbadge.warn { background: #b26a00; }
+.vbadge.fail { background: #c62828; }
+.vbadge.running { background: var(--muted); }
+.summary { margin: 0; padding: 10px 12px 10px 28px; border: 1px solid var(--border); border-radius: 8px; background: var(--field); display: grid; gap: 4px; }
+.summary:empty { display: none; }
+/* Updates (DESKTOP.md §23): settings card and update window */
+select {
+  font: inherit; font-weight: 400; padding: 6px 8px;
+  border: 1px solid var(--border); border-radius: 6px; background: var(--field); color: var(--fg);
+}
+label.inline { display: flex; gap: 8px; align-items: center; font-weight: 600; }
+body.update h3 { margin: 4px 0 0; font-size: 14px; }
+.notes {
+  margin: 0; max-height: 220px; overflow: auto; white-space: pre-wrap; word-break: break-word;
+  font: 13px/1.45 "Segoe UI", system-ui, sans-serif; padding: 8px 10px;
+  border: 1px solid var(--border); border-radius: 6px; background: var(--field);
+}

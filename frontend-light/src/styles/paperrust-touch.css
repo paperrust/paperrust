@@ -1,0 +1,77 @@
+/* PaperRust's own design language for the classic Light UI: more angular and flatter.
+ * Appearance only: no elements moved, no spacing/sizes changed.
+ * Loaded in main.ts AFTER styles/global.scss and overrides it there with
+ * equal or higher specificity.
+ * Switch off: remove the import in src/main.ts. */
+
+/* 1. Corners: almost right-angled (previously 0.425–0.6rem) */
+:root,
+[data-bs-theme] {
+  --pr-r: 0.125rem; /* 2px: default for areas, fields, buttons */
+  --pr-r-sm: 0.0625rem; /* 1px: small elements */
+  --bs-border-radius: var(--pr-r);
+  --bs-border-radius-sm: var(--pr-r-sm);
+  --bs-border-radius-lg: var(--pr-r);
+  --bs-border-radius-xl: var(--pr-r);
+  --bs-border-radius-xxl: var(--pr-r);
+  --bs-border-radius-pill: var(--pr-r);
+  --bs-dropdown-border-radius: var(--pr-r);
+  --bs-card-border-radius: var(--pr-r);
+  --bs-card-inner-border-radius: 0;
+}
+
+html .btn,
+html .pagination,
+html .input-group {
+  --bs-border-radius: var(--pr-r);
+  --bs-border-radius-sm: var(--pr-r);
+  --bs-border-radius-lg: var(--pr-r);
+}
+
+html .card,
+html .dropdown-menu,
+html .modal-content,
+html .popover,
+html .toast,
+html .list-group,
+html .form-control,
+html .form-select,
+html .alert,
+html .badge,
+html .rounded-pill {
+  border-radius: var(--pr-r);
+}
+
+html .badge {
+  /* Tags as angular labels instead of pills; text slightly bolder */
+  border-radius: var(--pr-r-sm);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* 2. Flat: cards with a clear line instead of a soft shadow */
+html .card {
+  box-shadow: none;
+  border: 1px solid var(--bs-border-color);
+}
+
+html .dropdown-menu,
+html .popover {
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+/* 3. Sidebar: active entry with accent edge on the left instead of a round area */
+html .sidebar[sc-app-frame] .nav-link[sc-app-frame],
+html .attributes-row[sc-app-frame] {
+  border-radius: 0;
+}
+
+html .sidebar[sc-app-frame] .nav-link.active[sc-app-frame] {
+  box-shadow: inset 3px 0 0 var(--pr-primary, var(--bs-primary));
+}
+
+/* further hard-coded roundings of individual components */
+html [sc-app-frame] .btn,
+html .list-group[sc-statistics-widget] {
+  border-radius: var(--pr-r);
+}

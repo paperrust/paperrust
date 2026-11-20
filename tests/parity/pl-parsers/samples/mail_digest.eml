@@ -1,0 +1,19 @@
+From: digest@example.com
+To: list@example.com
+Subject: Digest
+Date: 5 Nov 2024 10:00 EST
+Content-Type: multipart/digest; boundary=D
+
+--D
+
+From: one@example.com
+Subject: eins
+
+Erster
+--D
+
+From: two@example.com
+Subject: zwei
+
+Zweiter
+--D--

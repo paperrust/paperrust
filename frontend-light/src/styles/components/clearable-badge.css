@@ -1,0 +1,29 @@
+/* Count or checkmark badge that can be reset by click (ClearableBadge.svelte). */
+
+.badge {
+  min-width: 20px;
+  min-height: 20px;
+}
+
+.number {
+  min-width: 1em;
+  min-height: 1em;
+  display: inline-block;
+}
+
+/* Show cross only on hover, then hide content */
+.x {
+  display: none;
+}
+
+button:hover .check,
+button:hover .number {
+  opacity: 0 !important;
+}
+
+button:hover .x {
+  display: inline-block;
+  position: absolute;
+  top: 0.4em;
+  left: calc(50% - 0.4em);
+}

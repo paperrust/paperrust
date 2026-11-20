@@ -1,0 +1,48 @@
+/target
+/target-*
+*.log
+/reference/data
+/reference/pg
+/reference/venv
+/results/raw
+.env
+/tests/.venv/
+__pycache__/
+/results/parity/*.json
+/results/pgvalidate/*
+!/results/pgvalidate/summary.md
+results/bench/work/
+results/demo/
+
+# Repo-Hygiene (R3, 2026-11-09): keine Programme, Prozess-IDs oder Rohdaten von Messläufen.
+# Berichte (*.md, summary.json, latest.json) bleiben versionierbar.
+/results/bin/
+*.exe
+*.pdb
+*.pid
+/results/parity/**/2026-*.json
+/results/e2e/**/A/
+/results/e2e/**/B/
+/results/e2e/**/diff/
+# lokale Datenbanken, Dumps, Sicherungen
+*.pgdump
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+# Konfiguration mit Geheimnissen
+paperless.conf
+paperrust.conf
+# Arbeitsordner der Tests
+/tests/dbmigrate/.work/
+/tests/datamodel/.work/
+/results/desktop/
+/results/pack/
+/scratchpad/
+tests/parity/.w2*/
+/apps/desktop-shell/target/
+/results/static/
+
+# Testprotokoll: Bilder nur lokal (Bericht als Artifact veröffentlicht)
+/results/testprotokoll/**/*.png
+/results/testprotokoll/**/bericht/img-*.json
+/results/testprotokoll/**/*raw.log

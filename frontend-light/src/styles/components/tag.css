@@ -1,0 +1,17 @@
+/* Label badge (Tag.svelte). */
+
+a,
+span {
+  cursor: pointer;
+  white-space: normal;
+  word-break: break-word;
+  text-align: start;
+}
+
+/* Label without read permission */
+.private {
+  background-color: #000000;
+  color: #ffffff;
+  opacity: 0.5;
+  font-style: italic;
+}

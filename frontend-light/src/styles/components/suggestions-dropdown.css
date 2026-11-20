@@ -1,0 +1,10 @@
+/* Suggestions menu in the document view (SuggestionsDropdown.svelte). */
+
+.suggestions-dropdown {
+  min-width: 250px;
+}
+
+/* Options button without arrow */
+.btn-link.dropdown-toggle::after {
+  display: none;
+}

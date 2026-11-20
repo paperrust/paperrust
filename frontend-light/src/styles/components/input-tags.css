@@ -1,0 +1,43 @@
+/* Tag selection (InputTags.svelte) based on NgSelect. */
+
+.tag-wrap {
+  font-size: 1rem;
+}
+
+/* Locked state */
+.paperless-input-select.disabled .input-group {
+  cursor: not-allowed;
+}
+
+.paperless-input-select.disabled ::deep ng-select {
+  pointer-events: none;
+}
+
+.paperless-input-select.disabled ::deep ng-select .ng-select-container {
+  background-color: var(--pr-bg-disabled) !important;
+}
+
+/* Dropdown list: long hierarchies scrollable sideways; parent path expands on hover/marking */
+::deep .ng-dropdown-panel .ng-option {
+  overflow-x: auto !important;
+}
+
+::deep .ng-dropdown-panel .ng-option .tag-option-row {
+  width: max-content;
+  font-size: 1rem;
+}
+
+::deep .ng-dropdown-panel .ng-option .hierarchy-reveal {
+  max-width: 0;
+  overflow: hidden;
+  transition: max-width 200ms ease;
+}
+
+::deep .ng-dropdown-panel .ng-option .parents .badge {
+  white-space: nowrap;
+}
+
+::deep .ng-dropdown-panel .ng-option:hover .hierarchy-reveal,
+::deep .ng-dropdown-panel .ng-option.ng-option-marked .hierarchy-reveal {
+  max-width: 1000px;
+}

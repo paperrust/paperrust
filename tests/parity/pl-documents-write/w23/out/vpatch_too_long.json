@@ -1,0 +1,22 @@
+{
+  "django": {
+    "status": 400,
+    "body": {
+      "version_label": [
+        "Ensure this field has no more than 64 characters."
+      ]
+    },
+    "plan": [],
+    "files": {}
+  },
+  "rust": {
+    "status": 400,
+    "body": {
+      "version_label": [
+        "Ensure this field has no more than 64 characters."
+      ]
+    },
+    "plan": [],
+    "files": {}
+  }
+}

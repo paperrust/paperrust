@@ -1,0 +1,22 @@
+# Dokumentliste wie pgv_requests (ohne Teilstringsuche im Inhalt)
+ordering=-created
+ordering=-added&is_in_inbox=1
+ordering=title
+ordering=correspondent__name
+ordering=-num_notes
+ordering=owner
+ordering=-custom_field_7
+ordering=-created&tags__id__all=6
+ordering=-created&tags__id__in=7,8,9
+ordering=-created&tags__id__none=18
+ordering=-created&is_tagged=0
+ordering=-created&correspondent__id__in=1,2
+ordering=-created&document_type__id=1
+ordering=-created&created__date__gte=2024-01-01&created__date__lte=2024-12-31
+ordering=-created&custom_field_query=%5B7%2C%22gt%22%2C%22100%22%5D
+ordering=-created&owner__id__none=2
+ordering=-created&shared_by__id=2
+ordering=-created&archive_serial_number__isnull=1
+ordering=-created&mime_type=application%2Fpdf
+ordering=-created&has_duplicates=true
+ordering=-created&title__icontains=rechnung

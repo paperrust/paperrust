@@ -1,0 +1,31 @@
+[package]
+name = "pl-pdfops"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+# Values from the UI (docs/SETTINGS.md §8)
+pl-envlive.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+chrono.workspace = true
+pl-matching.workspace = true
+pl-ocr.workspace = true
+lopdf.workspace = true
+image.workspace = true
+flate2.workspace = true
+# zxing-cpp replacement (Apache-2.0). Without the feature `image` (which pins image =0.25.8 + imageproc).
+rxing.workspace = true
+# Text thumbnails (Pillow ImageFont.truetype/ImageDraw.multiline_text replacement).
+ab_glyph.workspace = true
+# TIFF tags per single image (dpi, Orientation) for TIFF→PDF like img2pdf (gap E18).
+tiff.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+tiff.workspace = true
+rxing = { workspace = true, features = ["encoders"] }

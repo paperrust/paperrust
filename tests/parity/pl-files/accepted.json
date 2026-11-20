@@ -1,0 +1,18 @@
+{
+ "_doc": "pl-files: akzeptierte Abweichungen. Format: tests/parity/harness/plharness/rules.py.",
+ "rules": [
+  {
+   "name": "share-traversal-special-view-404",
+   "reason": "Pfad /share/..%2F..%2Fetc%2Fpasswd: in Django passt er auf kein Muster und landet beim Catch-all (Login-Weiterleitung); PaperRust wertet ihn als Share-Route ohne gültigen Slug (404). Kein Dateizugriff in beiden Fällen.",
+   "ref": "docs/contract/pl-server.md#known-differences-frontend (2. URL-Konfiguration als Daten)",
+   "case": "files.share.traversal@*",
+   "kind": [
+    "status",
+    "header",
+    "body"
+   ],
+   "path": "\\$status|\\$body|header:location",
+   "target": "b"
+  }
+ ]
+}

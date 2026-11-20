@@ -1,0 +1,1009 @@
+{
+ "crate": "pl-mail",
+ "generated_by": "tests/parity/harness/gen_base_catalog.py (do not edit; add cases.json instead)",
+ "vars": {
+  "mail_account_id": {
+   "get": "/api/mail_accounts/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1
+   }
+  },
+  "mail_rule_id": {
+   "get": "/api/mail_rules/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1
+   }
+  },
+  "processed_mail_id": {
+   "get": "/api/processed_mail/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1
+   }
+  }
+ },
+ "cases": [
+  {
+   "id": "mail_accounts.list.default",
+   "route": "mail_accounts.list",
+   "method": "GET",
+   "path": "/api/mail_accounts/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "mail_accounts.list.page1",
+   "route": "mail_accounts.list",
+   "method": "GET",
+   "path": "/api/mail_accounts/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "mail_accounts.list.listall",
+   "route": "mail_accounts.list",
+   "method": "GET",
+   "path": "/api/mail_accounts/",
+   "query": {
+    "page": 1,
+    "page_size": 100000
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "mail_accounts.list.page2",
+   "route": "mail_accounts.list",
+   "method": "GET",
+   "path": "/api/mail_accounts/",
+   "query": {
+    "page": 2,
+    "page_size": 1
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "mail_accounts.list.page-too-high",
+   "route": "mail_accounts.list",
+   "method": "GET",
+   "path": "/api/mail_accounts/",
+   "query": {
+    "page": 99999,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "mail_accounts.list.page-invalid",
+   "route": "mail_accounts.list",
+   "method": "GET",
+   "path": "/api/mail_accounts/",
+   "query": {
+    "page": "abc"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "mail_accounts.list.page-zero",
+   "route": "mail_accounts.list",
+   "method": "GET",
+   "path": "/api/mail_accounts/",
+   "query": {
+    "page": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "mail_accounts.list.page-size-invalid",
+   "route": "mail_accounts.list",
+   "method": "GET",
+   "path": "/api/mail_accounts/",
+   "query": {
+    "page_size": "x"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "mail_accounts.list.page-size-zero",
+   "route": "mail_accounts.list",
+   "method": "GET",
+   "path": "/api/mail_accounts/",
+   "query": {
+    "page_size": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "mail_accounts.list.page-size-huge",
+   "route": "mail_accounts.list",
+   "method": "GET",
+   "path": "/api/mail_accounts/",
+   "query": {
+    "page_size": 10000000
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "mail_accounts.list.ordering-unknown",
+   "route": "mail_accounts.list",
+   "method": "GET",
+   "path": "/api/mail_accounts/",
+   "query": {
+    "ordering": "does_not_exist"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "mail_accounts.list.full-perms",
+   "route": "mail_accounts.list",
+   "method": "GET",
+   "path": "/api/mail_accounts/",
+   "query": {
+    "full_perms": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "mail_accounts.list.full-perms-0",
+   "route": "mail_accounts.list",
+   "method": "GET",
+   "path": "/api/mail_accounts/",
+   "query": {
+    "full_perms": "0"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "mail_accounts.list.auth",
+   "route": "mail_accounts.list",
+   "method": "GET",
+   "path": "/api/mail_accounts/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "anon",
+    "badtoken",
+    "inactive",
+    "admin@session",
+    "admin@basic"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "mail_accounts.list.apiver",
+   "route": "mail_accounts.list",
+   "method": "GET",
+   "path": "/api/mail_accounts/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "none",
+    "99",
+    "abc"
+   ]
+  },
+  {
+   "id": "mail_accounts.detail",
+   "route": "mail_accounts.retrieve",
+   "method": "GET",
+   "path": "/api/mail_accounts/${mail_account_id}/",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "mail_accounts.detail-unknown",
+   "route": "mail_accounts.retrieve",
+   "method": "GET",
+   "path": "/api/mail_accounts/999999999/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "mail_accounts.detail-nonint",
+   "route": "mail_accounts.retrieve",
+   "method": "GET",
+   "path": "/api/mail_accounts/abc/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "mail_accounts.detail-anon",
+   "route": "mail_accounts.retrieve",
+   "method": "GET",
+   "path": "/api/mail_accounts/${mail_account_id}/",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "mail_accounts.detail-noslash",
+   "route": "mail_accounts.retrieve",
+   "method": "GET",
+   "path": "/api/mail_accounts/${mail_account_id}",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "follow": false
+  },
+  {
+   "id": "mail_rules.list.default",
+   "route": "mail_rules.list",
+   "method": "GET",
+   "path": "/api/mail_rules/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "mail_rules.list.page1",
+   "route": "mail_rules.list",
+   "method": "GET",
+   "path": "/api/mail_rules/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "mail_rules.list.listall",
+   "route": "mail_rules.list",
+   "method": "GET",
+   "path": "/api/mail_rules/",
+   "query": {
+    "page": 1,
+    "page_size": 100000
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "mail_rules.list.page2",
+   "route": "mail_rules.list",
+   "method": "GET",
+   "path": "/api/mail_rules/",
+   "query": {
+    "page": 2,
+    "page_size": 1
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "mail_rules.list.page-too-high",
+   "route": "mail_rules.list",
+   "method": "GET",
+   "path": "/api/mail_rules/",
+   "query": {
+    "page": 99999,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "mail_rules.list.page-invalid",
+   "route": "mail_rules.list",
+   "method": "GET",
+   "path": "/api/mail_rules/",
+   "query": {
+    "page": "abc"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "mail_rules.list.page-zero",
+   "route": "mail_rules.list",
+   "method": "GET",
+   "path": "/api/mail_rules/",
+   "query": {
+    "page": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "mail_rules.list.page-size-invalid",
+   "route": "mail_rules.list",
+   "method": "GET",
+   "path": "/api/mail_rules/",
+   "query": {
+    "page_size": "x"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "mail_rules.list.page-size-zero",
+   "route": "mail_rules.list",
+   "method": "GET",
+   "path": "/api/mail_rules/",
+   "query": {
+    "page_size": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "mail_rules.list.page-size-huge",
+   "route": "mail_rules.list",
+   "method": "GET",
+   "path": "/api/mail_rules/",
+   "query": {
+    "page_size": 10000000
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "mail_rules.list.ordering-unknown",
+   "route": "mail_rules.list",
+   "method": "GET",
+   "path": "/api/mail_rules/",
+   "query": {
+    "ordering": "does_not_exist"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "mail_rules.list.full-perms",
+   "route": "mail_rules.list",
+   "method": "GET",
+   "path": "/api/mail_rules/",
+   "query": {
+    "full_perms": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "mail_rules.list.full-perms-0",
+   "route": "mail_rules.list",
+   "method": "GET",
+   "path": "/api/mail_rules/",
+   "query": {
+    "full_perms": "0"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "mail_rules.list.auth",
+   "route": "mail_rules.list",
+   "method": "GET",
+   "path": "/api/mail_rules/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "anon",
+    "badtoken",
+    "inactive",
+    "admin@session",
+    "admin@basic"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "mail_rules.list.apiver",
+   "route": "mail_rules.list",
+   "method": "GET",
+   "path": "/api/mail_rules/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "none",
+    "99",
+    "abc"
+   ]
+  },
+  {
+   "id": "mail_rules.detail",
+   "route": "mail_rules.retrieve",
+   "method": "GET",
+   "path": "/api/mail_rules/${mail_rule_id}/",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "mail_rules.detail-unknown",
+   "route": "mail_rules.retrieve",
+   "method": "GET",
+   "path": "/api/mail_rules/999999999/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "mail_rules.detail-nonint",
+   "route": "mail_rules.retrieve",
+   "method": "GET",
+   "path": "/api/mail_rules/abc/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "mail_rules.detail-anon",
+   "route": "mail_rules.retrieve",
+   "method": "GET",
+   "path": "/api/mail_rules/${mail_rule_id}/",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "mail_rules.detail-noslash",
+   "route": "mail_rules.retrieve",
+   "method": "GET",
+   "path": "/api/mail_rules/${mail_rule_id}",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "follow": false
+  },
+  {
+   "id": "processed_mail.list.default",
+   "route": "processed_mail.list",
+   "method": "GET",
+   "path": "/api/processed_mail/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "processed_mail.list.page1",
+   "route": "processed_mail.list",
+   "method": "GET",
+   "path": "/api/processed_mail/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "processed_mail.list.listall",
+   "route": "processed_mail.list",
+   "method": "GET",
+   "path": "/api/processed_mail/",
+   "query": {
+    "page": 1,
+    "page_size": 100000
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "processed_mail.list.page2",
+   "route": "processed_mail.list",
+   "method": "GET",
+   "path": "/api/processed_mail/",
+   "query": {
+    "page": 2,
+    "page_size": 1
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "processed_mail.list.page-too-high",
+   "route": "processed_mail.list",
+   "method": "GET",
+   "path": "/api/processed_mail/",
+   "query": {
+    "page": 99999,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "processed_mail.list.page-invalid",
+   "route": "processed_mail.list",
+   "method": "GET",
+   "path": "/api/processed_mail/",
+   "query": {
+    "page": "abc"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "processed_mail.list.page-zero",
+   "route": "processed_mail.list",
+   "method": "GET",
+   "path": "/api/processed_mail/",
+   "query": {
+    "page": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "processed_mail.list.page-size-invalid",
+   "route": "processed_mail.list",
+   "method": "GET",
+   "path": "/api/processed_mail/",
+   "query": {
+    "page_size": "x"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "processed_mail.list.page-size-zero",
+   "route": "processed_mail.list",
+   "method": "GET",
+   "path": "/api/processed_mail/",
+   "query": {
+    "page_size": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "processed_mail.list.page-size-huge",
+   "route": "processed_mail.list",
+   "method": "GET",
+   "path": "/api/processed_mail/",
+   "query": {
+    "page_size": 10000000
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "processed_mail.list.ordering-unknown",
+   "route": "processed_mail.list",
+   "method": "GET",
+   "path": "/api/processed_mail/",
+   "query": {
+    "ordering": "does_not_exist"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "processed_mail.list.extra0",
+   "route": "processed_mail.list",
+   "method": "GET",
+   "path": "/api/processed_mail/",
+   "query": {
+    "rule": "${mail_rule_id}"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "processed_mail.list.extra1",
+   "route": "processed_mail.list",
+   "method": "GET",
+   "path": "/api/processed_mail/",
+   "query": {
+    "status": "SUCCESS"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "processed_mail.list.auth",
+   "route": "processed_mail.list",
+   "method": "GET",
+   "path": "/api/processed_mail/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "anon",
+    "badtoken",
+    "inactive",
+    "admin@session",
+    "admin@basic"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "processed_mail.list.apiver",
+   "route": "processed_mail.list",
+   "method": "GET",
+   "path": "/api/processed_mail/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "none",
+    "99",
+    "abc"
+   ]
+  },
+  {
+   "id": "processed_mail.detail",
+   "route": "processed_mail.retrieve",
+   "method": "GET",
+   "path": "/api/processed_mail/${processed_mail_id}/",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "processed_mail.detail-unknown",
+   "route": "processed_mail.retrieve",
+   "method": "GET",
+   "path": "/api/processed_mail/999999999/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "processed_mail.detail-nonint",
+   "route": "processed_mail.retrieve",
+   "method": "GET",
+   "path": "/api/processed_mail/abc/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "processed_mail.detail-anon",
+   "route": "processed_mail.retrieve",
+   "method": "GET",
+   "path": "/api/processed_mail/${processed_mail_id}/",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "processed_mail.detail-noslash",
+   "route": "processed_mail.retrieve",
+   "method": "GET",
+   "path": "/api/processed_mail/${processed_mail_id}",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "follow": false
+  },
+  {
+   "id": "mail.oauth.callback-empty",
+   "route": "oauth.callback",
+   "method": "GET",
+   "path": "/api/oauth/callback/",
+   "users": [
+    "admin",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "mail.oauth.callback-bad-state",
+   "route": "oauth.callback",
+   "method": "GET",
+   "path": "/api/oauth/callback/",
+   "query": {
+    "code": "x",
+    "state": "invalid"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "mail_accounts.test.get",
+   "route": "mail_accounts.test",
+   "method": "GET",
+   "path": "/api/mail_accounts/test/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  }
+ ]
+}

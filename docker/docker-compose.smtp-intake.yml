@@ -1,0 +1,32 @@
+# Zusatz: SMTP-Empfang für Scanner/Drucker (Scan-to-Email, docs/user/scanner.md).
+#
+# Nur dazunehmen, wenn ein Drucker per E-Mail an PaperRust scannen soll. Ohne diese Datei ist der
+# Empfang aus und der Port nicht freigegeben.
+#
+#   cd docker
+#   docker compose -f docker-compose.postgres.yml -f docker-compose.smtp-intake.yml up -d
+#   (oder mit docker-compose.slim.yml statt docker-compose.postgres.yml)
+#
+# Danach in PaperRust unter Administration → Scanner ein Gerät anlegen und das Token im Drucker als
+# SMTP-Passwort eintragen. SMTP-Server = IP des Docker-Hosts, Port = 2525.
+#
+# Sicherheit: ohne Zertifikat geht das Token unverschlüsselt durchs LAN. Den Port NIE ins Internet
+# weiterleiten. Mit Zertifikat: Datei einhängen und PAPERRUST_SMTP_INTAKE_TLS_CERT/_TLS_KEY setzen
+# (Beispiel unten). Absender einschränken mit PAPERRUST_SMTP_INTAKE_ALLOWED_IPS – Achtung: im
+# Bridge-Netz sieht PaperRust oft die Gateway-IP von Docker (z. B. 172.17.0.1) statt der Drucker-IP.
+# IP-Listen je Gerät wirken dann nicht wie gedacht; Port lieber nur an die LAN-Adresse binden.
+
+services:
+  paperrust:
+    ports:
+      # Host-Port:Container-Port. Nur im LAN erreichbar machen, z. B. "192.168.1.10:2525:2525".
+      - "2525:2525"
+    environment:
+      PAPERRUST_SMTP_INTAKE: "on"
+      PAPERRUST_SMTP_INTAKE_LISTEN: "0.0.0.0:2525"
+      # PAPERRUST_SMTP_INTAKE_ALLOWED_IPS: "192.168.1.20"
+      # STARTTLS mit eigenem Zertifikat:
+      # PAPERRUST_SMTP_INTAKE_TLS_CERT: /usr/src/paperless/certs/smtp.crt
+      # PAPERRUST_SMTP_INTAKE_TLS_KEY: /usr/src/paperless/certs/smtp.key
+    # volumes:
+    #   - ./certs:/usr/src/paperless/certs:ro

@@ -1,0 +1,81 @@
+<!doctype html>
+
+
+
+<html lang="en" data-bs-theme="auto">
+<head>
+	<meta charset="utf-8">
+	<title>PaperRust</title>
+	<base href="{{base}}">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="cookie_prefix" content="{{cookie_prefix}}">
+	<meta name="robots" content="noindex,nofollow">
+	<meta name="author" content="PaperRust (based on paperless-ngx, GPL-3.0)">
+	<link rel="icon" type="image/x-icon" href="favicon.ico">
+	<link rel="manifest" href="{{webmanifest}}" crossorigin="use-credentials">
+	<link rel="stylesheet" href="{{styles_css}}">
+	<link rel="apple-touch-icon" href="{{apple_touch_icon}}">
+</head>
+<body>
+	<pngx-root>
+		<script type="text/javascript">
+			setTimeout(() => {
+				let warning = document.getElementsByClassName('warning').item(0)
+				if (warning) {
+					warning.classList.remove('hide')
+					warning.classList.add('show')
+				}
+			}, 8000)
+		</script>
+		<style type="text/css">
+			html, body {
+				width: 100%;
+				height: 100%;
+			}
+
+			@keyframes pulsate {
+				0% {
+					opacity: 0.1;
+				}
+				50% {
+					opacity: 0.3;
+				}
+				100% {
+					opacity: 0.1;
+				}
+			}
+
+			.app-loader svg, .app-loader h6 {
+				opacity: 0.1;
+				animation: pulsate 2s ease-out;
+				animation-iteration-count: infinite;
+			}
+
+			svg.logo .leaf {
+				fill: var(--bs-body-color) !important;
+			}
+		</style>
+		<div class="bg-light w-100 h-100 d-flex align-items-center">
+			<div class="app-loader align-self-center text-center mx-auto">
+				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 580 140" class='logo mb-2' height='6em' role="img" aria-label="PaperRust">
+  <path class="leaf" style="fill:#B7410E;" d="M80 12 V30 Q80 36 86 36 H104 Z"/>
+  <g class="text" style="fill: #000;">
+    <path d="M24 12 H80 L104 36 V122 Q104 128 98 128 H30 Q24 128 24 122 V18 Q24 12 30 12 Z M38 56 v7 h50 v-7 Z M38 74 v7 h38 v-7 Z M38 92 v7 h46 v-7 Z" fill-rule="evenodd"/>
+    <text x="128" y="101" font-family="Archivo, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-weight="800" font-size="80" letter-spacing="-1">PaperRust</text>
+  </g>
+</svg>
+
+				<h6 class="m-auto">{{t0}}</h6>
+				<p class="warning m-auto mt-3 small fade hide">{{t1}} <a href="rs/docs/troubleshooting.md">{{t2}}</a></p>
+			</div>
+		</div>
+		<script type="text/javascript">
+			window.DJANGO_MESSAGES = [
+				{{messages}}
+			]
+		</script>
+	</pngx-root>
+	<script src="{{polyfills_js}}" type="module"></script>
+	<script src="{{main_js}}" type="module"></script>
+</body>
+</html>

@@ -1,0 +1,248 @@
+{
+ "crate": "pl-objects",
+ "cases": [
+  {
+   "id": "w2.obj.create.state",
+   "route": "tags.create",
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tags/",
+     "json": {
+      "name": "w2-tag",
+      "color": "#123456",
+      "is_inbox_tag": true,
+      "matching_algorithm": 1,
+      "match": "x",
+      "parent": 1,
+      "set_permissions": {
+       "view": {
+        "users": [
+         4
+        ],
+        "groups": []
+       },
+       "change": {
+        "users": [],
+        "groups": [
+         1
+        ]
+       }
+      }
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/correspondents/",
+     "json": {
+      "name": "w2-corr",
+      "owner": 4
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/document_types/",
+     "json": {
+      "name": "w2-type",
+      "matching_algorithm": 6,
+      "match": ""
+     }
+    },
+    {
+     "sql": "select 'correspondent' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_correspondent x union all select 'documenttype' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_documenttype x union all select 'tag' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_tag x union all select 'storagepath' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_storagepath x order by 1, 2"
+    },
+    {
+     "sql": "select ct.model, o.object_pk, o.user_id as who, 'u' as kind, p.codename from guardian_userobjectpermission o join auth_permission p on p.id = o.permission_id join django_content_type ct on ct.id = o.content_type_id union all select ct.model, o.object_pk, o.group_id, 'g', p.codename from guardian_groupobjectpermission o join auth_permission p on p.id = o.permission_id join django_content_type ct on ct.id = o.content_type_id order by 1, 2, 4, 3, 5"
+    },
+    {
+     "sql": "select l.id, l.action, ct.app_label || '.' || ct.model as model, l.object_pk, l.object_id, l.object_repr, l.changes, l.changes_text, l.actor_id, l.remote_addr, l.additional_data, l.timestamp, l.cid is not null as has_cid, l.actor_email, l.serialized_data from auditlog_logentry l join django_content_type ct on ct.id = l.content_type_id where l.id > 918 order by l.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.obj.update.state",
+   "route": "tags.partial_update",
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PATCH",
+     "path": "/api/tags/2/",
+     "json": {
+      "name": "w2-renamed",
+      "parent": null,
+      "color": "#000000"
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/correspondents/1/",
+     "json": {
+      "match": "new",
+      "matching_algorithm": 3
+     }
+    },
+    {
+     "method": "PUT",
+     "path": "/api/document_types/1/",
+     "json": {
+      "name": "put-type"
+     }
+    },
+    {
+     "sql": "select 'correspondent' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_correspondent x union all select 'documenttype' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_documenttype x union all select 'tag' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_tag x union all select 'storagepath' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_storagepath x order by 1, 2"
+    },
+    {
+     "sql": "select l.id, l.action, ct.app_label || '.' || ct.model as model, l.object_pk, l.object_id, l.object_repr, l.changes, l.changes_text, l.actor_id, l.remote_addr, l.additional_data, l.timestamp, l.cid is not null as has_cid, l.actor_email, l.serialized_data from auditlog_logentry l join django_content_type ct on ct.id = l.content_type_id where l.id > 918 order by l.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.obj.destroy.state",
+   "route": "tags.destroy",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "DELETE",
+     "path": "/api/tags/1/"
+    },
+    {
+     "method": "DELETE",
+     "path": "/api/correspondents/1/"
+    },
+    {
+     "method": "DELETE",
+     "path": "/api/document_types/1/"
+    },
+    {
+     "method": "DELETE",
+     "path": "/api/storage_paths/1/"
+    },
+    {
+     "sql": "select 'correspondent' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_correspondent x union all select 'documenttype' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_documenttype x union all select 'tag' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_tag x union all select 'storagepath' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_storagepath x order by 1, 2"
+    },
+    {
+     "sql": "select id, correspondent_id, document_type_id, storage_path_id, owner_id, (select coalesce(array_agg(t.tag_id order by t.tag_id), '{}') from documents_document_tags t where t.document_id = d.id) as tags from documents_document d order by id"
+    },
+    {
+     "sql": "select ct.model, o.object_pk, o.user_id as who, 'u' as kind, p.codename from guardian_userobjectpermission o join auth_permission p on p.id = o.permission_id join django_content_type ct on ct.id = o.content_type_id union all select ct.model, o.object_pk, o.group_id, 'g', p.codename from guardian_groupobjectpermission o join auth_permission p on p.id = o.permission_id join django_content_type ct on ct.id = o.content_type_id order by 1, 2, 4, 3, 5"
+    },
+    {
+     "sql": "select l.id, l.action, ct.app_label || '.' || ct.model as model, l.object_pk, l.object_id, l.object_repr, l.changes, l.changes_text, l.actor_id, l.remote_addr, l.additional_data, l.timestamp, l.cid is not null as has_cid, l.actor_email, l.serialized_data from auditlog_logentry l join django_content_type ct on ct.id = l.content_type_id where l.id > 918 order by l.id"
+    },
+    {
+     "sql": "select id, task_type, trigger_source, status, owner_id, input_data from documents_paperlesstask where id > 12 order by id"
+    }
+   ]
+  },
+  {
+   "id": "w2.obj.destroy.foreign",
+   "route": "correspondents.destroy",
+   "users": [
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "DELETE",
+     "path": "/api/correspondents/12/"
+    },
+    {
+     "method": "DELETE",
+     "path": "/api/tags/20/"
+    },
+    {
+     "sql": "select 'correspondent' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_correspondent x union all select 'documenttype' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_documenttype x union all select 'tag' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_tag x union all select 'storagepath' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_storagepath x order by 1, 2"
+    }
+   ]
+  },
+  {
+   "id": "w2.obj.bulk.state",
+   "route": "bulk_edit_objects",
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/bulk_edit_objects/",
+     "json": {
+      "objects": [
+       1,
+       2
+      ],
+      "object_type": "tags",
+      "operation": "set_permissions",
+      "owner": 3,
+      "permissions": {
+       "view": {
+        "users": [
+         4
+        ]
+       },
+       "change": {
+        "groups": [
+         1
+        ]
+       }
+      },
+      "merge": false
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/bulk_edit_objects/",
+     "json": {
+      "objects": [
+       3
+      ],
+      "object_type": "correspondents",
+      "operation": "delete"
+     }
+    },
+    {
+     "sql": "select 'correspondent' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_correspondent x union all select 'documenttype' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_documenttype x union all select 'tag' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_tag x union all select 'storagepath' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_storagepath x order by 1, 2"
+    },
+    {
+     "sql": "select ct.model, o.object_pk, o.user_id as who, 'u' as kind, p.codename from guardian_userobjectpermission o join auth_permission p on p.id = o.permission_id join django_content_type ct on ct.id = o.content_type_id union all select ct.model, o.object_pk, o.group_id, 'g', p.codename from guardian_groupobjectpermission o join auth_permission p on p.id = o.permission_id join django_content_type ct on ct.id = o.content_type_id order by 1, 2, 4, 3, 5"
+    },
+    {
+     "sql": "select id, correspondent_id, document_type_id, storage_path_id, owner_id, (select coalesce(array_agg(t.tag_id order by t.tag_id), '{}') from documents_document_tags t where t.document_id = d.id) as tags from documents_document d order by id"
+    },
+    {
+     "sql": "select l.id, l.action, ct.app_label || '.' || ct.model as model, l.object_pk, l.object_id, l.object_repr, l.changes, l.changes_text, l.actor_id, l.remote_addr, l.additional_data, l.timestamp, l.cid is not null as has_cid, l.actor_email, l.serialized_data from auditlog_logentry l join django_content_type ct on ct.id = l.content_type_id where l.id > 918 order by l.id"
+    }
+   ]
+  }
+ ]
+}

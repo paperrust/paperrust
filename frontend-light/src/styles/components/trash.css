@@ -1,0 +1,12 @@
+/* Trash (Trash.svelte). */
+
+/* Action menu on phones without arrow */
+.d-block.d-sm-none .dropdown-toggle::after {
+  display: none;
+}
+
+/* No line under the last row or under the header of an empty table */
+tbody tr:last-child td,
+table:not(:has(tbody tr)) thead th {
+  border-bottom: none;
+}

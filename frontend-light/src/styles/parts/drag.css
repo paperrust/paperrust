@@ -1,0 +1,20 @@
+/* Drag and drop (lib/cdk-drag.ts, e.g. dashboard tiles):
+   preview copy neutral, copies do not react to the mouse. */
+
+/* Preview is a popover: cancel its browser defaults. In its own layer so that the
+   styles of the dragged element (e.g. .card) keep precedence. */
+@layer pr-drag {
+  .cdk-drag-preview {
+    inset: auto;
+    padding: 0;
+    overflow: visible;
+    color: inherit;
+    background: none;
+    border: none;
+  }
+}
+
+.cdk-drag-placeholder *,
+.cdk-drag-preview * {
+  pointer-events: none !important;
+}

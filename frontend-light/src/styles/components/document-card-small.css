@@ -1,0 +1,109 @@
+/* Small document card in the tile grid of the document list and the home page
+   (DocumentCardSmall.svelte). */
+
+/* Soft fade-in on appearance */
+@keyframes pr-entry-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.fade.show {
+  animation: pr-entry-fade 160ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade.show {
+    animation: none;
+  }
+}
+
+/* Thumbnail with fixed height */
+.doc-img-container {
+  position: relative;
+  height: 180px;
+}
+
+.doc-img {
+  object-fit: cover;
+  object-position: top left;
+}
+
+/* Selection checkbox in the image corner, visible only on hover */
+.document-card-check {
+  display: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 0.5rem;
+  border-top-left-radius: 0.25rem;
+  border-bottom-right-radius: 0.25rem;
+  pointer-events: none;
+}
+
+.document-card:hover .document-card-check {
+  display: block;
+}
+
+.document-card-check .form-check {
+  padding: 0;
+  min-height: 0;
+  margin-bottom: 0;
+}
+
+.document-card-check .form-check .form-check-input {
+  margin-left: 0;
+}
+
+/* Tags at the top right of the image */
+.tags {
+  top: 0.2rem;
+  right: 0;
+  max-width: 80%;
+  row-gap: 0.2rem;
+  line-height: 1;
+}
+
+/* With many tags: single line with ellipsis */
+.tags.tags-no-wrap ::deep .badge {
+  display: inline-block;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Notes counter at the bottom edge of the image */
+.document-card-notes {
+  position: absolute;
+  right: 0;
+  top: 142px;
+}
+
+.card-text {
+  font-size: 90%;
+}
+
+/* Info list in the card footer */
+.card-info,
+.card-info button {
+  line-height: 1;
+}
+
+.card-info button small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.card-info button:hover,
+.card-info button:focus {
+  background-color: transparent !important;
+  color: var(--bs-primary);
+}
+
+.card-footer .btn {
+  padding-top: 0.1rem;
+}
+
+a {
+  cursor: pointer;
+}

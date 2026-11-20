@@ -1,0 +1,45 @@
+[package]
+name = "pl-scan"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+# Scanner integration without NAS access on the device (docs/contract/pl-scan.md):
+# * eSCL/AirScan client (scan button in PaperRust), mDNS discovery (own minimal implementation)
+# * SMTP intake for devices only (scan-to-email), device token only for uploading
+# Both paths hand a file to the normal ingestion pipeline (`consume_file`).
+# All dependencies from [workspace.dependencies].
+[dependencies]
+pl-core.workspace = true
+pl-authz.workspace = true
+pl-queue.workspace = true
+pl-consumer.workspace = true
+pl-parsers.workspace = true
+pl-pdfops.workspace = true
+pl-envlive.workspace = true
+pl-templating.workspace = true
+axum.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+chrono.workspace = true
+tracing.workspace = true
+thiserror.workspace = true
+reqwest.workspace = true
+quick-xml.workspace = true
+lopdf.workspace = true
+image.workspace = true
+sha2.workspace = true
+rand.workspace = true
+uuid.workspace = true
+base64.workspace = true
+futures.workspace = true
+url.workspace = true
+tokio-rustls.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+tower = { workspace = true, features = ["util"] }
+http-body-util.workspace = true

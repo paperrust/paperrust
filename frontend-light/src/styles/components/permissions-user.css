@@ -1,0 +1,14 @@
+/* Permissions: user selection (PermissionsUser.svelte). */
+
+/* Locked: field gray, no interaction */
+.paperless-input-select.disabled {
+  cursor: not-allowed;
+}
+
+.paperless-input-select.disabled ::deep ng-select {
+  pointer-events: none;
+}
+
+.paperless-input-select.disabled ::deep ng-select .ng-select-container {
+  background-color: var(--pr-bg-disabled) !important;
+}

@@ -1,0 +1,360 @@
+@use 'sass:color';
+
+// Colors and design variables of the classic Light UI (PaperRust).
+// Accent color: rust #B7410E = hsl(18, 86%, 39%). lib/appearance.ts overrides --pr-primary/-lightness
+// with the theme color from the UI settings and sets primary-light or primary-dark on <body>.
+// Light/dark: data-bs-theme="light|dark|auto" on <html> (auto follows prefers-color-scheme).
+
+$ink-on-light: #212529; // Text on light accent color
+$ink-on-dark: #abb2bf; // Base text in dark mode
+$ink-on-dark-strong: color.adjust($ink-on-dark, $lightness: 10%); // slightly lighter for highlights
+
+@mixin rust-accent {
+  --pr-primary: 18, 86%;
+  --pr-primary-lightness: 39%;
+}
+
+:root {
+  @include rust-accent;
+  --pr-primary-text-contrast: var(--bs-light);
+  --bs-primary: hsl(var(--pr-primary), var(--pr-primary-lightness));
+  --bs-border-color: var(--bs-gray-400);
+  --pr-primary-faded: hsl(var(--pr-primary), calc(var(--pr-primary-lightness) + 76%));
+  --pr-primary-lighten-10: hsl(var(--pr-primary), calc(var(--pr-primary-lightness) + 10%));
+  --pr-primary-lighten-30: hsl(var(--pr-primary), calc(var(--pr-primary-lightness) + 30%));
+  --pr-primary-darken-5: hsl(var(--pr-primary), calc(var(--pr-primary-lightness) - 5%));
+  --pr-primary-darken-15: hsl(var(--pr-primary), calc(var(--pr-primary-lightness) - 15%));
+  --pr-primary-darken-18: hsl(var(--pr-primary), calc(var(--pr-primary-lightness) - 18%));
+  --pr-primary-darken-27: hsl(var(--pr-primary), calc(var(--pr-primary-lightness) - 27%));
+  --pr-success-darken-10: hsl(152, 69%, 11%);
+  // Surfaces
+  --pr-bg-alt: #fff;
+  --pr-bg-darker: #f4f6f5;
+  --pr-bg-alt2: var(--bs-gray-200);
+  --pr-bg-disabled: #f7f7f7;
+  --pr-card-hover-border: var(--bs-tertiary-color);
+  --pr-focus-alpha: 0.3;
+  // Messages (toasts)
+  --pr-toast-max-width: 340px;
+  --pr-toast-bg: rgba(255, 255, 255, 0.94);
+  --pr-toast-success: hsl(var(--pr-primary), 30%);
+  --pr-toast-success-bg: hsl(var(--pr-primary), 94%);
+  --pr-toast-info: hsl(211, 86%, 47%);
+  --pr-toast-error: hsl(352, 78%, 45%);
+  --pr-toast-error-bg: hsl(352, 80%, 96%);
+  --pr-toast-row-bg: #f3f5f4;
+  --pr-toast-row-hover-bg: #eaeeec;
+  --bs-info: var(--pr-bg-alt2);
+  --bs-info-rgb: 233, 236, 239;
+}
+
+@media screen and (min-width: 1024px) {
+  :root {
+    --pr-toast-max-width: 450px;
+  }
+}
+
+// Own theme color: text color on the accent surface depending on lightness
+.primary-light {
+  --pr-primary-text-contrast: #{$ink-on-light} !important;
+}
+
+// Draw checkmark/dot dark if the accent color is light (Bootstrap icon, stroke color #212529)
+.primary-light .form-check:not(.form-switch) .form-check-input:checked[type="checkbox"] {
+  --bs-form-check-bg-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23212529' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='M6 10l3 3l6-6'/%3e%3c/svg%3e");
+}
+
+.primary-light .form-check:not(.form-switch) .form-check-input:checked[type="radio"] {
+  --bs-form-check-bg-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='2' fill='%23212529'/%3e%3c/svg%3e");
+}
+
+.primary-dark {
+  --pr-primary-text-contrast: #{$ink-on-dark} !important;
+}
+
+// List as the only content of a menu: take over the corners of the menu
+.dropdown-menu > .list-group-flush:only-child > .list-group-item:first-child {
+  border-top-left-radius: var(--bs-dropdown-border-radius);
+  border-top-right-radius: var(--bs-dropdown-border-radius);
+}
+
+.dropdown-menu > .list-group-flush:only-child > .list-group-item:last-child {
+  border-bottom-left-radius: var(--bs-dropdown-border-radius);
+  border-bottom-right-radius: var(--bs-dropdown-border-radius);
+}
+
+// ---- Dark mode ----------------------------------------------------------------------------------
+
+// Accent color in the dark: same lightness as light (contrast, docs/BRANDING.md)
+@mixin dark-accent {
+  --pr-primary-lightness: 39%;
+  --bs-primary: hsl(var(--pr-primary),var(--pr-primary-lightness));
+}
+
+// Dark values and Bootstrap adjustments; included under [data-bs-theme=dark] and (system dark) under
+// [data-bs-theme=auto] body. "&.primary-light" targets the <body> with a light own theme color.
+@mixin dark-theme {
+  color-scheme: dark;
+  --pr-body-color-accent: #{$ink-on-dark-strong};
+  --pr-bg-alt: #242529;
+  --pr-toast-bg: rgba(36, 40, 43, 0.96);
+  --pr-toast-success: hsl(var(--pr-primary), 60%);
+  --pr-toast-success-bg: hsl(var(--pr-primary), 14%);
+  --pr-toast-info: hsl(211, 95%, 68%);
+  --pr-toast-error: hsl(352, 90%, 68%);
+  --pr-toast-error-bg: hsl(352, 45%, 20%);
+  --pr-toast-row-bg: #26282c;
+  --pr-toast-row-hover-bg: #2d2f34;
+  --pr-bg-alt2: #232323;
+  --pr-bg-darker: #121315;
+  --pr-bg-disabled: var(--pr-bg-alt);
+  --pr-card-hover-border: var(--bs-border-color);
+  --pr-focus-alpha: 0.6;
+  --pr-primary-faded: var(--pr-primary-darken-15);
+  --pr-primary-text-contrast: var(--bs-body-color);
+  --bs-body-color: #{$ink-on-dark};
+  --bs-secondary-color: #6c757d;
+  --bs-danger: #b71631;
+  --bs-danger-rgb: 183, 22, 49;
+  --bs-body-bg: #161618;
+  --bs-body-bg-rgb: 22, 22, 24;
+  --bs-secondary-bg: var(--pr-bg-disabled);
+  --bs-secondary-bg-rgb: 36, 37, 41;
+  --bs-light: #1c1c1f;
+  --bs-light-rgb: 28, 28, 31;
+  --bs-info: var(--pr-bg-alt);
+  --bs-info-rgb: 36, 36, 39;
+  --bs-border-color: #34373d;
+  --bs-tertiary-bg: var(--pr-bg-darker);
+  --bs-dark-border-subtle: var(--pr-bg-darker);
+  --bs-border-color-translucent: rgba(0, 0, 0, .175);
+  --bs-box-shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.15);
+
+  .text-dark,
+  .text-light {
+    color: var(--bs-body-color) !important;
+  }
+
+  // Buttons
+  .btn {
+    --bs-btn-disabled-opacity: 0.35;
+  }
+  .btn.btn-link {
+    --bs-btn-disabled-opacity: 0.85;
+  }
+  .btn-primary:hover,
+  .btn-primary:focus,
+  .btn-primary.active,
+  .btn-primary:active {
+    color: var(--bs-body-color) !important;
+  }
+  &.primary-light .btn-primary:hover,
+  &.primary-light .btn-primary:focus,
+  &.primary-light .btn-primary.active,
+  &.primary-light .btn-primary:active {
+    color: var(--pr-bg-darker) !important;
+  }
+  .btn-dark {
+    --bs-btn-color: #{$ink-on-dark};
+    --bs-btn-bg: var(--pr-bg-alt);
+    --bs-btn-border-color: var(--pr-bg-alt);
+    --bs-btn-hover-bg: var(--bs-light);
+    --bs-btn-hover-border-color: var(--pr-bg-darker);
+    --bs-btn-active-bg: var(--pr-bg-alt);
+  }
+  .btn-outline-primary:hover,
+  .btn-outline-primary:focus,
+  .btn-outline-primary.active,
+  .btn-outline-primary:active {
+    color: var(--bs-light) !important;
+  }
+  .btn-outline-secondary:hover,
+  .btn-outline-secondary:focus,
+  .btn-outline-secondary.active,
+  .btn-outline-secondary:active {
+    background-color: var(--pr-bg-darker);
+    color: var(--pr-body-color-accent) !important;
+  }
+  .btn-light {
+    color: var(--bs-body-color);
+  }
+  .btn .progress {
+    background-color: var(--pr-body-color-accent);
+  }
+
+  .list-group-item-action:not(.active):active {
+    --bs-list-group-action-active-color: var(--bs-body-color);
+    --bs-list-group-action-active-bg: var(--pr-bg-darker);
+  }
+
+  // File selection: no area behind the button on hover
+  .form-control:hover::file-selector-button {
+    background-color: transparent !important;
+  }
+
+  // Search field in the header bar
+  .search-container input,
+  .search-container input:focus,
+  .search-container pngx-bs-icon[name="search"],
+  .search-container ::placeholder {
+    color: var(--pr-primary-text-contrast) !important;
+  }
+
+  // Cards and dialogs
+  .card {
+    background-color: var(--bs-body-bg);
+    --bs-card-cap-bg: var(--bs-body-bg-rgb);
+  }
+  .card .card-header {
+    background-color: rgba(0, 0, 0, 0.12);
+  }
+  .row-cols-paperless-cards .card,
+  pngx-document-card-large .card {
+    --bs-border-color-translucent: rgba(0, 0, 0, .3);
+  }
+  .modal-content,
+  .modal-header,
+  .modal-body,
+  .modal-footer {
+    background-color: var(--bs-body-bg);
+    border-color: var(--bs-border-color);
+  }
+
+  // Labels
+  .badge.bg-light.border {
+    border-color: rgba(0, 0, 0, 0) !important;
+  }
+  .badge.bg-body {
+    background-color: rgba(var(--bs-dark-rgb), var(--bs-bg-opacity)) !important;
+  }
+
+  // Thumbnails of the documents
+  .document-card .card-body.bg-light {
+    background-color: var(--bs-body-bg);
+  }
+  .doc-img {
+    mix-blend-mode: normal;
+    border-radius: 0;
+    border-color: var(--bs-border-color);
+    filter: invert(10%);
+    transform: translateZ(0);
+  }
+  .doc-img.border-end {
+    border-right: none !important;
+  }
+  .doc-img.inverted {
+    filter: invert(95%) hue-rotate(180deg);
+  }
+  .card-selected .doc-img {
+    mix-blend-mode: luminosity;
+  }
+
+  // Selection field (parts/select.css)
+  .ng-dropdown-panel .ng-dropdown-panel-items .ng-option:not(.ng-option-selected):hover,
+  .ng-dropdown-panel .ng-dropdown-panel-items .ng-option.ng-option-marked {
+    background-color: var(--bs-light) !important;
+  }
+  .ng-select-multiple .ng-select-container .ng-value-container .ng-value {
+    background-color: var(--pr-bg-alt);
+    color: var(--bs-body-color);
+  }
+  .ng-select-multiple .ng-select-container .ng-value-container .ng-value .ng-value-icon.left {
+    border-color: var(--pr-bg-alt);
+  }
+  .ng-select-multiple .ng-select-container .ng-value-container .ng-value .ng-value-icon.left:hover {
+    background-color: var(--pr-primary-lighten-30);
+  }
+
+  // Tables
+  table.table-hover > tbody > tr:hover > * {
+    background-color: var(--bs-light);
+    color: var(--pr-body-color-accent);
+  }
+  .table-row-selected td,
+  .table-row-selected a:not(.badge) {
+    color: var(--pr-primary-text-contrast) !important;
+  }
+  .card .table {
+    border-color: var(--bs-gray-800);
+  }
+
+  // Notices
+  .alert-secondary {
+    background-color: var(--bs-light);
+    border-color: var(--pr-bg-darker);
+    color: var(--bs-body-color);
+  }
+  .alert-primary {
+    --bs-alert-color: var(--bs-primary);
+    --bs-alert-bg: var(--pr-primary-darken-18);
+    --bs-alert-border-color: var(--pr-bg-darker);
+  }
+  .alert-success {
+    --bs-alert-color: var(--pr-body-color-accent);
+    --bs-alert-bg: var(--pr-success-darken-10);
+    --bs-alert-border-color: var(--pr-bg-darker);
+  }
+
+  .table-striped > tbody > tr:nth-of-type(odd) > * {
+    color: var(--pr-body-color-accent);
+  }
+
+  // Draw close crosses light
+  .close,
+  .modal .btn-close,
+  .alert .btn-close {
+    text-shadow: 0 1px 0 #666;
+  }
+  .modal .btn-close,
+  .alert .btn-close,
+  .toast .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+  }
+
+  // Menus and lists
+  .dropdown-item {
+    --bs-dropdown-color: var(--bs-body-color);
+    --pr-bg-darker: var(--pr-bg-alt);
+  }
+  .list-group {
+    --bs-list-group-action-hover-color: var(--bs-secondary-color);
+  }
+  .card .list-group-item {
+    --bs-border-color: rgb(var(--bs-dark-rgb));
+  }
+  .card .list-group-item .bg-secondary {
+    background-color: rgb(var(--bs-dark-rgb)) !important;
+  }
+
+  .tooltip {
+    --bs-tooltip-bg: #000;
+  }
+}
+
+// Without own theme color: rust accent also in the dark, header bar keeps the original rust
+@mixin dark-default-accent {
+  &:not(.primary-light):not(.primary-dark) {
+    @include dark-accent;
+  }
+  &:not(.primary-light):not(.primary-dark) .navbar.bg-primary {
+    @include rust-accent;
+  }
+}
+
+[data-bs-theme="dark"] {
+  body {
+    @include dark-default-accent;
+  }
+  @include dark-theme;
+}
+
+// System setting "dark" (also before the first render, so that nothing flashes white)
+@media (prefers-color-scheme: dark) {
+  [data-bs-theme="auto"] body {
+    @include dark-default-accent;
+    &:not(.primary-light):not(.primary-dark) .navbar.bg-primary .dropdown-menu {
+      @include dark-accent;
+    }
+    @include dark-theme;
+  }
+}

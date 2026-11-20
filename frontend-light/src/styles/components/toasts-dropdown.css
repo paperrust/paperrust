@@ -1,0 +1,36 @@
+/* Notification bell with list in the header bar (ToastsDropdown.svelte). */
+
+.dropdown-toggle::after {
+  display: none;
+}
+
+/* Counter at the top right of the bell */
+.notification-count {
+  top: -0.2rem;
+  right: -0.2rem;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0.18rem 0.32rem;
+  font-size: 0.68rem;
+  line-height: 1;
+}
+
+.dropdown-menu {
+  width: var(--pr-toast-max-width);
+}
+
+.dropdown-menu .scroll-list {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.clear-all:hover {
+  color: var(--bs-body-color) !important;
+}
+
+/* very narrow screens: shift the list to the right so that it fits into the window */
+@media screen and (max-width: 400px) {
+  :host ::deep .dropdown-menu-end {
+    right: -3rem;
+  }
+}

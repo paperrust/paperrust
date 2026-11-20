@@ -1,0 +1,312 @@
+{
+ "crate": "pl-mail",
+ "cases": [
+  {
+   "id": "w23.documents.email.empty",
+   "route": "documents.email",
+   "method": "POST",
+   "path": "/api/documents/email/",
+   "json": {},
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.documents.email.validation",
+   "route": "documents.email",
+   "method": "POST",
+   "path": "/api/documents/email/",
+   "json": {
+    "documents": [],
+    "addresses": "bad, x@y.de",
+    "subject": " ",
+    "message": "m",
+    "use_archive_version": "x"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.documents.email.types",
+   "route": "documents.email",
+   "method": "POST",
+   "path": "/api/documents/email/",
+   "json": {
+    "documents": [
+     999999,
+     "a"
+    ],
+    "addresses": "a@b.c"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.documents.email.nulls",
+   "route": "documents.email",
+   "method": "POST",
+   "path": "/api/documents/email/",
+   "json": {
+    "documents": null,
+    "addresses": null,
+    "subject": null,
+    "message": null,
+    "use_archive_version": null
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.documents.email.notlist",
+   "route": "documents.email",
+   "method": "POST",
+   "path": "/api/documents/email/",
+   "json": {
+    "documents": 5,
+    "addresses": 5,
+    "subject": true,
+    "message": [
+     "x"
+    ]
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.documents.email.twice",
+   "route": "documents.email",
+   "method": "POST",
+   "path": "/api/documents/email/",
+   "json": {
+    "documents": [
+     1,
+     1
+    ],
+    "addresses": "a@example.com",
+    "subject": "s",
+    "message": "m"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.documents.email.smtpfail",
+   "route": "documents.email",
+   "method": "POST",
+   "path": "/api/documents/email/",
+   "json": {
+    "documents": [
+     1,
+     2
+    ],
+    "addresses": "a@example.com, b@example.org",
+    "subject": "s\nx",
+    "message": "m"
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.documents.email.smtpfail_original",
+   "route": "documents.email",
+   "method": "POST",
+   "path": "/api/documents/email/",
+   "json": {
+    "documents": [
+     1
+    ],
+    "addresses": "a@example.com",
+    "subject": "s",
+    "message": "m",
+    "use_archive_version": false
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.documents.email.perm",
+   "route": "documents.email",
+   "method": "POST",
+   "path": "/api/documents/email/",
+   "json": {
+    "documents": [
+     2
+    ],
+    "addresses": "a@example.com",
+    "subject": "s",
+    "message": "m"
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.documents.email.deleted_or_missing",
+   "route": "documents.email",
+   "method": "POST",
+   "path": "/api/documents/email/",
+   "json": {
+    "documents": [
+     99999
+    ],
+    "addresses": "a@example.com",
+    "subject": "s",
+    "message": "m"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.documents.email.listbody",
+   "route": "documents.email",
+   "method": "POST",
+   "path": "/api/documents/email/",
+   "json": [
+    1
+   ],
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.documents.email_document.json",
+   "route": "documents.email_document",
+   "method": "POST",
+   "path": "/api/documents/1/email/",
+   "json": {
+    "addresses": "a@b.de",
+    "subject": "s",
+    "message": "m"
+   },
+   "users": [
+    "admin",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.documents.email_document.form",
+   "route": "documents.email_document",
+   "method": "POST",
+   "path": "/api/documents/1/email/",
+   "form": {
+    "addresses": "a@b.de",
+    "subject": "s",
+    "message": "m"
+   },
+   "users": [
+    "admin",
+    "user2"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.documents.email_document.form_invalid",
+   "route": "documents.email_document",
+   "method": "POST",
+   "path": "/api/documents/1/email/",
+   "form": {
+    "addresses": "x",
+    "subject": "",
+    "message": "m"
+   },
+   "users": [
+    "admin",
+    "user2"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.documents.email_document.form_bool",
+   "route": "documents.email_document",
+   "method": "POST",
+   "path": "/api/documents/1/email/",
+   "form": {
+    "addresses": "a@b.de",
+    "subject": "s",
+    "message": "m",
+    "use_archive_version": "false"
+   },
+   "users": [
+    "admin",
+    "user2"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.documents.email_document.missing",
+   "route": "documents.email_document",
+   "method": "POST",
+   "path": "/api/documents/999999/email/",
+   "form": {
+    "addresses": "a@b.de",
+    "subject": "s",
+    "message": "m"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  }
+ ]
+}

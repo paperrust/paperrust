@@ -1,0 +1,834 @@
+// Base rules of the classic Light UI: font, spacing, adjustments to Bootstrap (npm package, MIT),
+// helper classes. Colors/variables: theme.scss. Included after theme.scss.
+
+$radius: .425rem; // Base rounding (paperrust-touch.css makes the corners more angular afterwards)
+$gutter: 1.5rem;
+
+// ---- Helpers: negative spacing that Bootstrap 5 no longer brings along ------------------------------
+.mt-n2 { margin-top: -0.5rem; }
+.me-n2 { margin-right: -0.5rem; }
+.mb-n2 { margin-bottom: -0.5rem; }
+.ms-n1 { margin-left: -0.25rem; }
+.ms-n2 { margin-left: -0.5rem; }
+.my-n2 {
+  margin-top: -0.5rem;
+  margin-bottom: -0.5rem;
+}
+
+// Rounding and breakpoints (incl. very wide xxxl) as variables
+:root {
+  --bs-border-radius: #{$radius};
+  --bs-breakpoint-xs: 0;
+  --bs-breakpoint-sm: 576px;
+  --bs-breakpoint-md: 768px;
+  --bs-breakpoint-lg: 992px;
+  --bs-breakpoint-xl: 1200px;
+  --bs-breakpoint-xxl: 1400px;
+  --bs-breakpoint-xxxl: 2400px;
+}
+
+// ---- Page --------------------------------------------------------------------------------------
+body {
+  --pr-body-font-size: 0.875rem;
+  --pr-sidebar-expanded-width: clamp(15rem, 16.66666667vw, 20rem);
+  font-size: var(--pr-body-font-size);
+  height: 100vh;
+  letter-spacing: -0.005em;
+}
+
+// smooth color change (light/dark, hover)
+* {
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.card,
+.dropdown-menu,
+.modal-content,
+.popover {
+  --bs-card-border-color: color-mix(in srgb, var(--bs-border-color) 72%, transparent);
+  border-radius: .55rem;
+}
+
+.card {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .04), 0 8px 24px rgba(0, 0, 0, .035);
+}
+
+.btn {
+  --bs-border-radius-sm: #{$radius};
+  font-weight: 500;
+}
+
+.pagination,
+.input-group {
+  --bs-border-radius-sm: #{$radius};
+}
+
+// Main area next to the sidebar (collapsed or expanded)
+@media (min-width: 768px) {
+  .col-slim {
+    padding-left: calc(56px + #{$gutter}) !important;
+  }
+  .col-sidebar-expanded {
+    flex: 0 0 auto;
+    width: calc(100% - var(--pr-sidebar-expanded-width));
+  }
+  .offset-sidebar-expanded {
+    margin-left: var(--pr-sidebar-expanded-width);
+  }
+}
+
+// Logo: sheet, dog-ear and lines follow text or accent color
+svg.logo .leaf { fill: var(--bs-primary) !important; }
+svg.logo .text { fill: var(--bs-body-color) !important; }
+svg.logo .paper { fill: var(--bs-body-color) !important; }
+svg.logo .corner { fill: var(--bs-primary) !important; }
+svg.logo .lines { fill: var(--bs-body-bg) !important; }
+
+.navbar.bg-primary {
+  --bs-primary: hsl(var(--pr-primary),var(--pr-primary-lightness));
+  --bs-primary-rgb: var(--bs-primary);
+}
+
+// Borders always in the theme border color
+.border { border-color: var(--bs-border-color) !important; }
+.border-end { border-right: 1px solid var(--bs-border-color) !important; }
+.border-start { border-left: 1px solid var(--bs-border-color) !important; }
+.border-bottom { border-bottom: 1px solid var(--bs-border-color) !important; }
+
+.nav-link,
+.list-group-item {
+  color: var(--bs-body-color);
+}
+
+.list-group-item .btn-link,
+table .btn-link {
+  font-size: 1em;
+}
+
+.fs-7 { font-size: 0.75rem !important; }
+
+.bg-body { background-color: var(--bs-body-bg); }
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6,
+.h1, .h2, .h3, .h4, .h5, .h6 {
+  font-weight: 600;
+}
+
+pngx-page-header h3 {
+  font-size: 1.5rem;
+}
+
+// Digits of equal width so that number columns line up cleanly
+table,
+.badge,
+.card-info,
+.pagination {
+  font-variant-numeric: tabular-nums;
+}
+
+// ---- Accent color on areas and buttons --------------------------------------------------------
+.bg-primary {
+  background-color: var(--bs-primary) !important;
+  color: var(--pr-primary-text-contrast);
+}
+
+.bg-darker { background-color: var(--pr-bg-darker) !important; }
+
+.navbar-brand { color: var(--pr-primary-text-contrast) !important; }
+
+.navbar .dropdown > .btn { color: var(--pr-primary-text-contrast) !important; }
+
+.btn-primary {
+  color: var(--pr-primary-text-contrast);
+  background-color: var(--bs-primary);
+  border-color: var(--bs-primary);
+}
+.btn-primary:hover,
+.btn-primary:focus {
+  background-color: var(--pr-primary-darken-5) !important;
+  border-color: var(--pr-primary-darken-5) !important;
+}
+.btn-primary:disabled,
+.btn-primary.disabled {
+  color: var(--pr-primary-text-contrast);
+  background-color: var(--pr-primary-darken-5) !important;
+  border-color: var(--pr-primary-darken-5) !important;
+}
+
+.btn-dark {
+  --bs-btn-color: var(--bs-gray-600);
+  --bs-btn-bg: var(--bs-gray-200);
+  --bs-btn-border-color: var(--bs-gray-200);
+  --bs-btn-hover-bg: var(--bs-gray-400);
+  --bs-btn-hover-border-color: var(--bs-gray-500);
+  --bs-btn-active-bg: var(--bs-gray-200);
+}
+
+.text-primary { color: var(--bs-primary) !important; }
+
+.btn-outline-primary {
+  border-color: var(--bs-primary) !important;
+  color: var(--bs-primary) !important;
+}
+.btn-outline-primary:hover,
+.btn-outline-primary:focus,
+.btn-outline-primary.active,
+.btn-outline-primary:active {
+  background-color: var(--bs-primary) !important;
+  color: var(--bs-light) !important;
+}
+
+.btn-outline-secondary { color: var(--bs-secondary); }
+.btn-outline-secondary:hover { color: var(--bs-light); }
+
+// Focus ring in accent color
+.btn:focus,
+.btn:active:focus,
+.dropdown-item:focus,
+.btn-check:focus + .btn,
+.form-control:focus,
+.form-check-input:focus,
+.form-check-radio:focus,
+.form-select:focus {
+  box-shadow: 0 0 0 0.25rem hsla(var(--pr-primary), var(--pr-primary-lightness), var(--pr-focus-alpha));
+}
+
+.btn-check:checked + .btn-outline-primary,
+.btn-check:active + .btn-outline-primary,
+.btn-outline-primary:active,
+.btn-outline-primary.active,
+.btn-outline-primary.dropdown-toggle.show {
+  background-color: var(--bs-primary);
+  color: var(--pr-primary-text-contrast) !important;
+}
+
+// Switch with focus: neutral gray button instead of Bootstrap's blue
+.form-switch .form-check-input:focus {
+  --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23bbb'/%3e%3c/svg%3e");
+}
+
+.nav-item a:focus-visible {
+  outline: none;
+  background-color: var(--bs-body-bg);
+}
+
+a.navbar-brand:focus-visible {
+  outline: none;
+  color: var(--pr-primary-darken-5);
+}
+
+.dropdown.show > .btn-primary {
+  background-color: var(--bs-primary);
+  border-color: var(--bs-primary);
+}
+.dropdown.show > .btn-outline-primary {
+  color: var(--pr-primary-text-contrast) !important;
+}
+
+// Links
+a, a:hover,
+.btn-link {
+  color: var(--bs-primary);
+}
+
+a.btn-link:hover,
+a.btn-link:active,
+a.btn-link:focus-visible,
+.btn-link:hover,
+.btn-link:active,
+.btn-link.show,
+.btn-link:focus-visible {
+  color: var(--pr-primary-lighten-10) !important;
+}
+.primary-light a.btn-link:hover,
+.primary-light a.btn-link:active,
+.primary-light a.btn-link:focus-visible,
+.primary-light .btn-link:hover,
+.primary-light .btn-link:active,
+.primary-light .btn-link.show,
+.primary-light .btn-link:focus-visible {
+  color: var(--pr-primary-darken-15) !important;
+}
+
+// ---- Sortable table headers (arrow like bootstrap-icons "chevron-down") ------------------------
+th[pngxSortable] {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+th[pngxSortable]::after {
+  content: '';
+  display: inline-block;
+  vertical-align: -0.15em;
+  width: 0.8rem;
+  height: 0.8rem;
+  margin-left: 0.25rem;
+  mask: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3e%3c/svg%3e") no-repeat center / 0.8rem;
+  background-color: currentColor;
+  opacity: 0;
+  transition: opacity 0.15s ease-in-out;
+}
+// unsorted column: hint on hover that it is sortable
+th[pngxSortable]:hover::after {
+  opacity: 0.35;
+}
+
+.asc,
+.des {
+  color: var(--bs-primary);
+  --bs-table-color-state: var(--bs-primary);
+}
+.asc::after,
+.des::after {
+  opacity: 1 !important;
+}
+.asc::after {
+  transform: rotate(180deg);
+}
+
+// ---- Selection fields (parts/select.css) in the form ----------------------------------------------
+.paperless-input-select .ng-select {
+  position: relative;
+  flex: 1 1 auto;
+  margin-bottom: 0;
+  min-height: calc(1em + 0.75rem + 5px);
+  line-height: 1.5;
+}
+.paperless-input-select .ng-select .ng-select-container {
+  border-radius: $radius;
+}
+.paperless-input-select .ng-select .ng-select-container .ng-value-container .ng-input {
+  top: 7px;
+}
+.paperless-input-select .ng-select .ng-select-container .ng-value-container .ng-input input {
+  min-width: 10px;
+}
+.paperless-input-select .ng-select.ng-select-multiple .ng-select-container .ng-value-container .ng-placeholder,
+.paperless-input-select .ng-select .ng-select-container .ng-value-container .ng-placeholder {
+  top: 7px;
+}
+.paperless-input-select .input-group ng-select:not(:last-child) .ng-select-container {
+  height: 100%;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+// Selection list (sits in the overlay outside the field)
+.ng-dropdown-panel {
+  font-size: var(--pr-body-font-size);
+}
+.ng-dropdown-panel .ng-dropdown-panel-items .ng-option.ng-option-marked {
+  background-color: var(--pr-bg-darker) !important;
+  color: var(--pr-body-color-accent) !important;
+}
+.ng-dropdown-panel .ng-dropdown-panel-items .ng-option.ng-option-selected,
+.ng-dropdown-panel .ng-dropdown-panel-items .ng-option.ng-option-selected.ng-option-marked {
+  font-weight: bold;
+  background-color: var(--pr-bg-alt2) !important;
+}
+
+// Tag field: selected tags without own background (the tags color themselves)
+.paperless-input-tags .ng-select.ng-select-multiple .ng-select-container .ng-value-container .ng-value {
+  background-color: transparent;
+  border-color: transparent;
+}
+.paperless-input-tags .ng-select.ng-select-multiple .ng-select-container .ng-value-container {
+  padding-top: 1px;
+}
+
+// ---- Form fields -----------------------------------------------------------------------------
+// iOS zooms into input fields with font < 16px
+@supports (-webkit-touch-callout: none) {
+  input[type="number"],
+  input[type="search"],
+  input[type="text"],
+  select:focus,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+.form-control:not(.btn),
+input,
+select,
+textarea,
+.form-select:not(.is-invalid):not(:disabled),
+.form-check-input,
+.ng-select .ng-select-container .ng-value-container .ng-input > input {
+  color: var(--bs-body-color);
+  background-color: var(--bs-body-bg);
+  border-color: var(--bs-border-color);
+  font-size: 0.875rem;
+}
+.form-control:not(.btn):focus,
+input:focus,
+select:focus,
+textarea:focus,
+.form-select:not(.is-invalid):not(:disabled):focus,
+.form-check-input:focus,
+.ng-select .ng-select-container .ng-value-container .ng-input > input:focus {
+  background-color: var(--pr-bg-darker);
+  color: var(--bs-body-color);
+}
+@media (max-width: 768px) {
+  .form-control:not(.btn),
+  input,
+  select,
+  textarea,
+  .form-select:not(.is-invalid):not(:disabled),
+  .form-check-input,
+  .ng-select .ng-select-container .ng-value-container .ng-input > input {
+    font-size: 1rem;
+  }
+}
+
+// larger font on the phone: small buttons in input groups slightly taller
+@media (max-width: 768px) {
+  .input-group-sm .btn-sm {
+    padding-top: .35rem;
+    padding-bottom: .35rem;
+  }
+}
+
+.input-group .form-control-sm {
+  padding-top: .15rem;
+  padding-bottom: .15rem;
+  min-height: calc(1.3em + 0.5rem + calc(var(--bs-border-width) * 2)) !important;
+}
+
+.input-group .btn-outline-secondary {
+  border-color: var(--bs-border-color);
+}
+
+.form-check-input:checked {
+  background-color: var(--bs-primary);
+  border-color: var(--bs-primary);
+}
+
+.form-check-input:focus {
+  border-color: var(--bs-primary);
+}
+
+.form-control:disabled,
+.form-control[readonly] {
+  background-color: var(--pr-bg-disabled);
+  cursor: not-allowed;
+}
+
+.cursor-pointer { cursor: pointer; }
+
+// ---- Page selection ---------------------------------------------------------------------------------
+ul.pagination {
+  margin-bottom: 0;
+}
+
+.page-link {
+  color: var(--bs-secondary);
+  background-color: var(--bs-body-bg);
+  border-color: var(--bs-border-color) !important;
+}
+.page-link:hover,
+.page-link:focus {
+  background-color: var(--bs-primary) !important;
+  color: var(--bs-light) !important;
+}
+
+.page-item.active .page-link {
+  background-color: var(--bs-primary);
+  color: var(--bs-light);
+}
+
+.page-item.disabled .page-link {
+  background-color: var(--pr-bg-darker);
+}
+
+// ---- Tabs -------------------------------------------------------------------------------------
+.nav-tabs {
+  border-bottom: 1px solid var(--bs-border-color);
+}
+.nav-tabs .nav-link {
+  color: var(--bs-primary);
+}
+.nav-tabs .nav-link.active,
+.nav-tabs .nav-link:hover {
+  border-color: var(--bs-border-color);
+  background-color: var(--bs-body-bg);
+  color: var(--bs-body-color);
+  border-bottom: 1px solid transparent;
+}
+.nav-tabs .nav-link:focus {
+  border-color: var(--bs-border-color);
+}
+.nav-tabs .nav-link.active:focus,
+.nav-tabs .nav-link:active {
+  border-bottom: 1px solid transparent;
+}
+
+.nav-underline {
+  gap: calc(0.5 * var(--bs-nav-underline-gap)) var(--bs-nav-underline-gap);
+}
+.nav-underline .nav-link.active,
+.nav-underline .nav-link:hover,
+.nav-underline .nav-link:focus {
+  color: var(--bs-primary);
+}
+
+// Selection field and list in theme colors
+.ng-select-container,
+.ng-select.ng-select-opened > .ng-select-container,
+.ng-dropdown-panel,
+.ng-dropdown-panel .ng-dropdown-panel-items .ng-option {
+  background-color: var(--bs-body-bg) !important;
+  color: var(--bs-body-color) !important;
+  border-color: var(--bs-border-color) !important;
+}
+.ng-select-container input:focus,
+.ng-select.ng-select-opened > .ng-select-container input:focus,
+.ng-dropdown-panel input:focus,
+.ng-dropdown-panel .ng-dropdown-panel-items .ng-option input:focus {
+  background-color: transparent !important;
+}
+
+.input-group-text {
+  color: var(--bs-body-color);
+  background-color: var(--bs-body-bg);
+  border-color: var(--bs-border-color);
+}
+
+// ---- Lists and menus ---------------------------------------------------------------------------
+.list-group-item {
+  color: var(--bs-body-color);
+  background-color: var(--bs-body-bg);
+  border-color: var(--bs-border-color);
+}
+.list-group-item:hover,
+.list-group-item:focus {
+  background-color: var(--bs-body-bg);
+}
+.list-group-item:focus {
+  color: var(--bs-body-color);
+}
+
+.dropdown-menu {
+  --bs-dropdown-font-size: var(--pr-body-font-size);
+  background-color: var(--bs-body-bg);
+}
+.dropdown-menu .dropdown-divider {
+  border-color: var(--bs-border-color);
+}
+.dropdown-menu .dropdown-item {
+  color: var(--bs-body-color);
+}
+.dropdown-menu .dropdown-item:hover,
+.dropdown-menu .dropdown-item:focus {
+  background-color: var(--pr-bg-darker);
+  color: var(--bs-body-color);
+}
+.dropdown-menu .dropdown-item.active {
+  background-color: var(--bs-primary);
+  color: var(--pr-primary-text-contrast);
+}
+.dropdown-menu .dropdown-item.disabled,
+.dropdown-menu .dropdown-item:disabled {
+  opacity: 50%;
+}
+
+// ---- Document thumbnails and cards --------------------------------------------------------
+.doc-img-container {
+  border: none !important;
+  overflow: hidden;
+}
+.doc-img-container .doc-img {
+  overflow: visible;
+}
+
+.card-selected {
+  border-color:var(--bs-primary);
+}
+.card-selected .document-card-check {
+  display: block !important;
+}
+.card-selected .doc-img-container {
+  background-color: var(--pr-primary-faded);
+}
+
+table.table {
+  --bs-table-color: var(--bs-body-color);
+  --bs-table-bg: var(--bs-light-rgb);
+}
+table.table.bg-body {
+  --bs-table-bg: var(--bs-body-bg);
+}
+
+.close {
+  color: var(--bs-body-color);
+}
+
+.modal .btn-close {
+  color: var(--bs-body-color);
+}
+
+// ---- Dialogs on small screens -----------------------------------------------------------
+// narrow: less horizontal padding
+@media (max-width: 575.98px) {
+  .modal {
+    --bs-modal-margin: 0.25rem;
+    --bs-modal-header-padding-x: 0.5rem;
+    --bs-modal-header-padding: var(--bs-modal-header-padding-y) var(--bs-modal-header-padding-x);
+  }
+  .modal .modal-body {
+    padding-inline: 0.5rem;
+  }
+  .modal .modal-footer {
+    padding-inline: 0.25rem;
+  }
+  .modal .accordion {
+    --bs-accordion-btn-padding-x: 0.75rem;
+    --bs-accordion-body-padding-x: 0.5rem;
+  }
+  .modal .card {
+    --bs-card-spacer-x: 0.5rem;
+  }
+  .modal .list-group {
+    --bs-list-group-item-padding-x: 0.5rem;
+  }
+}
+
+// low, but wide enough (e.g. phone in landscape): wider dialogs
+@media (min-width: 576px) and (max-height: 700px) {
+  .modal {
+    --bs-modal-margin: 0.5rem;
+  }
+  .modal-dialog {
+    max-width: min(var(--bs-modal-width), calc(100% - 1rem));
+  }
+  .modal-lg {
+    --bs-modal-width: 800px;
+  }
+  .modal-xl {
+    --bs-modal-width: 1140px;
+  }
+}
+
+// ---- Messages, notices, progress -----------------------------------------------------------
+.toast {
+  --bs-toast-max-width: var(--pr-toast-max-width);
+}
+
+.alert-primary {
+  --bs-alert-color: var(--bs-primary);
+  --bs-alert-bg: var(--pr-primary-faded);
+  --bs-alert-border-color: var(--bs-primary);
+}
+
+.alert-danger {
+  color: var(--bs-body-color);
+  background-color: var(--bs-danger);
+  border-color: var(--bs-danger);
+}
+
+.progress {
+  background-color: var(--bs-body-bg);
+}
+.progress .text-bg-primary {
+  background-color: var(--bs-primary) !important;
+}
+
+// Date selection (parts/datepicker.css)
+.ngb-dp-header,
+.ngb-dp-weekdays,
+.ngb-dp-month {
+  background-color: var(--bs-body-bg);
+}
+
+// ---- Popover and tour -----------------------------------------------------------------------
+.popover {
+  background-color: var(--pr-bg-alt);
+}
+.popover .popover-header {
+  background-color: var(--pr-bg-alt);
+}
+.popover .popover-header,
+.popover .popover-body {
+  border-color: var(--bs-border-color);
+  color: var(--bs-body-color);
+}
+
+.tour-active .popover {
+  min-width: 360px;
+  margin: 0 .25rem .25rem !important;
+}
+
+body.tour-active .row.sticky-top,
+body.tour-active .sidebar {
+  z-index: inherit !important;
+}
+
+.tour-step .popover-header {
+  --bs-popover-header-padding-y: .75rem;
+}
+.tour-step .popover-body {
+  padding: var(--bs-popover-body-padding-y) var(--bs-popover-body-padding-x) !important;
+}
+
+.nav-item.touranchor--is-active a {
+  font-weight: bold !important;
+  color: var(--bs-primary);
+}
+
+// Arrow tips of the popovers in the popover color
+.bs-popover-start > .popover-arrow::after,
+.bs-popover-auto[data-popper-placement^="left"] {
+  border-left-color: var(--pr-bg-alt);
+}
+.bs-popover-end > .popover-arrow::after,
+.bs-popover-auto[data-popper-placement^="right"] {
+  border-right-color: var(--pr-bg-alt);
+}
+.bs-popover-top > .popover-arrow::after,
+.bs-popover-auto[data-popper-placement^="top"] {
+  border-top-color: var(--pr-bg-alt);
+}
+.bs-popover-bottom > .popover-arrow::after,
+.bs-popover-auto[data-popper-placement^="bottom"] {
+  border-bottom-color: var(--pr-bg-alt);
+}
+.bs-popover-bottom .popover-header::before,
+.bs-popover-auto[x-placement^=bottom] .popover-header::before {
+  border-bottom-color: var(--pr-bg-alt);
+}
+
+// ---- Odds and ends for Bootstrap 5 -------------------------------------------------------------------
+a.badge {
+  text-decoration: none;
+}
+
+.btn-link {
+  text-decoration: none;
+}
+.btn-link:hover {
+  text-decoration: underline;
+}
+
+.btn-outline-primary:not(:disabled):not(.disabled).active,
+.btn-outline-primary:not(:disabled):not(.disabled):active,
+.show > .btn-outline-primary.dropdown-toggle {
+  background-color: var(--bs-primary);
+  border-color: var(--bs-primary);
+}
+
+// very small button group (e.g. label actions)
+.btn-group-xs > .btn {
+  padding: 0.2rem 0.25rem;
+  font-size: 0.675rem;
+  line-height: 1.2;
+  border-radius: 0.15rem;
+}
+.btn-group-xs > .btn:not(:first-child):not(:nth-child(2)) {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+.btn-group-xs > .btn:not(:last-child) {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+code {
+  color: var(--pr-body-color-accent);
+}
+
+.accordion {
+  --bs-accordion-btn-bg: var(--bs-light);
+  --bs-accordion-btn-color: var(--bs-primary);
+  --bs-accordion-color: var(--bs-body-color);
+  --bs-accordion-bg: var(--bs-light);
+  --bs-accordion-active-color: var(--bs-primary);
+  --bs-accordion-active-bg: var(--pr-bg-alt);
+}
+.accordion-button::after {
+  filter: invert(0.5) saturate(0);
+}
+.accordion-button {
+  font-size: var(--pr-body-font-size);
+}
+
+.me-1px { margin-right: 1px !important; }
+
+.whitespace-preserve { white-space: preserve; }
+
+// Drag and drop (parts/drag.css): placeholder pale, entries glide to their place
+.cdk-drag-placeholder {
+  opacity: .5;
+}
+.cdk-drop-list-dragging .cdk-drag:not(.cdk-drag-preview) {
+  transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
+}
+.cdk-drag-animating {
+  transition: transform 300ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+// Show buttons only on hovering over the row
+.hidden-button-container button {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s ease;
+}
+.hidden-button-container:hover button {
+  opacity: 1;
+  pointer-events: initial;
+}
+
+// pdf.js creates an invisible measuring canvas
+canvas.hiddenCanvasElement {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  z-index: -1;
+  height: 0;
+  width: 0;
+}
+
+// Icons in small buttons on the text baseline
+.btn-sm pngx-bs-icon svg {
+  vertical-align: text-bottom;
+}
+
+.document-card {
+  overflow: hidden;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+.document-card:hover:not(.card-selected) {
+  border-color: var(--pr-card-hover-border);
+  box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.1);
+}
+.document-card .document-card-check {
+  border-color: var(--pr-card-hover-border) !important;
+}
+.document-card .card-footer pngx-bs-icon svg {
+  vertical-align: middle;
+}
+
+// Preview button in a button group: border and corners like a normal group member
+.btn-group pngx-preview-popup:not(:last-child) > .btn {
+  margin-left: calc(var(--bs-border-width) * -1);
+}
+.btn-group pngx-preview-popup:not(:last-child) > .btn {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.btn-group pngx-preview-popup:not(:first-child) > .btn {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+.btn-group pngx-preview-popup {
+  position: relative;
+  flex: 1 1 auto;
+}
+.btn-group pngx-preview-popup > .btn {
+  display: block;
+}

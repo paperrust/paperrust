@@ -1,0 +1,7 @@
+* text=auto eol=lf
+*.png binary
+*.pdf binary
+*.webp binary
+tests/parity/pl-mail-worker/mails/** -text
+tests/parity/pl-mail-worker/expected/** -text
+*.db binary

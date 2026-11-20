@@ -1,0 +1,1633 @@
+{
+ "crate": "pl-auth-api",
+ "cases": [
+  {
+   "id": "w2.token.wrong-password",
+   "route": "auth.token",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/token/",
+     "json": {
+      "username": "alice",
+      "password": "nope"
+     }
+    },
+    {
+     "sql": "select user_id, length(key) as len, created from authtoken_token order by user_id"
+    }
+   ]
+  },
+  {
+   "id": "w2.token.inactive",
+   "route": "auth.token",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/token/",
+     "json": {
+      "username": "dave",
+      "password": "dave"
+     }
+    },
+    {
+     "sql": "select user_id, length(key) as len, created from authtoken_token order by user_id"
+    }
+   ]
+  },
+  {
+   "id": "w2.token.missing",
+   "route": "auth.token",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/token/",
+     "json": {
+      "username": "alice"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/token/",
+     "json": {}
+    },
+    {
+     "method": "POST",
+     "path": "/api/token/",
+     "json": {
+      "username": "",
+      "password": ""
+     }
+    }
+   ]
+  },
+  {
+   "id": "w2.token.state",
+   "route": "auth.token",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/token/",
+     "json": {
+      "username": "bob",
+      "password": "bob"
+     }
+    },
+    {
+     "sql": "select user_id, length(key) as len, created from authtoken_token order by user_id"
+    },
+    {
+     "sql": "select u.id, u.username, u.email, u.first_name, u.last_name, u.is_staff, u.is_active, u.is_superuser, u.date_joined, u.last_login, case when u.password like '!%' then 'unusable' else split_part(u.password, '$', 1) || '$' || split_part(u.password, '$', 2) end as pw_kind, (select coalesce(array_agg(g.group_id order by g.group_id), '{}') from auth_user_groups g where g.user_id = u.id) as groups, (select coalesce(array_agg(p.codename order by p.codename), '{}') from auth_user_user_permissions up join auth_permission p on p.id = up.permission_id where up.user_id = u.id) as perms from auth_user u order by u.id"
+    }
+   ],
+   "leak_allow": [
+    "token"
+   ]
+  },
+  {
+   "id": "w2.token.new-user",
+   "route": "auth.token",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/users/",
+     "json": {
+      "username": "tokuser",
+      "password": "Correct-Horse-9-Battery"
+     },
+     "user": "admin"
+    },
+    {
+     "method": "POST",
+     "path": "/api/token/",
+     "json": {
+      "username": "tokuser",
+      "password": "Correct-Horse-9-Battery"
+     },
+     "compare": "status"
+    },
+    {
+     "sql": "select user_id, length(key) as len, created from authtoken_token order by user_id"
+    }
+   ],
+   "leak_allow": [
+    "token"
+   ]
+  },
+  {
+   "id": "w2.token.as-authenticated",
+   "route": "auth.token",
+   "users": [
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/token/",
+     "json": {
+      "username": "carol",
+      "password": "carol"
+     }
+    }
+   ],
+   "leak_allow": [
+    "token"
+   ]
+  },
+  {
+   "id": "w2.token.throttle",
+   "route": "auth.token",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/token/",
+     "json": {
+      "username": "alice",
+      "password": "x"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/token/",
+     "json": {
+      "username": "alice",
+      "password": "x"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/token/",
+     "json": {
+      "username": "alice",
+      "password": "x"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/token/",
+     "json": {
+      "username": "alice",
+      "password": "x"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/token/",
+     "json": {
+      "username": "alice",
+      "password": "x"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/token/",
+     "json": {
+      "username": "alice",
+      "password": "x"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/token/",
+     "json": {
+      "username": "alice",
+      "password": "x"
+     }
+    }
+   ]
+  },
+  {
+   "id": "w2.profile.email",
+   "route": "profile.patch",
+   "users": [
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PATCH",
+     "path": "/api/profile/",
+     "json": {
+      "email": "alice-new@example.org"
+     }
+    },
+    {
+     "sql": "select u.id, u.username, u.email, u.first_name, u.last_name, u.is_staff, u.is_active, u.is_superuser, u.date_joined, u.last_login, case when u.password like '!%' then 'unusable' else split_part(u.password, '$', 1) || '$' || split_part(u.password, '$', 2) end as pw_kind, (select coalesce(array_agg(g.group_id order by g.group_id), '{}') from auth_user_groups g where g.user_id = u.id) as groups, (select coalesce(array_agg(p.codename order by p.codename), '{}') from auth_user_user_permissions up join auth_permission p on p.id = up.permission_id where up.user_id = u.id) as perms from auth_user u order by u.id"
+    },
+    {
+     "sql": "select user_id, email, verified, \"primary\" from account_emailaddress order by id"
+    }
+   ],
+   "leak_allow": [
+    "token"
+   ]
+  },
+  {
+   "id": "w2.profile.bad-email",
+   "route": "profile.patch",
+   "users": [
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PATCH",
+     "path": "/api/profile/",
+     "json": {
+      "email": "not-an-email"
+     }
+    },
+    {
+     "sql": "select u.id, u.username, u.email, u.first_name, u.last_name, u.is_staff, u.is_active, u.is_superuser, u.date_joined, u.last_login, case when u.password like '!%' then 'unusable' else split_part(u.password, '$', 1) || '$' || split_part(u.password, '$', 2) end as pw_kind, (select coalesce(array_agg(g.group_id order by g.group_id), '{}') from auth_user_groups g where g.user_id = u.id) as groups, (select coalesce(array_agg(p.codename order by p.codename), '{}') from auth_user_user_permissions up join auth_permission p on p.id = up.permission_id where up.user_id = u.id) as perms from auth_user u order by u.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.profile.short-password",
+   "route": "profile.patch",
+   "users": [
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PATCH",
+     "path": "/api/profile/",
+     "json": {
+      "password": "abc"
+     }
+    },
+    {
+     "sql": "select u.id, u.username, u.email, u.first_name, u.last_name, u.is_staff, u.is_active, u.is_superuser, u.date_joined, u.last_login, case when u.password like '!%' then 'unusable' else split_part(u.password, '$', 1) || '$' || split_part(u.password, '$', 2) end as pw_kind, (select coalesce(array_agg(g.group_id order by g.group_id), '{}') from auth_user_groups g where g.user_id = u.id) as groups, (select coalesce(array_agg(p.codename order by p.codename), '{}') from auth_user_user_permissions up join auth_permission p on p.id = up.permission_id where up.user_id = u.id) as perms from auth_user u order by u.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.profile.stars-password",
+   "route": "profile.patch",
+   "users": [
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PATCH",
+     "path": "/api/profile/",
+     "json": {
+      "password": "********",
+      "first_name": "A"
+     }
+    },
+    {
+     "sql": "select u.id, u.username, u.email, u.first_name, u.last_name, u.is_staff, u.is_active, u.is_superuser, u.date_joined, u.last_login, case when u.password like '!%' then 'unusable' else split_part(u.password, '$', 1) || '$' || split_part(u.password, '$', 2) end as pw_kind, (select coalesce(array_agg(g.group_id order by g.group_id), '{}') from auth_user_groups g where g.user_id = u.id) as groups, (select coalesce(array_agg(p.codename order by p.codename), '{}') from auth_user_user_permissions up join auth_permission p on p.id = up.permission_id where up.user_id = u.id) as perms from auth_user u order by u.id"
+    }
+   ],
+   "leak_allow": [
+    "token"
+   ]
+  },
+  {
+   "id": "w2.profile.readonly-fields",
+   "route": "profile.patch",
+   "users": [
+    "user2"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PATCH",
+     "path": "/api/profile/",
+     "json": {
+      "username": "hacker",
+      "is_superuser": true,
+      "auth_token": "x",
+      "is_mfa_enabled": true
+     }
+    },
+    {
+     "sql": "select u.id, u.username, u.email, u.first_name, u.last_name, u.is_staff, u.is_active, u.is_superuser, u.date_joined, u.last_login, case when u.password like '!%' then 'unusable' else split_part(u.password, '$', 1) || '$' || split_part(u.password, '$', 2) end as pw_kind, (select coalesce(array_agg(g.group_id order by g.group_id), '{}') from auth_user_groups g where g.user_id = u.id) as groups, (select coalesce(array_agg(p.codename order by p.codename), '{}') from auth_user_user_permissions up join auth_permission p on p.id = up.permission_id where up.user_id = u.id) as perms from auth_user u order by u.id"
+    }
+   ],
+   "leak_allow": [
+    "token"
+   ]
+  },
+  {
+   "id": "w2.profile.form",
+   "route": "profile.patch",
+   "users": [
+    "user2"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PATCH",
+     "path": "/api/profile/",
+     "form": {
+      "first_name": "Formy",
+      "last_name": "McForm"
+     }
+    },
+    {
+     "sql": "select u.id, u.username, u.email, u.first_name, u.last_name, u.is_staff, u.is_active, u.is_superuser, u.date_joined, u.last_login, case when u.password like '!%' then 'unusable' else split_part(u.password, '$', 1) || '$' || split_part(u.password, '$', 2) end as pw_kind, (select coalesce(array_agg(g.group_id order by g.group_id), '{}') from auth_user_groups g where g.user_id = u.id) as groups, (select coalesce(array_agg(p.codename order by p.codename), '{}') from auth_user_user_permissions up join auth_permission p on p.id = up.permission_id where up.user_id = u.id) as perms from auth_user u order by u.id"
+    }
+   ],
+   "leak_allow": [
+    "token"
+   ]
+  },
+  {
+   "id": "w2.profile.noperm",
+   "route": "profile.patch",
+   "users": [
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PATCH",
+     "path": "/api/profile/",
+     "json": {
+      "first_name": "C"
+     }
+    },
+    {
+     "sql": "select u.id, u.username, u.email, u.first_name, u.last_name, u.is_staff, u.is_active, u.is_superuser, u.date_joined, u.last_login, case when u.password like '!%' then 'unusable' else split_part(u.password, '$', 1) || '$' || split_part(u.password, '$', 2) end as pw_kind, (select coalesce(array_agg(g.group_id order by g.group_id), '{}') from auth_user_groups g where g.user_id = u.id) as groups, (select coalesce(array_agg(p.codename order by p.codename), '{}') from auth_user_user_permissions up join auth_permission p on p.id = up.permission_id where up.user_id = u.id) as perms from auth_user u order by u.id"
+    }
+   ],
+   "leak_allow": [
+    "token"
+   ]
+  },
+  {
+   "id": "w2.profile.session-password",
+   "route": "profile.patch",
+   "users": [
+    "user2@session"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PATCH",
+     "path": "/api/profile/",
+     "json": {
+      "password": "a-Much-Better-Passw0rd"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/api/profile/"
+    },
+    {
+     "sql": "select u.id, u.username, u.email, u.first_name, u.last_name, u.is_staff, u.is_active, u.is_superuser, u.date_joined, u.last_login, case when u.password like '!%' then 'unusable' else split_part(u.password, '$', 1) || '$' || split_part(u.password, '$', 2) end as pw_kind, (select coalesce(array_agg(g.group_id order by g.group_id), '{}') from auth_user_groups g where g.user_id = u.id) as groups, (select coalesce(array_agg(p.codename order by p.codename), '{}') from auth_user_user_permissions up join auth_permission p on p.id = up.permission_id where up.user_id = u.id) as perms from auth_user u order by u.id"
+    }
+   ],
+   "leak_allow": [
+    "token"
+   ]
+  },
+  {
+   "id": "w2.profile.token.state",
+   "route": "profile.generate_auth_token",
+   "users": [
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/profile/generate_auth_token/",
+     "compare": "status+headers"
+    },
+    {
+     "sql": "select user_id, length(key) as len, created from authtoken_token order by user_id"
+    }
+   ]
+  },
+  {
+   "id": "w2.profile.token.then-old",
+   "route": "profile.generate_auth_token",
+   "users": [
+    "user2"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/profile/generate_auth_token/",
+     "compare": "status+headers"
+    },
+    {
+     "method": "GET",
+     "path": "/api/profile/",
+     "compare": "status"
+    }
+   ]
+  },
+  {
+   "id": "w2.profile.disconnect.missing",
+   "route": "profile.disconnect_social_account",
+   "users": [
+    "user1",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/profile/disconnect_social_account/",
+     "json": {
+      "id": 1
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/profile/disconnect_social_account/",
+     "json": {}
+    }
+   ]
+  },
+  {
+   "id": "w2.profile.totp.errors",
+   "route": "profile.totp.post",
+   "users": [
+    "user1",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/profile/totp/",
+     "json": {
+      "secret": "JBSWY3DPEHPK3PXP",
+      "code": "000000"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/profile/totp/",
+     "json": {}
+    },
+    {
+     "method": "POST",
+     "path": "/api/profile/totp/",
+     "json": {
+      "code": "1"
+     }
+    }
+   ]
+  },
+  {
+   "id": "w2.profile.totp.delete-none",
+   "route": "profile.totp.delete",
+   "users": [
+    "user1",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "DELETE",
+     "path": "/api/profile/totp/"
+    }
+   ]
+  },
+  {
+   "id": "w2.users.deactivate_totp.none",
+   "route": "users.deactivate_totp",
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/users/3/deactivate_totp/"
+    },
+    {
+     "method": "POST",
+     "path": "/api/users/999/deactivate_totp/"
+    }
+   ]
+  },
+  {
+   "id": "w2.users.create.state",
+   "route": "users.create",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/users/",
+     "json": {
+      "username": "stateuser",
+      "email": "s@example.org",
+      "password": "Correct-Horse-9-Battery",
+      "groups": [
+       2
+      ],
+      "user_permissions": [
+       "view_tag"
+      ]
+     }
+    },
+    {
+     "sql": "select u.id, u.username, u.email, u.first_name, u.last_name, u.is_staff, u.is_active, u.is_superuser, u.date_joined, u.last_login, case when u.password like '!%' then 'unusable' else split_part(u.password, '$', 1) || '$' || split_part(u.password, '$', 2) end as pw_kind, (select coalesce(array_agg(g.group_id order by g.group_id), '{}') from auth_user_groups g where g.user_id = u.id) as groups, (select coalesce(array_agg(p.codename order by p.codename), '{}') from auth_user_user_permissions up join auth_permission p on p.id = up.permission_id where up.user_id = u.id) as perms from auth_user u order by u.id"
+    },
+    {
+     "sql": "select user_id, email, verified, \"primary\" from account_emailaddress order by id"
+    }
+   ]
+  },
+  {
+   "id": "w2.users.create.no-password",
+   "route": "users.create",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/users/",
+     "json": {
+      "username": "nopw"
+     }
+    },
+    {
+     "sql": "select u.id, u.username, u.email, u.first_name, u.last_name, u.is_staff, u.is_active, u.is_superuser, u.date_joined, u.last_login, case when u.password like '!%' then 'unusable' else split_part(u.password, '$', 1) || '$' || split_part(u.password, '$', 2) end as pw_kind, (select coalesce(array_agg(g.group_id order by g.group_id), '{}') from auth_user_groups g where g.user_id = u.id) as groups, (select coalesce(array_agg(p.codename order by p.codename), '{}') from auth_user_user_permissions up join auth_permission p on p.id = up.permission_id where up.user_id = u.id) as perms from auth_user u order by u.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.users.create.stars",
+   "route": "users.create",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/users/",
+     "json": {
+      "username": "stars",
+      "password": "**********"
+     }
+    },
+    {
+     "sql": "select u.id, u.username, u.email, u.first_name, u.last_name, u.is_staff, u.is_active, u.is_superuser, u.date_joined, u.last_login, case when u.password like '!%' then 'unusable' else split_part(u.password, '$', 1) || '$' || split_part(u.password, '$', 2) end as pw_kind, (select coalesce(array_agg(g.group_id order by g.group_id), '{}') from auth_user_groups g where g.user_id = u.id) as groups, (select coalesce(array_agg(p.codename order by p.codename), '{}') from auth_user_user_permissions up join auth_permission p on p.id = up.permission_id where up.user_id = u.id) as perms from auth_user u order by u.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.users.create.superuser",
+   "route": "users.create",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/users/",
+     "json": {
+      "username": "su2",
+      "is_superuser": true,
+      "is_staff": "true"
+     }
+    },
+    {
+     "sql": "select u.id, u.username, u.email, u.first_name, u.last_name, u.is_staff, u.is_active, u.is_superuser, u.date_joined, u.last_login, case when u.password like '!%' then 'unusable' else split_part(u.password, '$', 1) || '$' || split_part(u.password, '$', 2) end as pw_kind, (select coalesce(array_agg(g.group_id order by g.group_id), '{}') from auth_user_groups g where g.user_id = u.id) as groups, (select coalesce(array_agg(p.codename order by p.codename), '{}') from auth_user_user_permissions up join auth_permission p on p.id = up.permission_id where up.user_id = u.id) as perms from auth_user u order by u.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.users.create.errors",
+   "route": "users.create",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/users/",
+     "json": {
+      "username": "alice"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/users/",
+     "json": {
+      "username": "ALICE"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/users/",
+     "json": {}
+    },
+    {
+     "method": "POST",
+     "path": "/api/users/",
+     "json": {
+      "username": "bad name!"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/users/",
+     "json": {
+      "username": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/users/",
+     "json": {
+      "username": "pw",
+      "password": "abc"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/users/",
+     "json": {
+      "username": "pw2",
+      "password": "password"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/users/",
+     "json": {
+      "username": "g",
+      "groups": [
+       999
+      ]
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/users/",
+     "json": {
+      "username": "p",
+      "user_permissions": [
+       "nope"
+      ]
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/users/",
+     "json": {
+      "username": "p2",
+      "user_permissions": [
+       "add_logentry"
+      ]
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/users/",
+     "json": {
+      "username": "e",
+      "email": "bad"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/users/",
+     "json": {
+      "username": "b",
+      "is_active": "maybe"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/users/",
+     "json": {
+      "username": "t",
+      "groups": "1"
+     }
+    },
+    {
+     "sql": "select u.id, u.username, u.email, u.first_name, u.last_name, u.is_staff, u.is_active, u.is_superuser, u.date_joined, u.last_login, case when u.password like '!%' then 'unusable' else split_part(u.password, '$', 1) || '$' || split_part(u.password, '$', 2) end as pw_kind, (select coalesce(array_agg(g.group_id order by g.group_id), '{}') from auth_user_groups g where g.user_id = u.id) as groups, (select coalesce(array_agg(p.codename order by p.codename), '{}') from auth_user_user_permissions up join auth_permission p on p.id = up.permission_id where up.user_id = u.id) as perms from auth_user u order by u.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.users.create.denied",
+   "route": "users.create",
+   "users": [
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/users/",
+     "json": {
+      "username": "x1"
+     }
+    },
+    {
+     "sql": "select u.id, u.username, u.email, u.first_name, u.last_name, u.is_staff, u.is_active, u.is_superuser, u.date_joined, u.last_login, case when u.password like '!%' then 'unusable' else split_part(u.password, '$', 1) || '$' || split_part(u.password, '$', 2) end as pw_kind, (select coalesce(array_agg(g.group_id order by g.group_id), '{}') from auth_user_groups g where g.user_id = u.id) as groups, (select coalesce(array_agg(p.codename order by p.codename), '{}') from auth_user_user_permissions up join auth_permission p on p.id = up.permission_id where up.user_id = u.id) as perms from auth_user u order by u.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.users.create.escalation",
+   "route": "users.create",
+   "users": [
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PATCH",
+     "path": "/api/users/3/",
+     "json": {
+      "user_permissions": [
+       "add_user",
+       "change_user",
+       "view_user",
+       "delete_user",
+       "add_group",
+       "change_group",
+       "view_group",
+       "delete_group"
+      ]
+     },
+     "user": "admin"
+    },
+    {
+     "method": "POST",
+     "path": "/api/users/",
+     "json": {
+      "username": "esc1",
+      "is_superuser": true
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/users/",
+     "json": {
+      "username": "esc2",
+      "is_staff": "1"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/users/",
+     "json": {
+      "username": "esc3",
+      "is_superuser": "maybe"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/users/",
+     "json": {
+      "username": "ok1",
+      "is_superuser": false,
+      "is_staff": false,
+      "groups": [
+       1
+      ]
+     }
+    },
+    {
+     "sql": "select u.id, u.username, u.email, u.first_name, u.last_name, u.is_staff, u.is_active, u.is_superuser, u.date_joined, u.last_login, case when u.password like '!%' then 'unusable' else split_part(u.password, '$', 1) || '$' || split_part(u.password, '$', 2) end as pw_kind, (select coalesce(array_agg(g.group_id order by g.group_id), '{}') from auth_user_groups g where g.user_id = u.id) as groups, (select coalesce(array_agg(p.codename order by p.codename), '{}') from auth_user_user_permissions up join auth_permission p on p.id = up.permission_id where up.user_id = u.id) as perms from auth_user u order by u.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.users.update.escalation",
+   "route": "users.partial_update",
+   "users": [
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PATCH",
+     "path": "/api/users/3/",
+     "json": {
+      "user_permissions": [
+       "add_user",
+       "change_user",
+       "view_user",
+       "delete_user",
+       "add_group",
+       "change_group",
+       "view_group",
+       "delete_group"
+      ]
+     },
+     "user": "admin"
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/users/2/",
+     "json": {
+      "first_name": "Admin"
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/users/4/",
+     "json": {
+      "is_superuser": true
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/users/4/",
+     "json": {
+      "is_staff": true
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/users/4/",
+     "json": {
+      "is_staff": false,
+      "is_superuser": false,
+      "last_name": "Same"
+     }
+    },
+    {
+     "method": "PUT",
+     "path": "/api/users/5/",
+     "json": {
+      "username": "carol",
+      "is_superuser": "on"
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/users/3/",
+     "json": {
+      "first_name": "Self"
+     }
+    },
+    {
+     "sql": "select u.id, u.username, u.email, u.first_name, u.last_name, u.is_staff, u.is_active, u.is_superuser, u.date_joined, u.last_login, case when u.password like '!%' then 'unusable' else split_part(u.password, '$', 1) || '$' || split_part(u.password, '$', 2) end as pw_kind, (select coalesce(array_agg(g.group_id order by g.group_id), '{}') from auth_user_groups g where g.user_id = u.id) as groups, (select coalesce(array_agg(p.codename order by p.codename), '{}') from auth_user_user_permissions up join auth_permission p on p.id = up.permission_id where up.user_id = u.id) as perms from auth_user u order by u.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.users.update.password",
+   "route": "users.partial_update",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PATCH",
+     "path": "/api/users/4/",
+     "json": {
+      "password": "Another-Good-Passw0rd"
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/users/5/",
+     "json": {
+      "password": "**********"
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/users/5/",
+     "json": {
+      "password": "short"
+     }
+    },
+    {
+     "sql": "select u.id, u.username, u.email, u.first_name, u.last_name, u.is_staff, u.is_active, u.is_superuser, u.date_joined, u.last_login, case when u.password like '!%' then 'unusable' else split_part(u.password, '$', 1) || '$' || split_part(u.password, '$', 2) end as pw_kind, (select coalesce(array_agg(g.group_id order by g.group_id), '{}') from auth_user_groups g where g.user_id = u.id) as groups, (select coalesce(array_agg(p.codename order by p.codename), '{}') from auth_user_user_permissions up join auth_permission p on p.id = up.permission_id where up.user_id = u.id) as perms from auth_user u order by u.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.users.update.errors",
+   "route": "users.partial_update",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PATCH",
+     "path": "/api/users/4/",
+     "json": {
+      "username": "alice"
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/users/4/",
+     "json": {
+      "groups": [
+       99
+      ]
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/users/999/",
+     "json": {
+      "first_name": "x"
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/users/1/",
+     "json": {
+      "first_name": "anon"
+     }
+    },
+    {
+     "method": "PUT",
+     "path": "/api/users/4/",
+     "json": {
+      "email": "x@example.org"
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/users/abc/",
+     "json": {}
+    },
+    {
+     "sql": "select u.id, u.username, u.email, u.first_name, u.last_name, u.is_staff, u.is_active, u.is_superuser, u.date_joined, u.last_login, case when u.password like '!%' then 'unusable' else split_part(u.password, '$', 1) || '$' || split_part(u.password, '$', 2) end as pw_kind, (select coalesce(array_agg(g.group_id order by g.group_id), '{}') from auth_user_groups g where g.user_id = u.id) as groups, (select coalesce(array_agg(p.codename order by p.codename), '{}') from auth_user_user_permissions up join auth_permission p on p.id = up.permission_id where up.user_id = u.id) as perms from auth_user u order by u.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.users.update.deactivate",
+   "route": "users.partial_update",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PATCH",
+     "path": "/api/users/4/",
+     "json": {
+      "is_active": false
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/api/profile/",
+     "user": "user2"
+    },
+    {
+     "sql": "select u.id, u.username, u.email, u.first_name, u.last_name, u.is_staff, u.is_active, u.is_superuser, u.date_joined, u.last_login, case when u.password like '!%' then 'unusable' else split_part(u.password, '$', 1) || '$' || split_part(u.password, '$', 2) end as pw_kind, (select coalesce(array_agg(g.group_id order by g.group_id), '{}') from auth_user_groups g where g.user_id = u.id) as groups, (select coalesce(array_agg(p.codename order by p.codename), '{}') from auth_user_user_permissions up join auth_permission p on p.id = up.permission_id where up.user_id = u.id) as perms from auth_user u order by u.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.users.update.denied",
+   "route": "users.partial_update",
+   "users": [
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PATCH",
+     "path": "/api/users/4/",
+     "json": {
+      "first_name": "x"
+     }
+    },
+    {
+     "sql": "select u.id, u.username, u.email, u.first_name, u.last_name, u.is_staff, u.is_active, u.is_superuser, u.date_joined, u.last_login, case when u.password like '!%' then 'unusable' else split_part(u.password, '$', 1) || '$' || split_part(u.password, '$', 2) end as pw_kind, (select coalesce(array_agg(g.group_id order by g.group_id), '{}') from auth_user_groups g where g.user_id = u.id) as groups, (select coalesce(array_agg(p.codename order by p.codename), '{}') from auth_user_user_permissions up join auth_permission p on p.id = up.permission_id where up.user_id = u.id) as perms from auth_user u order by u.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.users.update.v9",
+   "route": "users.update",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "9",
+    "none"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PUT",
+     "path": "/api/users/5/",
+     "json": {
+      "username": "carol2",
+      "first_name": "C",
+      "user_permissions": [
+       "view_document"
+      ]
+     }
+    },
+    {
+     "sql": "select u.id, u.username, u.email, u.first_name, u.last_name, u.is_staff, u.is_active, u.is_superuser, u.date_joined, u.last_login, case when u.password like '!%' then 'unusable' else split_part(u.password, '$', 1) || '$' || split_part(u.password, '$', 2) end as pw_kind, (select coalesce(array_agg(g.group_id order by g.group_id), '{}') from auth_user_groups g where g.user_id = u.id) as groups, (select coalesce(array_agg(p.codename order by p.codename), '{}') from auth_user_user_permissions up join auth_permission p on p.id = up.permission_id where up.user_id = u.id) as perms from auth_user u order by u.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.groups.create.state",
+   "route": "groups.create",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/groups/",
+     "json": {
+      "name": "g-state",
+      "permissions": [
+       "view_document",
+       "change_tag"
+      ]
+     }
+    },
+    {
+     "sql": "select g.id, g.name, (select coalesce(array_agg(p.codename order by p.codename), '{}') from auth_group_permissions gp join auth_permission p on p.id = gp.permission_id where gp.group_id = g.id) as perms from auth_group g order by g.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.groups.create.errors",
+   "route": "groups.create",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/groups/",
+     "json": {
+      "name": "editors",
+      "permissions": []
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/groups/",
+     "json": {
+      "name": "x"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/groups/",
+     "json": {
+      "permissions": []
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/groups/",
+     "json": {
+      "name": "",
+      "permissions": []
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/groups/",
+     "json": {
+      "name": "y",
+      "permissions": [
+       "nope"
+      ]
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/groups/",
+     "json": {
+      "name": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+      "permissions": []
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/groups/",
+     "json": {
+      "name": "w",
+      "permissions": "view_tag"
+     }
+    },
+    {
+     "sql": "select g.id, g.name, (select coalesce(array_agg(p.codename order by p.codename), '{}') from auth_group_permissions gp join auth_permission p on p.id = gp.permission_id where gp.group_id = g.id) as perms from auth_group g order by g.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.groups.create.denied",
+   "route": "groups.create",
+   "users": [
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/groups/",
+     "json": {
+      "name": "gx",
+      "permissions": []
+     }
+    },
+    {
+     "sql": "select g.id, g.name, (select coalesce(array_agg(p.codename order by p.codename), '{}') from auth_group_permissions gp join auth_permission p on p.id = gp.permission_id where gp.group_id = g.id) as perms from auth_group g order by g.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.groups.update.state",
+   "route": "groups.partial_update",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PATCH",
+     "path": "/api/groups/1/",
+     "json": {
+      "name": "editors2"
+     }
+    },
+    {
+     "method": "PUT",
+     "path": "/api/groups/3/",
+     "json": {
+      "name": "auditors",
+      "permissions": [
+       "view_logentry",
+       "view_document",
+       "view_note"
+      ]
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/groups/2/",
+     "json": {
+      "name": "editors"
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/groups/99/",
+     "json": {
+      "name": "nn"
+     }
+    },
+    {
+     "sql": "select g.id, g.name, (select coalesce(array_agg(p.codename order by p.codename), '{}') from auth_group_permissions gp join auth_permission p on p.id = gp.permission_id where gp.group_id = g.id) as perms from auth_group g order by g.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.groups.update.denied",
+   "route": "groups.partial_update",
+   "users": [
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PATCH",
+     "path": "/api/groups/1/",
+     "json": {
+      "name": "hijack"
+     }
+    },
+    {
+     "sql": "select g.id, g.name, (select coalesce(array_agg(p.codename order by p.codename), '{}') from auth_group_permissions gp join auth_permission p on p.id = gp.permission_id where gp.group_id = g.id) as perms from auth_group g order by g.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.groups.destroy.state",
+   "route": "groups.destroy",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "DELETE",
+     "path": "/api/groups/1/"
+    },
+    {
+     "method": "DELETE",
+     "path": "/api/groups/1/"
+    },
+    {
+     "sql": "select g.id, g.name, (select coalesce(array_agg(p.codename order by p.codename), '{}') from auth_group_permissions gp join auth_permission p on p.id = gp.permission_id where gp.group_id = g.id) as perms from auth_group g order by g.id"
+    },
+    {
+     "sql": "select u.id, u.username, u.email, u.first_name, u.last_name, u.is_staff, u.is_active, u.is_superuser, u.date_joined, u.last_login, case when u.password like '!%' then 'unusable' else split_part(u.password, '$', 1) || '$' || split_part(u.password, '$', 2) end as pw_kind, (select coalesce(array_agg(g.group_id order by g.group_id), '{}') from auth_user_groups g where g.user_id = u.id) as groups, (select coalesce(array_agg(p.codename order by p.codename), '{}') from auth_user_user_permissions up join auth_permission p on p.id = up.permission_id where up.user_id = u.id) as perms from auth_user u order by u.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.groups.destroy.uisettings",
+   "route": "groups.destroy",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/ui_settings/",
+     "json": {
+      "settings": {
+       "permissions": {
+        "default_view_groups": [
+         1,
+         2
+        ],
+        "default_change_groups": [
+         2
+        ],
+        "default_owner": 4,
+        "default_view_users": [
+         4
+        ]
+       }
+      }
+     },
+     "user": "user1"
+    },
+    {
+     "method": "DELETE",
+     "path": "/api/groups/2/"
+    },
+    {
+     "sql": "select id, user_id, settings from documents_uisettings order by id"
+    }
+   ]
+  },
+  {
+   "id": "w2.groups.destroy.denied",
+   "route": "groups.destroy",
+   "users": [
+    "user1",
+    "noperm"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "DELETE",
+     "path": "/api/groups/1/"
+    },
+    {
+     "sql": "select g.id, g.name, (select coalesce(array_agg(p.codename order by p.codename), '{}') from auth_group_permissions gp join auth_permission p on p.id = gp.permission_id where gp.group_id = g.id) as perms from auth_group g order by g.id"
+    }
+   ]
+  },
+  {
+   "id": "w2.ui_settings.state",
+   "route": "ui_settings.post",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/ui_settings/",
+     "json": {
+      "settings": {
+       "language": "fr-FR",
+       "app_title": "X"
+      }
+     }
+    },
+    {
+     "sql": "select id, user_id, settings from documents_uisettings order by id"
+    }
+   ]
+  },
+  {
+   "id": "w2.ui_settings.errors",
+   "route": "ui_settings.post",
+   "users": [
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/ui_settings/",
+     "json": {
+      "settings": "x"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/ui_settings/",
+     "json": {
+      "settings": [
+       1
+      ]
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/ui_settings/",
+     "form": {
+      "settings": "{}"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/ui_settings/",
+     "data": "not json",
+     "content_type": "application/json"
+    },
+    {
+     "sql": "select id, user_id, settings from documents_uisettings order by id"
+    }
+   ]
+  },
+  {
+   "id": "w2.ui_settings.anon",
+   "route": "ui_settings.post",
+   "users": [
+    "anon",
+    "inactive"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/ui_settings/",
+     "json": {
+      "settings": {}
+     }
+    },
+    {
+     "sql": "select id, user_id, settings from documents_uisettings order by id"
+    }
+   ]
+  },
+  {
+   "id": "w2.ui_settings.new-user",
+   "route": "ui_settings.post",
+   "users": [
+    "user2"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/ui_settings/",
+     "json": {
+      "settings": {
+       "dark_mode": {
+        "enabled": true
+       }
+      }
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/api/ui_settings/"
+    },
+    {
+     "sql": "select id, user_id, settings from documents_uisettings order by id"
+    }
+   ]
+  },
+  {
+   "id": "w2.ui_settings.csrf",
+   "route": "ui_settings.post",
+   "users": [
+    "user1@session"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/ui_settings/",
+     "json": {
+      "settings": {
+       "a": 1
+      }
+     },
+     "csrf": false
+    },
+    {
+     "method": "POST",
+     "path": "/api/ui_settings/",
+     "json": {
+      "settings": {
+       "a": 2
+      }
+     }
+    },
+    {
+     "sql": "select id, user_id, settings from documents_uisettings order by id"
+    }
+   ]
+  }
+ ]
+}

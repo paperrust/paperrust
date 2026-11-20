@@ -1,0 +1,17 @@
+# gitleaks configuration for scripts/run-gates.sh: default rules + path allowlist for
+# third-party/generated trees. Do NOT allowlist project files that contain secrets.
+title = "PaperRust gitleaks"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "third-party code, build output, local reference installation, reports"
+paths = [
+  '''(^|/|\\)upstream(/|\\)''',
+  '''(^|/|\\)target(/|\\)''',
+  '''(^|/|\\)reference(/|\\)(venv|downloads|pg|bin|data|logs|run|snapshot)(/|\\)''',
+  '''(^|/|\\)tests(/|\\)\.venv(/|\\)''',
+  '''(^|/|\\)results(/|\\)''',
+  '''(^|/|\\)\.git(/|\\)''',
+]

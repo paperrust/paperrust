@@ -1,0 +1,8696 @@
+{
+ "reference_now": "2024-03-15T12:00:00+00:00",
+ "configs": [
+  {
+   "languages": [
+    "en"
+   ],
+   "tz": "UTC",
+   "fname_order": "YMD",
+   "order": "DMY"
+  },
+  {
+   "languages": [
+    "en",
+    "de"
+   ],
+   "tz": "Europe/Berlin",
+   "fname_order": null,
+   "order": "DMY"
+  },
+  {
+   "languages": [
+    "de"
+   ],
+   "tz": "Europe/Berlin",
+   "fname_order": "DMY",
+   "order": "DMY"
+  },
+  {
+   "languages": [
+    "en"
+   ],
+   "tz": "America/New_York",
+   "fname_order": null,
+   "order": "MDY"
+  },
+  {
+   "languages": [
+    "fr",
+    "es",
+    "it",
+    "pt",
+    "nl"
+   ],
+   "tz": "UTC",
+   "fname_order": null,
+   "order": "DMY"
+  },
+  {
+   "languages": [
+    "ru",
+    "cs",
+    "pl",
+    "tr",
+    "sv"
+   ],
+   "tz": "UTC",
+   "fname_order": null,
+   "order": "DMY"
+  },
+  {
+   "languages": [],
+   "tz": "UTC",
+   "fname_order": null,
+   "order": "DMY"
+  },
+  {
+   "languages": [
+    "en"
+   ],
+   "tz": "UTC",
+   "fname_order": null,
+   "order": "YMD"
+  }
+ ],
+ "parse": [
+  {
+   "config": 0,
+   "filename": "report-2023-12-25.txt",
+   "content": "Invoice date: 15 Jan 2024. Due: January 30, 2024. Order 2023-12-01.",
+   "dates": [
+    "2023-12-25T00:00:00+00:00",
+    "2024-01-15T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-12-25T00:00:00+00:00",
+    "2024-01-15T00:00:00+00:00",
+    "2024-01-30T00:00:00+00:00"
+   ],
+   "upstream_timed_out": true,
+   "regex_matches": [
+    "15 Jan 2024",
+    "January 30, 2024",
+    "Order 2023"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "report-2023-12-25.txt",
+   "content": "Taken on 01/02/2023 and 13/02/2023, also 12.31.2022",
+   "dates": [
+    "2023-12-25T00:00:00+00:00",
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-12-25T00:00:00+00:00",
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "01/02/2023",
+    "13/02/2023",
+    "12.31.2022"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "report-2023-12-25.txt",
+   "content": "Statement for March 2023 issued 1st April 2023",
+   "dates": [
+    "2023-12-25T00:00:00+00:00",
+    "2023-03-01T00:00:00+00:00",
+    "2023-04-01T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-12-25T00:00:00+00:00",
+    "2023-03-01T00:00:00+00:00",
+    "2023-04-01T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "March 2023",
+    "1st April 2023"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "report-2023-12-25.txt",
+   "content": "Monday 2024 report, Total 1234, Sept 5, 2021",
+   "dates": [
+    "2023-12-25T00:00:00+00:00",
+    "2024-03-15T00:00:00+00:00",
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-12-25T00:00:00+00:00",
+    "2024-03-15T00:00:00+00:00",
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Monday 2024",
+    "Total 1234",
+    "Sept 5, 2021"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "report-2023-12-25.txt",
+   "content": "bad date 99/99/9999 and 25/12/2022 and 31/02/2024",
+   "dates": [
+    "2023-12-25T00:00:00+00:00",
+    "2022-12-25T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-12-25T00:00:00+00:00",
+    "2022-12-25T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "99/99/9999",
+    "25/12/2022",
+    "31/02/2024"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "report-2023-12-25.txt",
+   "content": "Version 1.2.3 build 4.5.2010, phone 030-123-4567",
+   "dates": [
+    "2023-12-25T00:00:00+00:00",
+    "2010-05-04T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-12-25T00:00:00+00:00",
+    "2010-05-04T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "4.5.2010"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "report-2023-12-25.txt",
+   "content": "Printed 15-Jan-2024; archived 2019_05_06 ; x 05.06.2019_",
+   "dates": [
+    "2023-12-25T00:00:00+00:00",
+    "2024-01-15T00:00:00+00:00",
+    "2019-06-05T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-12-25T00:00:00+00:00",
+    "2024-01-15T00:00:00+00:00",
+    "2019-06-05T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15-Jan-2024",
+    "archived 2019",
+    "05.06.2019"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "report-2023-12-25.txt",
+   "content": "Dates 1.2.20245 2.3.19 and 10/11/12",
+   "dates": [
+    "2023-12-25T00:00:00+00:00",
+    "2019-03-02T00:00:00+00:00",
+    "2012-11-10T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-12-25T00:00:00+00:00",
+    "2019-03-02T00:00:00+00:00",
+    "2012-11-10T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "2.3.19",
+    "10/11/12"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "report-2023-12-25.txt",
+   "content": "Today 2024 and Yesterday 2023",
+   "dates": [
+    "2023-12-25T00:00:00+00:00",
+    "2024-03-15T12:00:00+00:00",
+    "2024-03-14T12:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-12-25T00:00:00+00:00",
+    "2024-03-15T12:00:00+00:00",
+    "2024-03-14T12:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Today 2024",
+    "Yesterday 2023"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "report-2023-12-25.txt",
+   "content": "Rechnung vom 15. März 2024, fällig am 1. April 2024. Gestern 2024 bezahlt.",
+   "dates": [
+    "2023-12-25T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-12-25T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15. März 2024",
+    "1. April 2024",
+    "Gestern 2024"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "report-2023-12-25.txt",
+   "content": "Kontoauszug Januar 2024, erstellt 03.02.2024, Jahr 2023",
+   "dates": [
+    "2023-12-25T00:00:00+00:00",
+    "2024-02-03T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-12-25T00:00:00+00:00",
+    "2024-02-03T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Januar 2024",
+    "03.02.2024",
+    "Jahr 2023"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "report-2023-12-25.txt",
+   "content": "Lieferdatum: 5. Dezember 2023 – Vertrag vom 12. Mai 2020",
+   "dates": [
+    "2023-12-25T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-12-25T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "5. Dezember 2023",
+    "12. Mai 2020"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "report-2023-12-25.txt",
+   "content": "Facture du 3 février 2024, échéance le 1er mars 2024",
+   "dates": [
+    "2023-12-25T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-12-25T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "3 février 2024",
+    "1er mars 2024"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "report-2023-12-25.txt",
+   "content": "Paris, le 15 août 2022. Mardi 2021",
+   "dates": [
+    "2023-12-25T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-12-25T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 août 2022",
+    "Mardi 2021"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "report-2023-12-25.txt",
+   "content": "Factura del 5 de mayo de 2023 y 12 enero 2022",
+   "dates": [
+    "2023-12-25T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-12-25T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "12 enero 2022"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "report-2023-12-25.txt",
+   "content": "Fattura del 12 gennaio 2022, scadenza 28 febbraio 2022",
+   "dates": [
+    "2023-12-25T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-12-25T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "12 gennaio 2022",
+    "28 febbraio 2022"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "report-2023-12-25.txt",
+   "content": "Lisboa, 7 de outubro de 2021 e 3 dez 2020",
+   "dates": [
+    "2023-12-25T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-12-25T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "3 dez 2020"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "report-2023-12-25.txt",
+   "content": "Factuur 14 juni 2023, vervaldatum 1 juli 2023",
+   "dates": [
+    "2023-12-25T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-12-25T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "14 juni 2023",
+    "1 juli 2023"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "report-2023-12-25.txt",
+   "content": "Счёт от 15 марта 2023 г. и 1 апреля 2023",
+   "dates": [
+    "2023-12-25T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-12-25T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "марта 2023",
+    "апреля 2023"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "report-2023-12-25.txt",
+   "content": "Faktura ze dne 3. května 2022, splatnost 17. června 2022",
+   "dates": [
+    "2023-12-25T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-12-25T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "3. května 2022",
+    "17. června 2022"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "report-2023-12-25.txt",
+   "content": "Faktura z dnia 12 lipca 2021 r.",
+   "dates": [
+    "2023-12-25T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-12-25T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "12 lipca 2021"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "report-2023-12-25.txt",
+   "content": "Fatura tarihi 5 Şubat 2024",
+   "dates": [
+    "2023-12-25T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-12-25T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "5 Şubat 2024"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "report-2023-12-25.txt",
+   "content": "Faktura 3 januari 2024 och 4 mars 2023",
+   "dates": [
+    "2023-12-25T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-12-25T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "3 januari 2024",
+    "4 mars 2023"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "report-2023-12-25.txt",
+   "content": "",
+   "dates": [
+    "2023-12-25T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-12-25T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": []
+  },
+  {
+   "config": 0,
+   "filename": "report-2023-12-25.txt",
+   "content": "no dates here at all",
+   "dates": [
+    "2023-12-25T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-12-25T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": []
+  },
+  {
+   "config": 0,
+   "filename": "report-2023-12-25.txt",
+   "content": "20240115 and 2024/1/5 and 5/1/24",
+   "dates": [
+    "2023-12-25T00:00:00+00:00",
+    "2024-03-15T00:00:00+00:00",
+    "2024-01-05T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-12-25T00:00:00+00:00",
+    "2024-03-15T00:00:00+00:00",
+    "2024-01-05T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 and 2024",
+    "5/1/24"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "img_2023.01.02.jpg",
+   "content": "Invoice date: 15 Jan 2024. Due: January 30, 2024. Order 2023-12-01.",
+   "dates": [
+    "2023-01-02T00:00:00+00:00",
+    "2024-01-15T00:00:00+00:00",
+    "2024-01-30T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-01-02T00:00:00+00:00",
+    "2024-01-15T00:00:00+00:00",
+    "2024-01-30T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 Jan 2024",
+    "January 30, 2024",
+    "Order 2023"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "img_2023.01.02.jpg",
+   "content": "Taken on 01/02/2023 and 13/02/2023, also 12.31.2022",
+   "dates": [
+    "2023-01-02T00:00:00+00:00",
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-01-02T00:00:00+00:00",
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "01/02/2023",
+    "13/02/2023",
+    "12.31.2022"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "img_2023.01.02.jpg",
+   "content": "Statement for March 2023 issued 1st April 2023",
+   "dates": [
+    "2023-01-02T00:00:00+00:00",
+    "2023-03-01T00:00:00+00:00",
+    "2023-04-01T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-01-02T00:00:00+00:00",
+    "2023-03-01T00:00:00+00:00",
+    "2023-04-01T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "March 2023",
+    "1st April 2023"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "img_2023.01.02.jpg",
+   "content": "Monday 2024 report, Total 1234, Sept 5, 2021",
+   "dates": [
+    "2023-01-02T00:00:00+00:00",
+    "2024-03-15T00:00:00+00:00",
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-01-02T00:00:00+00:00",
+    "2024-03-15T00:00:00+00:00",
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Monday 2024",
+    "Total 1234",
+    "Sept 5, 2021"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "scan_15.03.2024_invoice.pdf",
+   "content": "Invoice date: 15 Jan 2024. Due: January 30, 2024. Order 2023-12-01.",
+   "dates": [
+    "2024-03-15T00:00:00+00:00",
+    "2024-01-15T00:00:00+00:00",
+    "2024-01-30T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-03-15T00:00:00+00:00",
+    "2024-01-15T00:00:00+00:00",
+    "2024-01-30T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 Jan 2024",
+    "January 30, 2024",
+    "Order 2023"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "scan_15.03.2024_invoice.pdf",
+   "content": "Taken on 01/02/2023 and 13/02/2023, also 12.31.2022",
+   "dates": [
+    "2024-03-15T00:00:00+00:00",
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-03-15T00:00:00+00:00",
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "01/02/2023",
+    "13/02/2023",
+    "12.31.2022"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "scan_15.03.2024_invoice.pdf",
+   "content": "Statement for March 2023 issued 1st April 2023",
+   "dates": [
+    "2024-03-15T00:00:00+00:00",
+    "2023-03-01T00:00:00+00:00",
+    "2023-04-01T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-03-15T00:00:00+00:00",
+    "2023-03-01T00:00:00+00:00",
+    "2023-04-01T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "March 2023",
+    "1st April 2023"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "scan_15.03.2024_invoice.pdf",
+   "content": "Monday 2024 report, Total 1234, Sept 5, 2021",
+   "dates": [
+    "2024-03-15T00:00:00+00:00",
+    "2024-03-15T00:00:00+00:00",
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-03-15T00:00:00+00:00",
+    "2024-03-15T00:00:00+00:00",
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Monday 2024",
+    "Total 1234",
+    "Sept 5, 2021"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "notes.txt",
+   "content": "Invoice date: 15 Jan 2024. Due: January 30, 2024. Order 2023-12-01.",
+   "dates": [
+    "2024-01-15T00:00:00+00:00",
+    "2024-01-30T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00+00:00",
+    "2024-01-30T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 Jan 2024",
+    "January 30, 2024",
+    "Order 2023"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "notes.txt",
+   "content": "Taken on 01/02/2023 and 13/02/2023, also 12.31.2022",
+   "dates": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "01/02/2023",
+    "13/02/2023",
+    "12.31.2022"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "notes.txt",
+   "content": "Statement for March 2023 issued 1st April 2023",
+   "dates": [
+    "2023-03-01T00:00:00+00:00",
+    "2023-04-01T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-03-01T00:00:00+00:00",
+    "2023-04-01T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "March 2023",
+    "1st April 2023"
+   ]
+  },
+  {
+   "config": 0,
+   "filename": "notes.txt",
+   "content": "Monday 2024 report, Total 1234, Sept 5, 2021",
+   "dates": [
+    "2024-03-15T00:00:00+00:00",
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-03-15T00:00:00+00:00",
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Monday 2024",
+    "Total 1234",
+    "Sept 5, 2021"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "report-2023-12-25.txt",
+   "content": "Invoice date: 15 Jan 2024. Due: January 30, 2024. Order 2023-12-01.",
+   "dates": [
+    "2024-01-15T00:00:00+01:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00+01:00",
+    "2024-01-30T00:00:00+01:00"
+   ],
+   "upstream_timed_out": true,
+   "regex_matches": [
+    "15 Jan 2024",
+    "January 30, 2024",
+    "Order 2023"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "report-2023-12-25.txt",
+   "content": "Taken on 01/02/2023 and 13/02/2023, also 12.31.2022",
+   "dates": [
+    "2023-02-01T00:00:00+01:00",
+    "2023-02-13T00:00:00+01:00"
+   ],
+   "dates_full": [
+    "2023-02-01T00:00:00+01:00",
+    "2023-02-13T00:00:00+01:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "01/02/2023",
+    "13/02/2023",
+    "12.31.2022"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "report-2023-12-25.txt",
+   "content": "Statement for March 2023 issued 1st April 2023",
+   "dates": [
+    "2023-03-01T00:00:00+01:00",
+    "2023-04-01T00:00:00+02:00"
+   ],
+   "dates_full": [
+    "2023-03-01T00:00:00+01:00",
+    "2023-04-01T00:00:00+02:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "March 2023",
+    "1st April 2023"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "report-2023-12-25.txt",
+   "content": "Monday 2024 report, Total 1234, Sept 5, 2021",
+   "dates": [
+    "2024-03-15T00:00:00+01:00",
+    "2021-09-05T00:00:00+02:00"
+   ],
+   "dates_full": [
+    "2024-03-15T00:00:00+01:00",
+    "2021-09-05T00:00:00+02:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Monday 2024",
+    "Total 1234",
+    "Sept 5, 2021"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "report-2023-12-25.txt",
+   "content": "bad date 99/99/9999 and 25/12/2022 and 31/02/2024",
+   "dates": [
+    "2022-12-25T00:00:00+01:00"
+   ],
+   "dates_full": [
+    "2022-12-25T00:00:00+01:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "99/99/9999",
+    "25/12/2022",
+    "31/02/2024"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "report-2023-12-25.txt",
+   "content": "Version 1.2.3 build 4.5.2010, phone 030-123-4567",
+   "dates": [
+    "2010-05-04T00:00:00+02:00"
+   ],
+   "dates_full": [
+    "2010-05-04T00:00:00+02:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "4.5.2010"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "report-2023-12-25.txt",
+   "content": "Printed 15-Jan-2024; archived 2019_05_06 ; x 05.06.2019_",
+   "dates": [
+    "2024-01-15T00:00:00+01:00",
+    "2019-06-05T00:00:00+02:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00+01:00",
+    "2019-06-05T00:00:00+02:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15-Jan-2024",
+    "archived 2019",
+    "05.06.2019"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "report-2023-12-25.txt",
+   "content": "Dates 1.2.20245 2.3.19 and 10/11/12",
+   "dates": [
+    "2019-03-02T00:00:00+01:00",
+    "2012-11-10T00:00:00+01:00"
+   ],
+   "dates_full": [
+    "2019-03-02T00:00:00+01:00",
+    "2012-11-10T00:00:00+01:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "2.3.19",
+    "10/11/12"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "report-2023-12-25.txt",
+   "content": "Today 2024 and Yesterday 2023",
+   "dates": [
+    "2024-03-15T13:00:00+01:00",
+    "2024-03-14T13:00:00+01:00"
+   ],
+   "dates_full": [
+    "2024-03-15T13:00:00+01:00",
+    "2024-03-14T13:00:00+01:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Today 2024",
+    "Yesterday 2023"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "report-2023-12-25.txt",
+   "content": "Rechnung vom 15. März 2024, fällig am 1. April 2024. Gestern 2024 bezahlt.",
+   "dates": [
+    "2024-03-15T00:00:00+01:00",
+    "2024-03-14T13:00:00+01:00"
+   ],
+   "dates_full": [
+    "2024-03-15T00:00:00+01:00",
+    "2024-03-14T13:00:00+01:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15. März 2024",
+    "1. April 2024",
+    "Gestern 2024"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "report-2023-12-25.txt",
+   "content": "Kontoauszug Januar 2024, erstellt 03.02.2024, Jahr 2023",
+   "dates": [
+    "2024-01-01T00:00:00+01:00",
+    "2024-02-03T00:00:00+01:00",
+    "2023-03-01T00:00:00+01:00"
+   ],
+   "dates_full": [
+    "2024-01-01T00:00:00+01:00",
+    "2024-02-03T00:00:00+01:00",
+    "2023-03-01T00:00:00+01:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Januar 2024",
+    "03.02.2024",
+    "Jahr 2023"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "report-2023-12-25.txt",
+   "content": "Lieferdatum: 5. Dezember 2023 – Vertrag vom 12. Mai 2020",
+   "dates": [
+    "2023-12-05T00:00:00+01:00",
+    "2020-05-12T00:00:00+02:00"
+   ],
+   "dates_full": [
+    "2023-12-05T00:00:00+01:00",
+    "2020-05-12T00:00:00+02:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "5. Dezember 2023",
+    "12. Mai 2020"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "report-2023-12-25.txt",
+   "content": "Facture du 3 février 2024, échéance le 1er mars 2024",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "3 février 2024",
+    "1er mars 2024"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "report-2023-12-25.txt",
+   "content": "Paris, le 15 août 2022. Mardi 2021",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 août 2022",
+    "Mardi 2021"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "report-2023-12-25.txt",
+   "content": "Factura del 5 de mayo de 2023 y 12 enero 2022",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "12 enero 2022"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "report-2023-12-25.txt",
+   "content": "Fattura del 12 gennaio 2022, scadenza 28 febbraio 2022",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "12 gennaio 2022",
+    "28 febbraio 2022"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "report-2023-12-25.txt",
+   "content": "Lisboa, 7 de outubro de 2021 e 3 dez 2020",
+   "dates": [
+    "2020-12-03T00:00:00+01:00"
+   ],
+   "dates_full": [
+    "2020-12-03T00:00:00+01:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "3 dez 2020"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "report-2023-12-25.txt",
+   "content": "Factuur 14 juni 2023, vervaldatum 1 juli 2023",
+   "dates": [
+    "2023-06-14T00:00:00+02:00",
+    "2023-07-01T00:00:00+02:00"
+   ],
+   "dates_full": [
+    "2023-06-14T00:00:00+02:00",
+    "2023-07-01T00:00:00+02:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "14 juni 2023",
+    "1 juli 2023"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "report-2023-12-25.txt",
+   "content": "Счёт от 15 марта 2023 г. и 1 апреля 2023",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "марта 2023",
+    "апреля 2023"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "report-2023-12-25.txt",
+   "content": "Faktura ze dne 3. května 2022, splatnost 17. června 2022",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "3. května 2022",
+    "17. června 2022"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "report-2023-12-25.txt",
+   "content": "Faktura z dnia 12 lipca 2021 r.",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "12 lipca 2021"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "report-2023-12-25.txt",
+   "content": "Fatura tarihi 5 Şubat 2024",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "5 Şubat 2024"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "report-2023-12-25.txt",
+   "content": "Faktura 3 januari 2024 och 4 mars 2023",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "3 januari 2024",
+    "4 mars 2023"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "report-2023-12-25.txt",
+   "content": "",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": []
+  },
+  {
+   "config": 1,
+   "filename": "report-2023-12-25.txt",
+   "content": "no dates here at all",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": []
+  },
+  {
+   "config": 1,
+   "filename": "report-2023-12-25.txt",
+   "content": "20240115 and 2024/1/5 and 5/1/24",
+   "dates": [
+    "2024-03-15T00:00:00+01:00",
+    "2024-01-05T00:00:00+01:00"
+   ],
+   "dates_full": [
+    "2024-03-15T00:00:00+01:00",
+    "2024-01-05T00:00:00+01:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 and 2024",
+    "5/1/24"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "img_2023.01.02.jpg",
+   "content": "Invoice date: 15 Jan 2024. Due: January 30, 2024. Order 2023-12-01.",
+   "dates": [
+    "2024-01-15T00:00:00+01:00",
+    "2024-01-30T00:00:00+01:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00+01:00",
+    "2024-01-30T00:00:00+01:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 Jan 2024",
+    "January 30, 2024",
+    "Order 2023"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "img_2023.01.02.jpg",
+   "content": "Taken on 01/02/2023 and 13/02/2023, also 12.31.2022",
+   "dates": [
+    "2023-02-01T00:00:00+01:00",
+    "2023-02-13T00:00:00+01:00"
+   ],
+   "dates_full": [
+    "2023-02-01T00:00:00+01:00",
+    "2023-02-13T00:00:00+01:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "01/02/2023",
+    "13/02/2023",
+    "12.31.2022"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "img_2023.01.02.jpg",
+   "content": "Statement for March 2023 issued 1st April 2023",
+   "dates": [
+    "2023-03-01T00:00:00+01:00",
+    "2023-04-01T00:00:00+02:00"
+   ],
+   "dates_full": [
+    "2023-03-01T00:00:00+01:00",
+    "2023-04-01T00:00:00+02:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "March 2023",
+    "1st April 2023"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "img_2023.01.02.jpg",
+   "content": "Monday 2024 report, Total 1234, Sept 5, 2021",
+   "dates": [
+    "2024-03-15T00:00:00+01:00",
+    "2021-09-05T00:00:00+02:00"
+   ],
+   "dates_full": [
+    "2024-03-15T00:00:00+01:00",
+    "2021-09-05T00:00:00+02:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Monday 2024",
+    "Total 1234",
+    "Sept 5, 2021"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "scan_15.03.2024_invoice.pdf",
+   "content": "Invoice date: 15 Jan 2024. Due: January 30, 2024. Order 2023-12-01.",
+   "dates": [
+    "2024-01-15T00:00:00+01:00",
+    "2024-01-30T00:00:00+01:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00+01:00",
+    "2024-01-30T00:00:00+01:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 Jan 2024",
+    "January 30, 2024",
+    "Order 2023"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "scan_15.03.2024_invoice.pdf",
+   "content": "Taken on 01/02/2023 and 13/02/2023, also 12.31.2022",
+   "dates": [
+    "2023-02-01T00:00:00+01:00",
+    "2023-02-13T00:00:00+01:00"
+   ],
+   "dates_full": [
+    "2023-02-01T00:00:00+01:00",
+    "2023-02-13T00:00:00+01:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "01/02/2023",
+    "13/02/2023",
+    "12.31.2022"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "scan_15.03.2024_invoice.pdf",
+   "content": "Statement for March 2023 issued 1st April 2023",
+   "dates": [
+    "2023-03-01T00:00:00+01:00",
+    "2023-04-01T00:00:00+02:00"
+   ],
+   "dates_full": [
+    "2023-03-01T00:00:00+01:00",
+    "2023-04-01T00:00:00+02:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "March 2023",
+    "1st April 2023"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "scan_15.03.2024_invoice.pdf",
+   "content": "Monday 2024 report, Total 1234, Sept 5, 2021",
+   "dates": [
+    "2024-03-15T00:00:00+01:00",
+    "2021-09-05T00:00:00+02:00"
+   ],
+   "dates_full": [
+    "2024-03-15T00:00:00+01:00",
+    "2021-09-05T00:00:00+02:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Monday 2024",
+    "Total 1234",
+    "Sept 5, 2021"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "notes.txt",
+   "content": "Invoice date: 15 Jan 2024. Due: January 30, 2024. Order 2023-12-01.",
+   "dates": [
+    "2024-01-15T00:00:00+01:00",
+    "2024-01-30T00:00:00+01:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00+01:00",
+    "2024-01-30T00:00:00+01:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 Jan 2024",
+    "January 30, 2024",
+    "Order 2023"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "notes.txt",
+   "content": "Taken on 01/02/2023 and 13/02/2023, also 12.31.2022",
+   "dates": [
+    "2023-02-01T00:00:00+01:00",
+    "2023-02-13T00:00:00+01:00"
+   ],
+   "dates_full": [
+    "2023-02-01T00:00:00+01:00",
+    "2023-02-13T00:00:00+01:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "01/02/2023",
+    "13/02/2023",
+    "12.31.2022"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "notes.txt",
+   "content": "Statement for March 2023 issued 1st April 2023",
+   "dates": [
+    "2023-03-01T00:00:00+01:00",
+    "2023-04-01T00:00:00+02:00"
+   ],
+   "dates_full": [
+    "2023-03-01T00:00:00+01:00",
+    "2023-04-01T00:00:00+02:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "March 2023",
+    "1st April 2023"
+   ]
+  },
+  {
+   "config": 1,
+   "filename": "notes.txt",
+   "content": "Monday 2024 report, Total 1234, Sept 5, 2021",
+   "dates": [
+    "2024-03-15T00:00:00+01:00",
+    "2021-09-05T00:00:00+02:00"
+   ],
+   "dates_full": [
+    "2024-03-15T00:00:00+01:00",
+    "2021-09-05T00:00:00+02:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Monday 2024",
+    "Total 1234",
+    "Sept 5, 2021"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "report-2023-12-25.txt",
+   "content": "Invoice date: 15 Jan 2024. Due: January 30, 2024. Order 2023-12-01.",
+   "dates": [
+    "2024-01-15T00:00:00+01:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00+01:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 Jan 2024",
+    "January 30, 2024",
+    "Order 2023"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "report-2023-12-25.txt",
+   "content": "Taken on 01/02/2023 and 13/02/2023, also 12.31.2022",
+   "dates": [
+    "2023-02-01T00:00:00+01:00",
+    "2023-02-13T00:00:00+01:00"
+   ],
+   "dates_full": [
+    "2023-02-01T00:00:00+01:00",
+    "2023-02-13T00:00:00+01:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "01/02/2023",
+    "13/02/2023",
+    "12.31.2022"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "report-2023-12-25.txt",
+   "content": "Statement for March 2023 issued 1st April 2023",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "March 2023",
+    "1st April 2023"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "report-2023-12-25.txt",
+   "content": "Monday 2024 report, Total 1234, Sept 5, 2021",
+   "dates": [
+    "2021-09-05T00:00:00+02:00"
+   ],
+   "dates_full": [
+    "2021-09-05T00:00:00+02:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Monday 2024",
+    "Total 1234",
+    "Sept 5, 2021"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "report-2023-12-25.txt",
+   "content": "bad date 99/99/9999 and 25/12/2022 and 31/02/2024",
+   "dates": [
+    "2022-12-25T00:00:00+01:00"
+   ],
+   "dates_full": [
+    "2022-12-25T00:00:00+01:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "99/99/9999",
+    "25/12/2022",
+    "31/02/2024"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "report-2023-12-25.txt",
+   "content": "Version 1.2.3 build 4.5.2010, phone 030-123-4567",
+   "dates": [
+    "2010-05-04T00:00:00+02:00"
+   ],
+   "dates_full": [
+    "2010-05-04T00:00:00+02:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "4.5.2010"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "report-2023-12-25.txt",
+   "content": "Printed 15-Jan-2024; archived 2019_05_06 ; x 05.06.2019_",
+   "dates": [
+    "2024-01-15T00:00:00+01:00",
+    "2019-06-05T00:00:00+02:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00+01:00",
+    "2019-06-05T00:00:00+02:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15-Jan-2024",
+    "archived 2019",
+    "05.06.2019"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "report-2023-12-25.txt",
+   "content": "Dates 1.2.20245 2.3.19 and 10/11/12",
+   "dates": [
+    "2019-03-02T00:00:00+01:00",
+    "2012-11-10T00:00:00+01:00"
+   ],
+   "dates_full": [
+    "2019-03-02T00:00:00+01:00",
+    "2012-11-10T00:00:00+01:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "2.3.19",
+    "10/11/12"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "report-2023-12-25.txt",
+   "content": "Today 2024 and Yesterday 2023",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Today 2024",
+    "Yesterday 2023"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "report-2023-12-25.txt",
+   "content": "Rechnung vom 15. März 2024, fällig am 1. April 2024. Gestern 2024 bezahlt.",
+   "dates": [
+    "2024-03-15T00:00:00+01:00",
+    "2024-03-14T13:00:00+01:00"
+   ],
+   "dates_full": [
+    "2024-03-15T00:00:00+01:00",
+    "2024-03-14T13:00:00+01:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15. März 2024",
+    "1. April 2024",
+    "Gestern 2024"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "report-2023-12-25.txt",
+   "content": "Kontoauszug Januar 2024, erstellt 03.02.2024, Jahr 2023",
+   "dates": [
+    "2024-01-01T00:00:00+01:00",
+    "2024-02-03T00:00:00+01:00",
+    "2023-03-01T00:00:00+01:00"
+   ],
+   "dates_full": [
+    "2024-01-01T00:00:00+01:00",
+    "2024-02-03T00:00:00+01:00",
+    "2023-03-01T00:00:00+01:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Januar 2024",
+    "03.02.2024",
+    "Jahr 2023"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "report-2023-12-25.txt",
+   "content": "Lieferdatum: 5. Dezember 2023 – Vertrag vom 12. Mai 2020",
+   "dates": [
+    "2023-12-05T00:00:00+01:00",
+    "2020-05-12T00:00:00+02:00"
+   ],
+   "dates_full": [
+    "2023-12-05T00:00:00+01:00",
+    "2020-05-12T00:00:00+02:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "5. Dezember 2023",
+    "12. Mai 2020"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "report-2023-12-25.txt",
+   "content": "Facture du 3 février 2024, échéance le 1er mars 2024",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "3 février 2024",
+    "1er mars 2024"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "report-2023-12-25.txt",
+   "content": "Paris, le 15 août 2022. Mardi 2021",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 août 2022",
+    "Mardi 2021"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "report-2023-12-25.txt",
+   "content": "Factura del 5 de mayo de 2023 y 12 enero 2022",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "12 enero 2022"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "report-2023-12-25.txt",
+   "content": "Fattura del 12 gennaio 2022, scadenza 28 febbraio 2022",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "12 gennaio 2022",
+    "28 febbraio 2022"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "report-2023-12-25.txt",
+   "content": "Lisboa, 7 de outubro de 2021 e 3 dez 2020",
+   "dates": [
+    "2020-12-03T00:00:00+01:00"
+   ],
+   "dates_full": [
+    "2020-12-03T00:00:00+01:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "3 dez 2020"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "report-2023-12-25.txt",
+   "content": "Factuur 14 juni 2023, vervaldatum 1 juli 2023",
+   "dates": [
+    "2023-06-14T00:00:00+02:00",
+    "2023-07-01T00:00:00+02:00"
+   ],
+   "dates_full": [
+    "2023-06-14T00:00:00+02:00",
+    "2023-07-01T00:00:00+02:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "14 juni 2023",
+    "1 juli 2023"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "report-2023-12-25.txt",
+   "content": "Счёт от 15 марта 2023 г. и 1 апреля 2023",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "марта 2023",
+    "апреля 2023"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "report-2023-12-25.txt",
+   "content": "Faktura ze dne 3. května 2022, splatnost 17. června 2022",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "3. května 2022",
+    "17. června 2022"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "report-2023-12-25.txt",
+   "content": "Faktura z dnia 12 lipca 2021 r.",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "12 lipca 2021"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "report-2023-12-25.txt",
+   "content": "Fatura tarihi 5 Şubat 2024",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "5 Şubat 2024"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "report-2023-12-25.txt",
+   "content": "Faktura 3 januari 2024 och 4 mars 2023",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "3 januari 2024",
+    "4 mars 2023"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "report-2023-12-25.txt",
+   "content": "",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": []
+  },
+  {
+   "config": 2,
+   "filename": "report-2023-12-25.txt",
+   "content": "no dates here at all",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": []
+  },
+  {
+   "config": 2,
+   "filename": "report-2023-12-25.txt",
+   "content": "20240115 and 2024/1/5 and 5/1/24",
+   "dates": [
+    "2024-01-05T00:00:00+01:00"
+   ],
+   "dates_full": [
+    "2024-01-05T00:00:00+01:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 and 2024",
+    "5/1/24"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "img_2023.01.02.jpg",
+   "content": "Invoice date: 15 Jan 2024. Due: January 30, 2024. Order 2023-12-01.",
+   "dates": [
+    "2023-02-01T00:00:00+01:00",
+    "2024-01-15T00:00:00+01:00"
+   ],
+   "dates_full": [
+    "2023-02-01T00:00:00+01:00",
+    "2024-01-15T00:00:00+01:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 Jan 2024",
+    "January 30, 2024",
+    "Order 2023"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "img_2023.01.02.jpg",
+   "content": "Taken on 01/02/2023 and 13/02/2023, also 12.31.2022",
+   "dates": [
+    "2023-02-01T00:00:00+01:00",
+    "2023-02-01T00:00:00+01:00",
+    "2023-02-13T00:00:00+01:00"
+   ],
+   "dates_full": [
+    "2023-02-01T00:00:00+01:00",
+    "2023-02-01T00:00:00+01:00",
+    "2023-02-13T00:00:00+01:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "01/02/2023",
+    "13/02/2023",
+    "12.31.2022"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "img_2023.01.02.jpg",
+   "content": "Statement for March 2023 issued 1st April 2023",
+   "dates": [
+    "2023-02-01T00:00:00+01:00"
+   ],
+   "dates_full": [
+    "2023-02-01T00:00:00+01:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "March 2023",
+    "1st April 2023"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "img_2023.01.02.jpg",
+   "content": "Monday 2024 report, Total 1234, Sept 5, 2021",
+   "dates": [
+    "2023-02-01T00:00:00+01:00",
+    "2021-09-05T00:00:00+02:00"
+   ],
+   "dates_full": [
+    "2023-02-01T00:00:00+01:00",
+    "2021-09-05T00:00:00+02:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Monday 2024",
+    "Total 1234",
+    "Sept 5, 2021"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "scan_15.03.2024_invoice.pdf",
+   "content": "Invoice date: 15 Jan 2024. Due: January 30, 2024. Order 2023-12-01.",
+   "dates": [
+    "2024-03-15T00:00:00+01:00",
+    "2024-01-15T00:00:00+01:00"
+   ],
+   "dates_full": [
+    "2024-03-15T00:00:00+01:00",
+    "2024-01-15T00:00:00+01:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 Jan 2024",
+    "January 30, 2024",
+    "Order 2023"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "scan_15.03.2024_invoice.pdf",
+   "content": "Taken on 01/02/2023 and 13/02/2023, also 12.31.2022",
+   "dates": [
+    "2024-03-15T00:00:00+01:00",
+    "2023-02-01T00:00:00+01:00",
+    "2023-02-13T00:00:00+01:00"
+   ],
+   "dates_full": [
+    "2024-03-15T00:00:00+01:00",
+    "2023-02-01T00:00:00+01:00",
+    "2023-02-13T00:00:00+01:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "01/02/2023",
+    "13/02/2023",
+    "12.31.2022"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "scan_15.03.2024_invoice.pdf",
+   "content": "Statement for March 2023 issued 1st April 2023",
+   "dates": [
+    "2024-03-15T00:00:00+01:00"
+   ],
+   "dates_full": [
+    "2024-03-15T00:00:00+01:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "March 2023",
+    "1st April 2023"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "scan_15.03.2024_invoice.pdf",
+   "content": "Monday 2024 report, Total 1234, Sept 5, 2021",
+   "dates": [
+    "2024-03-15T00:00:00+01:00",
+    "2021-09-05T00:00:00+02:00"
+   ],
+   "dates_full": [
+    "2024-03-15T00:00:00+01:00",
+    "2021-09-05T00:00:00+02:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Monday 2024",
+    "Total 1234",
+    "Sept 5, 2021"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "notes.txt",
+   "content": "Invoice date: 15 Jan 2024. Due: January 30, 2024. Order 2023-12-01.",
+   "dates": [
+    "2024-01-15T00:00:00+01:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00+01:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 Jan 2024",
+    "January 30, 2024",
+    "Order 2023"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "notes.txt",
+   "content": "Taken on 01/02/2023 and 13/02/2023, also 12.31.2022",
+   "dates": [
+    "2023-02-01T00:00:00+01:00",
+    "2023-02-13T00:00:00+01:00"
+   ],
+   "dates_full": [
+    "2023-02-01T00:00:00+01:00",
+    "2023-02-13T00:00:00+01:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "01/02/2023",
+    "13/02/2023",
+    "12.31.2022"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "notes.txt",
+   "content": "Statement for March 2023 issued 1st April 2023",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "March 2023",
+    "1st April 2023"
+   ]
+  },
+  {
+   "config": 2,
+   "filename": "notes.txt",
+   "content": "Monday 2024 report, Total 1234, Sept 5, 2021",
+   "dates": [
+    "2021-09-05T00:00:00+02:00"
+   ],
+   "dates_full": [
+    "2021-09-05T00:00:00+02:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Monday 2024",
+    "Total 1234",
+    "Sept 5, 2021"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "report-2023-12-25.txt",
+   "content": "Invoice date: 15 Jan 2024. Due: January 30, 2024. Order 2023-12-01.",
+   "dates": [
+    "2024-01-15T00:00:00-05:00",
+    "2024-01-30T00:00:00-05:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00-05:00",
+    "2024-01-30T00:00:00-05:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 Jan 2024",
+    "January 30, 2024",
+    "Order 2023"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "report-2023-12-25.txt",
+   "content": "Taken on 01/02/2023 and 13/02/2023, also 12.31.2022",
+   "dates": [
+    "2023-01-02T00:00:00-05:00",
+    "2023-02-13T00:00:00-05:00",
+    "2022-12-31T00:00:00-05:00"
+   ],
+   "dates_full": [
+    "2023-01-02T00:00:00-05:00",
+    "2023-02-13T00:00:00-05:00",
+    "2022-12-31T00:00:00-05:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "01/02/2023",
+    "13/02/2023",
+    "12.31.2022"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "report-2023-12-25.txt",
+   "content": "Statement for March 2023 issued 1st April 2023",
+   "dates": [
+    "2023-03-01T00:00:00-05:00",
+    "2023-04-01T00:00:00-04:00"
+   ],
+   "dates_full": [
+    "2023-03-01T00:00:00-05:00",
+    "2023-04-01T00:00:00-04:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "March 2023",
+    "1st April 2023"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "report-2023-12-25.txt",
+   "content": "Monday 2024 report, Total 1234, Sept 5, 2021",
+   "dates": [
+    "2024-03-15T00:00:00-04:00",
+    "2021-09-05T00:00:00-04:00"
+   ],
+   "dates_full": [
+    "2024-03-15T00:00:00-04:00",
+    "2021-09-05T00:00:00-04:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Monday 2024",
+    "Total 1234",
+    "Sept 5, 2021"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "report-2023-12-25.txt",
+   "content": "bad date 99/99/9999 and 25/12/2022 and 31/02/2024",
+   "dates": [
+    "2022-12-25T00:00:00-05:00"
+   ],
+   "dates_full": [
+    "2022-12-25T00:00:00-05:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "99/99/9999",
+    "25/12/2022",
+    "31/02/2024"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "report-2023-12-25.txt",
+   "content": "Version 1.2.3 build 4.5.2010, phone 030-123-4567",
+   "dates": [
+    "2010-04-05T00:00:00-04:00"
+   ],
+   "dates_full": [
+    "2010-04-05T00:00:00-04:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "4.5.2010"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "report-2023-12-25.txt",
+   "content": "Printed 15-Jan-2024; archived 2019_05_06 ; x 05.06.2019_",
+   "dates": [
+    "2024-01-15T00:00:00-05:00",
+    "2019-05-06T00:00:00-04:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00-05:00",
+    "2019-05-06T00:00:00-04:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15-Jan-2024",
+    "archived 2019",
+    "05.06.2019"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "report-2023-12-25.txt",
+   "content": "Dates 1.2.20245 2.3.19 and 10/11/12",
+   "dates": [
+    "2019-02-03T00:00:00-05:00",
+    "2012-10-11T00:00:00-04:00"
+   ],
+   "dates_full": [
+    "2019-02-03T00:00:00-05:00",
+    "2012-10-11T00:00:00-04:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "2.3.19",
+    "10/11/12"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "report-2023-12-25.txt",
+   "content": "Today 2024 and Yesterday 2023",
+   "dates": [
+    "2024-03-15T08:00:00-04:00",
+    "2024-03-14T08:00:00-04:00"
+   ],
+   "dates_full": [
+    "2024-03-15T08:00:00-04:00",
+    "2024-03-14T08:00:00-04:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Today 2024",
+    "Yesterday 2023"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "report-2023-12-25.txt",
+   "content": "Rechnung vom 15. März 2024, fällig am 1. April 2024. Gestern 2024 bezahlt.",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15. März 2024",
+    "1. April 2024",
+    "Gestern 2024"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "report-2023-12-25.txt",
+   "content": "Kontoauszug Januar 2024, erstellt 03.02.2024, Jahr 2023",
+   "dates": [
+    "2024-03-02T00:00:00-05:00"
+   ],
+   "dates_full": [
+    "2024-03-02T00:00:00-05:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Januar 2024",
+    "03.02.2024",
+    "Jahr 2023"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "report-2023-12-25.txt",
+   "content": "Lieferdatum: 5. Dezember 2023 – Vertrag vom 12. Mai 2020",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "5. Dezember 2023",
+    "12. Mai 2020"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "report-2023-12-25.txt",
+   "content": "Facture du 3 février 2024, échéance le 1er mars 2024",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "3 février 2024",
+    "1er mars 2024"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "report-2023-12-25.txt",
+   "content": "Paris, le 15 août 2022. Mardi 2021",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 août 2022",
+    "Mardi 2021"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "report-2023-12-25.txt",
+   "content": "Factura del 5 de mayo de 2023 y 12 enero 2022",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "12 enero 2022"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "report-2023-12-25.txt",
+   "content": "Fattura del 12 gennaio 2022, scadenza 28 febbraio 2022",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "12 gennaio 2022",
+    "28 febbraio 2022"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "report-2023-12-25.txt",
+   "content": "Lisboa, 7 de outubro de 2021 e 3 dez 2020",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "3 dez 2020"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "report-2023-12-25.txt",
+   "content": "Factuur 14 juni 2023, vervaldatum 1 juli 2023",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "14 juni 2023",
+    "1 juli 2023"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "report-2023-12-25.txt",
+   "content": "Счёт от 15 марта 2023 г. и 1 апреля 2023",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "марта 2023",
+    "апреля 2023"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "report-2023-12-25.txt",
+   "content": "Faktura ze dne 3. května 2022, splatnost 17. června 2022",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "3. května 2022",
+    "17. června 2022"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "report-2023-12-25.txt",
+   "content": "Faktura z dnia 12 lipca 2021 r.",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "12 lipca 2021"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "report-2023-12-25.txt",
+   "content": "Fatura tarihi 5 Şubat 2024",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "5 Şubat 2024"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "report-2023-12-25.txt",
+   "content": "Faktura 3 januari 2024 och 4 mars 2023",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "3 januari 2024",
+    "4 mars 2023"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "report-2023-12-25.txt",
+   "content": "",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": []
+  },
+  {
+   "config": 3,
+   "filename": "report-2023-12-25.txt",
+   "content": "no dates here at all",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": []
+  },
+  {
+   "config": 3,
+   "filename": "report-2023-12-25.txt",
+   "content": "20240115 and 2024/1/5 and 5/1/24",
+   "dates": [
+    "2024-03-15T00:00:00-04:00"
+   ],
+   "dates_full": [
+    "2024-03-15T00:00:00-04:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 and 2024",
+    "5/1/24"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "img_2023.01.02.jpg",
+   "content": "Invoice date: 15 Jan 2024. Due: January 30, 2024. Order 2023-12-01.",
+   "dates": [
+    "2024-01-15T00:00:00-05:00",
+    "2024-01-30T00:00:00-05:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00-05:00",
+    "2024-01-30T00:00:00-05:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 Jan 2024",
+    "January 30, 2024",
+    "Order 2023"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "img_2023.01.02.jpg",
+   "content": "Taken on 01/02/2023 and 13/02/2023, also 12.31.2022",
+   "dates": [
+    "2023-01-02T00:00:00-05:00",
+    "2023-02-13T00:00:00-05:00",
+    "2022-12-31T00:00:00-05:00"
+   ],
+   "dates_full": [
+    "2023-01-02T00:00:00-05:00",
+    "2023-02-13T00:00:00-05:00",
+    "2022-12-31T00:00:00-05:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "01/02/2023",
+    "13/02/2023",
+    "12.31.2022"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "img_2023.01.02.jpg",
+   "content": "Statement for March 2023 issued 1st April 2023",
+   "dates": [
+    "2023-03-01T00:00:00-05:00",
+    "2023-04-01T00:00:00-04:00"
+   ],
+   "dates_full": [
+    "2023-03-01T00:00:00-05:00",
+    "2023-04-01T00:00:00-04:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "March 2023",
+    "1st April 2023"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "img_2023.01.02.jpg",
+   "content": "Monday 2024 report, Total 1234, Sept 5, 2021",
+   "dates": [
+    "2024-03-15T00:00:00-04:00",
+    "2021-09-05T00:00:00-04:00"
+   ],
+   "dates_full": [
+    "2024-03-15T00:00:00-04:00",
+    "2021-09-05T00:00:00-04:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Monday 2024",
+    "Total 1234",
+    "Sept 5, 2021"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "scan_15.03.2024_invoice.pdf",
+   "content": "Invoice date: 15 Jan 2024. Due: January 30, 2024. Order 2023-12-01.",
+   "dates": [
+    "2024-01-15T00:00:00-05:00",
+    "2024-01-30T00:00:00-05:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00-05:00",
+    "2024-01-30T00:00:00-05:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 Jan 2024",
+    "January 30, 2024",
+    "Order 2023"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "scan_15.03.2024_invoice.pdf",
+   "content": "Taken on 01/02/2023 and 13/02/2023, also 12.31.2022",
+   "dates": [
+    "2023-01-02T00:00:00-05:00",
+    "2023-02-13T00:00:00-05:00",
+    "2022-12-31T00:00:00-05:00"
+   ],
+   "dates_full": [
+    "2023-01-02T00:00:00-05:00",
+    "2023-02-13T00:00:00-05:00",
+    "2022-12-31T00:00:00-05:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "01/02/2023",
+    "13/02/2023",
+    "12.31.2022"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "scan_15.03.2024_invoice.pdf",
+   "content": "Statement for March 2023 issued 1st April 2023",
+   "dates": [
+    "2023-03-01T00:00:00-05:00",
+    "2023-04-01T00:00:00-04:00"
+   ],
+   "dates_full": [
+    "2023-03-01T00:00:00-05:00",
+    "2023-04-01T00:00:00-04:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "March 2023",
+    "1st April 2023"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "scan_15.03.2024_invoice.pdf",
+   "content": "Monday 2024 report, Total 1234, Sept 5, 2021",
+   "dates": [
+    "2024-03-15T00:00:00-04:00",
+    "2021-09-05T00:00:00-04:00"
+   ],
+   "dates_full": [
+    "2024-03-15T00:00:00-04:00",
+    "2021-09-05T00:00:00-04:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Monday 2024",
+    "Total 1234",
+    "Sept 5, 2021"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "notes.txt",
+   "content": "Invoice date: 15 Jan 2024. Due: January 30, 2024. Order 2023-12-01.",
+   "dates": [
+    "2024-01-15T00:00:00-05:00",
+    "2024-01-30T00:00:00-05:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00-05:00",
+    "2024-01-30T00:00:00-05:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 Jan 2024",
+    "January 30, 2024",
+    "Order 2023"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "notes.txt",
+   "content": "Taken on 01/02/2023 and 13/02/2023, also 12.31.2022",
+   "dates": [
+    "2023-01-02T00:00:00-05:00",
+    "2023-02-13T00:00:00-05:00",
+    "2022-12-31T00:00:00-05:00"
+   ],
+   "dates_full": [
+    "2023-01-02T00:00:00-05:00",
+    "2023-02-13T00:00:00-05:00",
+    "2022-12-31T00:00:00-05:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "01/02/2023",
+    "13/02/2023",
+    "12.31.2022"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "notes.txt",
+   "content": "Statement for March 2023 issued 1st April 2023",
+   "dates": [
+    "2023-03-01T00:00:00-05:00",
+    "2023-04-01T00:00:00-04:00"
+   ],
+   "dates_full": [
+    "2023-03-01T00:00:00-05:00",
+    "2023-04-01T00:00:00-04:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "March 2023",
+    "1st April 2023"
+   ]
+  },
+  {
+   "config": 3,
+   "filename": "notes.txt",
+   "content": "Monday 2024 report, Total 1234, Sept 5, 2021",
+   "dates": [
+    "2024-03-15T00:00:00-04:00",
+    "2021-09-05T00:00:00-04:00"
+   ],
+   "dates_full": [
+    "2024-03-15T00:00:00-04:00",
+    "2021-09-05T00:00:00-04:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Monday 2024",
+    "Total 1234",
+    "Sept 5, 2021"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "report-2023-12-25.txt",
+   "content": "Invoice date: 15 Jan 2024. Due: January 30, 2024. Order 2023-12-01.",
+   "dates": [
+    "2024-01-15T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 Jan 2024",
+    "January 30, 2024",
+    "Order 2023"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "report-2023-12-25.txt",
+   "content": "Taken on 01/02/2023 and 13/02/2023, also 12.31.2022",
+   "dates": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "01/02/2023",
+    "13/02/2023",
+    "12.31.2022"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "report-2023-12-25.txt",
+   "content": "Statement for March 2023 issued 1st April 2023",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "March 2023",
+    "1st April 2023"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "report-2023-12-25.txt",
+   "content": "Monday 2024 report, Total 1234, Sept 5, 2021",
+   "dates": [
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Monday 2024",
+    "Total 1234",
+    "Sept 5, 2021"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "report-2023-12-25.txt",
+   "content": "bad date 99/99/9999 and 25/12/2022 and 31/02/2024",
+   "dates": [
+    "2022-12-25T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2022-12-25T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "99/99/9999",
+    "25/12/2022",
+    "31/02/2024"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "report-2023-12-25.txt",
+   "content": "Version 1.2.3 build 4.5.2010, phone 030-123-4567",
+   "dates": [
+    "2010-05-04T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2010-05-04T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "4.5.2010"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "report-2023-12-25.txt",
+   "content": "Printed 15-Jan-2024; archived 2019_05_06 ; x 05.06.2019_",
+   "dates": [
+    "2024-01-15T00:00:00+00:00",
+    "2019-06-05T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00+00:00",
+    "2019-06-05T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15-Jan-2024",
+    "archived 2019",
+    "05.06.2019"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "report-2023-12-25.txt",
+   "content": "Dates 1.2.20245 2.3.19 and 10/11/12",
+   "dates": [
+    "2019-03-02T00:00:00+00:00",
+    "2012-11-10T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2019-03-02T00:00:00+00:00",
+    "2012-11-10T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "2.3.19",
+    "10/11/12"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "report-2023-12-25.txt",
+   "content": "Today 2024 and Yesterday 2023",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Today 2024",
+    "Yesterday 2023"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "report-2023-12-25.txt",
+   "content": "Rechnung vom 15. März 2024, fällig am 1. April 2024. Gestern 2024 bezahlt.",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15. März 2024",
+    "1. April 2024",
+    "Gestern 2024"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "report-2023-12-25.txt",
+   "content": "Kontoauszug Januar 2024, erstellt 03.02.2024, Jahr 2023",
+   "dates": [
+    "2024-02-03T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-02-03T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Januar 2024",
+    "03.02.2024",
+    "Jahr 2023"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "report-2023-12-25.txt",
+   "content": "Lieferdatum: 5. Dezember 2023 – Vertrag vom 12. Mai 2020",
+   "dates": [
+    "2020-05-12T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2020-05-12T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "5. Dezember 2023",
+    "12. Mai 2020"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "report-2023-12-25.txt",
+   "content": "Facture du 3 février 2024, échéance le 1er mars 2024",
+   "dates": [
+    "2024-02-03T00:00:00+00:00",
+    "2024-03-01T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-02-03T00:00:00+00:00",
+    "2024-03-01T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "3 février 2024",
+    "1er mars 2024"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "report-2023-12-25.txt",
+   "content": "Paris, le 15 août 2022. Mardi 2021",
+   "dates": [
+    "2022-08-15T00:00:00+00:00",
+    "2021-03-15T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2022-08-15T00:00:00+00:00",
+    "2021-03-15T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 août 2022",
+    "Mardi 2021"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "report-2023-12-25.txt",
+   "content": "Factura del 5 de mayo de 2023 y 12 enero 2022",
+   "dates": [
+    "2022-01-12T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2022-01-12T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "12 enero 2022"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "report-2023-12-25.txt",
+   "content": "Fattura del 12 gennaio 2022, scadenza 28 febbraio 2022",
+   "dates": [
+    "2022-01-12T00:00:00+00:00",
+    "2022-02-28T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2022-01-12T00:00:00+00:00",
+    "2022-02-28T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "12 gennaio 2022",
+    "28 febbraio 2022"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "report-2023-12-25.txt",
+   "content": "Lisboa, 7 de outubro de 2021 e 3 dez 2020",
+   "dates": [
+    "2020-12-03T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2020-12-03T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "3 dez 2020"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "report-2023-12-25.txt",
+   "content": "Factuur 14 juni 2023, vervaldatum 1 juli 2023",
+   "dates": [
+    "2023-06-14T00:00:00+00:00",
+    "2023-07-01T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-06-14T00:00:00+00:00",
+    "2023-07-01T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "14 juni 2023",
+    "1 juli 2023"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "report-2023-12-25.txt",
+   "content": "Счёт от 15 марта 2023 г. и 1 апреля 2023",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "марта 2023",
+    "апреля 2023"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "report-2023-12-25.txt",
+   "content": "Faktura ze dne 3. května 2022, splatnost 17. června 2022",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "3. května 2022",
+    "17. června 2022"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "report-2023-12-25.txt",
+   "content": "Faktura z dnia 12 lipca 2021 r.",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "12 lipca 2021"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "report-2023-12-25.txt",
+   "content": "Fatura tarihi 5 Şubat 2024",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "5 Şubat 2024"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "report-2023-12-25.txt",
+   "content": "Faktura 3 januari 2024 och 4 mars 2023",
+   "dates": [
+    "2024-01-03T00:00:00+00:00",
+    "2023-03-04T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-01-03T00:00:00+00:00",
+    "2023-03-04T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "3 januari 2024",
+    "4 mars 2023"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "report-2023-12-25.txt",
+   "content": "",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": []
+  },
+  {
+   "config": 4,
+   "filename": "report-2023-12-25.txt",
+   "content": "no dates here at all",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": []
+  },
+  {
+   "config": 4,
+   "filename": "report-2023-12-25.txt",
+   "content": "20240115 and 2024/1/5 and 5/1/24",
+   "dates": [
+    "2024-01-05T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-01-05T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 and 2024",
+    "5/1/24"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "img_2023.01.02.jpg",
+   "content": "Invoice date: 15 Jan 2024. Due: January 30, 2024. Order 2023-12-01.",
+   "dates": [
+    "2024-01-15T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 Jan 2024",
+    "January 30, 2024",
+    "Order 2023"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "img_2023.01.02.jpg",
+   "content": "Taken on 01/02/2023 and 13/02/2023, also 12.31.2022",
+   "dates": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "01/02/2023",
+    "13/02/2023",
+    "12.31.2022"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "img_2023.01.02.jpg",
+   "content": "Statement for March 2023 issued 1st April 2023",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "March 2023",
+    "1st April 2023"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "img_2023.01.02.jpg",
+   "content": "Monday 2024 report, Total 1234, Sept 5, 2021",
+   "dates": [
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Monday 2024",
+    "Total 1234",
+    "Sept 5, 2021"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "scan_15.03.2024_invoice.pdf",
+   "content": "Invoice date: 15 Jan 2024. Due: January 30, 2024. Order 2023-12-01.",
+   "dates": [
+    "2024-01-15T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 Jan 2024",
+    "January 30, 2024",
+    "Order 2023"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "scan_15.03.2024_invoice.pdf",
+   "content": "Taken on 01/02/2023 and 13/02/2023, also 12.31.2022",
+   "dates": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "01/02/2023",
+    "13/02/2023",
+    "12.31.2022"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "scan_15.03.2024_invoice.pdf",
+   "content": "Statement for March 2023 issued 1st April 2023",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "March 2023",
+    "1st April 2023"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "scan_15.03.2024_invoice.pdf",
+   "content": "Monday 2024 report, Total 1234, Sept 5, 2021",
+   "dates": [
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Monday 2024",
+    "Total 1234",
+    "Sept 5, 2021"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "notes.txt",
+   "content": "Invoice date: 15 Jan 2024. Due: January 30, 2024. Order 2023-12-01.",
+   "dates": [
+    "2024-01-15T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 Jan 2024",
+    "January 30, 2024",
+    "Order 2023"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "notes.txt",
+   "content": "Taken on 01/02/2023 and 13/02/2023, also 12.31.2022",
+   "dates": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "01/02/2023",
+    "13/02/2023",
+    "12.31.2022"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "notes.txt",
+   "content": "Statement for March 2023 issued 1st April 2023",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "March 2023",
+    "1st April 2023"
+   ]
+  },
+  {
+   "config": 4,
+   "filename": "notes.txt",
+   "content": "Monday 2024 report, Total 1234, Sept 5, 2021",
+   "dates": [
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Monday 2024",
+    "Total 1234",
+    "Sept 5, 2021"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "report-2023-12-25.txt",
+   "content": "Invoice date: 15 Jan 2024. Due: January 30, 2024. Order 2023-12-01.",
+   "dates": [
+    "2024-01-15T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 Jan 2024",
+    "January 30, 2024",
+    "Order 2023"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "report-2023-12-25.txt",
+   "content": "Taken on 01/02/2023 and 13/02/2023, also 12.31.2022",
+   "dates": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "01/02/2023",
+    "13/02/2023",
+    "12.31.2022"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "report-2023-12-25.txt",
+   "content": "Statement for March 2023 issued 1st April 2023",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "March 2023",
+    "1st April 2023"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "report-2023-12-25.txt",
+   "content": "Monday 2024 report, Total 1234, Sept 5, 2021",
+   "dates": [
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Monday 2024",
+    "Total 1234",
+    "Sept 5, 2021"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "report-2023-12-25.txt",
+   "content": "bad date 99/99/9999 and 25/12/2022 and 31/02/2024",
+   "dates": [
+    "2022-12-25T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2022-12-25T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "99/99/9999",
+    "25/12/2022",
+    "31/02/2024"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "report-2023-12-25.txt",
+   "content": "Version 1.2.3 build 4.5.2010, phone 030-123-4567",
+   "dates": [
+    "2010-05-04T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2010-05-04T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "4.5.2010"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "report-2023-12-25.txt",
+   "content": "Printed 15-Jan-2024; archived 2019_05_06 ; x 05.06.2019_",
+   "dates": [
+    "2024-01-15T00:00:00+00:00",
+    "2019-06-05T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00+00:00",
+    "2019-06-05T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15-Jan-2024",
+    "archived 2019",
+    "05.06.2019"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "report-2023-12-25.txt",
+   "content": "Dates 1.2.20245 2.3.19 and 10/11/12",
+   "dates": [
+    "2019-03-02T00:00:00+00:00",
+    "2012-11-10T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2019-03-02T00:00:00+00:00",
+    "2012-11-10T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "2.3.19",
+    "10/11/12"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "report-2023-12-25.txt",
+   "content": "Today 2024 and Yesterday 2023",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Today 2024",
+    "Yesterday 2023"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "report-2023-12-25.txt",
+   "content": "Rechnung vom 15. März 2024, fällig am 1. April 2024. Gestern 2024 bezahlt.",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15. März 2024",
+    "1. April 2024",
+    "Gestern 2024"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "report-2023-12-25.txt",
+   "content": "Kontoauszug Januar 2024, erstellt 03.02.2024, Jahr 2023",
+   "dates": [
+    "2024-02-03T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-02-03T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Januar 2024",
+    "03.02.2024",
+    "Jahr 2023"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "report-2023-12-25.txt",
+   "content": "Lieferdatum: 5. Dezember 2023 – Vertrag vom 12. Mai 2020",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "5. Dezember 2023",
+    "12. Mai 2020"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "report-2023-12-25.txt",
+   "content": "Facture du 3 février 2024, échéance le 1er mars 2024",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "3 février 2024",
+    "1er mars 2024"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "report-2023-12-25.txt",
+   "content": "Paris, le 15 août 2022. Mardi 2021",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 août 2022",
+    "Mardi 2021"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "report-2023-12-25.txt",
+   "content": "Factura del 5 de mayo de 2023 y 12 enero 2022",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "12 enero 2022"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "report-2023-12-25.txt",
+   "content": "Fattura del 12 gennaio 2022, scadenza 28 febbraio 2022",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "12 gennaio 2022",
+    "28 febbraio 2022"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "report-2023-12-25.txt",
+   "content": "Lisboa, 7 de outubro de 2021 e 3 dez 2020",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "3 dez 2020"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "report-2023-12-25.txt",
+   "content": "Factuur 14 juni 2023, vervaldatum 1 juli 2023",
+   "dates": [
+    "2023-06-14T00:00:00+00:00",
+    "2023-07-01T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-06-14T00:00:00+00:00",
+    "2023-07-01T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "14 juni 2023",
+    "1 juli 2023"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "report-2023-12-25.txt",
+   "content": "Счёт от 15 марта 2023 г. и 1 апреля 2023",
+   "dates": [
+    "2023-03-01T00:00:00+00:00",
+    "2023-04-01T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-03-01T00:00:00+00:00",
+    "2023-04-01T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "марта 2023",
+    "апреля 2023"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "report-2023-12-25.txt",
+   "content": "Faktura ze dne 3. května 2022, splatnost 17. června 2022",
+   "dates": [
+    "2022-05-03T00:00:00+00:00",
+    "2022-06-17T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2022-05-03T00:00:00+00:00",
+    "2022-06-17T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "3. května 2022",
+    "17. června 2022"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "report-2023-12-25.txt",
+   "content": "Faktura z dnia 12 lipca 2021 r.",
+   "dates": [
+    "2021-07-12T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2021-07-12T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "12 lipca 2021"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "report-2023-12-25.txt",
+   "content": "Fatura tarihi 5 Şubat 2024",
+   "dates": [
+    "2024-02-05T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-02-05T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "5 Şubat 2024"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "report-2023-12-25.txt",
+   "content": "Faktura 3 januari 2024 och 4 mars 2023",
+   "dates": [
+    "2024-01-03T00:00:00+00:00",
+    "2023-03-04T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-01-03T00:00:00+00:00",
+    "2023-03-04T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "3 januari 2024",
+    "4 mars 2023"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "report-2023-12-25.txt",
+   "content": "",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": []
+  },
+  {
+   "config": 5,
+   "filename": "report-2023-12-25.txt",
+   "content": "no dates here at all",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": []
+  },
+  {
+   "config": 5,
+   "filename": "report-2023-12-25.txt",
+   "content": "20240115 and 2024/1/5 and 5/1/24",
+   "dates": [
+    "2024-01-05T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-01-05T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 and 2024",
+    "5/1/24"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "img_2023.01.02.jpg",
+   "content": "Invoice date: 15 Jan 2024. Due: January 30, 2024. Order 2023-12-01.",
+   "dates": [
+    "2024-01-15T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 Jan 2024",
+    "January 30, 2024",
+    "Order 2023"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "img_2023.01.02.jpg",
+   "content": "Taken on 01/02/2023 and 13/02/2023, also 12.31.2022",
+   "dates": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "01/02/2023",
+    "13/02/2023",
+    "12.31.2022"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "img_2023.01.02.jpg",
+   "content": "Statement for March 2023 issued 1st April 2023",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "March 2023",
+    "1st April 2023"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "img_2023.01.02.jpg",
+   "content": "Monday 2024 report, Total 1234, Sept 5, 2021",
+   "dates": [
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Monday 2024",
+    "Total 1234",
+    "Sept 5, 2021"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "scan_15.03.2024_invoice.pdf",
+   "content": "Invoice date: 15 Jan 2024. Due: January 30, 2024. Order 2023-12-01.",
+   "dates": [
+    "2024-01-15T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 Jan 2024",
+    "January 30, 2024",
+    "Order 2023"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "scan_15.03.2024_invoice.pdf",
+   "content": "Taken on 01/02/2023 and 13/02/2023, also 12.31.2022",
+   "dates": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "01/02/2023",
+    "13/02/2023",
+    "12.31.2022"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "scan_15.03.2024_invoice.pdf",
+   "content": "Statement for March 2023 issued 1st April 2023",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "March 2023",
+    "1st April 2023"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "scan_15.03.2024_invoice.pdf",
+   "content": "Monday 2024 report, Total 1234, Sept 5, 2021",
+   "dates": [
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Monday 2024",
+    "Total 1234",
+    "Sept 5, 2021"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "notes.txt",
+   "content": "Invoice date: 15 Jan 2024. Due: January 30, 2024. Order 2023-12-01.",
+   "dates": [
+    "2024-01-15T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 Jan 2024",
+    "January 30, 2024",
+    "Order 2023"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "notes.txt",
+   "content": "Taken on 01/02/2023 and 13/02/2023, also 12.31.2022",
+   "dates": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "01/02/2023",
+    "13/02/2023",
+    "12.31.2022"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "notes.txt",
+   "content": "Statement for March 2023 issued 1st April 2023",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "March 2023",
+    "1st April 2023"
+   ]
+  },
+  {
+   "config": 5,
+   "filename": "notes.txt",
+   "content": "Monday 2024 report, Total 1234, Sept 5, 2021",
+   "dates": [
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Monday 2024",
+    "Total 1234",
+    "Sept 5, 2021"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "report-2023-12-25.txt",
+   "content": "Invoice date: 15 Jan 2024. Due: January 30, 2024. Order 2023-12-01.",
+   "dates": [
+    "2024-01-15T00:00:00+00:00",
+    "2024-01-30T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00+00:00",
+    "2024-01-30T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 Jan 2024",
+    "January 30, 2024",
+    "Order 2023"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "report-2023-12-25.txt",
+   "content": "Taken on 01/02/2023 and 13/02/2023, also 12.31.2022",
+   "dates": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "01/02/2023",
+    "13/02/2023",
+    "12.31.2022"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "report-2023-12-25.txt",
+   "content": "Statement for March 2023 issued 1st April 2023",
+   "dates": [
+    "2023-03-01T00:00:00+00:00",
+    "2023-04-01T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-03-01T00:00:00+00:00",
+    "2023-04-01T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "March 2023",
+    "1st April 2023"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "report-2023-12-25.txt",
+   "content": "Monday 2024 report, Total 1234, Sept 5, 2021",
+   "dates": [
+    "2024-03-15T00:00:00+00:00",
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-03-15T00:00:00+00:00",
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Monday 2024",
+    "Total 1234",
+    "Sept 5, 2021"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "report-2023-12-25.txt",
+   "content": "bad date 99/99/9999 and 25/12/2022 and 31/02/2024",
+   "dates": [],
+   "dates_full": [
+    "2022-12-25T00:00:00+00:00"
+   ],
+   "upstream_timed_out": true,
+   "regex_matches": [
+    "99/99/9999",
+    "25/12/2022",
+    "31/02/2024"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "report-2023-12-25.txt",
+   "content": "Version 1.2.3 build 4.5.2010, phone 030-123-4567",
+   "dates": [
+    "2010-05-04T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2010-05-04T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "4.5.2010"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "report-2023-12-25.txt",
+   "content": "Printed 15-Jan-2024; archived 2019_05_06 ; x 05.06.2019_",
+   "dates": [
+    "2024-01-15T00:00:00+00:00",
+    "2019-06-05T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00+00:00",
+    "2019-06-05T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15-Jan-2024",
+    "archived 2019",
+    "05.06.2019"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "report-2023-12-25.txt",
+   "content": "Dates 1.2.20245 2.3.19 and 10/11/12",
+   "dates": [
+    "2019-03-02T00:00:00+00:00",
+    "2012-11-10T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2019-03-02T00:00:00+00:00",
+    "2012-11-10T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "2.3.19",
+    "10/11/12"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "report-2023-12-25.txt",
+   "content": "Today 2024 and Yesterday 2023",
+   "dates": [
+    "2024-03-15T12:00:00+00:00",
+    "2024-03-14T12:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-03-15T12:00:00+00:00",
+    "2024-03-14T12:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Today 2024",
+    "Yesterday 2023"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "report-2023-12-25.txt",
+   "content": "Rechnung vom 15. März 2024, fällig am 1. April 2024. Gestern 2024 bezahlt.",
+   "dates": [
+    "2024-03-15T00:00:00+00:00",
+    "2024-03-14T12:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-03-15T00:00:00+00:00",
+    "2024-03-14T12:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15. März 2024",
+    "1. April 2024",
+    "Gestern 2024"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "report-2023-12-25.txt",
+   "content": "Kontoauszug Januar 2024, erstellt 03.02.2024, Jahr 2023",
+   "dates": [
+    "2024-01-01T00:00:00+00:00",
+    "2024-02-03T00:00:00+00:00",
+    "2023-03-01T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-01-01T00:00:00+00:00",
+    "2024-02-03T00:00:00+00:00",
+    "2023-03-01T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Januar 2024",
+    "03.02.2024",
+    "Jahr 2023"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "report-2023-12-25.txt",
+   "content": "Lieferdatum: 5. Dezember 2023 – Vertrag vom 12. Mai 2020",
+   "dates": [
+    "2023-12-05T00:00:00+00:00",
+    "2020-05-12T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-12-05T00:00:00+00:00",
+    "2020-05-12T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "5. Dezember 2023",
+    "12. Mai 2020"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "report-2023-12-25.txt",
+   "content": "Facture du 3 février 2024, échéance le 1er mars 2024",
+   "dates": [
+    "2024-02-03T00:00:00+00:00",
+    "2024-03-01T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-02-03T00:00:00+00:00",
+    "2024-03-01T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "3 février 2024",
+    "1er mars 2024"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "report-2023-12-25.txt",
+   "content": "Paris, le 15 août 2022. Mardi 2021",
+   "dates": [
+    "2022-08-15T00:00:00+00:00",
+    "2021-03-15T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2022-08-15T00:00:00+00:00",
+    "2021-03-15T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 août 2022",
+    "Mardi 2021"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "report-2023-12-25.txt",
+   "content": "Factura del 5 de mayo de 2023 y 12 enero 2022",
+   "dates": [
+    "2022-01-12T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2022-01-12T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "12 enero 2022"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "report-2023-12-25.txt",
+   "content": "Fattura del 12 gennaio 2022, scadenza 28 febbraio 2022",
+   "dates": [
+    "2022-01-12T00:00:00+00:00",
+    "2022-02-28T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2022-01-12T00:00:00+00:00",
+    "2022-02-28T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "12 gennaio 2022",
+    "28 febbraio 2022"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "report-2023-12-25.txt",
+   "content": "Lisboa, 7 de outubro de 2021 e 3 dez 2020",
+   "dates": [
+    "2020-12-03T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2020-12-03T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "3 dez 2020"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "report-2023-12-25.txt",
+   "content": "Factuur 14 juni 2023, vervaldatum 1 juli 2023",
+   "dates": [
+    "2023-06-14T00:00:00+00:00",
+    "2023-07-01T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-06-14T00:00:00+00:00",
+    "2023-07-01T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "14 juni 2023",
+    "1 juli 2023"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "report-2023-12-25.txt",
+   "content": "Счёт от 15 марта 2023 г. и 1 апреля 2023",
+   "dates": [
+    "2023-03-01T00:00:00+00:00",
+    "2023-04-01T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-03-01T00:00:00+00:00",
+    "2023-04-01T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "марта 2023",
+    "апреля 2023"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "report-2023-12-25.txt",
+   "content": "Faktura ze dne 3. května 2022, splatnost 17. června 2022",
+   "dates": [
+    "2022-05-03T00:00:00+00:00",
+    "2022-06-17T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2022-05-03T00:00:00+00:00",
+    "2022-06-17T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "3. května 2022",
+    "17. června 2022"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "report-2023-12-25.txt",
+   "content": "Faktura z dnia 12 lipca 2021 r.",
+   "dates": [
+    "2021-07-12T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2021-07-12T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "12 lipca 2021"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "report-2023-12-25.txt",
+   "content": "Fatura tarihi 5 Şubat 2024",
+   "dates": [
+    "2024-02-05T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-02-05T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "5 Şubat 2024"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "report-2023-12-25.txt",
+   "content": "Faktura 3 januari 2024 och 4 mars 2023",
+   "dates": [
+    "2024-01-03T00:00:00+00:00",
+    "2023-03-04T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-01-03T00:00:00+00:00",
+    "2023-03-04T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "3 januari 2024",
+    "4 mars 2023"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "report-2023-12-25.txt",
+   "content": "",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": []
+  },
+  {
+   "config": 6,
+   "filename": "report-2023-12-25.txt",
+   "content": "no dates here at all",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": []
+  },
+  {
+   "config": 6,
+   "filename": "report-2023-12-25.txt",
+   "content": "20240115 and 2024/1/5 and 5/1/24",
+   "dates": [
+    "2024-03-15T00:00:00+00:00",
+    "2024-01-05T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-03-15T00:00:00+00:00",
+    "2024-01-05T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 and 2024",
+    "5/1/24"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "img_2023.01.02.jpg",
+   "content": "Invoice date: 15 Jan 2024. Due: January 30, 2024. Order 2023-12-01.",
+   "dates": [
+    "2024-01-15T00:00:00+00:00",
+    "2024-01-30T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00+00:00",
+    "2024-01-30T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 Jan 2024",
+    "January 30, 2024",
+    "Order 2023"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "img_2023.01.02.jpg",
+   "content": "Taken on 01/02/2023 and 13/02/2023, also 12.31.2022",
+   "dates": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "01/02/2023",
+    "13/02/2023",
+    "12.31.2022"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "img_2023.01.02.jpg",
+   "content": "Statement for March 2023 issued 1st April 2023",
+   "dates": [
+    "2023-03-01T00:00:00+00:00",
+    "2023-04-01T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-03-01T00:00:00+00:00",
+    "2023-04-01T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "March 2023",
+    "1st April 2023"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "img_2023.01.02.jpg",
+   "content": "Monday 2024 report, Total 1234, Sept 5, 2021",
+   "dates": [
+    "2024-03-15T00:00:00+00:00",
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-03-15T00:00:00+00:00",
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Monday 2024",
+    "Total 1234",
+    "Sept 5, 2021"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "scan_15.03.2024_invoice.pdf",
+   "content": "Invoice date: 15 Jan 2024. Due: January 30, 2024. Order 2023-12-01.",
+   "dates": [
+    "2024-01-15T00:00:00+00:00",
+    "2024-01-30T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00+00:00",
+    "2024-01-30T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 Jan 2024",
+    "January 30, 2024",
+    "Order 2023"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "scan_15.03.2024_invoice.pdf",
+   "content": "Taken on 01/02/2023 and 13/02/2023, also 12.31.2022",
+   "dates": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "01/02/2023",
+    "13/02/2023",
+    "12.31.2022"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "scan_15.03.2024_invoice.pdf",
+   "content": "Statement for March 2023 issued 1st April 2023",
+   "dates": [
+    "2023-03-01T00:00:00+00:00",
+    "2023-04-01T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-03-01T00:00:00+00:00",
+    "2023-04-01T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "March 2023",
+    "1st April 2023"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "scan_15.03.2024_invoice.pdf",
+   "content": "Monday 2024 report, Total 1234, Sept 5, 2021",
+   "dates": [
+    "2024-03-15T00:00:00+00:00",
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-03-15T00:00:00+00:00",
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Monday 2024",
+    "Total 1234",
+    "Sept 5, 2021"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "notes.txt",
+   "content": "Invoice date: 15 Jan 2024. Due: January 30, 2024. Order 2023-12-01.",
+   "dates": [
+    "2024-01-15T00:00:00+00:00",
+    "2024-01-30T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00+00:00",
+    "2024-01-30T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 Jan 2024",
+    "January 30, 2024",
+    "Order 2023"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "notes.txt",
+   "content": "Taken on 01/02/2023 and 13/02/2023, also 12.31.2022",
+   "dates": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "01/02/2023",
+    "13/02/2023",
+    "12.31.2022"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "notes.txt",
+   "content": "Statement for March 2023 issued 1st April 2023",
+   "dates": [
+    "2023-03-01T00:00:00+00:00",
+    "2023-04-01T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-03-01T00:00:00+00:00",
+    "2023-04-01T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "March 2023",
+    "1st April 2023"
+   ]
+  },
+  {
+   "config": 6,
+   "filename": "notes.txt",
+   "content": "Monday 2024 report, Total 1234, Sept 5, 2021",
+   "dates": [
+    "2024-03-15T00:00:00+00:00",
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-03-15T00:00:00+00:00",
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Monday 2024",
+    "Total 1234",
+    "Sept 5, 2021"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "report-2023-12-25.txt",
+   "content": "Invoice date: 15 Jan 2024. Due: January 30, 2024. Order 2023-12-01.",
+   "dates": [
+    "2024-01-15T00:00:00+00:00",
+    "2024-01-30T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00+00:00",
+    "2024-01-30T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 Jan 2024",
+    "January 30, 2024",
+    "Order 2023"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "report-2023-12-25.txt",
+   "content": "Taken on 01/02/2023 and 13/02/2023, also 12.31.2022",
+   "dates": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00",
+    "2022-12-31T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00",
+    "2022-12-31T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "01/02/2023",
+    "13/02/2023",
+    "12.31.2022"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "report-2023-12-25.txt",
+   "content": "Statement for March 2023 issued 1st April 2023",
+   "dates": [
+    "2023-03-01T00:00:00+00:00",
+    "2023-04-01T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-03-01T00:00:00+00:00",
+    "2023-04-01T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "March 2023",
+    "1st April 2023"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "report-2023-12-25.txt",
+   "content": "Monday 2024 report, Total 1234, Sept 5, 2021",
+   "dates": [
+    "2024-03-15T00:00:00+00:00",
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-03-15T00:00:00+00:00",
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Monday 2024",
+    "Total 1234",
+    "Sept 5, 2021"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "report-2023-12-25.txt",
+   "content": "bad date 99/99/9999 and 25/12/2022 and 31/02/2024",
+   "dates": [
+    "2022-12-25T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2022-12-25T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "99/99/9999",
+    "25/12/2022",
+    "31/02/2024"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "report-2023-12-25.txt",
+   "content": "Version 1.2.3 build 4.5.2010, phone 030-123-4567",
+   "dates": [
+    "2010-04-05T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2010-04-05T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "4.5.2010"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "report-2023-12-25.txt",
+   "content": "Printed 15-Jan-2024; archived 2019_05_06 ; x 05.06.2019_",
+   "dates": [
+    "2024-01-15T00:00:00+00:00",
+    "2019-06-05T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00+00:00",
+    "2019-06-05T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15-Jan-2024",
+    "archived 2019",
+    "05.06.2019"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "report-2023-12-25.txt",
+   "content": "Dates 1.2.20245 2.3.19 and 10/11/12",
+   "dates": [
+    "2019-02-03T00:00:00+00:00",
+    "2010-11-12T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2019-02-03T00:00:00+00:00",
+    "2010-11-12T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "2.3.19",
+    "10/11/12"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "report-2023-12-25.txt",
+   "content": "Today 2024 and Yesterday 2023",
+   "dates": [
+    "2024-03-15T12:00:00+00:00",
+    "2024-03-14T12:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-03-15T12:00:00+00:00",
+    "2024-03-14T12:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Today 2024",
+    "Yesterday 2023"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "report-2023-12-25.txt",
+   "content": "Rechnung vom 15. März 2024, fällig am 1. April 2024. Gestern 2024 bezahlt.",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15. März 2024",
+    "1. April 2024",
+    "Gestern 2024"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "report-2023-12-25.txt",
+   "content": "Kontoauszug Januar 2024, erstellt 03.02.2024, Jahr 2023",
+   "dates": [
+    "2024-02-03T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-02-03T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Januar 2024",
+    "03.02.2024",
+    "Jahr 2023"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "report-2023-12-25.txt",
+   "content": "Lieferdatum: 5. Dezember 2023 – Vertrag vom 12. Mai 2020",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "5. Dezember 2023",
+    "12. Mai 2020"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "report-2023-12-25.txt",
+   "content": "Facture du 3 février 2024, échéance le 1er mars 2024",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "3 février 2024",
+    "1er mars 2024"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "report-2023-12-25.txt",
+   "content": "Paris, le 15 août 2022. Mardi 2021",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 août 2022",
+    "Mardi 2021"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "report-2023-12-25.txt",
+   "content": "Factura del 5 de mayo de 2023 y 12 enero 2022",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "12 enero 2022"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "report-2023-12-25.txt",
+   "content": "Fattura del 12 gennaio 2022, scadenza 28 febbraio 2022",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "12 gennaio 2022",
+    "28 febbraio 2022"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "report-2023-12-25.txt",
+   "content": "Lisboa, 7 de outubro de 2021 e 3 dez 2020",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "3 dez 2020"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "report-2023-12-25.txt",
+   "content": "Factuur 14 juni 2023, vervaldatum 1 juli 2023",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "14 juni 2023",
+    "1 juli 2023"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "report-2023-12-25.txt",
+   "content": "Счёт от 15 марта 2023 г. и 1 апреля 2023",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "марта 2023",
+    "апреля 2023"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "report-2023-12-25.txt",
+   "content": "Faktura ze dne 3. května 2022, splatnost 17. června 2022",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "3. května 2022",
+    "17. června 2022"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "report-2023-12-25.txt",
+   "content": "Faktura z dnia 12 lipca 2021 r.",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "12 lipca 2021"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "report-2023-12-25.txt",
+   "content": "Fatura tarihi 5 Şubat 2024",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "5 Şubat 2024"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "report-2023-12-25.txt",
+   "content": "Faktura 3 januari 2024 och 4 mars 2023",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "3 januari 2024",
+    "4 mars 2023"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "report-2023-12-25.txt",
+   "content": "",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": []
+  },
+  {
+   "config": 7,
+   "filename": "report-2023-12-25.txt",
+   "content": "no dates here at all",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": []
+  },
+  {
+   "config": 7,
+   "filename": "report-2023-12-25.txt",
+   "content": "20240115 and 2024/1/5 and 5/1/24",
+   "dates": [],
+   "dates_full": [],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 and 2024",
+    "5/1/24"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "img_2023.01.02.jpg",
+   "content": "Invoice date: 15 Jan 2024. Due: January 30, 2024. Order 2023-12-01.",
+   "dates": [
+    "2024-01-15T00:00:00+00:00",
+    "2024-01-30T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00+00:00",
+    "2024-01-30T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 Jan 2024",
+    "January 30, 2024",
+    "Order 2023"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "img_2023.01.02.jpg",
+   "content": "Taken on 01/02/2023 and 13/02/2023, also 12.31.2022",
+   "dates": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00",
+    "2022-12-31T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00",
+    "2022-12-31T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "01/02/2023",
+    "13/02/2023",
+    "12.31.2022"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "img_2023.01.02.jpg",
+   "content": "Statement for March 2023 issued 1st April 2023",
+   "dates": [
+    "2023-03-01T00:00:00+00:00",
+    "2023-04-01T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-03-01T00:00:00+00:00",
+    "2023-04-01T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "March 2023",
+    "1st April 2023"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "img_2023.01.02.jpg",
+   "content": "Monday 2024 report, Total 1234, Sept 5, 2021",
+   "dates": [
+    "2024-03-15T00:00:00+00:00",
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-03-15T00:00:00+00:00",
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Monday 2024",
+    "Total 1234",
+    "Sept 5, 2021"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "scan_15.03.2024_invoice.pdf",
+   "content": "Invoice date: 15 Jan 2024. Due: January 30, 2024. Order 2023-12-01.",
+   "dates": [
+    "2024-01-15T00:00:00+00:00",
+    "2024-01-30T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00+00:00",
+    "2024-01-30T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 Jan 2024",
+    "January 30, 2024",
+    "Order 2023"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "scan_15.03.2024_invoice.pdf",
+   "content": "Taken on 01/02/2023 and 13/02/2023, also 12.31.2022",
+   "dates": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00",
+    "2022-12-31T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00",
+    "2022-12-31T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "01/02/2023",
+    "13/02/2023",
+    "12.31.2022"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "scan_15.03.2024_invoice.pdf",
+   "content": "Statement for March 2023 issued 1st April 2023",
+   "dates": [
+    "2023-03-01T00:00:00+00:00",
+    "2023-04-01T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-03-01T00:00:00+00:00",
+    "2023-04-01T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "March 2023",
+    "1st April 2023"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "scan_15.03.2024_invoice.pdf",
+   "content": "Monday 2024 report, Total 1234, Sept 5, 2021",
+   "dates": [
+    "2024-03-15T00:00:00+00:00",
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-03-15T00:00:00+00:00",
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Monday 2024",
+    "Total 1234",
+    "Sept 5, 2021"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "notes.txt",
+   "content": "Invoice date: 15 Jan 2024. Due: January 30, 2024. Order 2023-12-01.",
+   "dates": [
+    "2024-01-15T00:00:00+00:00",
+    "2024-01-30T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-01-15T00:00:00+00:00",
+    "2024-01-30T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "15 Jan 2024",
+    "January 30, 2024",
+    "Order 2023"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "notes.txt",
+   "content": "Taken on 01/02/2023 and 13/02/2023, also 12.31.2022",
+   "dates": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00",
+    "2022-12-31T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-02-01T00:00:00+00:00",
+    "2023-02-13T00:00:00+00:00",
+    "2022-12-31T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "01/02/2023",
+    "13/02/2023",
+    "12.31.2022"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "notes.txt",
+   "content": "Statement for March 2023 issued 1st April 2023",
+   "dates": [
+    "2023-03-01T00:00:00+00:00",
+    "2023-04-01T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2023-03-01T00:00:00+00:00",
+    "2023-04-01T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "March 2023",
+    "1st April 2023"
+   ]
+  },
+  {
+   "config": 7,
+   "filename": "notes.txt",
+   "content": "Monday 2024 report, Total 1234, Sept 5, 2021",
+   "dates": [
+    "2024-03-15T00:00:00+00:00",
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "dates_full": [
+    "2024-03-15T00:00:00+00:00",
+    "2021-09-05T00:00:00+00:00"
+   ],
+   "upstream_timed_out": false,
+   "regex_matches": [
+    "Monday 2024",
+    "Total 1234",
+    "Sept 5, 2021"
+   ]
+  }
+ ],
+ "parse_string": [
+  {
+   "config": 0,
+   "string": "15/01/2024",
+   "order": "DMY",
+   "result": "2024-01-15T00:00:00+00:00"
+  },
+  {
+   "config": 0,
+   "string": "01/15/2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "2024/01/15",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "January 15, 2024",
+   "order": "DMY",
+   "result": "2024-01-15T00:00:00+00:00"
+  },
+  {
+   "config": 0,
+   "string": "15 Jan 2024",
+   "order": "DMY",
+   "result": "2024-01-15T00:00:00+00:00"
+  },
+  {
+   "config": 0,
+   "string": "15.01.2024",
+   "order": "DMY",
+   "result": "2024-01-15T00:00:00+00:00"
+  },
+  {
+   "config": 0,
+   "string": "2024-01-15",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "not a date",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "32/13/2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "abc123xyz",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "99/99/9999",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "11.01.10",
+   "order": "DMY",
+   "result": "2010-01-11T00:00:00+00:00"
+  },
+  {
+   "config": 0,
+   "string": "15.01 2024",
+   "order": "DMY",
+   "result": "2024-03-15T15:01:00+00:00"
+  },
+  {
+   "config": 0,
+   "string": "March 2024",
+   "order": "DMY",
+   "result": "2024-03-01T00:00:00+00:00"
+  },
+  {
+   "config": 0,
+   "string": "Monday 2024",
+   "order": "DMY",
+   "result": "2024-03-15T00:00:00+00:00"
+  },
+  {
+   "config": 0,
+   "string": "Gestern 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "Heute 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "1st April 2023",
+   "order": "DMY",
+   "result": "2023-04-01T00:00:00+00:00"
+  },
+  {
+   "config": 0,
+   "string": "UTC 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "Jan 2024 EST",
+   "order": "DMY",
+   "result": "2024-01-01T05:00:00+00:00"
+  },
+  {
+   "config": 0,
+   "string": "January 30, 2024",
+   "order": "DMY",
+   "result": "2024-01-30T00:00:00+00:00"
+  },
+  {
+   "config": 0,
+   "string": "Order 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "01/02/2023",
+   "order": "DMY",
+   "result": "2023-02-01T00:00:00+00:00"
+  },
+  {
+   "config": 0,
+   "string": "13/02/2023",
+   "order": "DMY",
+   "result": "2023-02-13T00:00:00+00:00"
+  },
+  {
+   "config": 0,
+   "string": "12.31.2022",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "March 2023",
+   "order": "DMY",
+   "result": "2023-03-01T00:00:00+00:00"
+  },
+  {
+   "config": 0,
+   "string": "Total 1234",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "Sept 5, 2021",
+   "order": "DMY",
+   "result": "2021-09-05T00:00:00+00:00"
+  },
+  {
+   "config": 0,
+   "string": "25/12/2022",
+   "order": "DMY",
+   "result": "2022-12-25T00:00:00+00:00"
+  },
+  {
+   "config": 0,
+   "string": "31/02/2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "4.5.2010",
+   "order": "DMY",
+   "result": "2010-05-04T00:00:00+00:00"
+  },
+  {
+   "config": 0,
+   "string": "15-Jan-2024",
+   "order": "DMY",
+   "result": "2024-01-15T00:00:00+00:00"
+  },
+  {
+   "config": 0,
+   "string": "archived 2019",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "05.06.2019",
+   "order": "DMY",
+   "result": "2019-06-05T00:00:00+00:00"
+  },
+  {
+   "config": 0,
+   "string": "2.3.19",
+   "order": "DMY",
+   "result": "2019-03-02T00:00:00+00:00"
+  },
+  {
+   "config": 0,
+   "string": "10/11/12",
+   "order": "DMY",
+   "result": "2012-11-10T00:00:00+00:00"
+  },
+  {
+   "config": 0,
+   "string": "Today 2024",
+   "order": "DMY",
+   "result": "2024-03-15T12:00:00+00:00"
+  },
+  {
+   "config": 0,
+   "string": "Yesterday 2023",
+   "order": "DMY",
+   "result": "2024-03-14T12:00:00+00:00"
+  },
+  {
+   "config": 0,
+   "string": "15. März 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "1. April 2024",
+   "order": "DMY",
+   "result": "2024-04-01T00:00:00+00:00"
+  },
+  {
+   "config": 0,
+   "string": "Januar 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "03.02.2024",
+   "order": "DMY",
+   "result": "2024-02-03T00:00:00+00:00"
+  },
+  {
+   "config": 0,
+   "string": "Jahr 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "5. Dezember 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "12. Mai 2020",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "3 février 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "1er mars 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "15 août 2022",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "Mardi 2021",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "12 enero 2022",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "12 gennaio 2022",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "28 febbraio 2022",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "3 dez 2020",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "14 juni 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "1 juli 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "марта 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "апреля 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "3. května 2022",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "17. června 2022",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "12 lipca 2021",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "5 Şubat 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "3 januari 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "4 mars 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 0,
+   "string": "15 and 2024",
+   "order": "DMY",
+   "result": "2024-03-15T00:00:00+00:00"
+  },
+  {
+   "config": 0,
+   "string": "5/1/24",
+   "order": "DMY",
+   "result": "2024-01-05T00:00:00+00:00"
+  },
+  {
+   "config": 1,
+   "string": "15/01/2024",
+   "order": "DMY",
+   "result": "2024-01-15T00:00:00+01:00"
+  },
+  {
+   "config": 1,
+   "string": "01/15/2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 1,
+   "string": "2024/01/15",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 1,
+   "string": "January 15, 2024",
+   "order": "DMY",
+   "result": "2024-01-15T00:00:00+01:00"
+  },
+  {
+   "config": 1,
+   "string": "15 Jan 2024",
+   "order": "DMY",
+   "result": "2024-01-15T00:00:00+01:00"
+  },
+  {
+   "config": 1,
+   "string": "15.01.2024",
+   "order": "DMY",
+   "result": "2024-01-15T00:00:00+01:00"
+  },
+  {
+   "config": 1,
+   "string": "2024-01-15",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 1,
+   "string": "not a date",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 1,
+   "string": "32/13/2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 1,
+   "string": "",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 1,
+   "string": "abc123xyz",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 1,
+   "string": "99/99/9999",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 1,
+   "string": "11.01.10",
+   "order": "DMY",
+   "result": "2010-01-11T00:00:00+01:00"
+  },
+  {
+   "config": 1,
+   "string": "15.01 2024",
+   "order": "DMY",
+   "result": "2024-03-15T15:01:00+01:00"
+  },
+  {
+   "config": 1,
+   "string": "March 2024",
+   "order": "DMY",
+   "result": "2024-03-01T00:00:00+01:00"
+  },
+  {
+   "config": 1,
+   "string": "Monday 2024",
+   "order": "DMY",
+   "result": "2024-03-15T00:00:00+01:00"
+  },
+  {
+   "config": 1,
+   "string": "Gestern 2024",
+   "order": "DMY",
+   "result": "2024-03-14T13:00:00+01:00"
+  },
+  {
+   "config": 1,
+   "string": "Heute 2024",
+   "order": "DMY",
+   "result": "2024-03-15T13:00:00+01:00"
+  },
+  {
+   "config": 1,
+   "string": "1st April 2023",
+   "order": "DMY",
+   "result": "2023-04-01T00:00:00+02:00"
+  },
+  {
+   "config": 1,
+   "string": "UTC 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 1,
+   "string": "Jan 2024 EST",
+   "order": "DMY",
+   "result": "2024-01-01T06:00:00+01:00"
+  },
+  {
+   "config": 1,
+   "string": "January 30, 2024",
+   "order": "DMY",
+   "result": "2024-01-30T00:00:00+01:00"
+  },
+  {
+   "config": 1,
+   "string": "Order 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 1,
+   "string": "01/02/2023",
+   "order": "DMY",
+   "result": "2023-02-01T00:00:00+01:00"
+  },
+  {
+   "config": 1,
+   "string": "13/02/2023",
+   "order": "DMY",
+   "result": "2023-02-13T00:00:00+01:00"
+  },
+  {
+   "config": 1,
+   "string": "12.31.2022",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 1,
+   "string": "March 2023",
+   "order": "DMY",
+   "result": "2023-03-01T00:00:00+01:00"
+  },
+  {
+   "config": 1,
+   "string": "Total 1234",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 1,
+   "string": "Sept 5, 2021",
+   "order": "DMY",
+   "result": "2021-09-05T00:00:00+02:00"
+  },
+  {
+   "config": 1,
+   "string": "25/12/2022",
+   "order": "DMY",
+   "result": "2022-12-25T00:00:00+01:00"
+  },
+  {
+   "config": 1,
+   "string": "31/02/2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 1,
+   "string": "4.5.2010",
+   "order": "DMY",
+   "result": "2010-05-04T00:00:00+02:00"
+  },
+  {
+   "config": 1,
+   "string": "15-Jan-2024",
+   "order": "DMY",
+   "result": "2024-01-15T00:00:00+01:00"
+  },
+  {
+   "config": 1,
+   "string": "archived 2019",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 1,
+   "string": "05.06.2019",
+   "order": "DMY",
+   "result": "2019-06-05T00:00:00+02:00"
+  },
+  {
+   "config": 1,
+   "string": "2.3.19",
+   "order": "DMY",
+   "result": "2019-03-02T00:00:00+01:00"
+  },
+  {
+   "config": 1,
+   "string": "10/11/12",
+   "order": "DMY",
+   "result": "2012-11-10T00:00:00+01:00"
+  },
+  {
+   "config": 1,
+   "string": "Today 2024",
+   "order": "DMY",
+   "result": "2024-03-15T13:00:00+01:00"
+  },
+  {
+   "config": 1,
+   "string": "Yesterday 2023",
+   "order": "DMY",
+   "result": "2024-03-14T13:00:00+01:00"
+  },
+  {
+   "config": 1,
+   "string": "15. März 2024",
+   "order": "DMY",
+   "result": "2024-03-15T00:00:00+01:00"
+  },
+  {
+   "config": 1,
+   "string": "1. April 2024",
+   "order": "DMY",
+   "result": "2024-04-01T00:00:00+02:00"
+  },
+  {
+   "config": 1,
+   "string": "Januar 2024",
+   "order": "DMY",
+   "result": "2024-01-01T00:00:00+01:00"
+  },
+  {
+   "config": 1,
+   "string": "03.02.2024",
+   "order": "DMY",
+   "result": "2024-02-03T00:00:00+01:00"
+  },
+  {
+   "config": 1,
+   "string": "Jahr 2023",
+   "order": "DMY",
+   "result": "2023-03-01T00:00:00+01:00"
+  },
+  {
+   "config": 1,
+   "string": "5. Dezember 2023",
+   "order": "DMY",
+   "result": "2023-12-05T00:00:00+01:00"
+  },
+  {
+   "config": 1,
+   "string": "12. Mai 2020",
+   "order": "DMY",
+   "result": "2020-05-12T00:00:00+02:00"
+  },
+  {
+   "config": 1,
+   "string": "3 février 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 1,
+   "string": "1er mars 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 1,
+   "string": "15 août 2022",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 1,
+   "string": "Mardi 2021",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 1,
+   "string": "12 enero 2022",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 1,
+   "string": "12 gennaio 2022",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 1,
+   "string": "28 febbraio 2022",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 1,
+   "string": "3 dez 2020",
+   "order": "DMY",
+   "result": "2020-12-03T00:00:00+01:00"
+  },
+  {
+   "config": 1,
+   "string": "14 juni 2023",
+   "order": "DMY",
+   "result": "2023-06-14T00:00:00+02:00"
+  },
+  {
+   "config": 1,
+   "string": "1 juli 2023",
+   "order": "DMY",
+   "result": "2023-07-01T00:00:00+02:00"
+  },
+  {
+   "config": 1,
+   "string": "марта 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 1,
+   "string": "апреля 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 1,
+   "string": "3. května 2022",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 1,
+   "string": "17. června 2022",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 1,
+   "string": "12 lipca 2021",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 1,
+   "string": "5 Şubat 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 1,
+   "string": "3 januari 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 1,
+   "string": "4 mars 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 1,
+   "string": "15 and 2024",
+   "order": "DMY",
+   "result": "2024-03-15T00:00:00+01:00"
+  },
+  {
+   "config": 1,
+   "string": "5/1/24",
+   "order": "DMY",
+   "result": "2024-01-05T00:00:00+01:00"
+  },
+  {
+   "config": 2,
+   "string": "15/01/2024",
+   "order": "DMY",
+   "result": "2024-01-15T00:00:00+01:00"
+  },
+  {
+   "config": 2,
+   "string": "01/15/2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "2024/01/15",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "January 15, 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "15 Jan 2024",
+   "order": "DMY",
+   "result": "2024-01-15T00:00:00+01:00"
+  },
+  {
+   "config": 2,
+   "string": "15.01.2024",
+   "order": "DMY",
+   "result": "2024-01-15T00:00:00+01:00"
+  },
+  {
+   "config": 2,
+   "string": "2024-01-15",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "not a date",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "32/13/2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "abc123xyz",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "99/99/9999",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "11.01.10",
+   "order": "DMY",
+   "result": "2010-01-11T00:00:00+01:00"
+  },
+  {
+   "config": 2,
+   "string": "15.01 2024",
+   "order": "DMY",
+   "result": "2024-03-15T15:01:00+01:00"
+  },
+  {
+   "config": 2,
+   "string": "March 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "Monday 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "Gestern 2024",
+   "order": "DMY",
+   "result": "2024-03-14T13:00:00+01:00"
+  },
+  {
+   "config": 2,
+   "string": "Heute 2024",
+   "order": "DMY",
+   "result": "2024-03-15T13:00:00+01:00"
+  },
+  {
+   "config": 2,
+   "string": "1st April 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "UTC 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "Jan 2024 EST",
+   "order": "DMY",
+   "result": "2024-01-01T06:00:00+01:00"
+  },
+  {
+   "config": 2,
+   "string": "January 30, 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "Order 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "01/02/2023",
+   "order": "DMY",
+   "result": "2023-02-01T00:00:00+01:00"
+  },
+  {
+   "config": 2,
+   "string": "13/02/2023",
+   "order": "DMY",
+   "result": "2023-02-13T00:00:00+01:00"
+  },
+  {
+   "config": 2,
+   "string": "12.31.2022",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "March 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "Total 1234",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "Sept 5, 2021",
+   "order": "DMY",
+   "result": "2021-09-05T00:00:00+02:00"
+  },
+  {
+   "config": 2,
+   "string": "25/12/2022",
+   "order": "DMY",
+   "result": "2022-12-25T00:00:00+01:00"
+  },
+  {
+   "config": 2,
+   "string": "31/02/2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "4.5.2010",
+   "order": "DMY",
+   "result": "2010-05-04T00:00:00+02:00"
+  },
+  {
+   "config": 2,
+   "string": "15-Jan-2024",
+   "order": "DMY",
+   "result": "2024-01-15T00:00:00+01:00"
+  },
+  {
+   "config": 2,
+   "string": "archived 2019",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "05.06.2019",
+   "order": "DMY",
+   "result": "2019-06-05T00:00:00+02:00"
+  },
+  {
+   "config": 2,
+   "string": "2.3.19",
+   "order": "DMY",
+   "result": "2019-03-02T00:00:00+01:00"
+  },
+  {
+   "config": 2,
+   "string": "10/11/12",
+   "order": "DMY",
+   "result": "2012-11-10T00:00:00+01:00"
+  },
+  {
+   "config": 2,
+   "string": "Today 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "Yesterday 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "15. März 2024",
+   "order": "DMY",
+   "result": "2024-03-15T00:00:00+01:00"
+  },
+  {
+   "config": 2,
+   "string": "1. April 2024",
+   "order": "DMY",
+   "result": "2024-04-01T00:00:00+02:00"
+  },
+  {
+   "config": 2,
+   "string": "Januar 2024",
+   "order": "DMY",
+   "result": "2024-01-01T00:00:00+01:00"
+  },
+  {
+   "config": 2,
+   "string": "03.02.2024",
+   "order": "DMY",
+   "result": "2024-02-03T00:00:00+01:00"
+  },
+  {
+   "config": 2,
+   "string": "Jahr 2023",
+   "order": "DMY",
+   "result": "2023-03-01T00:00:00+01:00"
+  },
+  {
+   "config": 2,
+   "string": "5. Dezember 2023",
+   "order": "DMY",
+   "result": "2023-12-05T00:00:00+01:00"
+  },
+  {
+   "config": 2,
+   "string": "12. Mai 2020",
+   "order": "DMY",
+   "result": "2020-05-12T00:00:00+02:00"
+  },
+  {
+   "config": 2,
+   "string": "3 février 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "1er mars 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "15 août 2022",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "Mardi 2021",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "12 enero 2022",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "12 gennaio 2022",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "28 febbraio 2022",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "3 dez 2020",
+   "order": "DMY",
+   "result": "2020-12-03T00:00:00+01:00"
+  },
+  {
+   "config": 2,
+   "string": "14 juni 2023",
+   "order": "DMY",
+   "result": "2023-06-14T00:00:00+02:00"
+  },
+  {
+   "config": 2,
+   "string": "1 juli 2023",
+   "order": "DMY",
+   "result": "2023-07-01T00:00:00+02:00"
+  },
+  {
+   "config": 2,
+   "string": "марта 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "апреля 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "3. května 2022",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "17. června 2022",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "12 lipca 2021",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "5 Şubat 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "3 januari 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "4 mars 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "15 and 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 2,
+   "string": "5/1/24",
+   "order": "DMY",
+   "result": "2024-01-05T00:00:00+01:00"
+  },
+  {
+   "config": 3,
+   "string": "15/01/2024",
+   "order": "MDY",
+   "result": "2024-01-15T00:00:00-05:00"
+  },
+  {
+   "config": 3,
+   "string": "01/15/2024",
+   "order": "MDY",
+   "result": "2024-01-15T00:00:00-05:00"
+  },
+  {
+   "config": 3,
+   "string": "2024/01/15",
+   "order": "MDY",
+   "result": "2024-01-15T00:00:00-05:00"
+  },
+  {
+   "config": 3,
+   "string": "January 15, 2024",
+   "order": "MDY",
+   "result": "2024-01-15T00:00:00-05:00"
+  },
+  {
+   "config": 3,
+   "string": "15 Jan 2024",
+   "order": "MDY",
+   "result": "2024-01-15T00:00:00-05:00"
+  },
+  {
+   "config": 3,
+   "string": "15.01.2024",
+   "order": "MDY",
+   "result": "2024-01-15T00:00:00-05:00"
+  },
+  {
+   "config": 3,
+   "string": "2024-01-15",
+   "order": "MDY",
+   "result": "2024-01-15T00:00:00-05:00"
+  },
+  {
+   "config": 3,
+   "string": "not a date",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "32/13/2024",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "abc123xyz",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "99/99/9999",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "11.01.10",
+   "order": "MDY",
+   "result": "2010-11-01T00:00:00-04:00"
+  },
+  {
+   "config": 3,
+   "string": "15.01 2024",
+   "order": "MDY",
+   "result": "2024-03-15T15:01:00-04:00"
+  },
+  {
+   "config": 3,
+   "string": "March 2024",
+   "order": "MDY",
+   "result": "2024-03-01T00:00:00-05:00"
+  },
+  {
+   "config": 3,
+   "string": "Monday 2024",
+   "order": "MDY",
+   "result": "2024-03-15T00:00:00-04:00"
+  },
+  {
+   "config": 3,
+   "string": "Gestern 2024",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "Heute 2024",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "1st April 2023",
+   "order": "MDY",
+   "result": "2023-04-01T00:00:00-04:00"
+  },
+  {
+   "config": 3,
+   "string": "UTC 2024",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "Jan 2024 EST",
+   "order": "MDY",
+   "result": "2024-01-01T00:00:00-05:00"
+  },
+  {
+   "config": 3,
+   "string": "January 30, 2024",
+   "order": "MDY",
+   "result": "2024-01-30T00:00:00-05:00"
+  },
+  {
+   "config": 3,
+   "string": "Order 2023",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "01/02/2023",
+   "order": "MDY",
+   "result": "2023-01-02T00:00:00-05:00"
+  },
+  {
+   "config": 3,
+   "string": "13/02/2023",
+   "order": "MDY",
+   "result": "2023-02-13T00:00:00-05:00"
+  },
+  {
+   "config": 3,
+   "string": "12.31.2022",
+   "order": "MDY",
+   "result": "2022-12-31T00:00:00-05:00"
+  },
+  {
+   "config": 3,
+   "string": "March 2023",
+   "order": "MDY",
+   "result": "2023-03-01T00:00:00-05:00"
+  },
+  {
+   "config": 3,
+   "string": "Total 1234",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "Sept 5, 2021",
+   "order": "MDY",
+   "result": "2021-09-05T00:00:00-04:00"
+  },
+  {
+   "config": 3,
+   "string": "25/12/2022",
+   "order": "MDY",
+   "result": "2022-12-25T00:00:00-05:00"
+  },
+  {
+   "config": 3,
+   "string": "31/02/2024",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "4.5.2010",
+   "order": "MDY",
+   "result": "2010-04-05T00:00:00-04:00"
+  },
+  {
+   "config": 3,
+   "string": "15-Jan-2024",
+   "order": "MDY",
+   "result": "2024-01-15T00:00:00-05:00"
+  },
+  {
+   "config": 3,
+   "string": "archived 2019",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "05.06.2019",
+   "order": "MDY",
+   "result": "2019-05-06T00:00:00-04:00"
+  },
+  {
+   "config": 3,
+   "string": "2.3.19",
+   "order": "MDY",
+   "result": "2019-02-03T00:00:00-05:00"
+  },
+  {
+   "config": 3,
+   "string": "10/11/12",
+   "order": "MDY",
+   "result": "2012-10-11T00:00:00-04:00"
+  },
+  {
+   "config": 3,
+   "string": "Today 2024",
+   "order": "MDY",
+   "result": "2024-03-15T08:00:00-04:00"
+  },
+  {
+   "config": 3,
+   "string": "Yesterday 2023",
+   "order": "MDY",
+   "result": "2024-03-14T08:00:00-04:00"
+  },
+  {
+   "config": 3,
+   "string": "15. März 2024",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "1. April 2024",
+   "order": "MDY",
+   "result": "2024-04-01T00:00:00-04:00"
+  },
+  {
+   "config": 3,
+   "string": "Januar 2024",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "03.02.2024",
+   "order": "MDY",
+   "result": "2024-03-02T00:00:00-05:00"
+  },
+  {
+   "config": 3,
+   "string": "Jahr 2023",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "5. Dezember 2023",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "12. Mai 2020",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "3 février 2024",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "1er mars 2024",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "15 août 2022",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "Mardi 2021",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "12 enero 2022",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "12 gennaio 2022",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "28 febbraio 2022",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "3 dez 2020",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "14 juni 2023",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "1 juli 2023",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "марта 2023",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "апреля 2023",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "3. května 2022",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "17. června 2022",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "12 lipca 2021",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "5 Şubat 2024",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "3 januari 2024",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "4 mars 2023",
+   "order": "MDY",
+   "result": null
+  },
+  {
+   "config": 3,
+   "string": "15 and 2024",
+   "order": "MDY",
+   "result": "2024-03-15T00:00:00-04:00"
+  },
+  {
+   "config": 3,
+   "string": "5/1/24",
+   "order": "MDY",
+   "result": "2024-05-01T00:00:00-04:00"
+  },
+  {
+   "config": 4,
+   "string": "15/01/2024",
+   "order": "DMY",
+   "result": "2024-01-15T00:00:00+00:00"
+  },
+  {
+   "config": 4,
+   "string": "01/15/2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "2024/01/15",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "January 15, 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "15 Jan 2024",
+   "order": "DMY",
+   "result": "2024-01-15T00:00:00+00:00"
+  },
+  {
+   "config": 4,
+   "string": "15.01.2024",
+   "order": "DMY",
+   "result": "2024-01-15T00:00:00+00:00"
+  },
+  {
+   "config": 4,
+   "string": "2024-01-15",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "not a date",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "32/13/2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "abc123xyz",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "99/99/9999",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "11.01.10",
+   "order": "DMY",
+   "result": "2010-01-11T00:00:00+00:00"
+  },
+  {
+   "config": 4,
+   "string": "15.01 2024",
+   "order": "DMY",
+   "result": "2024-03-15T15:01:00+00:00"
+  },
+  {
+   "config": 4,
+   "string": "March 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "Monday 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "Gestern 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "Heute 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "1st April 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "UTC 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "Jan 2024 EST",
+   "order": "DMY",
+   "result": "2024-01-01T05:00:00+00:00"
+  },
+  {
+   "config": 4,
+   "string": "January 30, 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "Order 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "01/02/2023",
+   "order": "DMY",
+   "result": "2023-02-01T00:00:00+00:00"
+  },
+  {
+   "config": 4,
+   "string": "13/02/2023",
+   "order": "DMY",
+   "result": "2023-02-13T00:00:00+00:00"
+  },
+  {
+   "config": 4,
+   "string": "12.31.2022",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "March 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "Total 1234",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "Sept 5, 2021",
+   "order": "DMY",
+   "result": "2021-09-05T00:00:00+00:00"
+  },
+  {
+   "config": 4,
+   "string": "25/12/2022",
+   "order": "DMY",
+   "result": "2022-12-25T00:00:00+00:00"
+  },
+  {
+   "config": 4,
+   "string": "31/02/2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "4.5.2010",
+   "order": "DMY",
+   "result": "2010-05-04T00:00:00+00:00"
+  },
+  {
+   "config": 4,
+   "string": "15-Jan-2024",
+   "order": "DMY",
+   "result": "2024-01-15T00:00:00+00:00"
+  },
+  {
+   "config": 4,
+   "string": "archived 2019",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "05.06.2019",
+   "order": "DMY",
+   "result": "2019-06-05T00:00:00+00:00"
+  },
+  {
+   "config": 4,
+   "string": "2.3.19",
+   "order": "DMY",
+   "result": "2019-03-02T00:00:00+00:00"
+  },
+  {
+   "config": 4,
+   "string": "10/11/12",
+   "order": "DMY",
+   "result": "2012-11-10T00:00:00+00:00"
+  },
+  {
+   "config": 4,
+   "string": "Today 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "Yesterday 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "15. März 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "1. April 2024",
+   "order": "DMY",
+   "result": "2024-04-01T00:00:00+00:00"
+  },
+  {
+   "config": 4,
+   "string": "Januar 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "03.02.2024",
+   "order": "DMY",
+   "result": "2024-02-03T00:00:00+00:00"
+  },
+  {
+   "config": 4,
+   "string": "Jahr 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "5. Dezember 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "12. Mai 2020",
+   "order": "DMY",
+   "result": "2020-05-12T00:00:00+00:00"
+  },
+  {
+   "config": 4,
+   "string": "3 février 2024",
+   "order": "DMY",
+   "result": "2024-02-03T00:00:00+00:00"
+  },
+  {
+   "config": 4,
+   "string": "1er mars 2024",
+   "order": "DMY",
+   "result": "2024-03-01T00:00:00+00:00"
+  },
+  {
+   "config": 4,
+   "string": "15 août 2022",
+   "order": "DMY",
+   "result": "2022-08-15T00:00:00+00:00"
+  },
+  {
+   "config": 4,
+   "string": "Mardi 2021",
+   "order": "DMY",
+   "result": "2021-03-15T00:00:00+00:00"
+  },
+  {
+   "config": 4,
+   "string": "12 enero 2022",
+   "order": "DMY",
+   "result": "2022-01-12T00:00:00+00:00"
+  },
+  {
+   "config": 4,
+   "string": "12 gennaio 2022",
+   "order": "DMY",
+   "result": "2022-01-12T00:00:00+00:00"
+  },
+  {
+   "config": 4,
+   "string": "28 febbraio 2022",
+   "order": "DMY",
+   "result": "2022-02-28T00:00:00+00:00"
+  },
+  {
+   "config": 4,
+   "string": "3 dez 2020",
+   "order": "DMY",
+   "result": "2020-12-03T00:00:00+00:00"
+  },
+  {
+   "config": 4,
+   "string": "14 juni 2023",
+   "order": "DMY",
+   "result": "2023-06-14T00:00:00+00:00"
+  },
+  {
+   "config": 4,
+   "string": "1 juli 2023",
+   "order": "DMY",
+   "result": "2023-07-01T00:00:00+00:00"
+  },
+  {
+   "config": 4,
+   "string": "марта 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "апреля 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "3. května 2022",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "17. června 2022",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "12 lipca 2021",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "5 Şubat 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "3 januari 2024",
+   "order": "DMY",
+   "result": "2024-01-03T00:00:00+00:00"
+  },
+  {
+   "config": 4,
+   "string": "4 mars 2023",
+   "order": "DMY",
+   "result": "2023-03-04T00:00:00+00:00"
+  },
+  {
+   "config": 4,
+   "string": "15 and 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 4,
+   "string": "5/1/24",
+   "order": "DMY",
+   "result": "2024-01-05T00:00:00+00:00"
+  },
+  {
+   "config": 5,
+   "string": "15/01/2024",
+   "order": "DMY",
+   "result": "2024-01-15T00:00:00+00:00"
+  },
+  {
+   "config": 5,
+   "string": "01/15/2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "2024/01/15",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "January 15, 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "15 Jan 2024",
+   "order": "DMY",
+   "result": "2024-01-15T00:00:00+00:00"
+  },
+  {
+   "config": 5,
+   "string": "15.01.2024",
+   "order": "DMY",
+   "result": "2024-01-15T00:00:00+00:00"
+  },
+  {
+   "config": 5,
+   "string": "2024-01-15",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "not a date",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "32/13/2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "abc123xyz",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "99/99/9999",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "11.01.10",
+   "order": "DMY",
+   "result": "2010-01-11T00:00:00+00:00"
+  },
+  {
+   "config": 5,
+   "string": "15.01 2024",
+   "order": "DMY",
+   "result": "2024-03-15T15:01:00+00:00"
+  },
+  {
+   "config": 5,
+   "string": "March 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "Monday 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "Gestern 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "Heute 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "1st April 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "UTC 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "Jan 2024 EST",
+   "order": "DMY",
+   "result": "2024-01-01T05:00:00+00:00"
+  },
+  {
+   "config": 5,
+   "string": "January 30, 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "Order 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "01/02/2023",
+   "order": "DMY",
+   "result": "2023-02-01T00:00:00+00:00"
+  },
+  {
+   "config": 5,
+   "string": "13/02/2023",
+   "order": "DMY",
+   "result": "2023-02-13T00:00:00+00:00"
+  },
+  {
+   "config": 5,
+   "string": "12.31.2022",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "March 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "Total 1234",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "Sept 5, 2021",
+   "order": "DMY",
+   "result": "2021-09-05T00:00:00+00:00"
+  },
+  {
+   "config": 5,
+   "string": "25/12/2022",
+   "order": "DMY",
+   "result": "2022-12-25T00:00:00+00:00"
+  },
+  {
+   "config": 5,
+   "string": "31/02/2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "4.5.2010",
+   "order": "DMY",
+   "result": "2010-05-04T00:00:00+00:00"
+  },
+  {
+   "config": 5,
+   "string": "15-Jan-2024",
+   "order": "DMY",
+   "result": "2024-01-15T00:00:00+00:00"
+  },
+  {
+   "config": 5,
+   "string": "archived 2019",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "05.06.2019",
+   "order": "DMY",
+   "result": "2019-06-05T00:00:00+00:00"
+  },
+  {
+   "config": 5,
+   "string": "2.3.19",
+   "order": "DMY",
+   "result": "2019-03-02T00:00:00+00:00"
+  },
+  {
+   "config": 5,
+   "string": "10/11/12",
+   "order": "DMY",
+   "result": "2012-11-10T00:00:00+00:00"
+  },
+  {
+   "config": 5,
+   "string": "Today 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "Yesterday 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "15. März 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "1. April 2024",
+   "order": "DMY",
+   "result": "2024-04-01T00:00:00+00:00"
+  },
+  {
+   "config": 5,
+   "string": "Januar 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "03.02.2024",
+   "order": "DMY",
+   "result": "2024-02-03T00:00:00+00:00"
+  },
+  {
+   "config": 5,
+   "string": "Jahr 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "5. Dezember 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "12. Mai 2020",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "3 février 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "1er mars 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "15 août 2022",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "Mardi 2021",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "12 enero 2022",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "12 gennaio 2022",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "28 febbraio 2022",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "3 dez 2020",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "14 juni 2023",
+   "order": "DMY",
+   "result": "2023-06-14T00:00:00+00:00"
+  },
+  {
+   "config": 5,
+   "string": "1 juli 2023",
+   "order": "DMY",
+   "result": "2023-07-01T00:00:00+00:00"
+  },
+  {
+   "config": 5,
+   "string": "марта 2023",
+   "order": "DMY",
+   "result": "2023-03-01T00:00:00+00:00"
+  },
+  {
+   "config": 5,
+   "string": "апреля 2023",
+   "order": "DMY",
+   "result": "2023-04-01T00:00:00+00:00"
+  },
+  {
+   "config": 5,
+   "string": "3. května 2022",
+   "order": "DMY",
+   "result": "2022-05-03T00:00:00+00:00"
+  },
+  {
+   "config": 5,
+   "string": "17. června 2022",
+   "order": "DMY",
+   "result": "2022-06-17T00:00:00+00:00"
+  },
+  {
+   "config": 5,
+   "string": "12 lipca 2021",
+   "order": "DMY",
+   "result": "2021-07-12T00:00:00+00:00"
+  },
+  {
+   "config": 5,
+   "string": "5 Şubat 2024",
+   "order": "DMY",
+   "result": "2024-02-05T00:00:00+00:00"
+  },
+  {
+   "config": 5,
+   "string": "3 januari 2024",
+   "order": "DMY",
+   "result": "2024-01-03T00:00:00+00:00"
+  },
+  {
+   "config": 5,
+   "string": "4 mars 2023",
+   "order": "DMY",
+   "result": "2023-03-04T00:00:00+00:00"
+  },
+  {
+   "config": 5,
+   "string": "15 and 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 5,
+   "string": "5/1/24",
+   "order": "DMY",
+   "result": "2024-01-05T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "15/01/2024",
+   "order": "DMY",
+   "result": "2024-01-15T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "01/15/2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 6,
+   "string": "2024/01/15",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 6,
+   "string": "January 15, 2024",
+   "order": "DMY",
+   "result": "2024-01-15T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "15 Jan 2024",
+   "order": "DMY",
+   "result": "2024-01-15T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "15.01.2024",
+   "order": "DMY",
+   "result": "2024-01-15T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "2024-01-15",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 6,
+   "string": "not a date",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 6,
+   "string": "32/13/2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 6,
+   "string": "",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 6,
+   "string": "abc123xyz",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 6,
+   "string": "99/99/9999",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 6,
+   "string": "11.01.10",
+   "order": "DMY",
+   "result": "2010-01-11T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "15.01 2024",
+   "order": "DMY",
+   "result": "2024-03-15T15:01:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "March 2024",
+   "order": "DMY",
+   "result": "2024-03-01T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "Monday 2024",
+   "order": "DMY",
+   "result": "2024-03-15T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "Gestern 2024",
+   "order": "DMY",
+   "result": "2024-03-14T12:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "Heute 2024",
+   "order": "DMY",
+   "result": "2024-03-15T12:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "1st April 2023",
+   "order": "DMY",
+   "result": "2023-04-01T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "UTC 2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 6,
+   "string": "Jan 2024 EST",
+   "order": "DMY",
+   "result": "2024-01-01T05:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "January 30, 2024",
+   "order": "DMY",
+   "result": "2024-01-30T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "Order 2023",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 6,
+   "string": "01/02/2023",
+   "order": "DMY",
+   "result": "2023-02-01T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "13/02/2023",
+   "order": "DMY",
+   "result": "2023-02-13T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "12.31.2022",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 6,
+   "string": "March 2023",
+   "order": "DMY",
+   "result": "2023-03-01T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "Total 1234",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 6,
+   "string": "Sept 5, 2021",
+   "order": "DMY",
+   "result": "2021-09-05T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "25/12/2022",
+   "order": "DMY",
+   "result": "2022-12-25T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "31/02/2024",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 6,
+   "string": "4.5.2010",
+   "order": "DMY",
+   "result": "2010-05-04T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "15-Jan-2024",
+   "order": "DMY",
+   "result": "2024-01-15T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "archived 2019",
+   "order": "DMY",
+   "result": null
+  },
+  {
+   "config": 6,
+   "string": "05.06.2019",
+   "order": "DMY",
+   "result": "2019-06-05T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "2.3.19",
+   "order": "DMY",
+   "result": "2019-03-02T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "10/11/12",
+   "order": "DMY",
+   "result": "2012-11-10T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "Today 2024",
+   "order": "DMY",
+   "result": "2024-03-15T12:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "Yesterday 2023",
+   "order": "DMY",
+   "result": "2024-03-14T12:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "15. März 2024",
+   "order": "DMY",
+   "result": "2024-03-15T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "1. April 2024",
+   "order": "DMY",
+   "result": "2024-04-01T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "Januar 2024",
+   "order": "DMY",
+   "result": "2024-01-01T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "03.02.2024",
+   "order": "DMY",
+   "result": "2024-02-03T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "Jahr 2023",
+   "order": "DMY",
+   "result": "2023-03-01T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "5. Dezember 2023",
+   "order": "DMY",
+   "result": "2023-12-05T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "12. Mai 2020",
+   "order": "DMY",
+   "result": "2020-05-12T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "3 février 2024",
+   "order": "DMY",
+   "result": "2024-02-03T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "1er mars 2024",
+   "order": "DMY",
+   "result": "2024-03-01T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "15 août 2022",
+   "order": "DMY",
+   "result": "2022-08-15T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "Mardi 2021",
+   "order": "DMY",
+   "result": "2021-03-15T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "12 enero 2022",
+   "order": "DMY",
+   "result": "2022-01-12T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "12 gennaio 2022",
+   "order": "DMY",
+   "result": "2022-01-12T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "28 febbraio 2022",
+   "order": "DMY",
+   "result": "2022-02-28T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "3 dez 2020",
+   "order": "DMY",
+   "result": "2020-12-03T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "14 juni 2023",
+   "order": "DMY",
+   "result": "2023-06-14T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "1 juli 2023",
+   "order": "DMY",
+   "result": "2023-07-01T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "марта 2023",
+   "order": "DMY",
+   "result": "2023-03-01T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "апреля 2023",
+   "order": "DMY",
+   "result": "2023-04-01T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "3. května 2022",
+   "order": "DMY",
+   "result": "2022-05-03T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "17. června 2022",
+   "order": "DMY",
+   "result": "2022-06-17T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "12 lipca 2021",
+   "order": "DMY",
+   "result": "2021-07-12T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "5 Şubat 2024",
+   "order": "DMY",
+   "result": "2024-02-05T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "3 januari 2024",
+   "order": "DMY",
+   "result": "2024-01-03T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "4 mars 2023",
+   "order": "DMY",
+   "result": "2023-03-04T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "15 and 2024",
+   "order": "DMY",
+   "result": "2024-03-15T00:00:00+00:00"
+  },
+  {
+   "config": 6,
+   "string": "5/1/24",
+   "order": "DMY",
+   "result": "2024-01-05T00:00:00+00:00"
+  },
+  {
+   "config": 7,
+   "string": "15/01/2024",
+   "order": "YMD",
+   "result": "2024-01-15T00:00:00+00:00"
+  },
+  {
+   "config": 7,
+   "string": "01/15/2024",
+   "order": "YMD",
+   "result": "2024-01-15T00:00:00+00:00"
+  },
+  {
+   "config": 7,
+   "string": "2024/01/15",
+   "order": "YMD",
+   "result": "2024-01-15T00:00:00+00:00"
+  },
+  {
+   "config": 7,
+   "string": "January 15, 2024",
+   "order": "YMD",
+   "result": "2024-01-15T00:00:00+00:00"
+  },
+  {
+   "config": 7,
+   "string": "15 Jan 2024",
+   "order": "YMD",
+   "result": "2024-01-15T00:00:00+00:00"
+  },
+  {
+   "config": 7,
+   "string": "15.01.2024",
+   "order": "YMD",
+   "result": "2024-01-15T00:00:00+00:00"
+  },
+  {
+   "config": 7,
+   "string": "2024-01-15",
+   "order": "YMD",
+   "result": "2024-01-15T00:00:00+00:00"
+  },
+  {
+   "config": 7,
+   "string": "not a date",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "32/13/2024",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "abc123xyz",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "99/99/9999",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "11.01.10",
+   "order": "YMD",
+   "result": "2011-01-10T00:00:00+00:00"
+  },
+  {
+   "config": 7,
+   "string": "15.01 2024",
+   "order": "YMD",
+   "result": "2024-03-15T15:01:00+00:00"
+  },
+  {
+   "config": 7,
+   "string": "March 2024",
+   "order": "YMD",
+   "result": "2024-03-01T00:00:00+00:00"
+  },
+  {
+   "config": 7,
+   "string": "Monday 2024",
+   "order": "YMD",
+   "result": "2024-03-15T00:00:00+00:00"
+  },
+  {
+   "config": 7,
+   "string": "Gestern 2024",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "Heute 2024",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "1st April 2023",
+   "order": "YMD",
+   "result": "2023-04-01T00:00:00+00:00"
+  },
+  {
+   "config": 7,
+   "string": "UTC 2024",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "Jan 2024 EST",
+   "order": "YMD",
+   "result": "2024-01-01T05:00:00+00:00"
+  },
+  {
+   "config": 7,
+   "string": "January 30, 2024",
+   "order": "YMD",
+   "result": "2024-01-30T00:00:00+00:00"
+  },
+  {
+   "config": 7,
+   "string": "Order 2023",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "01/02/2023",
+   "order": "YMD",
+   "result": "2023-02-01T00:00:00+00:00"
+  },
+  {
+   "config": 7,
+   "string": "13/02/2023",
+   "order": "YMD",
+   "result": "2023-02-13T00:00:00+00:00"
+  },
+  {
+   "config": 7,
+   "string": "12.31.2022",
+   "order": "YMD",
+   "result": "2022-12-31T00:00:00+00:00"
+  },
+  {
+   "config": 7,
+   "string": "March 2023",
+   "order": "YMD",
+   "result": "2023-03-01T00:00:00+00:00"
+  },
+  {
+   "config": 7,
+   "string": "Total 1234",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "Sept 5, 2021",
+   "order": "YMD",
+   "result": "2021-09-05T00:00:00+00:00"
+  },
+  {
+   "config": 7,
+   "string": "25/12/2022",
+   "order": "YMD",
+   "result": "2022-12-25T00:00:00+00:00"
+  },
+  {
+   "config": 7,
+   "string": "31/02/2024",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "4.5.2010",
+   "order": "YMD",
+   "result": "2010-04-05T00:00:00+00:00"
+  },
+  {
+   "config": 7,
+   "string": "15-Jan-2024",
+   "order": "YMD",
+   "result": "2024-01-15T00:00:00+00:00"
+  },
+  {
+   "config": 7,
+   "string": "archived 2019",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "05.06.2019",
+   "order": "YMD",
+   "result": "2019-06-05T00:00:00+00:00"
+  },
+  {
+   "config": 7,
+   "string": "2.3.19",
+   "order": "YMD",
+   "result": "2019-02-03T00:00:00+00:00"
+  },
+  {
+   "config": 7,
+   "string": "10/11/12",
+   "order": "YMD",
+   "result": "2010-11-12T00:00:00+00:00"
+  },
+  {
+   "config": 7,
+   "string": "Today 2024",
+   "order": "YMD",
+   "result": "2024-03-15T12:00:00+00:00"
+  },
+  {
+   "config": 7,
+   "string": "Yesterday 2023",
+   "order": "YMD",
+   "result": "2024-03-14T12:00:00+00:00"
+  },
+  {
+   "config": 7,
+   "string": "15. März 2024",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "1. April 2024",
+   "order": "YMD",
+   "result": "2024-04-01T00:00:00+00:00"
+  },
+  {
+   "config": 7,
+   "string": "Januar 2024",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "03.02.2024",
+   "order": "YMD",
+   "result": "2024-02-03T00:00:00+00:00"
+  },
+  {
+   "config": 7,
+   "string": "Jahr 2023",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "5. Dezember 2023",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "12. Mai 2020",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "3 février 2024",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "1er mars 2024",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "15 août 2022",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "Mardi 2021",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "12 enero 2022",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "12 gennaio 2022",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "28 febbraio 2022",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "3 dez 2020",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "14 juni 2023",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "1 juli 2023",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "марта 2023",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "апреля 2023",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "3. května 2022",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "17. června 2022",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "12 lipca 2021",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "5 Şubat 2024",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "3 januari 2024",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "4 mars 2023",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "15 and 2024",
+   "order": "YMD",
+   "result": null
+  },
+  {
+   "config": 7,
+   "string": "5/1/24",
+   "order": "YMD",
+   "result": "2024-05-01T00:00:00+00:00"
+  }
+ ],
+ "fuzz": [
+  {
+   "a": "springfield miss",
+   "b": "1220 main street springf eld miss",
+   "score": 93.75,
+   "cutoff90": 93.75
+  },
+  {
+   "a": "Springfield Miss",
+   "b": "1220 Main Street Springfield Mich",
+   "score": 87.5,
+   "cutoff90": 0.0
+  },
+  {
+   "a": "fuzzy wuzzy was a bear",
+   "b": "wuzzy fuzzy was a bear",
+   "score": 93.02325581395348,
+   "cutoff90": 93.02325581395348
+  },
+  {
+   "a": "abc",
+   "b": "abc",
+   "score": 100.0,
+   "cutoff90": 100.0
+  },
+  {
+   "a": "",
+   "b": "",
+   "score": 100.0,
+   "cutoff90": 100.0
+  },
+  {
+   "a": "",
+   "b": "x",
+   "score": 0.0,
+   "cutoff90": 0.0
+  },
+  {
+   "a": "abcd",
+   "b": "xabcy",
+   "score": 75.0,
+   "cutoff90": 0.0
+  },
+  {
+   "a": "hello world",
+   "b": "hello",
+   "score": 100.0,
+   "cutoff90": 100.0
+  },
+  {
+   "a": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab",
+   "b": "xxxxxxxxxxaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabb",
+   "score": 98.59154929577466,
+   "cutoff90": 98.59154929577466
+  },
+  {
+   "a": "Rechnung Müller",
+   "b": "Die rechnung von Herrn Muller ist da",
+   "score": 66.66666666666667,
+   "cutoff90": 0.0
+  }
+ ],
+ "fnmatch": [
+  {
+   "pattern": "*.pdf",
+   "name": "simple.pdf",
+   "translate": "(?s:.*\\.pdf)\\Z",
+   "match": true
+  },
+  {
+   "pattern": "*.pdf",
+   "name": "abc",
+   "translate": "(?s:.*\\.pdf)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "*.pdf",
+   "name": "x[y",
+   "translate": "(?s:.*\\.pdf)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "*.pdf",
+   "name": "a-b",
+   "translate": "(?s:.*\\.pdf)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "*.pdf",
+   "name": "]",
+   "translate": "(?s:.*\\.pdf)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "*.pdf",
+   "name": "a",
+   "translate": "(?s:.*\\.pdf)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "*.pdf",
+   "name": "",
+   "translate": "(?s:.*\\.pdf)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "*simple*",
+   "name": "simple.pdf",
+   "translate": "(?s:(?>.*?simple).*)\\Z",
+   "match": true
+  },
+  {
+   "pattern": "*simple*",
+   "name": "abc",
+   "translate": "(?s:(?>.*?simple).*)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "*simple*",
+   "name": "x[y",
+   "translate": "(?s:(?>.*?simple).*)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "*simple*",
+   "name": "a-b",
+   "translate": "(?s:(?>.*?simple).*)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "*simple*",
+   "name": "]",
+   "translate": "(?s:(?>.*?simple).*)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "*simple*",
+   "name": "a",
+   "translate": "(?s:(?>.*?simple).*)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "*simple*",
+   "name": "",
+   "translate": "(?s:(?>.*?simple).*)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "a?[!b]c",
+   "name": "simple.pdf",
+   "translate": "(?s:a.[^b]c)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "a?[!b]c",
+   "name": "abc",
+   "translate": "(?s:a.[^b]c)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "a?[!b]c",
+   "name": "x[y",
+   "translate": "(?s:a.[^b]c)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "a?[!b]c",
+   "name": "a-b",
+   "translate": "(?s:a.[^b]c)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "a?[!b]c",
+   "name": "]",
+   "translate": "(?s:a.[^b]c)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "a?[!b]c",
+   "name": "a",
+   "translate": "(?s:a.[^b]c)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "a?[!b]c",
+   "name": "",
+   "translate": "(?s:a.[^b]c)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "[a-c]*",
+   "name": "simple.pdf",
+   "translate": "(?s:[a-c].*)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "[a-c]*",
+   "name": "abc",
+   "translate": "(?s:[a-c].*)\\Z",
+   "match": true
+  },
+  {
+   "pattern": "[a-c]*",
+   "name": "x[y",
+   "translate": "(?s:[a-c].*)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "[a-c]*",
+   "name": "a-b",
+   "translate": "(?s:[a-c].*)\\Z",
+   "match": true
+  },
+  {
+   "pattern": "[a-c]*",
+   "name": "]",
+   "translate": "(?s:[a-c].*)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "[a-c]*",
+   "name": "a",
+   "translate": "(?s:[a-c].*)\\Z",
+   "match": true
+  },
+  {
+   "pattern": "[a-c]*",
+   "name": "",
+   "translate": "(?s:[a-c].*)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "[z-a]",
+   "name": "simple.pdf",
+   "translate": "(?s:(?!))\\Z",
+   "match": false
+  },
+  {
+   "pattern": "[z-a]",
+   "name": "abc",
+   "translate": "(?s:(?!))\\Z",
+   "match": false
+  },
+  {
+   "pattern": "[z-a]",
+   "name": "x[y",
+   "translate": "(?s:(?!))\\Z",
+   "match": false
+  },
+  {
+   "pattern": "[z-a]",
+   "name": "a-b",
+   "translate": "(?s:(?!))\\Z",
+   "match": false
+  },
+  {
+   "pattern": "[z-a]",
+   "name": "]",
+   "translate": "(?s:(?!))\\Z",
+   "match": false
+  },
+  {
+   "pattern": "[z-a]",
+   "name": "a",
+   "translate": "(?s:(?!))\\Z",
+   "match": false
+  },
+  {
+   "pattern": "[z-a]",
+   "name": "",
+   "translate": "(?s:(?!))\\Z",
+   "match": false
+  },
+  {
+   "pattern": "[!]",
+   "name": "simple.pdf",
+   "translate": "(?s:\\[!\\])\\Z",
+   "match": false
+  },
+  {
+   "pattern": "[!]",
+   "name": "abc",
+   "translate": "(?s:\\[!\\])\\Z",
+   "match": false
+  },
+  {
+   "pattern": "[!]",
+   "name": "x[y",
+   "translate": "(?s:\\[!\\])\\Z",
+   "match": false
+  },
+  {
+   "pattern": "[!]",
+   "name": "a-b",
+   "translate": "(?s:\\[!\\])\\Z",
+   "match": false
+  },
+  {
+   "pattern": "[!]",
+   "name": "]",
+   "translate": "(?s:\\[!\\])\\Z",
+   "match": false
+  },
+  {
+   "pattern": "[!]",
+   "name": "a",
+   "translate": "(?s:\\[!\\])\\Z",
+   "match": false
+  },
+  {
+   "pattern": "[!]",
+   "name": "",
+   "translate": "(?s:\\[!\\])\\Z",
+   "match": false
+  },
+  {
+   "pattern": "x[y",
+   "name": "simple.pdf",
+   "translate": "(?s:x\\[y)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "x[y",
+   "name": "abc",
+   "translate": "(?s:x\\[y)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "x[y",
+   "name": "x[y",
+   "translate": "(?s:x\\[y)\\Z",
+   "match": true
+  },
+  {
+   "pattern": "x[y",
+   "name": "a-b",
+   "translate": "(?s:x\\[y)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "x[y",
+   "name": "]",
+   "translate": "(?s:x\\[y)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "x[y",
+   "name": "a",
+   "translate": "(?s:x\\[y)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "x[y",
+   "name": "",
+   "translate": "(?s:x\\[y)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "*[a-]*",
+   "name": "simple.pdf",
+   "translate": "(?s:(?>.*?[a\\-]).*)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "*[a-]*",
+   "name": "abc",
+   "translate": "(?s:(?>.*?[a\\-]).*)\\Z",
+   "match": true
+  },
+  {
+   "pattern": "*[a-]*",
+   "name": "x[y",
+   "translate": "(?s:(?>.*?[a\\-]).*)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "*[a-]*",
+   "name": "a-b",
+   "translate": "(?s:(?>.*?[a\\-]).*)\\Z",
+   "match": true
+  },
+  {
+   "pattern": "*[a-]*",
+   "name": "]",
+   "translate": "(?s:(?>.*?[a\\-]).*)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "*[a-]*",
+   "name": "a",
+   "translate": "(?s:(?>.*?[a\\-]).*)\\Z",
+   "match": true
+  },
+  {
+   "pattern": "*[a-]*",
+   "name": "",
+   "translate": "(?s:(?>.*?[a\\-]).*)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "[]a]",
+   "name": "simple.pdf",
+   "translate": "(?s:[]a])\\Z",
+   "match": false
+  },
+  {
+   "pattern": "[]a]",
+   "name": "abc",
+   "translate": "(?s:[]a])\\Z",
+   "match": false
+  },
+  {
+   "pattern": "[]a]",
+   "name": "x[y",
+   "translate": "(?s:[]a])\\Z",
+   "match": false
+  },
+  {
+   "pattern": "[]a]",
+   "name": "a-b",
+   "translate": "(?s:[]a])\\Z",
+   "match": false
+  },
+  {
+   "pattern": "[]a]",
+   "name": "]",
+   "translate": "(?s:[]a])\\Z",
+   "match": true
+  },
+  {
+   "pattern": "[]a]",
+   "name": "a",
+   "translate": "(?s:[]a])\\Z",
+   "match": true
+  },
+  {
+   "pattern": "[]a]",
+   "name": "",
+   "translate": "(?s:[]a])\\Z",
+   "match": false
+  },
+  {
+   "pattern": "**",
+   "name": "simple.pdf",
+   "translate": "(?s:.*)\\Z",
+   "match": true
+  },
+  {
+   "pattern": "**",
+   "name": "abc",
+   "translate": "(?s:.*)\\Z",
+   "match": true
+  },
+  {
+   "pattern": "**",
+   "name": "x[y",
+   "translate": "(?s:.*)\\Z",
+   "match": true
+  },
+  {
+   "pattern": "**",
+   "name": "a-b",
+   "translate": "(?s:.*)\\Z",
+   "match": true
+  },
+  {
+   "pattern": "**",
+   "name": "]",
+   "translate": "(?s:.*)\\Z",
+   "match": true
+  },
+  {
+   "pattern": "**",
+   "name": "a",
+   "translate": "(?s:.*)\\Z",
+   "match": true
+  },
+  {
+   "pattern": "**",
+   "name": "",
+   "translate": "(?s:.*)\\Z",
+   "match": true
+  },
+  {
+   "pattern": "?",
+   "name": "simple.pdf",
+   "translate": "(?s:.)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "?",
+   "name": "abc",
+   "translate": "(?s:.)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "?",
+   "name": "x[y",
+   "translate": "(?s:.)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "?",
+   "name": "a-b",
+   "translate": "(?s:.)\\Z",
+   "match": false
+  },
+  {
+   "pattern": "?",
+   "name": "]",
+   "translate": "(?s:.)\\Z",
+   "match": true
+  },
+  {
+   "pattern": "?",
+   "name": "a",
+   "translate": "(?s:.)\\Z",
+   "match": true
+  },
+  {
+   "pattern": "?",
+   "name": "",
+   "translate": "(?s:.)\\Z",
+   "match": false
+  }
+ ]
+}

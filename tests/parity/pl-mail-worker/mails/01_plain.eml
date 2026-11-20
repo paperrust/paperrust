@@ -1,0 +1,10 @@
+From: Alice Example <alice@example.org>
+To: paperless@example.org
+Subject: Plain text only
+Date: Mon, 06 Jan 2025 08:00:00 +0100
+Message-ID: <plain@example.org>
+
+Hello,
+this has no attachment.
+.
+Bye

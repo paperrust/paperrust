@@ -1,0 +1,34 @@
+[package]
+name = "paperrust-desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "PaperRust Desktop: Supervisor für eingebettetes PostgreSQL + paperrust-Server (ohne Docker)"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "paperrust-desktop"
+path = "src/main.rs"
+
+# Deliberately only dependencies that are already in Cargo.lock (no Tauri/wry in this step,
+# no HTTP/DB library: PostgreSQL is controlled via its own tools).
+[dependencies]
+tokio.workspace = true
+serde.workspace = true
+# settings.request.json / desktop-settings.json (docs/SETTINGS.md §2.6)
+serde_json.workspace = true
+# `display` = serialization (write desktop.toml); toml_writer is already in the lock.
+toml = { workspace = true, features = ["display"] }
+rand.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

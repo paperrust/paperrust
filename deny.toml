@@ -1,0 +1,99 @@
+# cargo-deny configuration (release gate, see scripts/run-gates.sh and docs/contract/testing.md).
+# paperless-rs is GPL-3.0-only: only OSS licenses that may be combined with GPL-3.0 are allowed,
+# all crates must come from crates.io.
+
+[graph]
+all-features = true
+
+[output]
+feature-depth = 1
+
+[advisories]
+version = 2
+db-urls = ["https://github.com/rustsec/advisory-db"]
+yanked = "deny"
+# Each ignored advisory needs an issue/justification comment.
+# Bewertung: results/release/security/BERICHT.md Abschnitt "Abhängigkeiten" (2026-11-18).
+ignore = [
+    # rsa 0.9 (Marvin, Zeitseitenkanal bei RSA-*Entschlüsselung*): nur über sqlx-mysql
+    # (pl-dbmigrate, Umstieg von MariaDB/MySQL); der Client *verschlüsselt* dort nur das Passwort
+    # mit dem öffentlichen Schlüssel des Servers, kein privater Schlüssel im Prozess -> nicht
+    # erreichbar. Behebung erst mit sqlx 0.9 (rsa 0.10), CORE-REQUEST.
+    { id = "RUSTSEC-2023-0071", reason = "nur RSA-Verschlüsselung mit öffentlichem Schlüssel (sqlx-mysql), kein privater Schlüssel" },
+    # libsqlite3-sys 0.30 (SQLite < 3.54, -wal mit anderer Seitengröße liefert alten Speicher):
+    # nur lokaler Angriff mit präparierter DB+WAL; PaperRust öffnet nur eigene SQLite-Dateien
+    # (KI-Index, Sync-Cache) und beim Umstieg die vom Admin genannte paperless-ngx-DB.
+    # Behebung braucht sqlx 0.9 + rusqlite >= 0.41 (gleiche libsqlite3-sys), CORE-REQUEST.
+    { id = "RUSTSEC-2026-0459", reason = "nur lokale, vom Admin bereitgestellte SQLite-Dateien; Update braucht sqlx 0.9" },
+    # zip 3.0.0 nur über WordCraft (pl-pdftools Kindprozess paperrust-pdftool, Office -> PDF):
+    # liest DOCX/XLSX per ZipArchive::by_name, nutzt weder extract() noch ZipStreamReader noch
+    # AES-Einträge -> keine der Meldungen erreichbar; läuft zudem im begrenzten Kindprozess.
+    { id = "RUSTSEC-2026-0367", reason = "zip extract() nicht benutzt (WordCraft liest nur per by_name)" },
+    { id = "RUSTSEC-2026-0368", reason = "zip extract() nicht benutzt (WordCraft liest nur per by_name)" },
+    { id = "RUSTSEC-2026-0369", reason = "zip extract()/ZipStreamReader nicht benutzt" },
+    { id = "RUSTSEC-2026-0429", reason = "zip extract() nicht benutzt; Kindprozess-Grenze" },
+    { id = "RUSTSEC-2026-0545", reason = "keine AES-verschlüsselten ZIP-Einträge (by_name_decrypt nicht benutzt)" },
+    { id = "RUSTSEC-2026-0548", reason = "ZipStreamReader nicht benutzt" },
+    # Nicht mehr gepflegt (keine Sicherheitslücke): Ablösung geplant, kein Release-Blocker.
+    { id = "RUSTSEC-2026-0543", reason = "chrono unmaintained, keine Lücke; Ablösung (jiff) eigenes Vorhaben" },
+    { id = "RUSTSEC-2026-0555", reason = "chrono-tz unmaintained, keine Lücke" },
+    { id = "RUSTSEC-2026-0374", reason = "basic-toml unmaintained (nur Build/Konfiguration), keine Lücke" },
+    { id = "RUSTSEC-2026-0173", reason = "proc-macro-error2 unmaintained, nur zur Übersetzungszeit" },
+    { id = "RUSTSEC-2026-0192", reason = "ttf-parser unmaintained (Schriften im PDF-Kindprozess), keine Lücke" },
+    # lru 0.16 (tantivy): Use-after-free nur, wenn eine Panik *innerhalb* von LruCache::pop auftritt
+    # (Drop eines Werts panikt); tantivy speichert dort keine Werte mit panikendem Drop.
+    { id = "RUSTSEC-2026-0253", reason = "nur bei panikendem Drop in LruCache::pop; tantivy-Werte paniken nicht" },
+]
+
+[licenses]
+version = 2
+confidence-threshold = 0.9
+# GPL-3.0 compatible (FSF list "GPL-compatible free software licenses").
+allow = [
+    "GPL-3.0-only",          # this project
+    "GPL-3.0-or-later",
+    "GPL-2.0-or-later",      # usable under GPL-3.0
+    "LGPL-2.1-or-later",
+    "LGPL-3.0-only",
+    "LGPL-3.0-or-later",
+    "MIT",
+    "MIT-0",
+    "Apache-2.0",            # compatible with GPL-3.0 (not with GPL-2.0-only)
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "BSL-1.0",
+    "0BSD",
+    "CC0-1.0",
+    "Unlicense",
+    "MPL-2.0",               # section 3.3 secondary licenses incl. GPL
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "CDLA-Permissive-2.0",   # webpki-roots data (Mozilla CA list)
+    "bzip2-1.0.6",           # libbz2-rs-sys: BSD-artige Lizenz ohne Werbeklausel, GPL-verträglich
+    "zlib-acknowledgement",  # fastdivide (zlib-artig, GPL-verträglich)
+]
+# Not allowed on purpose: GPL-2.0-only, AGPL-*, OpenSSL, SSPL, BUSL, Commons-Clause, proprietary.
+exceptions = []
+
+[licenses.private]
+ignore = true
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true   # workspace path dependencies
+highlight = "all"
+deny = []
+skip = []
+skip-tree = []
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+# PdfCraft, WordCraft und craft-libs (alle MIT OR Apache-2.0) für pl-pdftools, feste Revisionen
+# (Cargo.toml, NOTICE)
+allow-git = ["https://github.com/storytold/pdfcraft", "https://github.com/storytold/wordcraft", "https://github.com/storytold/craft-libs"]

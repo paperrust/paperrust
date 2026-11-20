@@ -1,0 +1,2896 @@
+{
+ "crate": "pl-objects",
+ "generated_by": "tests/parity/harness/gen_base_catalog.py (do not edit; add cases.json instead)",
+ "vars": {
+  "correspondent_id": {
+   "get": "/api/correspondents/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1
+   }
+  },
+  "correspondent_id_last": {
+   "get": "/api/correspondents/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "-id",
+    "page_size": 1
+   }
+  },
+  "document_type_id": {
+   "get": "/api/document_types/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1
+   }
+  },
+  "storage_path_id": {
+   "get": "/api/storage_paths/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1
+   }
+  },
+  "tag_id": {
+   "get": "/api/tags/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1
+   }
+  },
+  "tag_id_last": {
+   "get": "/api/tags/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "-id",
+    "page_size": 1
+   }
+  }
+ },
+ "cases": [
+  {
+   "id": "tags.list.default",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "tags.list.page1",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "tags.list.listall",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "page": 1,
+    "page_size": 100000
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "tags.list.page2",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "page": 2,
+    "page_size": 1
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.page-too-high",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "page": 99999,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.page-invalid",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "page": "abc"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.page-zero",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "page": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.page-size-invalid",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "page_size": "x"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.page-size-zero",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "page_size": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.page-size-huge",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "page_size": 10000000
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.ordering-unknown",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "ordering": "does_not_exist"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.ordering+name",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "name"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.ordering-name",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-name"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.ordering+color",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "color"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.ordering-color",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-color"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.ordering+matching_algorithm",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "matching_algorithm"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.ordering-matching_algorithm",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-matching_algorithm"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.ordering+match",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "match"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.ordering-match",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-match"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.ordering+document_count",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "document_count"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.ordering-document_count",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-document_count"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.name-filter",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "name",
+    "name__icontains": "a",
+    "full_perms": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "tags.list.name-filter-empty",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "name__icontains": ""
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.name-filter-unicode",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "name__icontains": "ä"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.name-iexact",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "name__iexact": "A"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.name-istartswith",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "name__istartswith": "a"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.name-iendswith",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "name__iendswith": "e"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.full-perms",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "full_perms": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "tags.list.full-perms-0",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "full_perms": "0"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.getfew",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "id__in": "${tag_id},${tag_id_last}",
+    "ordering": "-id",
+    "page_size": 1000
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.id",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "id": "${tag_id}"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.id-in-invalid",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "id__in": "a,b"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.id-in-empty",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "id__in": ""
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.extra0",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "is_root": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.extra1",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "is_root": "false"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.auth",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "anon",
+    "badtoken",
+    "inactive",
+    "admin@session",
+    "admin@basic"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.apiver",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "none",
+    "99",
+    "abc"
+   ]
+  },
+  {
+   "id": "tags.detail",
+   "route": "tags.retrieve",
+   "method": "GET",
+   "path": "/api/tags/${tag_id}/",
+   "query": {
+    "full_perms": "true"
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "tags.detail-unknown",
+   "route": "tags.retrieve",
+   "method": "GET",
+   "path": "/api/tags/999999999/",
+   "query": {
+    "full_perms": "true"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.detail-nonint",
+   "route": "tags.retrieve",
+   "method": "GET",
+   "path": "/api/tags/abc/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.detail-anon",
+   "route": "tags.retrieve",
+   "method": "GET",
+   "path": "/api/tags/${tag_id}/",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.detail-noslash",
+   "route": "tags.retrieve",
+   "method": "GET",
+   "path": "/api/tags/${tag_id}",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "follow": false
+  },
+  {
+   "id": "tags.list.405-put",
+   "route": "tags.list",
+   "method": "PUT",
+   "path": "/api/tags/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "json": {}
+  },
+  {
+   "id": "tags.list.405-delete",
+   "route": "tags.list",
+   "method": "DELETE",
+   "path": "/api/tags/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "json": {}
+  },
+  {
+   "id": "tags.list.405-patch",
+   "route": "tags.list",
+   "method": "PATCH",
+   "path": "/api/tags/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "json": {}
+  },
+  {
+   "id": "correspondents.list.default",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "correspondents.list.page1",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "correspondents.list.listall",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "page": 1,
+    "page_size": 100000
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "correspondents.list.page2",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "page": 2,
+    "page_size": 1
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.list.page-too-high",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "page": 99999,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.list.page-invalid",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "page": "abc"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.list.page-zero",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "page": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.list.page-size-invalid",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "page_size": "x"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.list.page-size-zero",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "page_size": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.list.page-size-huge",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "page_size": 10000000
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.list.ordering-unknown",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "ordering": "does_not_exist"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.list.ordering+name",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "name"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.list.ordering-name",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-name"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.list.ordering+matching_algorithm",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "matching_algorithm"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.list.ordering-matching_algorithm",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-matching_algorithm"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.list.ordering+match",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "match"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.list.ordering-match",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-match"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.list.ordering+document_count",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "document_count"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.list.ordering-document_count",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-document_count"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.list.ordering+last_correspondence",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "last_correspondence"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.list.ordering-last_correspondence",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-last_correspondence"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.list.name-filter",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "name",
+    "name__icontains": "a",
+    "full_perms": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "correspondents.list.name-filter-empty",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "name__icontains": ""
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.list.name-filter-unicode",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "name__icontains": "ä"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.list.name-iexact",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "name__iexact": "A"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.list.name-istartswith",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "name__istartswith": "a"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.list.name-iendswith",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "name__iendswith": "e"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.list.full-perms",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "full_perms": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "correspondents.list.full-perms-0",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "full_perms": "0"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.list.getfew",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "id__in": "${correspondent_id},${correspondent_id_last}",
+    "ordering": "-id",
+    "page_size": 1000
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.list.id",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "id": "${correspondent_id}"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.list.id-in-invalid",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "id__in": "a,b"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.list.id-in-empty",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "id__in": ""
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.list.extra0",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "last_correspondence": "true",
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.list.auth",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "anon",
+    "badtoken",
+    "inactive",
+    "admin@session",
+    "admin@basic"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.list.apiver",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "none",
+    "99",
+    "abc"
+   ]
+  },
+  {
+   "id": "correspondents.detail",
+   "route": "correspondents.retrieve",
+   "method": "GET",
+   "path": "/api/correspondents/${correspondent_id}/",
+   "query": {
+    "full_perms": "true"
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "correspondents.detail-unknown",
+   "route": "correspondents.retrieve",
+   "method": "GET",
+   "path": "/api/correspondents/999999999/",
+   "query": {
+    "full_perms": "true"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.detail-nonint",
+   "route": "correspondents.retrieve",
+   "method": "GET",
+   "path": "/api/correspondents/abc/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.detail-anon",
+   "route": "correspondents.retrieve",
+   "method": "GET",
+   "path": "/api/correspondents/${correspondent_id}/",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.detail-noslash",
+   "route": "correspondents.retrieve",
+   "method": "GET",
+   "path": "/api/correspondents/${correspondent_id}",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "follow": false
+  },
+  {
+   "id": "correspondents.list.405-put",
+   "route": "correspondents.list",
+   "method": "PUT",
+   "path": "/api/correspondents/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "json": {}
+  },
+  {
+   "id": "correspondents.list.405-delete",
+   "route": "correspondents.list",
+   "method": "DELETE",
+   "path": "/api/correspondents/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "json": {}
+  },
+  {
+   "id": "correspondents.list.405-patch",
+   "route": "correspondents.list",
+   "method": "PATCH",
+   "path": "/api/correspondents/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "json": {}
+  },
+  {
+   "id": "document_types.list.default",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "document_types.list.page1",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "document_types.list.listall",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "query": {
+    "page": 1,
+    "page_size": 100000
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "document_types.list.page2",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "query": {
+    "page": 2,
+    "page_size": 1
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.list.page-too-high",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "query": {
+    "page": 99999,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.list.page-invalid",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "query": {
+    "page": "abc"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.list.page-zero",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "query": {
+    "page": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.list.page-size-invalid",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "query": {
+    "page_size": "x"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.list.page-size-zero",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "query": {
+    "page_size": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.list.page-size-huge",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "query": {
+    "page_size": 10000000
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.list.ordering-unknown",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "query": {
+    "ordering": "does_not_exist"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.list.ordering+name",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "name"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.list.ordering-name",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-name"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.list.ordering+matching_algorithm",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "matching_algorithm"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.list.ordering-matching_algorithm",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-matching_algorithm"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.list.ordering+match",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "match"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.list.ordering-match",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-match"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.list.ordering+document_count",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "document_count"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.list.ordering-document_count",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-document_count"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.list.name-filter",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "name",
+    "name__icontains": "a",
+    "full_perms": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "document_types.list.name-filter-empty",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "query": {
+    "name__icontains": ""
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.list.name-filter-unicode",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "query": {
+    "name__icontains": "ä"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.list.name-iexact",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "query": {
+    "name__iexact": "A"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.list.name-istartswith",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "query": {
+    "name__istartswith": "a"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.list.name-iendswith",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "query": {
+    "name__iendswith": "e"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.list.full-perms",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "query": {
+    "full_perms": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "document_types.list.full-perms-0",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "query": {
+    "full_perms": "0"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.list.getfew",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "query": {
+    "id__in": "${document_type_id}",
+    "ordering": "-id",
+    "page_size": 1000
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.list.id",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "query": {
+    "id": "${document_type_id}"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.list.id-in-invalid",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "query": {
+    "id__in": "a,b"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.list.id-in-empty",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "query": {
+    "id__in": ""
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.list.auth",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "anon",
+    "badtoken",
+    "inactive",
+    "admin@session",
+    "admin@basic"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.list.apiver",
+   "route": "document_types.list",
+   "method": "GET",
+   "path": "/api/document_types/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "none",
+    "99",
+    "abc"
+   ]
+  },
+  {
+   "id": "document_types.detail",
+   "route": "document_types.retrieve",
+   "method": "GET",
+   "path": "/api/document_types/${document_type_id}/",
+   "query": {
+    "full_perms": "true"
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "document_types.detail-unknown",
+   "route": "document_types.retrieve",
+   "method": "GET",
+   "path": "/api/document_types/999999999/",
+   "query": {
+    "full_perms": "true"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.detail-nonint",
+   "route": "document_types.retrieve",
+   "method": "GET",
+   "path": "/api/document_types/abc/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.detail-anon",
+   "route": "document_types.retrieve",
+   "method": "GET",
+   "path": "/api/document_types/${document_type_id}/",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.detail-noslash",
+   "route": "document_types.retrieve",
+   "method": "GET",
+   "path": "/api/document_types/${document_type_id}",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "follow": false
+  },
+  {
+   "id": "document_types.list.405-put",
+   "route": "document_types.list",
+   "method": "PUT",
+   "path": "/api/document_types/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "json": {}
+  },
+  {
+   "id": "document_types.list.405-delete",
+   "route": "document_types.list",
+   "method": "DELETE",
+   "path": "/api/document_types/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "json": {}
+  },
+  {
+   "id": "document_types.list.405-patch",
+   "route": "document_types.list",
+   "method": "PATCH",
+   "path": "/api/document_types/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "json": {}
+  },
+  {
+   "id": "storage_paths.list.default",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "storage_paths.list.page1",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "storage_paths.list.listall",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "page": 1,
+    "page_size": 100000
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "storage_paths.list.page2",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "page": 2,
+    "page_size": 1
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.list.page-too-high",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "page": 99999,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.list.page-invalid",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "page": "abc"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.list.page-zero",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "page": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.list.page-size-invalid",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "page_size": "x"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.list.page-size-zero",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "page_size": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.list.page-size-huge",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "page_size": 10000000
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.list.ordering-unknown",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "ordering": "does_not_exist"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.list.ordering+name",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "name"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.list.ordering-name",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-name"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.list.ordering+path",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "path"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.list.ordering-path",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-path"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.list.ordering+matching_algorithm",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "matching_algorithm"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.list.ordering-matching_algorithm",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-matching_algorithm"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.list.ordering+match",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "match"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.list.ordering-match",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-match"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.list.ordering+document_count",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "document_count"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.list.ordering-document_count",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-document_count"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.list.name-filter",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "name",
+    "name__icontains": "a",
+    "full_perms": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "storage_paths.list.name-filter-empty",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "name__icontains": ""
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.list.name-filter-unicode",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "name__icontains": "ä"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.list.name-iexact",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "name__iexact": "A"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.list.name-istartswith",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "name__istartswith": "a"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.list.name-iendswith",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "name__iendswith": "e"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.list.full-perms",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "full_perms": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "storage_paths.list.full-perms-0",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "full_perms": "0"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.list.getfew",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "id__in": "${storage_path_id}",
+    "ordering": "-id",
+    "page_size": 1000
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.list.id",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "id": "${storage_path_id}"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.list.id-in-invalid",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "id__in": "a,b"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.list.id-in-empty",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "id__in": ""
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.list.extra0",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "path__icontains": "{"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.list.auth",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "anon",
+    "badtoken",
+    "inactive",
+    "admin@session",
+    "admin@basic"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.list.apiver",
+   "route": "storage_paths.list",
+   "method": "GET",
+   "path": "/api/storage_paths/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "none",
+    "99",
+    "abc"
+   ]
+  },
+  {
+   "id": "storage_paths.detail",
+   "route": "storage_paths.retrieve",
+   "method": "GET",
+   "path": "/api/storage_paths/${storage_path_id}/",
+   "query": {
+    "full_perms": "true"
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "storage_paths.detail-unknown",
+   "route": "storage_paths.retrieve",
+   "method": "GET",
+   "path": "/api/storage_paths/999999999/",
+   "query": {
+    "full_perms": "true"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.detail-nonint",
+   "route": "storage_paths.retrieve",
+   "method": "GET",
+   "path": "/api/storage_paths/abc/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.detail-anon",
+   "route": "storage_paths.retrieve",
+   "method": "GET",
+   "path": "/api/storage_paths/${storage_path_id}/",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.detail-noslash",
+   "route": "storage_paths.retrieve",
+   "method": "GET",
+   "path": "/api/storage_paths/${storage_path_id}",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "follow": false
+  },
+  {
+   "id": "storage_paths.list.405-put",
+   "route": "storage_paths.list",
+   "method": "PUT",
+   "path": "/api/storage_paths/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "json": {}
+  },
+  {
+   "id": "storage_paths.list.405-delete",
+   "route": "storage_paths.list",
+   "method": "DELETE",
+   "path": "/api/storage_paths/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "json": {}
+  },
+  {
+   "id": "storage_paths.list.405-patch",
+   "route": "storage_paths.list",
+   "method": "PATCH",
+   "path": "/api/storage_paths/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "json": {}
+  },
+  {
+   "id": "bulk_edit_objects.get",
+   "route": "bulk_edit_objects",
+   "method": "GET",
+   "path": "/api/bulk_edit_objects/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.test.get",
+   "route": "storage_paths.test",
+   "method": "GET",
+   "path": "/api/storage_paths/test/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  }
+ ]
+}

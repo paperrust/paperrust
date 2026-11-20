@@ -1,0 +1,26 @@
+{
+ "crate": "pl-accounts",
+ "cases": [
+  {
+   "id": "w23.profile.social_account_providers",
+   "route": "profile.social_account_providers",
+   "method": "GET",
+   "path": "/api/profile/social_account_providers/",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm",
+    "anon",
+    "inactive",
+    "badtoken",
+    "admin@session",
+    "user1@basic"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  }
+ ]
+}

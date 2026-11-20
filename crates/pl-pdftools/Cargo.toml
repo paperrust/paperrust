@@ -1,0 +1,79 @@
+[package]
+name = "pl-pdftools"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+# PDF tools redact/shrink/repair (docs/contract/pl-pdftools.md).
+# The PdfCraft building blocks run only in the child process `paperrust-pdftool` (feature `engine`);
+# the server only links the library without `engine` (job format + process launcher).
+
+[features]
+default = []
+engine = ["dep:pdfcraft-cos", "dep:pdfcraft-redact", "dep:pdfcraft-optimize", "dep:pdfcraft-annot", "dep:pdfcraft-edit", "dep:pdfcraft-model", "dep:image", "office", "heif"]
+# Office → PDF with WordCraft (document model, import, PDF export only); runs only in the child process.
+# Part of `engine`, so that packaging (`--features engine`) stays unchanged.
+office = ["dep:wordcraft-doc", "dep:wordcraft-docx", "dep:wordcraft-docbin", "dep:wordcraft-formats", "dep:wordcraft-pdf"]
+# HEIC/HEIF (iPhone photos) → PNG with craft-heif (heic-rs, pure Rust without unsafe, no C); runs only
+# in the child process. Part of `engine`.
+heif = ["dep:craft-heif", "dep:image"]
+
+[[bin]]
+name = "paperrust-pdftool"
+path = "src/bin/paperrust-pdftool.rs"
+required-features = ["engine"]
+
+# Integration tests start the real child process: `cargo test -p pl-pdftools --features engine`
+[[test]]
+name = "tools"
+required-features = ["engine"]
+
+[[test]]
+name = "isolation"
+required-features = ["engine"]
+
+[[test]]
+name = "office"
+required-features = ["engine"]
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tokio = { workspace = true }
+pl-core.workspace = true
+# PdfCraft (MIT OR Apache-2.0), https://github.com/storytold/pdfcraft – fixed revision, see NOTICE.
+# Alpha software: used only in the isolated child process.
+pdfcraft-cos = { git = "https://github.com/storytold/pdfcraft", rev = "0f22627bff6cde9930817e891290f653d882bbda", optional = true }
+pdfcraft-redact = { git = "https://github.com/storytold/pdfcraft", rev = "0f22627bff6cde9930817e891290f653d882bbda", optional = true }
+pdfcraft-optimize = { git = "https://github.com/storytold/pdfcraft", rev = "0f22627bff6cde9930817e891290f653d882bbda", optional = true }
+pdfcraft-annot = { git = "https://github.com/storytold/pdfcraft", rev = "0f22627bff6cde9930817e891290f653d882bbda", optional = true }
+pdfcraft-edit = { git = "https://github.com/storytold/pdfcraft", rev = "0f22627bff6cde9930817e891290f653d882bbda", optional = true }
+pdfcraft-model = { git = "https://github.com/storytold/pdfcraft", rev = "0f22627bff6cde9930817e891290f653d882bbda", optional = true }
+
+# WordCraft (MIT OR Apache-2.0), https://github.com/storytold/wordcraft – fixed revision, see NOTICE.
+# Document model, import and PDF export only; no UI, no ArtCraft branding. Alpha software:
+# used only in the isolated child process.
+wordcraft-doc = { workspace = true, optional = true }
+wordcraft-docx = { workspace = true, optional = true }
+# Word 97–2003 (.doc, OLE2) via craft-doc-binary.
+wordcraft-docbin = { workspace = true, optional = true }
+wordcraft-formats = { workspace = true, optional = true }
+wordcraft-pdf = { workspace = true, optional = true }
+
+# craft-heif (MIT OR Apache-2.0), https://github.com/storytold/craft-libs – fixed revision; uses
+# heic-rs =0.1.4 (MIT OR Apache-2.0, pure Rust, no unsafe). Young library: child process only.
+craft-heif = { workspace = true, optional = true }
+
+# Unpack/pack JPEG when redacting scans (scanimages.rs); same version as in
+# pdfcraft-optimize, so no additional build.
+image = { workspace = true, optional = true }
+
+[dev-dependencies]
+image.workspace = true
+# Synthetic, lossless HEIF files for the tests (feature `testdata`).
+craft-heif = { workspace = true, features = ["testdata"] }
+tempfile.workspace = true
+lopdf.workspace = true

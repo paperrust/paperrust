@@ -1,0 +1,6 @@
+/* Administration: custom fields (CustomFields.svelte). */
+
+/* Action menu on phones without arrow */
+.d-block.d-sm-none .dropdown-toggle::after {
+  display: none;
+}

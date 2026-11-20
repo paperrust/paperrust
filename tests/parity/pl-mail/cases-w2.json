@@ -1,0 +1,389 @@
+{
+ "crate": "pl-mail",
+ "cases": [
+  {
+   "id": "w2.mail.acc.create.state",
+   "route": "mail_accounts.create",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/mail_accounts/",
+     "json": {
+      "name": "w2-acc",
+      "imap_server": "imap.example.invalid",
+      "imap_port": 993,
+      "imap_security": 2,
+      "username": "u",
+      "password": "pw-secret",
+      "character_set": "UTF-8",
+      "is_token": false,
+      "account_type": 1
+     }
+    },
+    {
+     "sql": "select 'mailaccount' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_mailaccount x union all select 'mailrule' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_mailrule x union all select 'mailrule_assign_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_mailrule_assign_tags x union all select 'processedmail' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_processedmail x order by 1, 2"
+    },
+    {
+     "sql": "select ct.model, o.object_pk, o.user_id as who, 'u' as kind, p.codename from guardian_userobjectpermission o join auth_permission p on p.id = o.permission_id join django_content_type ct on ct.id = o.content_type_id union all select ct.model, o.object_pk, o.group_id, 'g', p.codename from guardian_groupobjectpermission o join auth_permission p on p.id = o.permission_id join django_content_type ct on ct.id = o.content_type_id order by 1, 2, 4, 3, 5"
+    }
+   ]
+  },
+  {
+   "id": "w2.mail.acc.create.perms",
+   "route": "mail_accounts.create",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/mail_accounts/",
+     "json": {
+      "name": "w2-acc-p",
+      "imap_server": "imap.example.invalid",
+      "imap_port": 993,
+      "imap_security": 2,
+      "username": "u",
+      "password": "pw-secret",
+      "character_set": "UTF-8",
+      "is_token": false,
+      "account_type": 1,
+      "owner": 4,
+      "set_permissions": {
+       "view": {
+        "users": [
+         3
+        ],
+        "groups": [
+         2
+        ]
+       },
+       "change": {
+        "users": [],
+        "groups": [
+         1
+        ]
+       }
+      }
+     }
+    },
+    {
+     "sql": "select 'mailaccount' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_mailaccount x union all select 'mailrule' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_mailrule x union all select 'mailrule_assign_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_mailrule_assign_tags x union all select 'processedmail' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_processedmail x order by 1, 2"
+    },
+    {
+     "sql": "select ct.model, o.object_pk, o.user_id as who, 'u' as kind, p.codename from guardian_userobjectpermission o join auth_permission p on p.id = o.permission_id join django_content_type ct on ct.id = o.content_type_id union all select ct.model, o.object_pk, o.group_id, 'g', p.codename from guardian_groupobjectpermission o join auth_permission p on p.id = o.permission_id join django_content_type ct on ct.id = o.content_type_id order by 1, 2, 4, 3, 5"
+    }
+   ]
+  },
+  {
+   "id": "w2.mail.acc.create.dupe",
+   "route": "mail_accounts.create",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/mail_accounts/",
+     "json": {
+      "name": "w2-dupe",
+      "imap_server": "imap.example.invalid",
+      "imap_port": 993,
+      "imap_security": 2,
+      "username": "u",
+      "password": "pw-secret",
+      "character_set": "UTF-8",
+      "is_token": false,
+      "account_type": 1
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/mail_accounts/",
+     "json": {
+      "name": "w2-dupe",
+      "imap_server": "imap.example.invalid",
+      "imap_port": 993,
+      "imap_security": 2,
+      "username": "u",
+      "password": "pw-secret",
+      "character_set": "UTF-8",
+      "is_token": false,
+      "account_type": 1
+     }
+    },
+    {
+     "sql": "select 'mailaccount' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_mailaccount x union all select 'mailrule' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_mailrule x union all select 'mailrule_assign_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_mailrule_assign_tags x union all select 'processedmail' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_processedmail x order by 1, 2"
+    }
+   ]
+  },
+  {
+   "id": "w2.mail.acc.update.state",
+   "route": "mail_accounts.partial_update",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PATCH",
+     "path": "/api/mail_accounts/1/",
+     "json": {
+      "password": "**********",
+      "imap_port": 1993
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/mail_accounts/1/",
+     "json": {
+      "password": "new-secret"
+     }
+    },
+    {
+     "method": "PUT",
+     "path": "/api/mail_accounts/2/",
+     "json": {
+      "name": "put-acc",
+      "imap_server": "imap.example.invalid",
+      "imap_port": 993,
+      "imap_security": 2,
+      "username": "u",
+      "password": "pw-secret",
+      "character_set": "UTF-8",
+      "is_token": false,
+      "account_type": 1
+     }
+    },
+    {
+     "sql": "select 'mailaccount' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_mailaccount x union all select 'mailrule' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_mailrule x union all select 'mailrule_assign_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_mailrule_assign_tags x union all select 'processedmail' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_processedmail x order by 1, 2"
+    }
+   ]
+  },
+  {
+   "id": "w2.mail.acc.update.foreign",
+   "route": "mail_accounts.partial_update",
+   "users": [
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PATCH",
+     "path": "/api/mail_accounts/1/",
+     "json": {
+      "name": "x"
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/mail_accounts/2/",
+     "json": {
+      "name": "y"
+     }
+    },
+    {
+     "sql": "select 'mailaccount' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_mailaccount x union all select 'mailrule' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_mailrule x union all select 'mailrule_assign_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_mailrule_assign_tags x union all select 'processedmail' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_processedmail x order by 1, 2"
+    }
+   ]
+  },
+  {
+   "id": "w2.mail.acc.destroy.state",
+   "route": "mail_accounts.destroy",
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "DELETE",
+     "path": "/api/mail_accounts/1/"
+    },
+    {
+     "sql": "select 'mailaccount' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_mailaccount x union all select 'mailrule' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_mailrule x union all select 'mailrule_assign_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_mailrule_assign_tags x union all select 'processedmail' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_processedmail x order by 1, 2"
+    }
+   ]
+  },
+  {
+   "id": "w2.mail.acc.process.state",
+   "route": "mail_accounts.process",
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/mail_accounts/1/process/"
+    },
+    {
+     "sql": "select id, task_type, trigger_source, status, owner_id, input_data from documents_paperlesstask where id > 12 order by id"
+    }
+   ]
+  },
+  {
+   "id": "w2.mail.rule.create.state",
+   "route": "mail_rules.create",
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/mail_rules/",
+     "json": {
+      "name": "w2-rule",
+      "account": 1,
+      "folder": "INBOX/sub",
+      "filter_from": "a@example.org",
+      "maximum_age": 10,
+      "action": 3,
+      "action_parameter": "",
+      "assign_tags": [
+       1,
+       2
+      ],
+      "assign_correspondent": 1,
+      "assign_document_type": 1,
+      "order": 4,
+      "attachment_type": 2,
+      "consumption_scope": 3,
+      "pdf_layout": 2,
+      "assign_title_from": 2,
+      "assign_correspondent_from": 3,
+      "assign_owner_from_rule": false,
+      "stop_processing": true
+     }
+    },
+    {
+     "sql": "select 'mailaccount' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_mailaccount x union all select 'mailrule' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_mailrule x union all select 'mailrule_assign_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_mailrule_assign_tags x union all select 'processedmail' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_processedmail x order by 1, 2"
+    },
+    {
+     "sql": "select ct.model, o.object_pk, o.user_id as who, 'u' as kind, p.codename from guardian_userobjectpermission o join auth_permission p on p.id = o.permission_id join django_content_type ct on ct.id = o.content_type_id union all select ct.model, o.object_pk, o.group_id, 'g', p.codename from guardian_groupobjectpermission o join auth_permission p on p.id = o.permission_id join django_content_type ct on ct.id = o.content_type_id order by 1, 2, 4, 3, 5"
+    }
+   ]
+  },
+  {
+   "id": "w2.mail.rule.update.state",
+   "route": "mail_rules.partial_update",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PATCH",
+     "path": "/api/mail_rules/1/",
+     "json": {
+      "assign_tags": [],
+      "action": 4
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/mail_rules/1/",
+     "json": {
+      "action": 3,
+      "action_parameter": null
+     }
+    },
+    {
+     "sql": "select 'mailaccount' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_mailaccount x union all select 'mailrule' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_mailrule x union all select 'mailrule_assign_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_mailrule_assign_tags x union all select 'processedmail' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_processedmail x order by 1, 2"
+    }
+   ]
+  },
+  {
+   "id": "w2.mail.rule.destroy.state",
+   "route": "mail_rules.destroy",
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "DELETE",
+     "path": "/api/mail_rules/1/"
+    },
+    {
+     "sql": "select 'mailaccount' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_mailaccount x union all select 'mailrule' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_mailrule x union all select 'mailrule_assign_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_mailrule_assign_tags x union all select 'processedmail' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_processedmail x order by 1, 2"
+    }
+   ]
+  },
+  {
+   "id": "w2.mail.processed.bulk_delete.state",
+   "route": "processed_mail.bulk_delete",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/processed_mail/bulk_delete/",
+     "json": {
+      "mail_ids": [
+       1,
+       2,
+       3
+      ]
+     }
+    },
+    {
+     "sql": "select 'mailaccount' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_mailaccount x union all select 'mailrule' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_mailrule x union all select 'mailrule_assign_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_mailrule_assign_tags x union all select 'processedmail' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from paperless_mail_processedmail x order by 1, 2"
+    }
+   ]
+  }
+ ]
+}

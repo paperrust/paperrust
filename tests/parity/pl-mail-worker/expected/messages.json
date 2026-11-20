@@ -1,0 +1,163 @@
+{
+ "01_plain.eml": {
+  "uid": "1",
+  "subject": "Plain text only",
+  "from_": "alice@example.org",
+  "from_name": "Alice Example",
+  "date": "2025-01-06T08:00:00+01:00",
+  "attachments": [],
+  "eml_sha256": "341b4bfb0fd67e374eee9c02b0c00db4c075f697ef76d00069dd0ba99b24e595"
+ },
+ "02_pdf_attachment.eml": {
+  "uid": "1",
+  "subject": "Invoice 2025-001",
+  "from_": "bob@example.org",
+  "from_name": "Bob, the Builder",
+  "date": "2025-01-07T09:00:00+01:00",
+  "attachments": [
+   {
+    "filename": "invoice-2025-001.pdf",
+    "content_disposition": "attachment",
+    "content_type": "application/pdf",
+    "sha256": "794abaa4f6f06fc519895c22944a0ab43ad02b4fb32bdefa1952ce81613cb47b",
+    "magic": "application/pdf"
+   },
+   {
+    "filename": "signature.asc",
+    "content_disposition": "attachment",
+    "content_type": "application/octet-stream",
+    "sha256": "2760928ce990beca283b62a54266de511eb32047bb9fbdcb00858fec8d874a11",
+    "magic": "application/pgp-signature"
+   }
+  ],
+  "eml_sha256": "77b444f6ec0a6e2b4419149b9755ac3a876d1cbf843f7b87eee43e2d13741c5d"
+ },
+ "03_long_headers.eml": {
+  "uid": "1",
+  "subject": "This is a very long subject line that definitely exceeds the seventy-eight character limit of RFC 5322",
+  "from_": "carol@example.org",
+  "from_name": "Carol",
+  "date": "2025-01-08T10:30:00-05:00",
+  "attachments": [],
+  "eml_sha256": "8c1c11626466147e7edefc4025778a2d007b6b380ed076dabe7f9c00628b64b1"
+ },
+ "04_8bit_headers.eml": {
+  "uid": "1",
+  "subject": "Rechnung für März – Größe",
+  "from_": "doerte@example.org",
+  "from_name": "Dörte Müller",
+  "date": "2025-01-09T11:00:00+01:00",
+  "attachments": [],
+  "eml_sha256": "ede269383aefc48905c9bcd2dd9e3691cdb08202af0a93198948d34d351c9dd1"
+ },
+ "05_nested_inline.eml": {
+  "uid": "1",
+  "subject": "Beleg über 100 CHF",
+  "from_": "eve@example.org",
+  "from_name": "Eve Österreich",
+  "date": "2025-01-10T12:00:00+00:00",
+  "attachments": [
+   {
+    "filename": "logo.png",
+    "content_disposition": "inline",
+    "content_type": "image/png",
+    "sha256": "6b7fa434f92a8b80aab02d9bf1a12e49ffcae424e4013a1c4f68b67e3d2bbcd0",
+    "magic": "image/png"
+   },
+   {
+    "filename": "Beleg über 100.pdf",
+    "content_disposition": "attachment",
+    "content_type": "application/pdf",
+    "sha256": "794abaa4f6f06fc519895c22944a0ab43ad02b4fb32bdefa1952ce81613cb47b",
+    "magic": "application/pdf"
+   }
+  ],
+  "eml_sha256": "670847425fdb961ddce1caa8e1463d12ad11554541c9df8fe521347fd2b5246b"
+ },
+ "06_forwarded.eml": {
+  "uid": "1",
+  "subject": "Fwd: original",
+  "from_": "frank@example.org",
+  "from_name": "",
+  "date": "2025-01-11T13:00:00+01:00",
+  "attachments": [
+   {
+    "filename": "",
+    "content_disposition": "",
+    "content_type": "message/rfc822",
+    "sha256": "9c41d42273984666855f41ef4b8ebae3b7ffa68c26e0540769f4c0570d2a5518",
+    "magic": "message/rfc822"
+   }
+  ],
+  "eml_sha256": "9f1ec05c9f2bbd573247a599f4fcd1fc6276b595f9c15858bc686107a46a4734"
+ },
+ "07_lf_only_no_close.eml": {
+  "uid": "1",
+  "subject": "LF only and no close boundary",
+  "from_": "grace@example.org",
+  "from_name": "Grace",
+  "date": "2025-01-12T14:00:00+01:00",
+  "attachments": [
+   {
+    "filename": "scan.PDF",
+    "content_disposition": "attachment",
+    "content_type": "application/pdf",
+    "sha256": "9eb33abcffd14da9ff93ad8cc9c73ddd5ec0dc4c2d186315f0a2b0a9375ca479",
+    "magic": "application/pdf"
+   }
+  ],
+  "eml_sha256": "adf1c7ede8f0e33012752032347bc987fc510e53ddd91e8c344315c035e88263"
+ },
+ "08_no_date_bad_from.eml": {
+  "uid": "1",
+  "subject": "No date header",
+  "from_": "",
+  "from_name": "just-a-name",
+  "date": "1900-01-01T00:00:00+01:00",
+  "attachments": [],
+  "eml_sha256": "bdfe4194e8cb89aa19912446b5197d3e85598d869fb5d000418a8229a2339402"
+ },
+ "09_signed.eml": {
+  "uid": "1",
+  "subject": "Signed message with a rather long subject so that folding would normally apply here",
+  "from_": "heidi@example.org",
+  "from_name": "Heidi",
+  "date": "2025-01-13T15:00:00+01:00",
+  "attachments": [
+   {
+    "filename": "signature.asc",
+    "content_disposition": "attachment",
+    "content_type": "application/pgp-signature",
+    "sha256": "72ca6f6c862452aebabaa2110f0da914ad5728a7338c74159fa250070e8b041e",
+    "magic": "application/pgp-signature"
+   }
+  ],
+  "eml_sha256": "d281daed095e24173ad4c37f07f1d8de799d0fb241136c13f84f39d3cc29814f"
+ },
+ "10_inline_only.eml": {
+  "uid": "1",
+  "subject": "Inline PDF only",
+  "from_": "ivan@example.org",
+  "from_name": "Ivan",
+  "date": "2025-01-14T16:00:00+01:00",
+  "attachments": [
+   {
+    "filename": "inline.pdf",
+    "content_disposition": "inline",
+    "content_type": "application/pdf",
+    "sha256": "794abaa4f6f06fc519895c22944a0ab43ad02b4fb32bdefa1952ce81613cb47b",
+    "magic": "application/pdf"
+   }
+  ],
+  "eml_sha256": "2c0d4dca2b7969928b1a4f1f7c710720be316e3b72fad28b0eac4be30cc29e43"
+ },
+ "11_invoice_reminder.eml": {
+  "uid": "1",
+  "subject": "Invoice reminder",
+  "from_": "zed@example.org",
+  "from_name": "Zed",
+  "date": "2025-01-15T17:00:00+01:00",
+  "attachments": [],
+  "eml_sha256": "53cfe89db50878bd5d92129c38316ee23d5027c3e01caa1e34b9b4989e00ea5f"
+ }
+}

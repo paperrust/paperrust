@@ -1,0 +1,14 @@
+// Global styles of the classic Light UI (after Bootstrap from the npm package, see src/main.ts).
+// Order matters: colors/dark mode, print, then the base rules.
+@use 'theme';
+@use 'print';
+@use 'base';
+
+// Fixed dimensions instead of style="…" in the markup (CSP without 'unsafe-inline', test log A-331)
+.pr-lh-14 { line-height: 1.4; }
+.pr-w-25px { width: 25px; }
+.pr-w-2rem { width: 2rem; }
+.pr-minw-150 { min-width: 150px; }
+.pr-wrap-anywhere { overflow-wrap: anywhere; }
+.pr-size-3rem { width: 3rem; height: 3rem; }
+.pr-size-26rem { width: 26rem; height: 26rem; }

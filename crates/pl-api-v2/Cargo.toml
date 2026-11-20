@@ -1,0 +1,52 @@
+[package]
+name = "pl-api-v2"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+# Native API v2 under /rs/api/v2 (ARCHITECTURE-V2 §3). Never depends on v1 serializers
+# (pl-documents) or on pl_core::pagination; permissions are decided by the core (pl-domain/pl-store).
+[features]
+# /ask (retrieval/answer via pl-ai like MCP ask_documents). Without it → /ask answers 501.
+default = ["ai"]
+ai = ["dep:pl-ai"]
+
+[dependencies]
+pl-domain.workspace = true
+pl-store.workspace = true
+pl-core.workspace = true
+pl-authz.workspace = true
+pl-auth-api.workspace = true
+axum.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+futures.workspace = true
+tokio-util.workspace = true
+percent-encoding.workspace = true
+bytes.workspace = true
+# System settings (WP5): registry/storage, logo check like v1 (SVG allow list, raster re-encoded)
+pl-settings.workspace = true
+sqlx.workspace = true
+rand.workspace = true
+image.workspace = true
+quick-xml.workspace = true
+# ASN label generator (/asn/…); path instead of a workspace entry (CORE-REQUEST: pl-labels in [workspace.dependencies])
+pl-labels = { path = "../pl-labels" }
+# PaperRust UI (design 2): life areas, timeline (pl-timeline), questions to the archive
+# (pl-ai: the same retrieval as MCP ask_documents). Path instead of a workspace entry (CORE-REQUEST:
+# pl-timeline in [workspace.dependencies]).
+pl-timeline = { path = "../pl-timeline" }
+pl-ai = { workspace = true, optional = true }
+# /ask: v1 calls in-process (Router::oneshot)
+tower = { workspace = true, features = ["util"] }
+
+[dev-dependencies]
+tower = { workspace = true, features = ["util"] }
+http-body-util.workspace = true
+# WP5 test: parity with v1 `/api/config/`
+pl-system.workspace = true

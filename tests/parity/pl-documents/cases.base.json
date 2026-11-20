@@ -1,0 +1,675 @@
+{
+ "crate": "pl-documents",
+ "generated_by": "tests/parity/harness/gen_base_catalog.py (do not edit; add cases.json instead)",
+ "vars": {
+  "doc_id": {
+   "get": "/api/documents/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1,
+    "fields": "id"
+   }
+  },
+  "doc_id_last": {
+   "get": "/api/documents/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "-id",
+    "page_size": 1,
+    "fields": "id"
+   }
+  },
+  "doc_with_notes": {
+   "get": "/api/documents/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "-num_notes",
+    "page_size": 1,
+    "fields": "id"
+   }
+  }
+ },
+ "cases": [
+  {
+   "id": "documents.list.frontend-default",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "include_selection_data": "true"
+   },
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "documents.list.truncate",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "truncate_content": "true"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.list.fields-id",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 100000,
+    "fields": "id"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.list.fields-id-title",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "id__in": "${doc_id},${doc_id_last}",
+    "ordering": "-id",
+    "page_size": 1000,
+    "fields": "id,title"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.list.fields-unknown",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "fields": "nope"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.list.full-perms",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "full_perms": "true"
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "documents.list.page-too-high",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 99999
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.list.page-invalid",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": "x"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.list.page-size-huge",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page_size": 10000000,
+    "fields": "id"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.list.v9-all",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page_size": 3
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "9"
+   ]
+  },
+  {
+   "id": "documents.detail",
+   "route": "documents.retrieve",
+   "method": "GET",
+   "path": "/api/documents/${doc_id}/",
+   "query": {
+    "full_perms": "true"
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "documents.detail-unknown",
+   "route": "documents.retrieve",
+   "method": "GET",
+   "path": "/api/documents/999999999/",
+   "query": {
+    "full_perms": "true"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.detail-nonint",
+   "route": "documents.retrieve",
+   "method": "GET",
+   "path": "/api/documents/abc/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.detail-anon",
+   "route": "documents.retrieve",
+   "method": "GET",
+   "path": "/api/documents/${doc_id}/",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.detail-noslash",
+   "route": "documents.retrieve",
+   "method": "GET",
+   "path": "/api/documents/${doc_id}",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "follow": false
+  },
+  {
+   "id": "documents.retrieve.plain",
+   "route": "documents.retrieve",
+   "method": "GET",
+   "path": "/api/documents/${doc_id}/",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "documents.retrieve.versions",
+   "route": "documents.retrieve",
+   "method": "GET",
+   "path": "/api/documents/${doc_id}/",
+   "query": {
+    "fields": "id,versions"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.retrieve.fields",
+   "route": "documents.retrieve",
+   "method": "GET",
+   "path": "/api/documents/${doc_id}/",
+   "query": {
+    "fields": "id,title,tags"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.retrieve.version-param",
+   "route": "documents.retrieve",
+   "method": "GET",
+   "path": "/api/documents/${doc_id}/",
+   "query": {
+    "full_perms": "true",
+    "version": 999999999
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.metadata",
+   "route": "documents.metadata",
+   "method": "GET",
+   "path": "/api/documents/${doc_id}/metadata/",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.metadata.unknown",
+   "route": "documents.metadata",
+   "method": "GET",
+   "path": "/api/documents/999999999/metadata/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.metadata.version",
+   "route": "documents.metadata",
+   "method": "GET",
+   "path": "/api/documents/${doc_id}/metadata/",
+   "query": {
+    "version": 999999999
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.notes",
+   "route": "documents.notes",
+   "method": "GET",
+   "path": "/api/documents/${doc_with_notes}/notes/",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "documents.notes.unknown",
+   "route": "documents.notes",
+   "method": "GET",
+   "path": "/api/documents/999999999/notes/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.history",
+   "route": "documents.history",
+   "method": "GET",
+   "path": "/api/documents/${doc_id}/history/",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.history.unknown",
+   "route": "documents.history",
+   "method": "GET",
+   "path": "/api/documents/999999999/history/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.share_links",
+   "route": "documents.share_links",
+   "method": "GET",
+   "path": "/api/documents/${doc_id}/share_links/",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.share_links.unknown",
+   "route": "documents.share_links",
+   "method": "GET",
+   "path": "/api/documents/999999999/share_links/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.root",
+   "route": "documents.root",
+   "method": "GET",
+   "path": "/api/documents/${doc_id}/root/",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.root.unknown",
+   "route": "documents.root",
+   "method": "GET",
+   "path": "/api/documents/999999999/root/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.suggestions",
+   "route": "documents.suggestions",
+   "method": "GET",
+   "path": "/api/documents/${doc_id}/suggestions/",
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.suggestions.unknown",
+   "route": "documents.suggestions",
+   "method": "GET",
+   "path": "/api/documents/999999999/suggestions/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.ai_suggestions",
+   "route": "documents.ai_suggestions",
+   "method": "GET",
+   "path": "/api/documents/${doc_id}/ai_suggestions/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.next_asn",
+   "route": "documents.next_asn",
+   "method": "GET",
+   "path": "/api/documents/next_asn/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "documents.selection_data",
+   "route": "documents.selection_data",
+   "method": "POST",
+   "path": "/api/documents/selection_data/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "json": {
+    "documents": [
+     "${doc_id}",
+     "${doc_id_last}"
+    ]
+   }
+  },
+  {
+   "id": "documents.selection_data.empty",
+   "route": "documents.selection_data",
+   "method": "POST",
+   "path": "/api/documents/selection_data/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "json": {
+    "documents": []
+   }
+  },
+  {
+   "id": "documents.selection_data.invalid",
+   "route": "documents.selection_data",
+   "method": "POST",
+   "path": "/api/documents/selection_data/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "json": {
+    "documents": "x"
+   }
+  },
+  {
+   "id": "documents.selection_data.get",
+   "route": "documents.selection_data",
+   "method": "GET",
+   "path": "/api/documents/selection_data/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.list.auth",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "anon",
+    "badtoken",
+    "inactive",
+    "admin@session",
+    "admin@basic"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.list.apiver",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "none",
+    "99",
+    "abc"
+   ]
+  },
+  {
+   "id": "documents.retrieve.auth",
+   "route": "documents.retrieve",
+   "method": "GET",
+   "path": "/api/documents/${doc_id}/",
+   "users": [
+    "anon",
+    "badtoken",
+    "inactive",
+    "admin@session",
+    "admin@basic"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.retrieve.apiver",
+   "route": "documents.retrieve",
+   "method": "GET",
+   "path": "/api/documents/${doc_id}/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "none",
+    "99",
+    "abc"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="{{ html_lang() }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="color-scheme" content="light dark">
+<title>{{ t("auth.page.forbidden") }} (403)</title>
+<style>
+:root { --bg: #f4f6f5; --card: #fff; --ink: #1f1a17; --muted: #5b5f63; --line: #d5d9dc; font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+@media (prefers-color-scheme: dark) { :root { --bg: #121315; --card: #1b1c1f; --ink: #d3d7de; --muted: #9aa1ab; --line: #34363b; } }
+body { margin: 0; background: var(--bg); color: var(--ink); font-size: 15px; line-height: 1.5; }
+main { max-width: 560px; margin: 10vh auto; padding: 24px 28px; background: var(--card); border: 1px solid var(--line); border-top: 3px solid #b7410e; border-radius: 2px; }
+h1 { font-size: 20px; font-weight: 600; margin: 0 0 12px; }
+h1 span { color: var(--muted); font-weight: 400; }
+p { margin: 0 0 12px; }
+.muted { color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>{{ t("auth.page.forbidden") }} <span>(403)</span></h1>
+  <p>{{ t("auth.csrf.text") }}</p>
+  {%- if no_referer %}
+  <p>{{ t("auth.csrf.no_referer") }}</p>
+  {%- endif %}
+  {%- if no_cookie %}
+  <p>{{ t("auth.csrf.no_cookie") }}</p>
+  {%- endif %}
+  <p class="muted">{{ t("auth.csrf.retry") }}</p>
+</main>
+</body>
+</html>

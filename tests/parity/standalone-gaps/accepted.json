@@ -1,0 +1,67 @@
+{
+  "_doc": "Accepted deviations of the standalone-gap cases (docs/STANDALONE-GAPS.md).",
+  "rules": [
+    {
+      "name": "oauth-state-random",
+      "reason": "PaperlessMailOAuth2Manager erzeugt pro Anfrage einen neuen Zufalls-state (secrets.token_urlsafe(32)); A und B liefern daher verschiedene state=-Parameter. Restliche URL (Endpunkt, Parameterreihenfolge, Kodierung) per Hand und im Unit-Test pl-auth-api ui_settings::tests::oauth_urls_like_httpx_oauth verglichen.",
+      "ref": "docs/STANDALONE-GAPS.md#mail-oauth",
+      "case": "gaps.*",
+      "kind": [
+        "value"
+      ],
+      "path": "(step\\d+:)?\\$\\.settings\\.(gmail|outlook)_oauth_url"
+    },
+    {
+      "name": "standalone-405-without-view-permissions",
+      "reason": "Nur ohne Django (B = PAPERRUST_DJANGO_URL=off): eine Methode ohne Rust-Route auf einem /api/-Pfad bekommt Authentifizierung + DRF-405 (pl-server routing::method_not_allowed_without_django) statt vorher 404. Die view-eigene Rechteprüfung vor dem 405 (z. B. Modellrecht delete_tag bei DELETE /api/tags/, ViewDocumentsPermissions) ist nicht nachgebaut: Nutzer ohne das Recht bekommen 405 statt 403. Im Mischbetrieb gehen solche Anfragen unverändert an Django (Fall dort identisch).",
+      "ref": "docs/STANDALONE-GAPS.md#5-querschnitt-body-gate",
+      "case": "gaps.method.not_allowed@*",
+      "kind": [
+        "status",
+        "value"
+      ],
+      "path": "step\\d+:(\\$status|\\$\\.detail)",
+      "target": "b"
+    },
+    {
+      "name": "gaps-bulk-download-windows-unlink",
+      "reason": "Wie die globale Regel bulk-download-windows-unlink: die Windows-Referenz loescht die noch offene Temp-ZIP (PermissionError WinError 32 -> 500); unter Linux liefert upstream 200 + ZIP wie Rust. Referenzartefakt, betrifft nur den Erfolgsfall (step0).",
+      "ref": "docs/contract/pl-files.md#known-differences",
+      "case": "gaps.selall.bulk_download@*",
+      "kind": [
+        "status",
+        "header",
+        "missing",
+        "extra",
+        "value",
+        "type",
+        "length",
+        "body-kind"
+      ],
+      "path": "step0:.*"
+    },
+    {
+      "name": "gaps-status-storage-available-volatile",
+      "reason": "Freier Speicher aendert sich zwischen A- und B-Anfrage (wie die globale Regel fuer status@*).",
+      "ref": "docs/contract/pl-system.md#known-differences",
+      "case": "gaps.prefix_views@*",
+      "kind": [
+        "value"
+      ],
+      "path": "step\\d+:\\$\\.storage\\.available"
+    },
+    {
+      "name": "bulk-update-coalesced",
+      "reason": "Nacharbeit bulk_update_documents wird an eine wartende, nicht gestartete Aufgabe angehängt (stress B6): vier Massenänderungen hintereinander ergeben eine PaperlessTask-Zeile in B, vier in A. Wirkung je Dokument gleich (ids mit Wiederholungen).",
+      "ref": "docs/contract/pl-documents-write.md#known-differences (Zusammenfassen der Nacharbeit, coalesce.rs)",
+      "case": "gaps.selall.bulk_edit@*",
+      "kind": [
+        "length"
+      ],
+      "path": "step8:\\$",
+      "a": 4,
+      "b": 1,
+      "target": "b"
+    }
+  ]
+}

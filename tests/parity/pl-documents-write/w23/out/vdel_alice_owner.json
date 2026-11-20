@@ -1,0 +1,20 @@
+{
+  "django": {
+    "status": 200,
+    "body": {
+      "result": "OK",
+      "current_version_id": 203
+    },
+    "plan": [],
+    "files": {}
+  },
+  "rust": {
+    "status": 200,
+    "body": {
+      "result": "OK",
+      "current_version_id": 203
+    },
+    "plan": [],
+    "files": {}
+  }
+}

@@ -1,0 +1,1057 @@
+{
+ "crate": "pl-workflows",
+ "cases": [
+  {
+   "id": "w2.wf.create.nested-state",
+   "route": "workflows.create",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/workflows/",
+     "json": {
+      "name": "w2 wf",
+      "order": 7,
+      "enabled": true,
+      "triggers": [
+       {
+        "type": 1,
+        "sources": [
+         1,
+         3
+        ],
+        "filter_filename": "*.pdf",
+        "filter_path": "/in/*",
+        "filter_has_tags": [
+         1,
+         2
+        ],
+        "filter_has_all_tags": [
+         3
+        ],
+        "filter_has_not_tags": [
+         4
+        ],
+        "filter_has_any_correspondents": [
+         1
+        ],
+        "filter_has_not_correspondents": [
+         2
+        ],
+        "filter_has_any_document_types": [
+         1
+        ],
+        "filter_has_not_document_types": [
+         2
+        ],
+        "filter_has_any_storage_paths": [
+         1
+        ],
+        "filter_has_not_storage_paths": [
+         2
+        ],
+        "match": "invoice",
+        "matching_algorithm": 1,
+        "is_insensitive": false
+       },
+       {
+        "type": 4,
+        "schedule_offset_days": 3,
+        "schedule_is_recurring": true,
+        "schedule_recurring_interval_days": 7,
+        "schedule_date_field": "custom_field",
+        "schedule_date_custom_field": 4
+       }
+      ],
+      "actions": [
+       {
+        "type": 1,
+        "assign_title": "{{ correspondent }}",
+        "assign_tags": [
+         1,
+         5
+        ],
+        "assign_correspondent": 2,
+        "assign_document_type": 1,
+        "assign_storage_path": 1,
+        "assign_owner": 3,
+        "assign_view_users": [
+         3,
+         4
+        ],
+        "assign_view_groups": [
+         1
+        ],
+        "assign_change_users": [
+         3
+        ],
+        "assign_change_groups": [
+         2
+        ],
+        "assign_custom_fields": [
+         1,
+         2
+        ],
+        "assign_custom_fields_values": {
+         "1": "abc",
+         "2": "https://example.org"
+        }
+       },
+       {
+        "type": 2,
+        "remove_tags": [
+         1
+        ],
+        "remove_all_tags": false,
+        "remove_correspondents": [
+         1
+        ],
+        "remove_document_types": [
+         1
+        ],
+        "remove_storage_paths": [
+         1
+        ],
+        "remove_custom_fields": [
+         1
+        ],
+        "remove_owners": [
+         2
+        ],
+        "remove_view_users": [
+         3
+        ],
+        "remove_view_groups": [
+         1
+        ],
+        "remove_change_users": [
+         4
+        ],
+        "remove_change_groups": [
+         2
+        ]
+       },
+       {
+        "type": 3,
+        "email": {
+         "subject": "S {{ doc_title }}",
+         "body": "B",
+         "to": "a@example.org, b@example.org",
+         "include_document": true
+        }
+       },
+       {
+        "type": 4,
+        "webhook": {
+         "url": "http://127.0.0.1:9/hook",
+         "use_params": true,
+         "params": {
+          "a": "1"
+         },
+         "headers": {
+          "X-A": "b"
+         },
+         "include_document": false
+        }
+       }
+      ]
+     }
+    },
+    {
+     "sql": "select 'workflow' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow x union all select 'workflow_actions' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_actions x union all select 'workflow_triggers' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_triggers x union all select 'workflowaction' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction x union all select 'workflowaction_assign_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_groups x union all select 'workflowaction_assign_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_users x union all select 'workflowaction_assign_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_custom_fields x union all select 'workflowaction_assign_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_tags x union all select 'workflowaction_assign_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_groups x union all select 'workflowaction_assign_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_users x union all select 'workflowaction_remove_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_groups x union all select 'workflowaction_remove_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_users x union all select 'workflowaction_remove_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_correspondents x union all select 'workflowaction_remove_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_custom_fields x union all select 'workflowaction_remove_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_document_types x union all select 'workflowaction_remove_owners' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_owners x union all select 'workflowaction_remove_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_storage_paths x union all select 'workflowaction_remove_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_tags x union all select 'workflowaction_remove_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_groups x union all select 'workflowaction_remove_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_users x union all select 'workflowactionemail' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionemail x union all select 'workflowactionwebhook' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionwebhook x union all select 'workflowrun' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowrun x union all select 'workflowtrigger' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger x union all select 'workflowtrigger_filter_has_all_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_all_tags x union all select 'workflowtrigger_filter_has_any_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_correspondents x union all select 'workflowtrigger_filter_has_any_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_document_types x union all select 'workflowtrigger_filter_has_any_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_storage_paths x union all select 'workflowtrigger_filter_has_not_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_correspondents x union all select 'workflowtrigger_filter_has_not_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_document_types x union all select 'workflowtrigger_filter_has_not_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_storage_paths x union all select 'workflowtrigger_filter_has_not_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_tags x union all select 'workflowtrigger_filter_has_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_tags x order by 1, 2"
+    }
+   ]
+  },
+  {
+   "id": "w2.wf.create.denied-state",
+   "route": "workflows.create",
+   "users": [
+    "user1",
+    "user2",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/workflows/",
+     "json": {
+      "name": "x",
+      "triggers": [
+       {
+        "type": 2
+       }
+      ],
+      "actions": [
+       {
+        "type": 1
+       }
+      ]
+     }
+    },
+    {
+     "sql": "select 'workflow' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow x union all select 'workflow_actions' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_actions x union all select 'workflow_triggers' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_triggers x union all select 'workflowaction' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction x union all select 'workflowaction_assign_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_groups x union all select 'workflowaction_assign_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_users x union all select 'workflowaction_assign_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_custom_fields x union all select 'workflowaction_assign_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_tags x union all select 'workflowaction_assign_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_groups x union all select 'workflowaction_assign_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_users x union all select 'workflowaction_remove_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_groups x union all select 'workflowaction_remove_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_users x union all select 'workflowaction_remove_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_correspondents x union all select 'workflowaction_remove_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_custom_fields x union all select 'workflowaction_remove_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_document_types x union all select 'workflowaction_remove_owners' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_owners x union all select 'workflowaction_remove_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_storage_paths x union all select 'workflowaction_remove_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_tags x union all select 'workflowaction_remove_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_groups x union all select 'workflowaction_remove_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_users x union all select 'workflowactionemail' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionemail x union all select 'workflowactionwebhook' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionwebhook x union all select 'workflowrun' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowrun x union all select 'workflowtrigger' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger x union all select 'workflowtrigger_filter_has_all_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_all_tags x union all select 'workflowtrigger_filter_has_any_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_correspondents x union all select 'workflowtrigger_filter_has_any_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_document_types x union all select 'workflowtrigger_filter_has_any_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_storage_paths x union all select 'workflowtrigger_filter_has_not_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_correspondents x union all select 'workflowtrigger_filter_has_not_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_document_types x union all select 'workflowtrigger_filter_has_not_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_storage_paths x union all select 'workflowtrigger_filter_has_not_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_tags x union all select 'workflowtrigger_filter_has_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_tags x order by 1, 2"
+    }
+   ]
+  },
+  {
+   "id": "w2.wf.create.existing-ids",
+   "route": "workflows.create",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/workflows/",
+     "json": {
+      "name": "reuse",
+      "triggers": [
+       {
+        "id": 1,
+        "type": 2
+       }
+      ],
+      "actions": [
+       {
+        "id": 1,
+        "type": 1,
+        "assign_title": "t"
+       }
+      ]
+     }
+    },
+    {
+     "sql": "select 'workflow' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow x union all select 'workflow_actions' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_actions x union all select 'workflow_triggers' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_triggers x union all select 'workflowaction' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction x union all select 'workflowaction_assign_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_groups x union all select 'workflowaction_assign_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_users x union all select 'workflowaction_assign_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_custom_fields x union all select 'workflowaction_assign_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_tags x union all select 'workflowaction_assign_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_groups x union all select 'workflowaction_assign_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_users x union all select 'workflowaction_remove_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_groups x union all select 'workflowaction_remove_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_users x union all select 'workflowaction_remove_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_correspondents x union all select 'workflowaction_remove_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_custom_fields x union all select 'workflowaction_remove_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_document_types x union all select 'workflowaction_remove_owners' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_owners x union all select 'workflowaction_remove_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_storage_paths x union all select 'workflowaction_remove_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_tags x union all select 'workflowaction_remove_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_groups x union all select 'workflowaction_remove_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_users x union all select 'workflowactionemail' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionemail x union all select 'workflowactionwebhook' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionwebhook x union all select 'workflowrun' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowrun x union all select 'workflowtrigger' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger x union all select 'workflowtrigger_filter_has_all_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_all_tags x union all select 'workflowtrigger_filter_has_any_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_correspondents x union all select 'workflowtrigger_filter_has_any_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_document_types x union all select 'workflowtrigger_filter_has_any_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_storage_paths x union all select 'workflowtrigger_filter_has_not_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_correspondents x union all select 'workflowtrigger_filter_has_not_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_document_types x union all select 'workflowtrigger_filter_has_not_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_storage_paths x union all select 'workflowtrigger_filter_has_not_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_tags x union all select 'workflowtrigger_filter_has_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_tags x order by 1, 2"
+    }
+   ]
+  },
+  {
+   "id": "w2.wf.create.bad-refs",
+   "route": "workflows.create",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/workflows/",
+     "json": {
+      "name": "refs",
+      "triggers": [
+       {
+        "type": 2,
+        "filter_has_tags": [
+         9999
+        ]
+       }
+      ],
+      "actions": [
+       {
+        "type": 1
+       }
+      ]
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/workflows/",
+     "json": {
+      "name": "refs2",
+      "triggers": [
+       {
+        "type": 2
+       }
+      ],
+      "actions": [
+       {
+        "type": 1,
+        "assign_owner": 9999
+       }
+      ]
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/workflows/",
+     "json": {
+      "name": "refs3",
+      "triggers": [
+       {
+        "type": 2
+       }
+      ],
+      "actions": [
+       {
+        "type": 1,
+        "assign_custom_fields_values": {
+         "999": 1
+        }
+       }
+      ]
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/workflows/",
+     "json": {
+      "name": "refs4",
+      "triggers": [
+       {
+        "type": 1,
+        "sources": [
+         7
+        ]
+       }
+      ],
+      "actions": [
+       {
+        "type": 1
+       }
+      ]
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/workflows/",
+     "json": {
+      "name": "refs5",
+      "triggers": [],
+      "actions": []
+     }
+    },
+    {
+     "sql": "select 'workflow' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow x union all select 'workflow_actions' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_actions x union all select 'workflow_triggers' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_triggers x union all select 'workflowaction' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction x union all select 'workflowaction_assign_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_groups x union all select 'workflowaction_assign_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_users x union all select 'workflowaction_assign_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_custom_fields x union all select 'workflowaction_assign_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_tags x union all select 'workflowaction_assign_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_groups x union all select 'workflowaction_assign_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_users x union all select 'workflowaction_remove_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_groups x union all select 'workflowaction_remove_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_users x union all select 'workflowaction_remove_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_correspondents x union all select 'workflowaction_remove_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_custom_fields x union all select 'workflowaction_remove_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_document_types x union all select 'workflowaction_remove_owners' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_owners x union all select 'workflowaction_remove_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_storage_paths x union all select 'workflowaction_remove_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_tags x union all select 'workflowaction_remove_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_groups x union all select 'workflowaction_remove_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_users x union all select 'workflowactionemail' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionemail x union all select 'workflowactionwebhook' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionwebhook x union all select 'workflowrun' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowrun x union all select 'workflowtrigger' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger x union all select 'workflowtrigger_filter_has_all_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_all_tags x union all select 'workflowtrigger_filter_has_any_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_correspondents x union all select 'workflowtrigger_filter_has_any_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_document_types x union all select 'workflowtrigger_filter_has_any_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_storage_paths x union all select 'workflowtrigger_filter_has_not_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_correspondents x union all select 'workflowtrigger_filter_has_not_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_document_types x union all select 'workflowtrigger_filter_has_not_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_storage_paths x union all select 'workflowtrigger_filter_has_not_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_tags x union all select 'workflowtrigger_filter_has_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_tags x order by 1, 2"
+    }
+   ]
+  },
+  {
+   "id": "w2.wf.update.replace-prunes",
+   "route": "workflows.partial_update",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/workflow_triggers/",
+     "json": {
+      "type": 2,
+      "filter_filename": "orphan"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/workflow_actions/",
+     "json": {
+      "type": 1,
+      "assign_title": "orphan"
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/workflows/1/",
+     "json": {
+      "triggers": [
+       {
+        "type": 3,
+        "filter_filename": "new.pdf"
+       }
+      ],
+      "actions": [
+       {
+        "type": 2,
+        "remove_all_tags": true
+       }
+      ]
+     }
+    },
+    {
+     "sql": "select 'workflow' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow x union all select 'workflow_actions' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_actions x union all select 'workflow_triggers' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_triggers x union all select 'workflowaction' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction x union all select 'workflowaction_assign_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_groups x union all select 'workflowaction_assign_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_users x union all select 'workflowaction_assign_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_custom_fields x union all select 'workflowaction_assign_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_tags x union all select 'workflowaction_assign_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_groups x union all select 'workflowaction_assign_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_users x union all select 'workflowaction_remove_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_groups x union all select 'workflowaction_remove_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_users x union all select 'workflowaction_remove_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_correspondents x union all select 'workflowaction_remove_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_custom_fields x union all select 'workflowaction_remove_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_document_types x union all select 'workflowaction_remove_owners' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_owners x union all select 'workflowaction_remove_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_storage_paths x union all select 'workflowaction_remove_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_tags x union all select 'workflowaction_remove_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_groups x union all select 'workflowaction_remove_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_users x union all select 'workflowactionemail' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionemail x union all select 'workflowactionwebhook' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionwebhook x union all select 'workflowrun' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowrun x union all select 'workflowtrigger' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger x union all select 'workflowtrigger_filter_has_all_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_all_tags x union all select 'workflowtrigger_filter_has_any_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_correspondents x union all select 'workflowtrigger_filter_has_any_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_document_types x union all select 'workflowtrigger_filter_has_any_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_storage_paths x union all select 'workflowtrigger_filter_has_not_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_correspondents x union all select 'workflowtrigger_filter_has_not_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_document_types x union all select 'workflowtrigger_filter_has_not_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_storage_paths x union all select 'workflowtrigger_filter_has_not_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_tags x union all select 'workflowtrigger_filter_has_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_tags x order by 1, 2"
+    }
+   ]
+  },
+  {
+   "id": "w2.wf.update.keep-ids",
+   "route": "workflows.partial_update",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "GET",
+     "path": "/api/workflows/2/"
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/workflows/2/",
+     "json": {
+      "name": "w2-renamed",
+      "order": 0,
+      "enabled": false
+     }
+    },
+    {
+     "sql": "select 'workflow' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow x union all select 'workflow_actions' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_actions x union all select 'workflow_triggers' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_triggers x union all select 'workflowaction' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction x union all select 'workflowaction_assign_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_groups x union all select 'workflowaction_assign_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_users x union all select 'workflowaction_assign_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_custom_fields x union all select 'workflowaction_assign_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_tags x union all select 'workflowaction_assign_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_groups x union all select 'workflowaction_assign_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_users x union all select 'workflowaction_remove_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_groups x union all select 'workflowaction_remove_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_users x union all select 'workflowaction_remove_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_correspondents x union all select 'workflowaction_remove_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_custom_fields x union all select 'workflowaction_remove_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_document_types x union all select 'workflowaction_remove_owners' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_owners x union all select 'workflowaction_remove_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_storage_paths x union all select 'workflowaction_remove_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_tags x union all select 'workflowaction_remove_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_groups x union all select 'workflowaction_remove_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_users x union all select 'workflowactionemail' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionemail x union all select 'workflowactionwebhook' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionwebhook x union all select 'workflowrun' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowrun x union all select 'workflowtrigger' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger x union all select 'workflowtrigger_filter_has_all_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_all_tags x union all select 'workflowtrigger_filter_has_any_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_correspondents x union all select 'workflowtrigger_filter_has_any_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_document_types x union all select 'workflowtrigger_filter_has_any_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_storage_paths x union all select 'workflowtrigger_filter_has_not_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_correspondents x union all select 'workflowtrigger_filter_has_not_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_document_types x union all select 'workflowtrigger_filter_has_not_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_storage_paths x union all select 'workflowtrigger_filter_has_not_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_tags x union all select 'workflowtrigger_filter_has_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_tags x order by 1, 2"
+    }
+   ]
+  },
+  {
+   "id": "w2.wf.update.put-full",
+   "route": "workflows.update",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PUT",
+     "path": "/api/workflows/1/",
+     "json": {
+      "name": "w2 wf",
+      "order": 7,
+      "enabled": true,
+      "triggers": [
+       {
+        "type": 1,
+        "sources": [
+         1,
+         3
+        ],
+        "filter_filename": "*.pdf",
+        "filter_path": "/in/*",
+        "filter_has_tags": [
+         1,
+         2
+        ],
+        "filter_has_all_tags": [
+         3
+        ],
+        "filter_has_not_tags": [
+         4
+        ],
+        "filter_has_any_correspondents": [
+         1
+        ],
+        "filter_has_not_correspondents": [
+         2
+        ],
+        "filter_has_any_document_types": [
+         1
+        ],
+        "filter_has_not_document_types": [
+         2
+        ],
+        "filter_has_any_storage_paths": [
+         1
+        ],
+        "filter_has_not_storage_paths": [
+         2
+        ],
+        "match": "invoice",
+        "matching_algorithm": 1,
+        "is_insensitive": false
+       },
+       {
+        "type": 4,
+        "schedule_offset_days": 3,
+        "schedule_is_recurring": true,
+        "schedule_recurring_interval_days": 7,
+        "schedule_date_field": "custom_field",
+        "schedule_date_custom_field": 4
+       }
+      ],
+      "actions": [
+       {
+        "type": 1,
+        "assign_title": "{{ correspondent }}",
+        "assign_tags": [
+         1,
+         5
+        ],
+        "assign_correspondent": 2,
+        "assign_document_type": 1,
+        "assign_storage_path": 1,
+        "assign_owner": 3,
+        "assign_view_users": [
+         3,
+         4
+        ],
+        "assign_view_groups": [
+         1
+        ],
+        "assign_change_users": [
+         3
+        ],
+        "assign_change_groups": [
+         2
+        ],
+        "assign_custom_fields": [
+         1,
+         2
+        ],
+        "assign_custom_fields_values": {
+         "1": "abc",
+         "2": "https://example.org"
+        }
+       },
+       {
+        "type": 2,
+        "remove_tags": [
+         1
+        ],
+        "remove_all_tags": false,
+        "remove_correspondents": [
+         1
+        ],
+        "remove_document_types": [
+         1
+        ],
+        "remove_storage_paths": [
+         1
+        ],
+        "remove_custom_fields": [
+         1
+        ],
+        "remove_owners": [
+         2
+        ],
+        "remove_view_users": [
+         3
+        ],
+        "remove_view_groups": [
+         1
+        ],
+        "remove_change_users": [
+         4
+        ],
+        "remove_change_groups": [
+         2
+        ]
+       },
+       {
+        "type": 3,
+        "email": {
+         "subject": "S {{ doc_title }}",
+         "body": "B",
+         "to": "a@example.org, b@example.org",
+         "include_document": true
+        }
+       },
+       {
+        "type": 4,
+        "webhook": {
+         "url": "http://127.0.0.1:9/hook",
+         "use_params": true,
+         "params": {
+          "a": "1"
+         },
+         "headers": {
+          "X-A": "b"
+         },
+         "include_document": false
+        }
+       }
+      ]
+     }
+    },
+    {
+     "sql": "select 'workflow' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow x union all select 'workflow_actions' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_actions x union all select 'workflow_triggers' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_triggers x union all select 'workflowaction' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction x union all select 'workflowaction_assign_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_groups x union all select 'workflowaction_assign_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_users x union all select 'workflowaction_assign_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_custom_fields x union all select 'workflowaction_assign_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_tags x union all select 'workflowaction_assign_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_groups x union all select 'workflowaction_assign_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_users x union all select 'workflowaction_remove_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_groups x union all select 'workflowaction_remove_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_users x union all select 'workflowaction_remove_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_correspondents x union all select 'workflowaction_remove_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_custom_fields x union all select 'workflowaction_remove_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_document_types x union all select 'workflowaction_remove_owners' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_owners x union all select 'workflowaction_remove_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_storage_paths x union all select 'workflowaction_remove_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_tags x union all select 'workflowaction_remove_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_groups x union all select 'workflowaction_remove_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_users x union all select 'workflowactionemail' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionemail x union all select 'workflowactionwebhook' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionwebhook x union all select 'workflowrun' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowrun x union all select 'workflowtrigger' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger x union all select 'workflowtrigger_filter_has_all_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_all_tags x union all select 'workflowtrigger_filter_has_any_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_correspondents x union all select 'workflowtrigger_filter_has_any_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_document_types x union all select 'workflowtrigger_filter_has_any_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_storage_paths x union all select 'workflowtrigger_filter_has_not_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_correspondents x union all select 'workflowtrigger_filter_has_not_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_document_types x union all select 'workflowtrigger_filter_has_not_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_storage_paths x union all select 'workflowtrigger_filter_has_not_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_tags x union all select 'workflowtrigger_filter_has_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_tags x order by 1, 2"
+    }
+   ]
+  },
+  {
+   "id": "w2.wf.update.put-missing",
+   "route": "workflows.update",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PUT",
+     "path": "/api/workflows/1/",
+     "json": {
+      "name": "only"
+     }
+    },
+    {
+     "sql": "select 'workflow' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow x union all select 'workflow_actions' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_actions x union all select 'workflow_triggers' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_triggers x union all select 'workflowaction' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction x union all select 'workflowaction_assign_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_groups x union all select 'workflowaction_assign_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_users x union all select 'workflowaction_assign_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_custom_fields x union all select 'workflowaction_assign_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_tags x union all select 'workflowaction_assign_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_groups x union all select 'workflowaction_assign_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_users x union all select 'workflowaction_remove_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_groups x union all select 'workflowaction_remove_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_users x union all select 'workflowaction_remove_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_correspondents x union all select 'workflowaction_remove_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_custom_fields x union all select 'workflowaction_remove_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_document_types x union all select 'workflowaction_remove_owners' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_owners x union all select 'workflowaction_remove_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_storage_paths x union all select 'workflowaction_remove_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_tags x union all select 'workflowaction_remove_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_groups x union all select 'workflowaction_remove_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_users x union all select 'workflowactionemail' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionemail x union all select 'workflowactionwebhook' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionwebhook x union all select 'workflowrun' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowrun x union all select 'workflowtrigger' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger x union all select 'workflowtrigger_filter_has_all_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_all_tags x union all select 'workflowtrigger_filter_has_any_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_correspondents x union all select 'workflowtrigger_filter_has_any_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_document_types x union all select 'workflowtrigger_filter_has_any_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_storage_paths x union all select 'workflowtrigger_filter_has_not_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_correspondents x union all select 'workflowtrigger_filter_has_not_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_document_types x union all select 'workflowtrigger_filter_has_not_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_storage_paths x union all select 'workflowtrigger_filter_has_not_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_tags x union all select 'workflowtrigger_filter_has_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_tags x order by 1, 2"
+    }
+   ]
+  },
+  {
+   "id": "w2.wf.update.email-to-webhook",
+   "route": "workflows.partial_update",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PATCH",
+     "path": "/api/workflows/1/",
+     "json": {
+      "actions": [
+       {
+        "type": 4,
+        "webhook": {
+         "url": "http://127.0.0.1:9/x"
+        }
+       }
+      ]
+     }
+    },
+    {
+     "sql": "select 'workflow' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow x union all select 'workflow_actions' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_actions x union all select 'workflow_triggers' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_triggers x union all select 'workflowaction' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction x union all select 'workflowaction_assign_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_groups x union all select 'workflowaction_assign_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_users x union all select 'workflowaction_assign_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_custom_fields x union all select 'workflowaction_assign_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_tags x union all select 'workflowaction_assign_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_groups x union all select 'workflowaction_assign_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_users x union all select 'workflowaction_remove_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_groups x union all select 'workflowaction_remove_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_users x union all select 'workflowaction_remove_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_correspondents x union all select 'workflowaction_remove_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_custom_fields x union all select 'workflowaction_remove_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_document_types x union all select 'workflowaction_remove_owners' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_owners x union all select 'workflowaction_remove_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_storage_paths x union all select 'workflowaction_remove_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_tags x union all select 'workflowaction_remove_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_groups x union all select 'workflowaction_remove_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_users x union all select 'workflowactionemail' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionemail x union all select 'workflowactionwebhook' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionwebhook x union all select 'workflowrun' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowrun x union all select 'workflowtrigger' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger x union all select 'workflowtrigger_filter_has_all_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_all_tags x union all select 'workflowtrigger_filter_has_any_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_correspondents x union all select 'workflowtrigger_filter_has_any_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_document_types x union all select 'workflowtrigger_filter_has_any_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_storage_paths x union all select 'workflowtrigger_filter_has_not_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_correspondents x union all select 'workflowtrigger_filter_has_not_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_document_types x union all select 'workflowtrigger_filter_has_not_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_storage_paths x union all select 'workflowtrigger_filter_has_not_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_tags x union all select 'workflowtrigger_filter_has_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_tags x order by 1, 2"
+    }
+   ]
+  },
+  {
+   "id": "w2.wf.update.denied",
+   "route": "workflows.partial_update",
+   "users": [
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PATCH",
+     "path": "/api/workflows/1/",
+     "json": {
+      "name": "hijack"
+     }
+    },
+    {
+     "sql": "select 'workflow' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow x union all select 'workflow_actions' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_actions x union all select 'workflow_triggers' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_triggers x union all select 'workflowaction' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction x union all select 'workflowaction_assign_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_groups x union all select 'workflowaction_assign_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_users x union all select 'workflowaction_assign_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_custom_fields x union all select 'workflowaction_assign_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_tags x union all select 'workflowaction_assign_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_groups x union all select 'workflowaction_assign_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_users x union all select 'workflowaction_remove_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_groups x union all select 'workflowaction_remove_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_users x union all select 'workflowaction_remove_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_correspondents x union all select 'workflowaction_remove_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_custom_fields x union all select 'workflowaction_remove_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_document_types x union all select 'workflowaction_remove_owners' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_owners x union all select 'workflowaction_remove_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_storage_paths x union all select 'workflowaction_remove_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_tags x union all select 'workflowaction_remove_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_groups x union all select 'workflowaction_remove_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_users x union all select 'workflowactionemail' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionemail x union all select 'workflowactionwebhook' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionwebhook x union all select 'workflowrun' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowrun x union all select 'workflowtrigger' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger x union all select 'workflowtrigger_filter_has_all_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_all_tags x union all select 'workflowtrigger_filter_has_any_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_correspondents x union all select 'workflowtrigger_filter_has_any_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_document_types x union all select 'workflowtrigger_filter_has_any_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_storage_paths x union all select 'workflowtrigger_filter_has_not_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_correspondents x union all select 'workflowtrigger_filter_has_not_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_document_types x union all select 'workflowtrigger_filter_has_not_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_storage_paths x union all select 'workflowtrigger_filter_has_not_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_tags x union all select 'workflowtrigger_filter_has_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_tags x order by 1, 2"
+    }
+   ]
+  },
+  {
+   "id": "w2.wf.update.missing",
+   "route": "workflows.partial_update",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PATCH",
+     "path": "/api/workflows/999/",
+     "json": {
+      "name": "x"
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/workflows/abc/",
+     "json": {
+      "name": "x"
+     }
+    }
+   ]
+  },
+  {
+   "id": "w2.wf.destroy.state",
+   "route": "workflows.destroy",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "DELETE",
+     "path": "/api/workflows/1/"
+    },
+    {
+     "method": "DELETE",
+     "path": "/api/workflows/1/"
+    },
+    {
+     "sql": "select 'workflow' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow x union all select 'workflow_actions' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_actions x union all select 'workflow_triggers' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_triggers x union all select 'workflowaction' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction x union all select 'workflowaction_assign_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_groups x union all select 'workflowaction_assign_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_users x union all select 'workflowaction_assign_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_custom_fields x union all select 'workflowaction_assign_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_tags x union all select 'workflowaction_assign_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_groups x union all select 'workflowaction_assign_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_users x union all select 'workflowaction_remove_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_groups x union all select 'workflowaction_remove_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_users x union all select 'workflowaction_remove_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_correspondents x union all select 'workflowaction_remove_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_custom_fields x union all select 'workflowaction_remove_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_document_types x union all select 'workflowaction_remove_owners' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_owners x union all select 'workflowaction_remove_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_storage_paths x union all select 'workflowaction_remove_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_tags x union all select 'workflowaction_remove_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_groups x union all select 'workflowaction_remove_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_users x union all select 'workflowactionemail' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionemail x union all select 'workflowactionwebhook' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionwebhook x union all select 'workflowrun' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowrun x union all select 'workflowtrigger' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger x union all select 'workflowtrigger_filter_has_all_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_all_tags x union all select 'workflowtrigger_filter_has_any_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_correspondents x union all select 'workflowtrigger_filter_has_any_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_document_types x union all select 'workflowtrigger_filter_has_any_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_storage_paths x union all select 'workflowtrigger_filter_has_not_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_correspondents x union all select 'workflowtrigger_filter_has_not_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_document_types x union all select 'workflowtrigger_filter_has_not_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_storage_paths x union all select 'workflowtrigger_filter_has_not_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_tags x union all select 'workflowtrigger_filter_has_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_tags x order by 1, 2"
+    }
+   ]
+  },
+  {
+   "id": "w2.wf.destroy.denied",
+   "route": "workflows.destroy",
+   "users": [
+    "user1",
+    "noperm"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "DELETE",
+     "path": "/api/workflows/1/"
+    },
+    {
+     "sql": "select 'workflow' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow x union all select 'workflow_actions' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_actions x union all select 'workflow_triggers' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_triggers x union all select 'workflowaction' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction x union all select 'workflowaction_assign_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_groups x union all select 'workflowaction_assign_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_users x union all select 'workflowaction_assign_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_custom_fields x union all select 'workflowaction_assign_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_tags x union all select 'workflowaction_assign_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_groups x union all select 'workflowaction_assign_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_users x union all select 'workflowaction_remove_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_groups x union all select 'workflowaction_remove_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_users x union all select 'workflowaction_remove_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_correspondents x union all select 'workflowaction_remove_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_custom_fields x union all select 'workflowaction_remove_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_document_types x union all select 'workflowaction_remove_owners' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_owners x union all select 'workflowaction_remove_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_storage_paths x union all select 'workflowaction_remove_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_tags x union all select 'workflowaction_remove_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_groups x union all select 'workflowaction_remove_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_users x union all select 'workflowactionemail' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionemail x union all select 'workflowactionwebhook' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionwebhook x union all select 'workflowrun' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowrun x union all select 'workflowtrigger' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger x union all select 'workflowtrigger_filter_has_all_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_all_tags x union all select 'workflowtrigger_filter_has_any_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_correspondents x union all select 'workflowtrigger_filter_has_any_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_document_types x union all select 'workflowtrigger_filter_has_any_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_storage_paths x union all select 'workflowtrigger_filter_has_not_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_correspondents x union all select 'workflowtrigger_filter_has_not_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_document_types x union all select 'workflowtrigger_filter_has_not_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_storage_paths x union all select 'workflowtrigger_filter_has_not_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_tags x union all select 'workflowtrigger_filter_has_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_tags x order by 1, 2"
+    }
+   ]
+  },
+  {
+   "id": "w2.trig.create.state",
+   "route": "workflow_triggers.create",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/workflow_triggers/",
+     "json": {
+      "type": 2,
+      "filter_has_tags": [
+       1,
+       2
+      ],
+      "filter_has_not_correspondents": [
+       3
+      ],
+      "filter_custom_field_query": "[\"AND\", [[1, \"exists\", true]]]"
+     }
+    },
+    {
+     "sql": "select 'workflow' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow x union all select 'workflow_actions' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_actions x union all select 'workflow_triggers' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_triggers x union all select 'workflowaction' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction x union all select 'workflowaction_assign_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_groups x union all select 'workflowaction_assign_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_users x union all select 'workflowaction_assign_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_custom_fields x union all select 'workflowaction_assign_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_tags x union all select 'workflowaction_assign_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_groups x union all select 'workflowaction_assign_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_users x union all select 'workflowaction_remove_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_groups x union all select 'workflowaction_remove_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_users x union all select 'workflowaction_remove_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_correspondents x union all select 'workflowaction_remove_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_custom_fields x union all select 'workflowaction_remove_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_document_types x union all select 'workflowaction_remove_owners' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_owners x union all select 'workflowaction_remove_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_storage_paths x union all select 'workflowaction_remove_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_tags x union all select 'workflowaction_remove_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_groups x union all select 'workflowaction_remove_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_users x union all select 'workflowactionemail' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionemail x union all select 'workflowactionwebhook' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionwebhook x union all select 'workflowrun' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowrun x union all select 'workflowtrigger' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger x union all select 'workflowtrigger_filter_has_all_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_all_tags x union all select 'workflowtrigger_filter_has_any_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_correspondents x union all select 'workflowtrigger_filter_has_any_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_document_types x union all select 'workflowtrigger_filter_has_any_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_storage_paths x union all select 'workflowtrigger_filter_has_not_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_correspondents x union all select 'workflowtrigger_filter_has_not_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_document_types x union all select 'workflowtrigger_filter_has_not_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_storage_paths x union all select 'workflowtrigger_filter_has_not_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_tags x union all select 'workflowtrigger_filter_has_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_tags x order by 1, 2"
+    }
+   ]
+  },
+  {
+   "id": "w2.trig.update.state",
+   "route": "workflow_triggers.partial_update",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PATCH",
+     "path": "/api/workflow_triggers/1/",
+     "json": {
+      "filter_has_tags": [],
+      "filter_filename": null
+     }
+    },
+    {
+     "method": "PUT",
+     "path": "/api/workflow_triggers/2/",
+     "json": {
+      "type": 3,
+      "filter_has_any_document_types": [
+       1,
+       2
+      ]
+     }
+    },
+    {
+     "sql": "select 'workflow' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow x union all select 'workflow_actions' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_actions x union all select 'workflow_triggers' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_triggers x union all select 'workflowaction' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction x union all select 'workflowaction_assign_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_groups x union all select 'workflowaction_assign_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_users x union all select 'workflowaction_assign_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_custom_fields x union all select 'workflowaction_assign_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_tags x union all select 'workflowaction_assign_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_groups x union all select 'workflowaction_assign_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_users x union all select 'workflowaction_remove_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_groups x union all select 'workflowaction_remove_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_users x union all select 'workflowaction_remove_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_correspondents x union all select 'workflowaction_remove_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_custom_fields x union all select 'workflowaction_remove_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_document_types x union all select 'workflowaction_remove_owners' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_owners x union all select 'workflowaction_remove_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_storage_paths x union all select 'workflowaction_remove_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_tags x union all select 'workflowaction_remove_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_groups x union all select 'workflowaction_remove_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_users x union all select 'workflowactionemail' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionemail x union all select 'workflowactionwebhook' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionwebhook x union all select 'workflowrun' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowrun x union all select 'workflowtrigger' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger x union all select 'workflowtrigger_filter_has_all_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_all_tags x union all select 'workflowtrigger_filter_has_any_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_correspondents x union all select 'workflowtrigger_filter_has_any_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_document_types x union all select 'workflowtrigger_filter_has_any_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_storage_paths x union all select 'workflowtrigger_filter_has_not_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_correspondents x union all select 'workflowtrigger_filter_has_not_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_document_types x union all select 'workflowtrigger_filter_has_not_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_storage_paths x union all select 'workflowtrigger_filter_has_not_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_tags x union all select 'workflowtrigger_filter_has_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_tags x order by 1, 2"
+    }
+   ]
+  },
+  {
+   "id": "w2.trig.destroy.state",
+   "route": "workflow_triggers.destroy",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "DELETE",
+     "path": "/api/workflow_triggers/1/"
+    },
+    {
+     "sql": "select 'workflow' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow x union all select 'workflow_actions' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_actions x union all select 'workflow_triggers' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_triggers x union all select 'workflowaction' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction x union all select 'workflowaction_assign_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_groups x union all select 'workflowaction_assign_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_users x union all select 'workflowaction_assign_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_custom_fields x union all select 'workflowaction_assign_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_tags x union all select 'workflowaction_assign_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_groups x union all select 'workflowaction_assign_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_users x union all select 'workflowaction_remove_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_groups x union all select 'workflowaction_remove_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_users x union all select 'workflowaction_remove_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_correspondents x union all select 'workflowaction_remove_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_custom_fields x union all select 'workflowaction_remove_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_document_types x union all select 'workflowaction_remove_owners' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_owners x union all select 'workflowaction_remove_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_storage_paths x union all select 'workflowaction_remove_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_tags x union all select 'workflowaction_remove_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_groups x union all select 'workflowaction_remove_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_users x union all select 'workflowactionemail' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionemail x union all select 'workflowactionwebhook' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionwebhook x union all select 'workflowrun' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowrun x union all select 'workflowtrigger' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger x union all select 'workflowtrigger_filter_has_all_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_all_tags x union all select 'workflowtrigger_filter_has_any_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_correspondents x union all select 'workflowtrigger_filter_has_any_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_document_types x union all select 'workflowtrigger_filter_has_any_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_storage_paths x union all select 'workflowtrigger_filter_has_not_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_correspondents x union all select 'workflowtrigger_filter_has_not_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_document_types x union all select 'workflowtrigger_filter_has_not_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_storage_paths x union all select 'workflowtrigger_filter_has_not_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_tags x union all select 'workflowtrigger_filter_has_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_tags x order by 1, 2"
+    }
+   ]
+  },
+  {
+   "id": "w2.trig.denied",
+   "route": "workflow_triggers.create",
+   "users": [
+    "user1",
+    "noperm"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/workflow_triggers/",
+     "json": {
+      "type": 2
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/workflow_triggers/1/",
+     "json": {
+      "filter_filename": "x"
+     }
+    },
+    {
+     "method": "DELETE",
+     "path": "/api/workflow_triggers/1/"
+    },
+    {
+     "sql": "select 'workflow' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow x union all select 'workflow_actions' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_actions x union all select 'workflow_triggers' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_triggers x union all select 'workflowaction' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction x union all select 'workflowaction_assign_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_groups x union all select 'workflowaction_assign_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_users x union all select 'workflowaction_assign_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_custom_fields x union all select 'workflowaction_assign_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_tags x union all select 'workflowaction_assign_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_groups x union all select 'workflowaction_assign_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_users x union all select 'workflowaction_remove_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_groups x union all select 'workflowaction_remove_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_users x union all select 'workflowaction_remove_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_correspondents x union all select 'workflowaction_remove_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_custom_fields x union all select 'workflowaction_remove_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_document_types x union all select 'workflowaction_remove_owners' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_owners x union all select 'workflowaction_remove_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_storage_paths x union all select 'workflowaction_remove_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_tags x union all select 'workflowaction_remove_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_groups x union all select 'workflowaction_remove_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_users x union all select 'workflowactionemail' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionemail x union all select 'workflowactionwebhook' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionwebhook x union all select 'workflowrun' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowrun x union all select 'workflowtrigger' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger x union all select 'workflowtrigger_filter_has_all_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_all_tags x union all select 'workflowtrigger_filter_has_any_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_correspondents x union all select 'workflowtrigger_filter_has_any_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_document_types x union all select 'workflowtrigger_filter_has_any_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_storage_paths x union all select 'workflowtrigger_filter_has_not_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_correspondents x union all select 'workflowtrigger_filter_has_not_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_document_types x union all select 'workflowtrigger_filter_has_not_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_storage_paths x union all select 'workflowtrigger_filter_has_not_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_tags x union all select 'workflowtrigger_filter_has_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_tags x order by 1, 2"
+    }
+   ]
+  },
+  {
+   "id": "w2.act.create.state",
+   "route": "workflow_actions.create",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/workflow_actions/",
+     "json": {
+      "type": 1,
+      "assign_tags": [
+       2,
+       1
+      ],
+      "assign_view_users": [
+       4
+      ],
+      "assign_custom_fields": [
+       3
+      ],
+      "assign_custom_fields_values": {
+       "3": "2025-01-01"
+      }
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/workflow_actions/",
+     "json": {
+      "type": 3,
+      "email": {
+       "subject": "s",
+       "body": "b",
+       "to": "x@example.org"
+      }
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/workflow_actions/",
+     "json": {
+      "type": 4,
+      "webhook": {
+       "url": "http://127.0.0.1:9/h",
+       "as_json": true,
+       "body": "{}"
+      }
+     }
+    },
+    {
+     "sql": "select 'workflow' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow x union all select 'workflow_actions' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_actions x union all select 'workflow_triggers' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_triggers x union all select 'workflowaction' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction x union all select 'workflowaction_assign_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_groups x union all select 'workflowaction_assign_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_users x union all select 'workflowaction_assign_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_custom_fields x union all select 'workflowaction_assign_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_tags x union all select 'workflowaction_assign_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_groups x union all select 'workflowaction_assign_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_users x union all select 'workflowaction_remove_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_groups x union all select 'workflowaction_remove_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_users x union all select 'workflowaction_remove_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_correspondents x union all select 'workflowaction_remove_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_custom_fields x union all select 'workflowaction_remove_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_document_types x union all select 'workflowaction_remove_owners' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_owners x union all select 'workflowaction_remove_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_storage_paths x union all select 'workflowaction_remove_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_tags x union all select 'workflowaction_remove_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_groups x union all select 'workflowaction_remove_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_users x union all select 'workflowactionemail' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionemail x union all select 'workflowactionwebhook' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionwebhook x union all select 'workflowrun' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowrun x union all select 'workflowtrigger' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger x union all select 'workflowtrigger_filter_has_all_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_all_tags x union all select 'workflowtrigger_filter_has_any_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_correspondents x union all select 'workflowtrigger_filter_has_any_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_document_types x union all select 'workflowtrigger_filter_has_any_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_storage_paths x union all select 'workflowtrigger_filter_has_not_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_correspondents x union all select 'workflowtrigger_filter_has_not_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_document_types x union all select 'workflowtrigger_filter_has_not_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_storage_paths x union all select 'workflowtrigger_filter_has_not_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_tags x union all select 'workflowtrigger_filter_has_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_tags x order by 1, 2"
+    }
+   ]
+  },
+  {
+   "id": "w2.act.update.state",
+   "route": "workflow_actions.partial_update",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "PATCH",
+     "path": "/api/workflow_actions/1/",
+     "json": {
+      "assign_tags": [
+       3
+      ],
+      "assign_title": null
+     }
+    },
+    {
+     "method": "PUT",
+     "path": "/api/workflow_actions/2/",
+     "json": {
+      "type": 2,
+      "remove_all_tags": true
+     }
+    },
+    {
+     "sql": "select 'workflow' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow x union all select 'workflow_actions' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_actions x union all select 'workflow_triggers' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_triggers x union all select 'workflowaction' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction x union all select 'workflowaction_assign_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_groups x union all select 'workflowaction_assign_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_users x union all select 'workflowaction_assign_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_custom_fields x union all select 'workflowaction_assign_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_tags x union all select 'workflowaction_assign_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_groups x union all select 'workflowaction_assign_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_users x union all select 'workflowaction_remove_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_groups x union all select 'workflowaction_remove_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_users x union all select 'workflowaction_remove_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_correspondents x union all select 'workflowaction_remove_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_custom_fields x union all select 'workflowaction_remove_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_document_types x union all select 'workflowaction_remove_owners' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_owners x union all select 'workflowaction_remove_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_storage_paths x union all select 'workflowaction_remove_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_tags x union all select 'workflowaction_remove_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_groups x union all select 'workflowaction_remove_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_users x union all select 'workflowactionemail' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionemail x union all select 'workflowactionwebhook' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionwebhook x union all select 'workflowrun' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowrun x union all select 'workflowtrigger' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger x union all select 'workflowtrigger_filter_has_all_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_all_tags x union all select 'workflowtrigger_filter_has_any_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_correspondents x union all select 'workflowtrigger_filter_has_any_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_document_types x union all select 'workflowtrigger_filter_has_any_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_storage_paths x union all select 'workflowtrigger_filter_has_not_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_correspondents x union all select 'workflowtrigger_filter_has_not_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_document_types x union all select 'workflowtrigger_filter_has_not_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_storage_paths x union all select 'workflowtrigger_filter_has_not_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_tags x union all select 'workflowtrigger_filter_has_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_tags x order by 1, 2"
+    }
+   ]
+  },
+  {
+   "id": "w2.act.update.email-change",
+   "route": "workflow_actions.partial_update",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "GET",
+     "path": "/api/workflow_actions/"
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/workflow_actions/3/",
+     "json": {
+      "email": {
+       "subject": "changed",
+       "body": "b",
+       "to": "c@example.org"
+      }
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/workflow_actions/4/",
+     "json": {
+      "webhook": {
+       "url": "http://127.0.0.1:9/changed"
+      }
+     }
+    },
+    {
+     "sql": "select 'workflow' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow x union all select 'workflow_actions' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_actions x union all select 'workflow_triggers' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_triggers x union all select 'workflowaction' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction x union all select 'workflowaction_assign_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_groups x union all select 'workflowaction_assign_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_users x union all select 'workflowaction_assign_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_custom_fields x union all select 'workflowaction_assign_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_tags x union all select 'workflowaction_assign_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_groups x union all select 'workflowaction_assign_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_users x union all select 'workflowaction_remove_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_groups x union all select 'workflowaction_remove_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_users x union all select 'workflowaction_remove_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_correspondents x union all select 'workflowaction_remove_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_custom_fields x union all select 'workflowaction_remove_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_document_types x union all select 'workflowaction_remove_owners' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_owners x union all select 'workflowaction_remove_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_storage_paths x union all select 'workflowaction_remove_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_tags x union all select 'workflowaction_remove_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_groups x union all select 'workflowaction_remove_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_users x union all select 'workflowactionemail' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionemail x union all select 'workflowactionwebhook' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionwebhook x union all select 'workflowrun' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowrun x union all select 'workflowtrigger' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger x union all select 'workflowtrigger_filter_has_all_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_all_tags x union all select 'workflowtrigger_filter_has_any_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_correspondents x union all select 'workflowtrigger_filter_has_any_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_document_types x union all select 'workflowtrigger_filter_has_any_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_storage_paths x union all select 'workflowtrigger_filter_has_not_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_correspondents x union all select 'workflowtrigger_filter_has_not_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_document_types x union all select 'workflowtrigger_filter_has_not_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_storage_paths x union all select 'workflowtrigger_filter_has_not_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_tags x union all select 'workflowtrigger_filter_has_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_tags x order by 1, 2"
+    }
+   ]
+  },
+  {
+   "id": "w2.act.destroy.state",
+   "route": "workflow_actions.destroy",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "DELETE",
+     "path": "/api/workflow_actions/1/"
+    },
+    {
+     "method": "DELETE",
+     "path": "/api/workflow_actions/3/"
+    },
+    {
+     "sql": "select 'workflow' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow x union all select 'workflow_actions' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_actions x union all select 'workflow_triggers' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_triggers x union all select 'workflowaction' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction x union all select 'workflowaction_assign_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_groups x union all select 'workflowaction_assign_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_users x union all select 'workflowaction_assign_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_custom_fields x union all select 'workflowaction_assign_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_tags x union all select 'workflowaction_assign_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_groups x union all select 'workflowaction_assign_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_users x union all select 'workflowaction_remove_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_groups x union all select 'workflowaction_remove_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_users x union all select 'workflowaction_remove_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_correspondents x union all select 'workflowaction_remove_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_custom_fields x union all select 'workflowaction_remove_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_document_types x union all select 'workflowaction_remove_owners' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_owners x union all select 'workflowaction_remove_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_storage_paths x union all select 'workflowaction_remove_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_tags x union all select 'workflowaction_remove_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_groups x union all select 'workflowaction_remove_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_users x union all select 'workflowactionemail' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionemail x union all select 'workflowactionwebhook' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionwebhook x union all select 'workflowrun' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowrun x union all select 'workflowtrigger' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger x union all select 'workflowtrigger_filter_has_all_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_all_tags x union all select 'workflowtrigger_filter_has_any_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_correspondents x union all select 'workflowtrigger_filter_has_any_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_document_types x union all select 'workflowtrigger_filter_has_any_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_storage_paths x union all select 'workflowtrigger_filter_has_not_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_correspondents x union all select 'workflowtrigger_filter_has_not_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_document_types x union all select 'workflowtrigger_filter_has_not_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_storage_paths x union all select 'workflowtrigger_filter_has_not_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_tags x union all select 'workflowtrigger_filter_has_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_tags x order by 1, 2"
+    }
+   ]
+  },
+  {
+   "id": "w2.act.denied",
+   "route": "workflow_actions.create",
+   "users": [
+    "user1",
+    "noperm"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/workflow_actions/",
+     "json": {
+      "type": 1
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/workflow_actions/1/",
+     "json": {
+      "assign_title": "x"
+     }
+    },
+    {
+     "method": "DELETE",
+     "path": "/api/workflow_actions/1/"
+    },
+    {
+     "sql": "select 'workflow' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow x union all select 'workflow_actions' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_actions x union all select 'workflow_triggers' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflow_triggers x union all select 'workflowaction' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction x union all select 'workflowaction_assign_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_groups x union all select 'workflowaction_assign_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_change_users x union all select 'workflowaction_assign_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_custom_fields x union all select 'workflowaction_assign_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_tags x union all select 'workflowaction_assign_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_groups x union all select 'workflowaction_assign_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_assign_view_users x union all select 'workflowaction_remove_change_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_groups x union all select 'workflowaction_remove_change_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_change_users x union all select 'workflowaction_remove_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_correspondents x union all select 'workflowaction_remove_custom_fields' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_custom_fields x union all select 'workflowaction_remove_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_document_types x union all select 'workflowaction_remove_owners' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_owners x union all select 'workflowaction_remove_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_storage_paths x union all select 'workflowaction_remove_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_tags x union all select 'workflowaction_remove_view_groups' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_groups x union all select 'workflowaction_remove_view_users' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowaction_remove_view_users x union all select 'workflowactionemail' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionemail x union all select 'workflowactionwebhook' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowactionwebhook x union all select 'workflowrun' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowrun x union all select 'workflowtrigger' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger x union all select 'workflowtrigger_filter_has_all_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_all_tags x union all select 'workflowtrigger_filter_has_any_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_correspondents x union all select 'workflowtrigger_filter_has_any_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_document_types x union all select 'workflowtrigger_filter_has_any_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_any_storage_paths x union all select 'workflowtrigger_filter_has_not_correspondents' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_correspondents x union all select 'workflowtrigger_filter_has_not_document_types' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_document_types x union all select 'workflowtrigger_filter_has_not_storage_paths' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_storage_paths x union all select 'workflowtrigger_filter_has_not_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_not_tags x union all select 'workflowtrigger_filter_has_tags' as t, (to_jsonb(x) ->> 'id')::int as id, to_jsonb(x) as row from documents_workflowtrigger_filter_has_tags x order by 1, 2"
+    }
+   ]
+  }
+ ]
+}

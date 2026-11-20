@@ -1,0 +1,171 @@
+/* Calendar popup on the date field (Datepicker.svelte):
+   header with arrows and month/year selection, below it a month as a grid. */
+
+/* ---- Frame ---- */
+
+ngb-datepicker {
+  display: inline-block;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.25rem;
+}
+
+ngb-datepicker.dropdown-menu {
+  padding: 0;
+}
+
+/* ---- Header ---- */
+
+.ngb-dp-header {
+  padding-top: 0.25rem;
+  background-color: var(--bs-tertiary-bg);
+  border-bottom: 0;
+  border-radius: 0.25rem 0.25rem 0 0;
+}
+
+ngb-datepicker-navigation {
+  display: flex;
+  align-items: center;
+}
+
+.ngb-dp-arrow {
+  display: flex;
+  flex: 1 1 auto;
+  width: 2rem;
+  height: 2rem;
+  margin: 0;
+  padding-right: 0;
+  padding-left: 0;
+}
+
+.ngb-dp-arrow-next {
+  justify-content: flex-end;
+}
+
+.ngb-dp-arrow-btn {
+  z-index: 1;
+  margin: 0 0.5rem;
+  padding: 0 0.25rem;
+  background-color: transparent;
+  border: none;
+}
+
+.ngb-dp-arrow-btn:focus {
+  outline-width: 1px;
+  outline-style: auto;
+}
+
+/* Angle made of two border edges, rotated: pointing left, pointing right */
+.ngb-dp-navigation-chevron {
+  display: inline-block;
+  width: 0.75em;
+  height: 0.75em;
+  margin-left: 0.25em;
+  margin-right: 0.15em;
+  border-style: solid;
+  border-width: 0.2em 0.2em 0 0;
+  transform: rotate(-135deg);
+}
+
+.ngb-dp-arrow-next .ngb-dp-navigation-chevron {
+  margin-left: 0.15em;
+  margin-right: 0.25em;
+  transform: rotate(45deg);
+}
+
+/* Month and year selection side by side */
+.ngb-dp-navigation-select {
+  display: flex;
+  flex: 1 1 9rem;
+}
+
+ngb-datepicker-navigation-select > .form-select {
+  flex: 1 1 auto;
+  height: 1.85rem;
+  padding: 0 0.5rem;
+  font-size: 0.875rem;
+}
+
+ngb-datepicker-navigation-select > .form-select:focus {
+  z-index: 1;
+}
+
+/* ---- Month ---- */
+
+.ngb-dp-months {
+  display: flex;
+}
+
+.ngb-dp-month {
+  pointer-events: none;
+}
+
+ngb-datepicker-month {
+  display: block;
+  pointer-events: auto;
+}
+
+.ngb-dp-week {
+  display: flex;
+  border-radius: 0.25rem;
+}
+
+/* Weekday row: sits behind .ngb-dp-week so that the angular corners apply */
+.ngb-dp-weekdays {
+  background-color: var(--bs-tertiary-bg);
+  border-bottom: 1px solid var(--bs-border-color);
+  border-radius: 0;
+}
+
+.ngb-dp-month:first-child .ngb-dp-week {
+  padding-left: 0.25rem;
+}
+
+.ngb-dp-month:last-child .ngb-dp-week {
+  padding-right: 0.25rem;
+}
+
+.ngb-dp-month .ngb-dp-week:last-child {
+  padding-bottom: 0.25rem;
+}
+
+.ngb-dp-weekday {
+  width: 2rem;
+  height: 2rem;
+  line-height: 2rem;
+  text-align: center;
+  font-style: italic;
+  color: var(--bs-info);
+}
+
+/* ---- Days ---- */
+
+.ngb-dp-day {
+  width: 2rem;
+  height: 2rem;
+  cursor: pointer;
+}
+
+/* Day with keyboard focus lies on top */
+.ngb-dp-day[tabindex="0"] {
+  z-index: 1;
+}
+
+[ngbDatepickerDayView] {
+  width: 2rem;
+  height: 2rem;
+  line-height: 2rem;
+  text-align: center;
+  background: transparent;
+  border-radius: 0.25rem;
+}
+
+[ngbDatepickerDayView]:hover:not(.bg-primary),
+[ngbDatepickerDayView].active:not(.bg-primary) {
+  background-color: var(--bs-tertiary-bg);
+  outline: 1px solid var(--bs-border-color);
+}
+
+/* Days from the neighboring month paler */
+[ngbDatepickerDayView].outside {
+  opacity: 0.5;
+}

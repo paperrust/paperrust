@@ -1,0 +1,47 @@
+[package]
+name = "pl-sync-client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+# Client core for desktop mode 2b/3 (docs/SYNC.md §4/§5/§8, docs/REMOTE-APP.md §5):
+# local SQLite replica (FTS5), PaperRust remote (API v2: device token, feed, resolve, batch,
+# ids, files with ETag/Range), selection + limits, file cache, offline queries, gateway for the
+# shell's `prapi://` scheme, token in the OS keychain, TLS pinning (SPKI-SHA-256).
+# Deliberately without axum/Tauri – the shell (apps/desktop-shell, own workspace) includes it by path.
+[dependencies]
+pl-domain.workspace = true
+sqlx = { workspace = true, features = ["sqlite"] }
+reqwest.workspace = true
+rustls-native-certs.workspace = true
+# Same version as reqwest/tokio-rustls in the lock (0.23, ring); for the own ServerCertVerifier.
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+tokio.workspace = true
+futures.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+sha2.workspace = true
+url.workspace = true
+percent-encoding.workspace = true
+bytes.workspace = true
+# Overwrite passwords after the token retrieval (docs/SYNC.md §8); is already in the lock.
+zeroize = "1"
+# Mode 2b: TLS to the server for the `/ws/status/` relay (wsrelay; same rustls version,
+# is already in the root and the shell lock via reqwest).
+tokio-rustls.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+# Windows Credential Manager (CredWriteW/CredReadW/CredDeleteW) instead of a new keyring crate.
+windows-sys = { workspace = true, features = ["Win32_Security_Credentials", "Win32_Foundation"] }
+
+[dev-dependencies]
+axum.workspace = true
+tempfile.workspace = true
+tokio = { workspace = true, features = ["test-util"] }
+hyper-util.workspace = true
+rcgen = { version = "=0.13.2", default-features = false, features = ["ring", "pem"] }

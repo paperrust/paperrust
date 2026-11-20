@@ -1,0 +1,973 @@
+{
+ "crate": "pl-system",
+ "generated_by": "tests/parity/harness/gen_base_catalog.py (do not edit; add cases.json instead)",
+ "vars": {
+  "app_config_id": {
+   "get": "/api/config/",
+   "json": "0.id",
+   "user": "admin"
+  },
+  "log_name": {
+   "get": "/api/logs/",
+   "json": "0",
+   "user": "admin"
+  },
+  "task_pk": {
+   "get": "/api/tasks/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "page_size": 1
+   }
+  },
+  "task_uuid": {
+   "get": "/api/tasks/",
+   "json": "results.0.task_id",
+   "user": "admin",
+   "query": {
+    "page_size": 1
+   }
+  }
+ },
+ "cases": [
+  {
+   "id": "tasks.list.default",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "tasks.list.page1",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "tasks.list.listall",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "page": 1,
+    "page_size": 100000
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "tasks.list.page2",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "page": 2,
+    "page_size": 1
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.list.page-too-high",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "page": 99999,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.list.page-invalid",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "page": "abc"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.list.page-zero",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "page": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.list.page-size-invalid",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "page_size": "x"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.list.page-size-zero",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "page_size": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.list.page-size-huge",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "page_size": 10000000
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.list.ordering-unknown",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "ordering": "does_not_exist"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.list.ordering+date_created",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "date_created"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.list.ordering-date_created",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-date_created"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.list.ordering+date_done",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "date_done"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.list.ordering-date_done",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-date_done"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.list.ordering+status",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "status"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.list.ordering-status",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-status"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.list.ordering+task_type",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "task_type"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.list.ordering-task_type",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-task_type"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.list.ordering+duration_seconds",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "duration_seconds"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.list.ordering-duration_seconds",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-duration_seconds"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.list.ordering+wait_time_seconds",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "wait_time_seconds"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.list.ordering-wait_time_seconds",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "page": 1,
+    "page_size": 25,
+    "ordering": "-wait_time_seconds"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.list.extra0",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "acknowledged": "false"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.list.extra1",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "status": "FAILURE"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.list.extra2",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "task_type": "consume_file"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.list.extra3",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "is_complete": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.list.extra4",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "name": "a"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.list.extra5",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "result": "x"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.list.extra6",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "task_id": "${task_uuid}"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.list.extra7",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "task_name": "consume_file"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.list.extra8",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "type": "auto_task"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.list.extra9",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "date_created_after": "2020-01-01T00:00:00Z"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.list.extra10",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "status": "NOPE"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.list.auth",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "anon",
+    "badtoken",
+    "inactive",
+    "admin@session",
+    "admin@basic"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.list.apiver",
+   "route": "tasks.list",
+   "method": "GET",
+   "path": "/api/tasks/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "none",
+    "99",
+    "abc"
+   ]
+  },
+  {
+   "id": "tasks.detail",
+   "route": "tasks.retrieve",
+   "method": "GET",
+   "path": "/api/tasks/${task_pk}/",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "tasks.detail-unknown",
+   "route": "tasks.retrieve",
+   "method": "GET",
+   "path": "/api/tasks/999999999/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.detail-nonint",
+   "route": "tasks.retrieve",
+   "method": "GET",
+   "path": "/api/tasks/abc/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.detail-anon",
+   "route": "tasks.retrieve",
+   "method": "GET",
+   "path": "/api/tasks/${task_pk}/",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.detail-noslash",
+   "route": "tasks.retrieve",
+   "method": "GET",
+   "path": "/api/tasks/${task_pk}",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "follow": false
+  },
+  {
+   "id": "tasks.status_counts",
+   "route": "tasks.status_counts",
+   "method": "GET",
+   "path": "/api/tasks/status_counts/",
+   "query": {
+    "acknowledged": "false"
+   },
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "tasks.summary",
+   "route": "tasks.summary",
+   "method": "GET",
+   "path": "/api/tasks/summary/",
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.summary.days",
+   "route": "tasks.summary",
+   "method": "GET",
+   "path": "/api/tasks/summary/",
+   "query": {
+    "days": 7
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.summary.days-invalid",
+   "route": "tasks.summary",
+   "method": "GET",
+   "path": "/api/tasks/summary/",
+   "query": {
+    "days": "x"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tasks.active",
+   "route": "tasks.active",
+   "method": "GET",
+   "path": "/api/tasks/active/",
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "statistics",
+   "route": "statistics",
+   "method": "GET",
+   "path": "/api/statistics/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon",
+    "user2"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "status",
+   "route": "status",
+   "method": "GET",
+   "path": "/api/status/",
+   "users": [
+    "admin",
+    "user1",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "leak_allow": [
+    "path"
+   ]
+  },
+  {
+   "id": "config.list",
+   "route": "config.list",
+   "method": "GET",
+   "path": "/api/config/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "config.retrieve",
+   "route": "config.retrieve",
+   "method": "GET",
+   "path": "/api/config/${app_config_id}/",
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "config.retrieve-unknown",
+   "route": "config.retrieve",
+   "method": "GET",
+   "path": "/api/config/999999999/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "logs.list",
+   "route": "logs.list",
+   "method": "GET",
+   "path": "/api/logs/",
+   "users": [
+    "admin",
+    "user1",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "logs.retrieve",
+   "route": "logs.retrieve",
+   "method": "GET",
+   "path": "/api/logs/${log_name}/",
+   "query": {
+    "limit": 10
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "compare": "status+headers",
+   "leak_allow": [
+    "path",
+    "stacktrace",
+    "sql"
+   ]
+  },
+  {
+   "id": "logs.retrieve.unknown",
+   "route": "logs.retrieve",
+   "method": "GET",
+   "path": "/api/logs/doesnotexist/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "logs.retrieve.traversal",
+   "route": "logs.retrieve",
+   "method": "GET",
+   "path": "/api/logs/..%2F..%2Fpaperless/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "logs.retrieve.limit-invalid",
+   "route": "logs.retrieve",
+   "method": "GET",
+   "path": "/api/logs/${log_name}/",
+   "query": {
+    "limit": "x"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "compare": "status"
+  },
+  {
+   "id": "remote_version",
+   "route": "remote_version",
+   "method": "GET",
+   "path": "/api/remote_version/",
+   "users": [
+    "admin",
+    "user1",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "statistics.auth",
+   "route": "statistics",
+   "method": "GET",
+   "path": "/api/statistics/",
+   "users": [
+    "anon",
+    "badtoken",
+    "inactive",
+    "admin@session",
+    "admin@basic"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "statistics.apiver",
+   "route": "statistics",
+   "method": "GET",
+   "path": "/api/statistics/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "none",
+    "99",
+    "abc"
+   ]
+  }
+ ]
+}

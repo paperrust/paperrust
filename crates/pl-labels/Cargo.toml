@@ -1,0 +1,27 @@
+[package]
+name = "pl-labels"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+# ASN label generator (PaperRust extension, docs/contract/pl-labels.md): label sheets with
+# ASN barcodes (QR/DataMatrix/Code128) and separator sheets as vector PDF or SVG preview, plus a
+# log of printed number ranges (`paperrust_asn_print`). Without axum.
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+flate2.workspace = true
+sqlx.workspace = true
+chrono.workspace = true
+# Encoders (QR/DataMatrix/Code128); `encoders` brings no further crates (Apache-2.0).
+rxing = { workspace = true, features = ["encoders"] }
+
+[dev-dependencies]
+# Round-trip test: PDF → PDFium raster → consumer barcode detection (pl-pdfops) → ASN/separation.
+pl-pdfops.workspace = true
+pl-ocr.workspace = true
+image.workspace = true
+tempfile.workspace = true
+tokio.workspace = true

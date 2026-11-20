@@ -1,0 +1,95 @@
+/* Home page tile of a saved view: table or tile grid (SavedViewWidget.svelte). */
+
+/* Expand as soon as the documents are loaded */
+.wrapper {
+  transition: all 0.3s ease-out;
+  overflow: hidden;
+  max-height: 0;
+  width: 100%;
+}
+
+.show {
+  max-height: 99999px;
+  overflow: visible;
+}
+
+/* Table view */
+table {
+  overflow-wrap: anywhere;
+  table-layout: fixed;
+}
+
+@media (min-width: 768px) {
+  th.w-25 {
+    width: 15% !important;
+  }
+}
+
+tbody pngx-tag {
+  cursor: pointer;
+}
+
+/* Row buttons appear only on hover */
+tr .btn-group {
+  margin-right: 2px;
+  box-shadow: -6px 0px 4px -1px rgba(var(--bs-body-bg-rgb), 0.5);
+  opacity: 0;
+  pointer-events: none;
+}
+
+tr:hover .btn-group {
+  opacity: 1;
+  pointer-events: all;
+}
+
+/* Tile grid: fewer columns in the narrower main column than in the document list */
+.row-cols-paperless-cards > * {
+  flex: 0 0 auto;
+  width: 50%;
+}
+
+@media (min-width: 1200px) {
+  .row-cols-paperless-cards > * { width: 33.3333333333%; }
+}
+
+@media (min-width: 1600px) {
+  .row-cols-paperless-cards > * { width: 25%; }
+}
+
+@media (min-width: 1800px) {
+  .row-cols-paperless-cards > * { width: 20%; }
+}
+
+@media (min-width: 2000px) {
+  .row-cols-paperless-cards > * { width: 16.6666666667%; }
+}
+
+/* Narrow sidebar (main.col-slim in the app frame): one more column.
+   Deliberately unencapsulated, applies to every tile grid. */
+@media (min-width: 768px) {
+  ::deep .col-slim .row-cols-paperless-cards > * {
+    flex: 0 0 auto;
+    width: 33.3333333333% !important;
+  }
+}
+
+@media (min-width: 1200px) {
+  ::deep .col-slim .row-cols-paperless-cards > * { width: 25% !important; }
+}
+
+@media (min-width: 1600px) {
+  ::deep .col-slim .row-cols-paperless-cards > * { width: 20% !important; }
+}
+
+@media (min-width: 1800px) {
+  ::deep .col-slim .row-cols-paperless-cards > * { width: 16.6666666667% !important; }
+}
+
+@media (min-width: 2000px) {
+  ::deep .col-slim .row-cols-paperless-cards > * { width: 14.2857142857% !important; }
+}
+
+/* Small cards on the home page without selection checkbox (applies globally) */
+::deep .document-card-check {
+  display: none !important;
+}

@@ -1,0 +1,6 @@
+/* Metadata table in the document view (MetadataCollapse.svelte). */
+
+/* Long values without spaces (hashes, paths) may wrap anywhere */
+.metadata-column {
+  overflow-wrap: anywhere;
+}

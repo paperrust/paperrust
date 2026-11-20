@@ -1,0 +1,35 @@
+/* Scrollable entry list in the filter menu (FilterableDropdown.svelte):
+   viewport, content at the top left, placeholder for the full scroll height. */
+
+cdk-virtual-scroll-viewport {
+  position: relative;
+  display: block;
+  transform: translateZ(0);
+}
+
+.cdk-virtual-scrollable {
+  overflow: auto;
+  overflow-anchor: none;
+  scroll-behavior: auto;
+  will-change: scroll-position;
+  contain: strict;
+}
+
+.cdk-virtual-scroll-content-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  contain: content;
+}
+
+/* vertical list: content at least as wide as the window */
+.cdk-virtual-scroll-orientation-vertical .cdk-virtual-scroll-content-wrapper {
+  min-width: 100%;
+}
+
+/* Height comes as inline style */
+.cdk-virtual-scroll-spacer {
+  flex: 0 0 auto;
+  height: 1px;
+  transform-origin: 0 0;
+}

@@ -1,0 +1,123 @@
+/* Document list: filter bar, table and tile grid (DocumentList.svelte). */
+
+/* Filter/bulk edit bar sticks below the header bar */
+.sticky-top {
+  z-index: 990;
+  top: calc(7.5rem - 2px);
+  transition: top 0.2s ease;
+}
+
+@media (min-width: 580px) {
+  .sticky-top {
+    top: 4.5em;
+  }
+}
+
+/* An open menu in the bar should lie above everything else */
+:host ::deep .sticky-top:has(.dropdown-menu.show) {
+  z-index: 1040;
+}
+
+/* Menus in the header row */
+.dropdown-menu-right {
+  right: 0 !important;
+  left: auto !important;
+}
+
+pngx-page-header .dropdown-menu {
+  --bs-dropdown-min-width: 12em;
+}
+
+pngx-page-header .dropdown-menu .views-list {
+  max-height: min(400px, 100vh - 260px);
+}
+
+/* Table view */
+tr {
+  user-select: none;
+}
+
+.table-row-selected {
+  background-color: var(--pr-primary-faded);
+}
+
+.table .form-check {
+  padding: 0.2rem;
+  min-height: 0;
+  margin-bottom: 0;
+}
+
+.table .form-check .form-check-input {
+  margin-left: 0;
+}
+
+a {
+  cursor: pointer;
+}
+
+/* Tile grid: column count grows with the window width (2 to 9 columns) */
+.row-cols-paperless-cards > * {
+  flex: 0 0 auto;
+  width: 50%;
+}
+
+@media (min-width: 768px) {
+  .row-cols-paperless-cards > * { width: 33.3333333333%; }
+}
+
+@media (min-width: 992px) {
+  .row-cols-paperless-cards > * { width: 25%; }
+}
+
+@media (min-width: 1200px) {
+  .row-cols-paperless-cards > * { width: 20%; }
+}
+
+@media (min-width: 1400px) {
+  .row-cols-paperless-cards > * { width: 16.6666666667%; }
+}
+
+@media (min-width: 1600px) {
+  .row-cols-paperless-cards > * { width: 14.2857142857%; }
+}
+
+@media (min-width: 1800px) {
+  .row-cols-paperless-cards > * { width: 12.5%; }
+}
+
+@media (min-width: 2000px) {
+  .row-cols-paperless-cards > * { width: 11.1111111111%; }
+}
+
+/* Narrow sidebar (main.col-slim in the app frame): more room, one more column.
+   Deliberately unencapsulated, applies to every tile grid. */
+@media (min-width: 768px) {
+  ::deep .col-slim .row-cols-paperless-cards > * {
+    flex: 0 0 auto;
+    width: 25% !important;
+  }
+}
+
+@media (min-width: 992px) {
+  ::deep .col-slim .row-cols-paperless-cards > * { width: 20% !important; }
+}
+
+@media (min-width: 1200px) {
+  ::deep .col-slim .row-cols-paperless-cards > * { width: 16.6666666667% !important; }
+}
+
+@media (min-width: 1400px) {
+  ::deep .col-slim .row-cols-paperless-cards > * { width: 14.2857142857% !important; }
+}
+
+@media (min-width: 1600px) {
+  ::deep .col-slim .row-cols-paperless-cards > * { width: 12.5% !important; }
+}
+
+@media (min-width: 1800px) {
+  ::deep .col-slim .row-cols-paperless-cards > * { width: 11.1111111111% !important; }
+}
+
+@media (min-width: 2000px) {
+  ::deep .col-slim .row-cols-paperless-cards > * { width: 10% !important; }
+}

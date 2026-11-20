@@ -1,0 +1,11 @@
+/* Notes on the document (DocumentNotes.svelte). */
+
+/* Keep line breaks of the note */
+.card-body {
+  white-space: pre-wrap;
+}
+
+/* Show delete button only when hovering over the card */
+.card:hover .fade {
+  opacity: 1;
+}

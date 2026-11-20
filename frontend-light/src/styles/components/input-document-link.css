@@ -1,0 +1,34 @@
+/* Linked documents (InputDocumentLink.svelte). */
+
+/* Selected documents as links without border/background (applies globally as before) */
+::deep .ng-select-container .ng-value-container {
+  overflow: hidden;
+}
+
+::deep .ng-select-container .ng-value-container .ng-value {
+  border-color: transparent !important;
+  background-color: transparent !important;
+}
+
+/* Locked state */
+.paperless-input-select.disabled {
+  --bs-btn-disabled-border-color: transparent;
+}
+
+.paperless-input-select.disabled ::deep ng-select .ng-select-container div,
+.paperless-input-select.disabled ::deep ng-select .ng-select-container .ng-arrow-wrapper,
+.paperless-input-select.disabled ::deep ng-select .ng-select-container input {
+  cursor: not-allowed;
+}
+
+.paperless-input-select.disabled ::deep ng-select .ng-select-container {
+  background-color: var(--pr-bg-disabled) !important;
+}
+
+pngx-bs-icon {
+  cursor: pointer;
+}
+
+.badge {
+  font-size: 0.75rem;
+}

@@ -1,0 +1,18 @@
+{
+  "django": {
+    "status": 401,
+    "body": {
+      "detail": "User inactive or deleted."
+    },
+    "plan": [],
+    "files": {}
+  },
+  "rust": {
+    "status": 401,
+    "body": {
+      "detail": "User inactive or deleted."
+    },
+    "plan": [],
+    "files": {}
+  }
+}

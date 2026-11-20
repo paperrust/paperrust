@@ -1,0 +1,6068 @@
+{
+ "grantees": {
+  "correspondent": {
+   "1": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "10": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "11": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "12": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "2": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [
+      2
+     ],
+     "users": []
+    }
+   },
+   "3": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "4": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "5": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "6": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "7": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "8": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "9": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   }
+  },
+  "document": {
+   "1": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "10": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [
+      2
+     ],
+     "users": []
+    }
+   },
+   "100": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [
+      2
+     ],
+     "users": [
+      3
+     ]
+    }
+   },
+   "101": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "102": {
+    "change": {
+     "groups": [
+      1
+     ],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      4
+     ]
+    }
+   },
+   "103": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "104": {
+    "change": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    }
+   },
+   "105": {
+    "change": {
+     "groups": [
+      1
+     ],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      4
+     ]
+    }
+   },
+   "106": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    }
+   },
+   "107": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "108": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    }
+   },
+   "109": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      5
+     ]
+    }
+   },
+   "11": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "110": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [
+      2
+     ],
+     "users": []
+    }
+   },
+   "111": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "112": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "113": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "114": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "115": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "116": {
+    "change": {
+     "groups": [
+      1
+     ],
+     "users": []
+    },
+    "view": {
+     "groups": [
+      1
+     ],
+     "users": []
+    }
+   },
+   "117": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "118": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "119": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      5
+     ]
+    }
+   },
+   "12": {
+    "change": {
+     "groups": [
+      1
+     ],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      4
+     ]
+    }
+   },
+   "120": {
+    "change": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    },
+    "view": {
+     "groups": [
+      2
+     ],
+     "users": [
+      3
+     ]
+    }
+   },
+   "121": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "122": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "123": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "124": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    }
+   },
+   "125": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "126": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "127": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "128": {
+    "change": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    }
+   },
+   "129": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      5
+     ]
+    }
+   },
+   "13": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "130": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [
+      2
+     ],
+     "users": []
+    }
+   },
+   "131": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "132": {
+    "change": {
+     "groups": [
+      1
+     ],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      4
+     ]
+    }
+   },
+   "133": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "134": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "135": {
+    "change": {
+     "groups": [
+      1
+     ],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      4
+     ]
+    }
+   },
+   "136": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "137": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "138": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "139": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      5
+     ]
+    }
+   },
+   "14": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "140": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [
+      2
+     ],
+     "users": [
+      3
+     ]
+    }
+   },
+   "141": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "142": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "143": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "144": {
+    "change": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    }
+   },
+   "145": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "146": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "147": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "148": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    }
+   },
+   "149": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      5
+     ]
+    }
+   },
+   "15": {
+    "change": {
+     "groups": [
+      1
+     ],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      4
+     ]
+    }
+   },
+   "150": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [
+      2
+     ],
+     "users": []
+    }
+   },
+   "151": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "152": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "153": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "154": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "155": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "156": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    }
+   },
+   "157": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "158": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "159": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      5
+     ]
+    }
+   },
+   "16": {
+    "change": {
+     "groups": [
+      1
+     ],
+     "users": []
+    },
+    "view": {
+     "groups": [
+      1
+     ],
+     "users": []
+    }
+   },
+   "160": {
+    "change": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    },
+    "view": {
+     "groups": [
+      2
+     ],
+     "users": [
+      3
+     ]
+    }
+   },
+   "161": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "162": {
+    "change": {
+     "groups": [
+      1
+     ],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      4
+     ]
+    }
+   },
+   "163": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "164": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    }
+   },
+   "165": {
+    "change": {
+     "groups": [
+      1
+     ],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      4
+     ]
+    }
+   },
+   "166": {
+    "change": {
+     "groups": [
+      1
+     ],
+     "users": []
+    },
+    "view": {
+     "groups": [
+      1
+     ],
+     "users": []
+    }
+   },
+   "167": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "168": {
+    "change": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    }
+   },
+   "169": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      5
+     ]
+    }
+   },
+   "17": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "170": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [
+      2
+     ],
+     "users": []
+    }
+   },
+   "171": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "172": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "173": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "174": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "175": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "176": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "177": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "178": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "179": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      5
+     ]
+    }
+   },
+   "18": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "180": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [
+      2
+     ],
+     "users": [
+      3
+     ]
+    }
+   },
+   "181": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "182": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "183": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "184": {
+    "change": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    }
+   },
+   "185": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "186": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "187": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "188": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    }
+   },
+   "189": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      5
+     ]
+    }
+   },
+   "19": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      5
+     ]
+    }
+   },
+   "190": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [
+      2
+     ],
+     "users": []
+    }
+   },
+   "191": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "192": {
+    "change": {
+     "groups": [
+      1
+     ],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      4
+     ]
+    }
+   },
+   "193": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "194": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "195": {
+    "change": {
+     "groups": [
+      1
+     ],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      4
+     ]
+    }
+   },
+   "196": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "197": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "198": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "199": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      5
+     ]
+    }
+   },
+   "2": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "20": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [
+      2
+     ],
+     "users": [
+      3
+     ]
+    }
+   },
+   "200": {
+    "change": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    },
+    "view": {
+     "groups": [
+      2
+     ],
+     "users": [
+      3
+     ]
+    }
+   },
+   "201": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "202": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "203": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "204": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "21": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "22": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "23": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "24": {
+    "change": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    }
+   },
+   "25": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "26": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "27": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "28": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    }
+   },
+   "29": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      5
+     ]
+    }
+   },
+   "3": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "30": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [
+      2
+     ],
+     "users": []
+    }
+   },
+   "31": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "32": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "33": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "34": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "35": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "36": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "37": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "38": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "39": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      5
+     ]
+    }
+   },
+   "4": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    }
+   },
+   "40": {
+    "change": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    },
+    "view": {
+     "groups": [
+      2
+     ],
+     "users": [
+      3
+     ]
+    }
+   },
+   "41": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "42": {
+    "change": {
+     "groups": [
+      1
+     ],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      4
+     ]
+    }
+   },
+   "43": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "44": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    }
+   },
+   "45": {
+    "change": {
+     "groups": [
+      1
+     ],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      4
+     ]
+    }
+   },
+   "46": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "47": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "48": {
+    "change": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    }
+   },
+   "49": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      5
+     ]
+    }
+   },
+   "5": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "50": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [
+      2
+     ],
+     "users": []
+    }
+   },
+   "51": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "52": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "53": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "54": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "55": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "56": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    }
+   },
+   "57": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "58": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "59": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      5
+     ]
+    }
+   },
+   "6": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    }
+   },
+   "60": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [
+      2
+     ],
+     "users": [
+      3
+     ]
+    }
+   },
+   "61": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "62": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "63": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "64": {
+    "change": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    }
+   },
+   "65": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "66": {
+    "change": {
+     "groups": [
+      1
+     ],
+     "users": []
+    },
+    "view": {
+     "groups": [
+      1
+     ],
+     "users": []
+    }
+   },
+   "67": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "68": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    }
+   },
+   "69": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      5
+     ]
+    }
+   },
+   "7": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "70": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [
+      2
+     ],
+     "users": []
+    }
+   },
+   "71": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "72": {
+    "change": {
+     "groups": [
+      1
+     ],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      4
+     ]
+    }
+   },
+   "73": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "74": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "75": {
+    "change": {
+     "groups": [
+      1
+     ],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      4
+     ]
+    }
+   },
+   "76": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "77": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "78": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "79": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      5
+     ]
+    }
+   },
+   "8": {
+    "change": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    }
+   },
+   "80": {
+    "change": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    },
+    "view": {
+     "groups": [
+      2
+     ],
+     "users": [
+      3
+     ]
+    }
+   },
+   "81": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "82": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "83": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "84": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    }
+   },
+   "85": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "86": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "87": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "88": {
+    "change": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    }
+   },
+   "89": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      5
+     ]
+    }
+   },
+   "9": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      5
+     ]
+    }
+   },
+   "90": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [
+      2
+     ],
+     "users": []
+    }
+   },
+   "91": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "92": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "93": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "94": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "95": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "96": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "97": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "98": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "99": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      5
+     ]
+    }
+   }
+  },
+  "documenttype": {
+   "1": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "2": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      4
+     ]
+    }
+   },
+   "3": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "4": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "5": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "6": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "7": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "8": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   }
+  },
+  "mailaccount": {
+   "1": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "2": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "3": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   }
+  },
+  "mailrule": {
+   "1": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "2": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "3": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   }
+  },
+  "savedview": {
+   "1": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      4
+     ]
+    }
+   },
+   "2": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "3": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "4": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "5": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   }
+  },
+  "storagepath": {
+   "1": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    }
+   },
+   "2": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "3": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "4": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "5": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [
+      1
+     ],
+     "users": []
+    }
+   }
+  },
+  "tag": {
+   "1": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "10": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      4
+     ]
+    }
+   },
+   "11": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "12": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "13": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    }
+   },
+   "14": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "15": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "16": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "17": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "18": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "19": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "2": {
+    "change": {
+     "groups": [],
+     "users": [
+      3
+     ]
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "20": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "3": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "4": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "5": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "6": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "7": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "8": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   },
+   "9": {
+    "change": {
+     "groups": [],
+     "users": []
+    },
+    "view": {
+     "groups": [],
+     "users": []
+    }
+   }
+  }
+ },
+ "obj_perm": {
+  "correspondent": {
+   "AnonymousUser": {
+    "change": [],
+    "delete": [],
+    "view": []
+   },
+   "admin": {
+    "change": [
+     1,
+     12,
+     8,
+     9,
+     11,
+     7,
+     3,
+     5,
+     10,
+     2,
+     4,
+     6
+    ],
+    "delete": [
+     1,
+     12,
+     8,
+     9,
+     11,
+     7,
+     3,
+     5,
+     10,
+     2,
+     4,
+     6
+    ],
+    "view": [
+     1,
+     12,
+     8,
+     9,
+     11,
+     7,
+     3,
+     5,
+     10,
+     2,
+     4,
+     6
+    ]
+   },
+   "alice": {
+    "change": [],
+    "delete": [],
+    "view": []
+   },
+   "bob": {
+    "change": [],
+    "delete": [],
+    "view": [
+     2
+    ]
+   },
+   "carol": {
+    "change": [],
+    "delete": [],
+    "view": []
+   },
+   "dave": {
+    "change": [],
+    "delete": [],
+    "view": []
+   }
+  },
+  "document": {
+   "AnonymousUser": {
+    "change": [],
+    "delete": [],
+    "view": []
+   },
+   "admin": {
+    "change": [
+     192,
+     191,
+     190,
+     189,
+     188,
+     187,
+     186,
+     185,
+     184,
+     183,
+     182,
+     181,
+     180,
+     179,
+     178,
+     177,
+     176,
+     175,
+     174,
+     173,
+     172,
+     171,
+     170,
+     169,
+     168,
+     167,
+     166,
+     165,
+     164,
+     163,
+     162,
+     161,
+     160,
+     159,
+     158,
+     157,
+     156,
+     155,
+     154,
+     153,
+     152,
+     151,
+     150,
+     149,
+     148,
+     147,
+     146,
+     145,
+     144,
+     143,
+     142,
+     141,
+     140,
+     139,
+     138,
+     137,
+     136,
+     135,
+     134,
+     133,
+     132,
+     131,
+     130,
+     129,
+     128,
+     127,
+     126,
+     125,
+     124,
+     123,
+     122,
+     121,
+     120,
+     119,
+     118,
+     117,
+     116,
+     115,
+     114,
+     113,
+     112,
+     111,
+     110,
+     109,
+     108,
+     107,
+     106,
+     105,
+     104,
+     103,
+     102,
+     101,
+     100,
+     99,
+     98,
+     97,
+     96,
+     95,
+     94,
+     93,
+     92,
+     91,
+     90,
+     89,
+     88,
+     87,
+     86,
+     85,
+     84,
+     83,
+     82,
+     81,
+     80,
+     79,
+     78,
+     77,
+     76,
+     75,
+     74,
+     73,
+     72,
+     71,
+     70,
+     69,
+     68,
+     67,
+     66,
+     65,
+     64,
+     63,
+     62,
+     61,
+     60,
+     59,
+     58,
+     57,
+     56,
+     55,
+     54,
+     53,
+     52,
+     51,
+     50,
+     49,
+     48,
+     47,
+     46,
+     45,
+     44,
+     43,
+     42,
+     41,
+     40,
+     39,
+     38,
+     37,
+     36,
+     35,
+     34,
+     33,
+     32,
+     31,
+     30,
+     29,
+     28,
+     27,
+     26,
+     25,
+     24,
+     23,
+     22,
+     21,
+     20,
+     19,
+     18,
+     17,
+     16,
+     15,
+     14,
+     13,
+     12,
+     11,
+     10,
+     9,
+     8,
+     200,
+     7,
+     199,
+     6,
+     198,
+     5,
+     197,
+     4,
+     196,
+     3,
+     195,
+     203,
+     204,
+     2,
+     194,
+     1,
+     202,
+     201,
+     193
+    ],
+    "delete": [
+     192,
+     191,
+     190,
+     189,
+     188,
+     187,
+     186,
+     185,
+     184,
+     183,
+     182,
+     181,
+     180,
+     179,
+     178,
+     177,
+     176,
+     175,
+     174,
+     173,
+     172,
+     171,
+     170,
+     169,
+     168,
+     167,
+     166,
+     165,
+     164,
+     163,
+     162,
+     161,
+     160,
+     159,
+     158,
+     157,
+     156,
+     155,
+     154,
+     153,
+     152,
+     151,
+     150,
+     149,
+     148,
+     147,
+     146,
+     145,
+     144,
+     143,
+     142,
+     141,
+     140,
+     139,
+     138,
+     137,
+     136,
+     135,
+     134,
+     133,
+     132,
+     131,
+     130,
+     129,
+     128,
+     127,
+     126,
+     125,
+     124,
+     123,
+     122,
+     121,
+     120,
+     119,
+     118,
+     117,
+     116,
+     115,
+     114,
+     113,
+     112,
+     111,
+     110,
+     109,
+     108,
+     107,
+     106,
+     105,
+     104,
+     103,
+     102,
+     101,
+     100,
+     99,
+     98,
+     97,
+     96,
+     95,
+     94,
+     93,
+     92,
+     91,
+     90,
+     89,
+     88,
+     87,
+     86,
+     85,
+     84,
+     83,
+     82,
+     81,
+     80,
+     79,
+     78,
+     77,
+     76,
+     75,
+     74,
+     73,
+     72,
+     71,
+     70,
+     69,
+     68,
+     67,
+     66,
+     65,
+     64,
+     63,
+     62,
+     61,
+     60,
+     59,
+     58,
+     57,
+     56,
+     55,
+     54,
+     53,
+     52,
+     51,
+     50,
+     49,
+     48,
+     47,
+     46,
+     45,
+     44,
+     43,
+     42,
+     41,
+     40,
+     39,
+     38,
+     37,
+     36,
+     35,
+     34,
+     33,
+     32,
+     31,
+     30,
+     29,
+     28,
+     27,
+     26,
+     25,
+     24,
+     23,
+     22,
+     21,
+     20,
+     19,
+     18,
+     17,
+     16,
+     15,
+     14,
+     13,
+     12,
+     11,
+     10,
+     9,
+     8,
+     200,
+     7,
+     199,
+     6,
+     198,
+     5,
+     197,
+     4,
+     196,
+     3,
+     195,
+     203,
+     204,
+     2,
+     194,
+     1,
+     202,
+     201,
+     193
+    ],
+    "view": [
+     192,
+     191,
+     190,
+     189,
+     188,
+     187,
+     186,
+     185,
+     184,
+     183,
+     182,
+     181,
+     180,
+     179,
+     178,
+     177,
+     176,
+     175,
+     174,
+     173,
+     172,
+     171,
+     170,
+     169,
+     168,
+     167,
+     166,
+     165,
+     164,
+     163,
+     162,
+     161,
+     160,
+     159,
+     158,
+     157,
+     156,
+     155,
+     154,
+     153,
+     152,
+     151,
+     150,
+     149,
+     148,
+     147,
+     146,
+     145,
+     144,
+     143,
+     142,
+     141,
+     140,
+     139,
+     138,
+     137,
+     136,
+     135,
+     134,
+     133,
+     132,
+     131,
+     130,
+     129,
+     128,
+     127,
+     126,
+     125,
+     124,
+     123,
+     122,
+     121,
+     120,
+     119,
+     118,
+     117,
+     116,
+     115,
+     114,
+     113,
+     112,
+     111,
+     110,
+     109,
+     108,
+     107,
+     106,
+     105,
+     104,
+     103,
+     102,
+     101,
+     100,
+     99,
+     98,
+     97,
+     96,
+     95,
+     94,
+     93,
+     92,
+     91,
+     90,
+     89,
+     88,
+     87,
+     86,
+     85,
+     84,
+     83,
+     82,
+     81,
+     80,
+     79,
+     78,
+     77,
+     76,
+     75,
+     74,
+     73,
+     72,
+     71,
+     70,
+     69,
+     68,
+     67,
+     66,
+     65,
+     64,
+     63,
+     62,
+     61,
+     60,
+     59,
+     58,
+     57,
+     56,
+     55,
+     54,
+     53,
+     52,
+     51,
+     50,
+     49,
+     48,
+     47,
+     46,
+     45,
+     44,
+     43,
+     42,
+     41,
+     40,
+     39,
+     38,
+     37,
+     36,
+     35,
+     34,
+     33,
+     32,
+     31,
+     30,
+     29,
+     28,
+     27,
+     26,
+     25,
+     24,
+     23,
+     22,
+     21,
+     20,
+     19,
+     18,
+     17,
+     16,
+     15,
+     14,
+     13,
+     12,
+     11,
+     10,
+     9,
+     8,
+     200,
+     7,
+     199,
+     6,
+     198,
+     5,
+     197,
+     4,
+     196,
+     3,
+     195,
+     203,
+     204,
+     2,
+     194,
+     1,
+     202,
+     201,
+     193
+    ]
+   },
+   "alice": {
+    "change": [
+     192,
+     184,
+     168,
+     166,
+     165,
+     162,
+     160,
+     144,
+     135,
+     132,
+     128,
+     120,
+     116,
+     105,
+     104,
+     102,
+     88,
+     80,
+     75,
+     72,
+     66,
+     64,
+     48,
+     45,
+     42,
+     40,
+     24,
+     16,
+     15,
+     12,
+     8,
+     200,
+     195
+    ],
+    "delete": [],
+    "view": [
+     188,
+     184,
+     180,
+     168,
+     166,
+     164,
+     160,
+     156,
+     148,
+     144,
+     140,
+     128,
+     124,
+     120,
+     116,
+     108,
+     106,
+     104,
+     100,
+     88,
+     84,
+     80,
+     68,
+     66,
+     64,
+     60,
+     56,
+     48,
+     44,
+     40,
+     28,
+     24,
+     20,
+     16,
+     8,
+     200,
+     6,
+     4
+    ]
+   },
+   "bob": {
+    "change": [],
+    "delete": [],
+    "view": [
+     192,
+     190,
+     180,
+     170,
+     165,
+     162,
+     160,
+     150,
+     140,
+     135,
+     132,
+     130,
+     120,
+     110,
+     105,
+     102,
+     100,
+     90,
+     80,
+     75,
+     72,
+     70,
+     60,
+     50,
+     45,
+     42,
+     40,
+     30,
+     20,
+     15,
+     12,
+     10,
+     200,
+     195
+    ]
+   },
+   "carol": {
+    "change": [],
+    "delete": [],
+    "view": [
+     189,
+     179,
+     169,
+     159,
+     149,
+     139,
+     129,
+     119,
+     109,
+     99,
+     89,
+     79,
+     69,
+     59,
+     49,
+     39,
+     29,
+     19,
+     9,
+     199
+    ]
+   },
+   "dave": {
+    "change": [],
+    "delete": [],
+    "view": []
+   }
+  },
+  "documenttype": {
+   "AnonymousUser": {
+    "change": [],
+    "delete": [],
+    "view": []
+   },
+   "admin": {
+    "change": [
+     4,
+     6,
+     2,
+     1,
+     5,
+     8,
+     3,
+     7
+    ],
+    "delete": [
+     4,
+     6,
+     2,
+     1,
+     5,
+     8,
+     3,
+     7
+    ],
+    "view": [
+     4,
+     6,
+     2,
+     1,
+     5,
+     8,
+     3,
+     7
+    ]
+   },
+   "alice": {
+    "change": [],
+    "delete": [],
+    "view": []
+   },
+   "bob": {
+    "change": [],
+    "delete": [],
+    "view": [
+     2
+    ]
+   },
+   "carol": {
+    "change": [],
+    "delete": [],
+    "view": []
+   },
+   "dave": {
+    "change": [],
+    "delete": [],
+    "view": []
+   }
+  },
+  "mailaccount": {
+   "AnonymousUser": {
+    "change": [],
+    "delete": [],
+    "view": []
+   },
+   "admin": {
+    "change": [
+     1,
+     2,
+     3
+    ],
+    "delete": [
+     1,
+     2,
+     3
+    ],
+    "view": [
+     1,
+     2,
+     3
+    ]
+   },
+   "alice": {
+    "change": [],
+    "delete": [],
+    "view": []
+   },
+   "bob": {
+    "change": [],
+    "delete": [],
+    "view": []
+   },
+   "carol": {
+    "change": [],
+    "delete": [],
+    "view": []
+   },
+   "dave": {
+    "change": [],
+    "delete": [],
+    "view": []
+   }
+  },
+  "mailrule": {
+   "AnonymousUser": {
+    "change": [],
+    "delete": [],
+    "view": []
+   },
+   "admin": {
+    "change": [
+     1,
+     2,
+     3
+    ],
+    "delete": [
+     1,
+     2,
+     3
+    ],
+    "view": [
+     1,
+     2,
+     3
+    ]
+   },
+   "alice": {
+    "change": [],
+    "delete": [],
+    "view": []
+   },
+   "bob": {
+    "change": [],
+    "delete": [],
+    "view": []
+   },
+   "carol": {
+    "change": [],
+    "delete": [],
+    "view": []
+   },
+   "dave": {
+    "change": [],
+    "delete": [],
+    "view": []
+   }
+  },
+  "savedview": {
+   "AnonymousUser": {
+    "change": [],
+    "delete": [],
+    "view": []
+   },
+   "admin": {
+    "change": [
+     3,
+     4,
+     1,
+     5,
+     2
+    ],
+    "delete": [
+     3,
+     4,
+     1,
+     5,
+     2
+    ],
+    "view": [
+     3,
+     4,
+     1,
+     5,
+     2
+    ]
+   },
+   "alice": {
+    "change": [],
+    "delete": [],
+    "view": []
+   },
+   "bob": {
+    "change": [],
+    "delete": [],
+    "view": [
+     1
+    ]
+   },
+   "carol": {
+    "change": [],
+    "delete": [],
+    "view": []
+   },
+   "dave": {
+    "change": [],
+    "delete": [],
+    "view": []
+   }
+  },
+  "storagepath": {
+   "AnonymousUser": {
+    "change": [],
+    "delete": [],
+    "view": []
+   },
+   "admin": {
+    "change": [
+     3,
+     5,
+     1,
+     4,
+     2
+    ],
+    "delete": [
+     3,
+     5,
+     1,
+     4,
+     2
+    ],
+    "view": [
+     3,
+     5,
+     1,
+     4,
+     2
+    ]
+   },
+   "alice": {
+    "change": [],
+    "delete": [],
+    "view": [
+     5,
+     1
+    ]
+   },
+   "bob": {
+    "change": [],
+    "delete": [],
+    "view": []
+   },
+   "carol": {
+    "change": [],
+    "delete": [],
+    "view": []
+   },
+   "dave": {
+    "change": [],
+    "delete": [],
+    "view": []
+   }
+  },
+  "tag": {
+   "AnonymousUser": {
+    "change": [],
+    "delete": [],
+    "view": []
+   },
+   "admin": {
+    "change": [
+     18,
+     2,
+     13,
+     10,
+     16,
+     1,
+     14,
+     6,
+     9,
+     7,
+     19,
+     11,
+     3,
+     4,
+     5,
+     17,
+     20,
+     8,
+     12,
+     15
+    ],
+    "delete": [
+     18,
+     2,
+     13,
+     10,
+     16,
+     1,
+     14,
+     6,
+     9,
+     7,
+     19,
+     11,
+     3,
+     4,
+     5,
+     17,
+     20,
+     8,
+     12,
+     15
+    ],
+    "view": [
+     18,
+     2,
+     13,
+     10,
+     16,
+     1,
+     14,
+     6,
+     9,
+     7,
+     19,
+     11,
+     3,
+     4,
+     5,
+     17,
+     20,
+     8,
+     12,
+     15
+    ]
+   },
+   "alice": {
+    "change": [
+     2
+    ],
+    "delete": [],
+    "view": [
+     13
+    ]
+   },
+   "bob": {
+    "change": [],
+    "delete": [],
+    "view": [
+     10
+    ]
+   },
+   "carol": {
+    "change": [],
+    "delete": [],
+    "view": []
+   },
+   "dave": {
+    "change": [],
+    "delete": [],
+    "view": []
+   }
+  }
+ },
+ "permitted": {
+  "<anon>": {
+   "correspondent.change": [
+    4,
+    7,
+    10,
+    12
+   ],
+   "correspondent.view": [
+    4,
+    7,
+    10,
+    12
+   ],
+   "document.change": [
+    3,
+    7,
+    13,
+    17,
+    23,
+    27,
+    33,
+    37,
+    43,
+    47,
+    53,
+    57,
+    63,
+    67,
+    73,
+    77,
+    83,
+    87,
+    93,
+    97,
+    103,
+    107,
+    113,
+    117,
+    123,
+    127,
+    133,
+    137,
+    143,
+    147,
+    153,
+    157,
+    163,
+    167,
+    173,
+    177,
+    183,
+    187,
+    193
+   ],
+   "document.view": [
+    3,
+    7,
+    13,
+    17,
+    23,
+    27,
+    33,
+    37,
+    43,
+    47,
+    53,
+    57,
+    63,
+    67,
+    73,
+    77,
+    83,
+    87,
+    93,
+    97,
+    103,
+    107,
+    113,
+    117,
+    123,
+    127,
+    133,
+    137,
+    143,
+    147,
+    153,
+    157,
+    163,
+    167,
+    173,
+    177,
+    183,
+    187,
+    193
+   ],
+   "documenttype.change": [
+    1,
+    3,
+    6
+   ],
+   "documenttype.view": [
+    1,
+    3,
+    6
+   ],
+   "mailaccount.change": [],
+   "mailaccount.view": [],
+   "mailrule.change": [],
+   "mailrule.view": [],
+   "savedview.change": [
+    5
+   ],
+   "savedview.view": [
+    5
+   ],
+   "storagepath.change": [
+    2,
+    4
+   ],
+   "storagepath.view": [
+    2,
+    4
+   ],
+   "tag.change": [
+    1,
+    6,
+    7,
+    8,
+    9,
+    14,
+    15,
+    18,
+    20
+   ],
+   "tag.view": [
+    1,
+    6,
+    7,
+    8,
+    9,
+    14,
+    15,
+    18,
+    20
+   ]
+  },
+  "AnonymousUser": {
+   "correspondent.change": [
+    4,
+    7,
+    10,
+    12
+   ],
+   "correspondent.view": [
+    4,
+    7,
+    10,
+    12
+   ],
+   "document.change": [
+    3,
+    7,
+    13,
+    17,
+    23,
+    27,
+    33,
+    37,
+    43,
+    47,
+    53,
+    57,
+    63,
+    67,
+    73,
+    77,
+    83,
+    87,
+    93,
+    97,
+    103,
+    107,
+    113,
+    117,
+    123,
+    127,
+    133,
+    137,
+    143,
+    147,
+    153,
+    157,
+    163,
+    167,
+    173,
+    177,
+    183,
+    187,
+    193
+   ],
+   "document.view": [
+    3,
+    7,
+    13,
+    17,
+    23,
+    27,
+    33,
+    37,
+    43,
+    47,
+    53,
+    57,
+    63,
+    67,
+    73,
+    77,
+    83,
+    87,
+    93,
+    97,
+    103,
+    107,
+    113,
+    117,
+    123,
+    127,
+    133,
+    137,
+    143,
+    147,
+    153,
+    157,
+    163,
+    167,
+    173,
+    177,
+    183,
+    187,
+    193
+   ],
+   "documenttype.change": [
+    1,
+    3,
+    6
+   ],
+   "documenttype.view": [
+    1,
+    3,
+    6
+   ],
+   "mailaccount.change": [],
+   "mailaccount.view": [],
+   "mailrule.change": [],
+   "mailrule.view": [],
+   "savedview.change": [
+    5
+   ],
+   "savedview.view": [
+    5
+   ],
+   "storagepath.change": [
+    2,
+    4
+   ],
+   "storagepath.view": [
+    2,
+    4
+   ],
+   "tag.change": [
+    1,
+    6,
+    7,
+    8,
+    9,
+    14,
+    15,
+    18,
+    20
+   ],
+   "tag.view": [
+    1,
+    6,
+    7,
+    8,
+    9,
+    14,
+    15,
+    18,
+    20
+   ]
+  },
+  "admin": {
+   "correspondent.change": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12
+   ],
+   "correspondent.view": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12
+   ],
+   "document.change": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    61,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    69,
+    70,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83,
+    84,
+    85,
+    86,
+    87,
+    88,
+    89,
+    90,
+    91,
+    92,
+    93,
+    94,
+    95,
+    96,
+    97,
+    98,
+    99,
+    100,
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    108,
+    109,
+    110,
+    111,
+    112,
+    113,
+    114,
+    115,
+    116,
+    117,
+    118,
+    119,
+    120,
+    121,
+    122,
+    123,
+    124,
+    125,
+    126,
+    127,
+    128,
+    129,
+    130,
+    131,
+    132,
+    133,
+    134,
+    135,
+    136,
+    137,
+    138,
+    139,
+    140,
+    141,
+    142,
+    143,
+    144,
+    145,
+    146,
+    147,
+    148,
+    149,
+    150,
+    151,
+    152,
+    153,
+    154,
+    155,
+    156,
+    157,
+    158,
+    159,
+    160,
+    161,
+    162,
+    163,
+    164,
+    165,
+    166,
+    167,
+    168,
+    169,
+    170,
+    171,
+    172,
+    173,
+    174,
+    175,
+    176,
+    177,
+    178,
+    179,
+    180,
+    181,
+    182,
+    183,
+    184,
+    185,
+    186,
+    187,
+    188,
+    189,
+    190,
+    191,
+    192,
+    193,
+    194,
+    195,
+    201,
+    202,
+    203,
+    204
+   ],
+   "document.view": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    61,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    69,
+    70,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83,
+    84,
+    85,
+    86,
+    87,
+    88,
+    89,
+    90,
+    91,
+    92,
+    93,
+    94,
+    95,
+    96,
+    97,
+    98,
+    99,
+    100,
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    108,
+    109,
+    110,
+    111,
+    112,
+    113,
+    114,
+    115,
+    116,
+    117,
+    118,
+    119,
+    120,
+    121,
+    122,
+    123,
+    124,
+    125,
+    126,
+    127,
+    128,
+    129,
+    130,
+    131,
+    132,
+    133,
+    134,
+    135,
+    136,
+    137,
+    138,
+    139,
+    140,
+    141,
+    142,
+    143,
+    144,
+    145,
+    146,
+    147,
+    148,
+    149,
+    150,
+    151,
+    152,
+    153,
+    154,
+    155,
+    156,
+    157,
+    158,
+    159,
+    160,
+    161,
+    162,
+    163,
+    164,
+    165,
+    166,
+    167,
+    168,
+    169,
+    170,
+    171,
+    172,
+    173,
+    174,
+    175,
+    176,
+    177,
+    178,
+    179,
+    180,
+    181,
+    182,
+    183,
+    184,
+    185,
+    186,
+    187,
+    188,
+    189,
+    190,
+    191,
+    192,
+    193,
+    194,
+    195,
+    201,
+    202,
+    203,
+    204
+   ],
+   "documenttype.change": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+   ],
+   "documenttype.view": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+   ],
+   "mailaccount.change": [
+    1,
+    2,
+    3
+   ],
+   "mailaccount.view": [
+    1,
+    2,
+    3
+   ],
+   "mailrule.change": [
+    1,
+    2,
+    3
+   ],
+   "mailrule.view": [
+    1,
+    2,
+    3
+   ],
+   "savedview.change": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "savedview.view": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "storagepath.change": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "storagepath.view": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "tag.change": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20
+   ],
+   "tag.view": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20
+   ]
+  },
+  "alice": {
+   "correspondent.change": [
+    1,
+    4,
+    5,
+    7,
+    10,
+    12
+   ],
+   "correspondent.view": [
+    1,
+    4,
+    5,
+    7,
+    10,
+    12
+   ],
+   "document.change": [
+    2,
+    3,
+    5,
+    7,
+    8,
+    12,
+    13,
+    15,
+    16,
+    17,
+    22,
+    23,
+    24,
+    25,
+    27,
+    32,
+    33,
+    35,
+    37,
+    40,
+    42,
+    43,
+    45,
+    47,
+    48,
+    52,
+    53,
+    55,
+    57,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    72,
+    73,
+    75,
+    77,
+    80,
+    82,
+    83,
+    85,
+    87,
+    88,
+    92,
+    93,
+    95,
+    97,
+    102,
+    103,
+    104,
+    105,
+    107,
+    112,
+    113,
+    115,
+    116,
+    117,
+    120,
+    122,
+    123,
+    125,
+    127,
+    128,
+    132,
+    133,
+    135,
+    137,
+    142,
+    143,
+    144,
+    145,
+    147,
+    152,
+    153,
+    155,
+    157,
+    160,
+    162,
+    163,
+    165,
+    166,
+    167,
+    168,
+    172,
+    173,
+    175,
+    177,
+    182,
+    183,
+    184,
+    185,
+    187,
+    192,
+    193,
+    195,
+    203,
+    204
+   ],
+   "document.view": [
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    12,
+    13,
+    15,
+    16,
+    17,
+    20,
+    22,
+    23,
+    24,
+    25,
+    27,
+    28,
+    32,
+    33,
+    35,
+    37,
+    40,
+    42,
+    43,
+    44,
+    45,
+    47,
+    48,
+    52,
+    53,
+    55,
+    56,
+    57,
+    60,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    72,
+    73,
+    75,
+    77,
+    80,
+    82,
+    83,
+    84,
+    85,
+    87,
+    88,
+    92,
+    93,
+    95,
+    97,
+    100,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    108,
+    112,
+    113,
+    115,
+    116,
+    117,
+    120,
+    122,
+    123,
+    124,
+    125,
+    127,
+    128,
+    132,
+    133,
+    135,
+    137,
+    140,
+    142,
+    143,
+    144,
+    145,
+    147,
+    148,
+    152,
+    153,
+    155,
+    156,
+    157,
+    160,
+    162,
+    163,
+    164,
+    165,
+    166,
+    167,
+    168,
+    172,
+    173,
+    175,
+    177,
+    180,
+    182,
+    183,
+    184,
+    185,
+    187,
+    188,
+    192,
+    193,
+    195,
+    203,
+    204
+   ],
+   "documenttype.change": [
+    1,
+    3,
+    5,
+    6
+   ],
+   "documenttype.view": [
+    1,
+    3,
+    5,
+    6
+   ],
+   "mailaccount.change": [
+    2
+   ],
+   "mailaccount.view": [
+    2
+   ],
+   "mailrule.change": [
+    3
+   ],
+   "mailrule.view": [
+    3
+   ],
+   "savedview.change": [
+    3,
+    5
+   ],
+   "savedview.view": [
+    3,
+    5
+   ],
+   "storagepath.change": [
+    2,
+    3,
+    4
+   ],
+   "storagepath.view": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "tag.change": [
+    1,
+    2,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    14,
+    15,
+    17,
+    18,
+    20
+   ],
+   "tag.view": [
+    1,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    17,
+    18,
+    20
+   ]
+  },
+  "bob": {
+   "correspondent.change": [
+    4,
+    7,
+    9,
+    10,
+    12
+   ],
+   "correspondent.view": [
+    2,
+    4,
+    7,
+    9,
+    10,
+    12
+   ],
+   "document.change": [
+    3,
+    6,
+    7,
+    13,
+    16,
+    17,
+    23,
+    26,
+    27,
+    33,
+    36,
+    37,
+    43,
+    46,
+    47,
+    53,
+    56,
+    57,
+    63,
+    66,
+    67,
+    73,
+    76,
+    77,
+    83,
+    86,
+    87,
+    93,
+    96,
+    97,
+    103,
+    106,
+    107,
+    113,
+    116,
+    117,
+    123,
+    126,
+    127,
+    133,
+    136,
+    137,
+    143,
+    146,
+    147,
+    153,
+    156,
+    157,
+    163,
+    166,
+    167,
+    173,
+    176,
+    177,
+    183,
+    186,
+    187,
+    193
+   ],
+   "document.view": [
+    3,
+    6,
+    7,
+    10,
+    12,
+    13,
+    15,
+    16,
+    17,
+    20,
+    23,
+    26,
+    27,
+    30,
+    33,
+    36,
+    37,
+    40,
+    42,
+    43,
+    45,
+    46,
+    47,
+    50,
+    53,
+    56,
+    57,
+    60,
+    63,
+    66,
+    67,
+    70,
+    72,
+    73,
+    75,
+    76,
+    77,
+    80,
+    83,
+    86,
+    87,
+    90,
+    93,
+    96,
+    97,
+    100,
+    102,
+    103,
+    105,
+    106,
+    107,
+    110,
+    113,
+    116,
+    117,
+    120,
+    123,
+    126,
+    127,
+    130,
+    132,
+    133,
+    135,
+    136,
+    137,
+    140,
+    143,
+    146,
+    147,
+    150,
+    153,
+    156,
+    157,
+    160,
+    162,
+    163,
+    165,
+    166,
+    167,
+    170,
+    173,
+    176,
+    177,
+    180,
+    183,
+    186,
+    187,
+    190,
+    192,
+    193,
+    195
+   ],
+   "documenttype.change": [
+    1,
+    3,
+    6,
+    8
+   ],
+   "documenttype.view": [
+    1,
+    2,
+    3,
+    6,
+    8
+   ],
+   "mailaccount.change": [],
+   "mailaccount.view": [],
+   "mailrule.change": [],
+   "mailrule.view": [],
+   "savedview.change": [
+    5
+   ],
+   "savedview.view": [
+    1,
+    5
+   ],
+   "storagepath.change": [
+    2,
+    4,
+    5
+   ],
+   "storagepath.view": [
+    2,
+    4,
+    5
+   ],
+   "tag.change": [
+    1,
+    6,
+    7,
+    8,
+    9,
+    13,
+    14,
+    15,
+    18,
+    20
+   ],
+   "tag.view": [
+    1,
+    6,
+    7,
+    8,
+    9,
+    10,
+    13,
+    14,
+    15,
+    18,
+    20
+   ]
+  },
+  "carol": {
+   "correspondent.change": [
+    4,
+    7,
+    10,
+    12
+   ],
+   "correspondent.view": [
+    4,
+    7,
+    10,
+    12
+   ],
+   "document.change": [
+    3,
+    7,
+    9,
+    13,
+    17,
+    19,
+    23,
+    27,
+    29,
+    33,
+    37,
+    39,
+    43,
+    47,
+    49,
+    53,
+    57,
+    59,
+    63,
+    67,
+    69,
+    73,
+    77,
+    79,
+    83,
+    87,
+    89,
+    93,
+    97,
+    99,
+    103,
+    107,
+    109,
+    113,
+    117,
+    119,
+    123,
+    127,
+    129,
+    133,
+    137,
+    139,
+    143,
+    147,
+    149,
+    153,
+    157,
+    159,
+    163,
+    167,
+    169,
+    173,
+    177,
+    179,
+    183,
+    187,
+    189,
+    193
+   ],
+   "document.view": [
+    3,
+    7,
+    9,
+    13,
+    17,
+    19,
+    23,
+    27,
+    29,
+    33,
+    37,
+    39,
+    43,
+    47,
+    49,
+    53,
+    57,
+    59,
+    63,
+    67,
+    69,
+    73,
+    77,
+    79,
+    83,
+    87,
+    89,
+    93,
+    97,
+    99,
+    103,
+    107,
+    109,
+    113,
+    117,
+    119,
+    123,
+    127,
+    129,
+    133,
+    137,
+    139,
+    143,
+    147,
+    149,
+    153,
+    157,
+    159,
+    163,
+    167,
+    169,
+    173,
+    177,
+    179,
+    183,
+    187,
+    189,
+    193
+   ],
+   "documenttype.change": [
+    1,
+    3,
+    6
+   ],
+   "documenttype.view": [
+    1,
+    3,
+    6
+   ],
+   "mailaccount.change": [],
+   "mailaccount.view": [],
+   "mailrule.change": [],
+   "mailrule.view": [],
+   "savedview.change": [
+    5
+   ],
+   "savedview.view": [
+    5
+   ],
+   "storagepath.change": [
+    2,
+    4
+   ],
+   "storagepath.view": [
+    2,
+    4
+   ],
+   "tag.change": [
+    1,
+    6,
+    7,
+    8,
+    9,
+    14,
+    15,
+    18,
+    19,
+    20
+   ],
+   "tag.view": [
+    1,
+    6,
+    7,
+    8,
+    9,
+    14,
+    15,
+    18,
+    19,
+    20
+   ]
+  },
+  "dave": {
+   "correspondent.change": [],
+   "correspondent.view": [],
+   "document.change": [],
+   "document.view": [],
+   "documenttype.change": [],
+   "documenttype.view": [],
+   "mailaccount.change": [],
+   "mailaccount.view": [],
+   "mailrule.change": [],
+   "mailrule.view": [],
+   "savedview.change": [],
+   "savedview.view": [],
+   "storagepath.change": [],
+   "storagepath.view": [],
+   "tag.change": [],
+   "tag.view": []
+  }
+ },
+ "shared": {
+  "correspondent": [
+   2
+  ],
+  "document": [
+   4,
+   6,
+   8,
+   9,
+   10,
+   12,
+   15,
+   16,
+   19,
+   20,
+   24,
+   28,
+   29,
+   30,
+   39,
+   40,
+   42,
+   44,
+   45,
+   48,
+   49,
+   50,
+   56,
+   59,
+   60,
+   64,
+   66,
+   68,
+   69,
+   70,
+   72,
+   75,
+   79,
+   80,
+   84,
+   88,
+   89,
+   90,
+   99,
+   100,
+   102,
+   104,
+   105,
+   106,
+   108,
+   109,
+   110,
+   116,
+   119,
+   120,
+   124,
+   128,
+   129,
+   130,
+   132,
+   135,
+   139,
+   140,
+   144,
+   148,
+   149,
+   150,
+   156,
+   159,
+   160,
+   162,
+   164,
+   165,
+   166,
+   168,
+   169,
+   170,
+   179,
+   180,
+   184,
+   188,
+   189,
+   190,
+   192,
+   195,
+   199,
+   200
+  ],
+  "documenttype": [
+   2
+  ],
+  "mailaccount": [],
+  "mailrule": [],
+  "savedview": [
+   1
+  ],
+  "storagepath": [
+   1,
+   5
+  ],
+  "tag": [
+   2,
+   10,
+   13
+  ]
+ },
+ "users": {
+  "AnonymousUser": {
+   "groups": [],
+   "id": 1,
+   "is_active": true,
+   "is_superuser": false,
+   "perms": []
+  },
+  "admin": {
+   "groups": [],
+   "id": 2,
+   "is_active": true,
+   "is_superuser": true,
+   "perms": [
+    "account.add_emailaddress",
+    "account.add_emailconfirmation",
+    "account.change_emailaddress",
+    "account.change_emailconfirmation",
+    "account.delete_emailaddress",
+    "account.delete_emailconfirmation",
+    "account.view_emailaddress",
+    "account.view_emailconfirmation",
+    "admin.add_logentry",
+    "admin.change_logentry",
+    "admin.delete_logentry",
+    "admin.view_logentry",
+    "auditlog.add_logentry",
+    "auditlog.change_logentry",
+    "auditlog.delete_logentry",
+    "auditlog.view_logentry",
+    "auth.add_group",
+    "auth.add_permission",
+    "auth.add_user",
+    "auth.change_group",
+    "auth.change_permission",
+    "auth.change_user",
+    "auth.delete_group",
+    "auth.delete_permission",
+    "auth.delete_user",
+    "auth.view_group",
+    "auth.view_permission",
+    "auth.view_user",
+    "authtoken.add_token",
+    "authtoken.add_tokenproxy",
+    "authtoken.change_token",
+    "authtoken.change_tokenproxy",
+    "authtoken.delete_token",
+    "authtoken.delete_tokenproxy",
+    "authtoken.view_token",
+    "authtoken.view_tokenproxy",
+    "contenttypes.add_contenttype",
+    "contenttypes.change_contenttype",
+    "contenttypes.delete_contenttype",
+    "contenttypes.view_contenttype",
+    "documents.add_correspondent",
+    "documents.add_customfield",
+    "documents.add_customfieldinstance",
+    "documents.add_document",
+    "documents.add_documentbarcode",
+    "documents.add_documenttype",
+    "documents.add_note",
+    "documents.add_paperlesstask",
+    "documents.add_savedview",
+    "documents.add_savedviewfilterrule",
+    "documents.add_sharelink",
+    "documents.add_sharelinkbundle",
+    "documents.add_storagepath",
+    "documents.add_tag",
+    "documents.add_uisettings",
+    "documents.add_workflow",
+    "documents.add_workflowaction",
+    "documents.add_workflowactionemail",
+    "documents.add_workflowactionwebhook",
+    "documents.add_workflowrun",
+    "documents.add_workflowtrigger",
+    "documents.change_correspondent",
+    "documents.change_customfield",
+    "documents.change_customfieldinstance",
+    "documents.change_document",
+    "documents.change_documentbarcode",
+    "documents.change_documenttype",
+    "documents.change_note",
+    "documents.change_paperlesstask",
+    "documents.change_savedview",
+    "documents.change_savedviewfilterrule",
+    "documents.change_sharelink",
+    "documents.change_sharelinkbundle",
+    "documents.change_storagepath",
+    "documents.change_tag",
+    "documents.change_uisettings",
+    "documents.change_workflow",
+    "documents.change_workflowaction",
+    "documents.change_workflowactionemail",
+    "documents.change_workflowactionwebhook",
+    "documents.change_workflowrun",
+    "documents.change_workflowtrigger",
+    "documents.delete_correspondent",
+    "documents.delete_customfield",
+    "documents.delete_customfieldinstance",
+    "documents.delete_document",
+    "documents.delete_documentbarcode",
+    "documents.delete_documenttype",
+    "documents.delete_note",
+    "documents.delete_paperlesstask",
+    "documents.delete_savedview",
+    "documents.delete_savedviewfilterrule",
+    "documents.delete_sharelink",
+    "documents.delete_sharelinkbundle",
+    "documents.delete_storagepath",
+    "documents.delete_tag",
+    "documents.delete_uisettings",
+    "documents.delete_workflow",
+    "documents.delete_workflowaction",
+    "documents.delete_workflowactionemail",
+    "documents.delete_workflowactionwebhook",
+    "documents.delete_workflowrun",
+    "documents.delete_workflowtrigger",
+    "documents.view_correspondent",
+    "documents.view_customfield",
+    "documents.view_customfieldinstance",
+    "documents.view_document",
+    "documents.view_documentbarcode",
+    "documents.view_documenttype",
+    "documents.view_note",
+    "documents.view_paperlesstask",
+    "documents.view_savedview",
+    "documents.view_savedviewfilterrule",
+    "documents.view_sharelink",
+    "documents.view_sharelinkbundle",
+    "documents.view_storagepath",
+    "documents.view_tag",
+    "documents.view_uisettings",
+    "documents.view_workflow",
+    "documents.view_workflowaction",
+    "documents.view_workflowactionemail",
+    "documents.view_workflowactionwebhook",
+    "documents.view_workflowrun",
+    "documents.view_workflowtrigger",
+    "guardian.add_groupobjectpermission",
+    "guardian.add_userobjectpermission",
+    "guardian.change_groupobjectpermission",
+    "guardian.change_userobjectpermission",
+    "guardian.delete_groupobjectpermission",
+    "guardian.delete_userobjectpermission",
+    "guardian.view_groupobjectpermission",
+    "guardian.view_userobjectpermission",
+    "mfa.add_authenticator",
+    "mfa.change_authenticator",
+    "mfa.delete_authenticator",
+    "mfa.view_authenticator",
+    "paperless.add_applicationconfiguration",
+    "paperless.change_applicationconfiguration",
+    "paperless.delete_applicationconfiguration",
+    "paperless.view_applicationconfiguration",
+    "paperless.view_global_statistics",
+    "paperless.view_system_monitoring",
+    "paperless_mail.add_mailaccount",
+    "paperless_mail.add_mailrule",
+    "paperless_mail.add_processedmail",
+    "paperless_mail.change_mailaccount",
+    "paperless_mail.change_mailrule",
+    "paperless_mail.change_processedmail",
+    "paperless_mail.delete_mailaccount",
+    "paperless_mail.delete_mailrule",
+    "paperless_mail.delete_processedmail",
+    "paperless_mail.view_mailaccount",
+    "paperless_mail.view_mailrule",
+    "paperless_mail.view_processedmail",
+    "sessions.add_session",
+    "sessions.change_session",
+    "sessions.delete_session",
+    "sessions.view_session",
+    "socialaccount.add_socialaccount",
+    "socialaccount.add_socialapp",
+    "socialaccount.add_socialtoken",
+    "socialaccount.change_socialaccount",
+    "socialaccount.change_socialapp",
+    "socialaccount.change_socialtoken",
+    "socialaccount.delete_socialaccount",
+    "socialaccount.delete_socialapp",
+    "socialaccount.delete_socialtoken",
+    "socialaccount.view_socialaccount",
+    "socialaccount.view_socialapp",
+    "socialaccount.view_socialtoken"
+   ]
+  },
+  "alice": {
+   "groups": [
+    1
+   ],
+   "id": 3,
+   "is_active": true,
+   "is_superuser": false,
+   "perms": [
+    "documents.add_correspondent",
+    "documents.add_customfield",
+    "documents.add_document",
+    "documents.add_documenttype",
+    "documents.add_note",
+    "documents.add_paperlesstask",
+    "documents.add_savedview",
+    "documents.add_sharelink",
+    "documents.add_storagepath",
+    "documents.add_tag",
+    "documents.add_uisettings",
+    "documents.change_correspondent",
+    "documents.change_customfield",
+    "documents.change_document",
+    "documents.change_documenttype",
+    "documents.change_note",
+    "documents.change_paperlesstask",
+    "documents.change_savedview",
+    "documents.change_sharelink",
+    "documents.change_storagepath",
+    "documents.change_tag",
+    "documents.change_uisettings",
+    "documents.delete_document",
+    "documents.delete_note",
+    "documents.view_correspondent",
+    "documents.view_customfield",
+    "documents.view_document",
+    "documents.view_documenttype",
+    "documents.view_note",
+    "documents.view_paperlesstask",
+    "documents.view_savedview",
+    "documents.view_sharelink",
+    "documents.view_storagepath",
+    "documents.view_tag",
+    "documents.view_uisettings",
+    "documents.view_workflow",
+    "paperless_mail.view_mailaccount",
+    "paperless_mail.view_mailrule"
+   ]
+  },
+  "bob": {
+   "groups": [
+    2
+   ],
+   "id": 4,
+   "is_active": true,
+   "is_superuser": false,
+   "perms": [
+    "documents.add_correspondent",
+    "documents.add_document",
+    "documents.add_documenttype",
+    "documents.add_note",
+    "documents.add_savedview",
+    "documents.add_tag",
+    "documents.add_uisettings",
+    "documents.change_correspondent",
+    "documents.change_document",
+    "documents.change_documenttype",
+    "documents.change_note",
+    "documents.change_savedview",
+    "documents.change_tag",
+    "documents.change_uisettings",
+    "documents.view_correspondent",
+    "documents.view_customfield",
+    "documents.view_document",
+    "documents.view_documenttype",
+    "documents.view_note",
+    "documents.view_savedview",
+    "documents.view_storagepath",
+    "documents.view_tag",
+    "documents.view_uisettings"
+   ]
+  },
+  "carol": {
+   "groups": [],
+   "id": 5,
+   "is_active": true,
+   "is_superuser": false,
+   "perms": []
+  },
+  "dave": {
+   "groups": [
+    1
+   ],
+   "id": 6,
+   "is_active": false,
+   "is_superuser": false,
+   "perms": []
+  }
+ }
+}

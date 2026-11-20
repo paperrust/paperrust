@@ -1,0 +1,9 @@
+/* Area for popup messages at the top center (Toasts.svelte). */
+
+:host {
+  position: fixed;
+  top: 0;
+  right: calc(50% - var(--pr-toast-max-width) / 2);
+  margin: 0.3em;
+  z-index: 1200;
+}

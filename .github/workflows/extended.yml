@@ -1,0 +1,229 @@
+# PaperRust – extended checks: Rust on Windows, Docker images (build + smoke test, no push),
+# desktop packages (unsigned). Too slow for every pull request, so they run on main, on tags and
+# manually.
+#
+# Nothing is published: no registry login, no push, no release. Artifacts (web UI, desktop packages)
+# are kept as workflow artifacts for 7 days only. Publishing the image: release-image.yml.
+
+name: Extended
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: extended-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  CARGO_NET_RETRY: "10"
+  RUST_BACKTRACE: short
+
+jobs:
+  rust-windows:
+    name: Rust (Windows)
+    runs-on: windows-2025
+    timeout-minutes: 120
+    env:
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - run: rustup toolchain install --profile minimal
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: extended-windows
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: cargo test
+        # DB/reference tests are #[ignore]; Tesseract/PDFium tests skip themselves without the tools.
+        run: cargo test --workspace --locked
+      - name: cargo test pl-pdftools (child process paperrust-pdftool, isolation)
+        run: cargo test -p pl-pdftools --features engine --locked
+
+  frontend-dist:
+    name: Web UI + server statics
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend-light/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: frontend-light/package.json
+          cache: pnpm
+          cache-dependency-path: frontend-light/pnpm-lock.yaml
+      - name: Build web UI
+        working-directory: frontend-light
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+      - name: Statics from Python packages (Swagger UI, DRF) – pinned as in the Dockerfile
+        run: bash scripts/fetch-extra-static.sh "$RUNNER_TEMP/extra-static"
+      - name: Server statics (STATIC_ROOT)
+        run: EXTRA_STATIC="$RUNNER_TEMP/extra-static" bash scripts/build-static.sh results/static
+      - name: Check result
+        run: |
+          test -f frontend-light/dist/index.html
+          test -f frontend-light/dist/m.html
+          test -f results/static/base.css
+          test -d results/static/drf_spectacular_sidecar
+          du -sh frontend-light/dist results/static
+      - name: Archive
+        run: tar -cf frontend-dist.tar frontend-light/dist results/static
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend-dist.tar
+          retention-days: 7
+
+  docker:
+    # Both architectures natively (no QEMU): amd64 on ubuntu-24.04, arm64 on ubuntu-24.04-arm.
+    name: Docker image ${{ matrix.arch }} (build + smoke test, no push)
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Validate compose files (examples + NAS templates)
+        run: |
+          for f in docker/docker-compose.*.yml docker/nas/docker-compose.yml docker/nas/casaos/docker-compose.yml; do
+            echo "== $f"; AppID=paperrust PUID=1000 PGID=1000 TZ=UTC docker compose -f "$f" config --quiet
+          done
+      - name: Unraid templates (well-formed XML)
+        if: matrix.arch == 'amd64'
+        run: |
+          for f in docker/nas/unraid/*.xml; do
+            python3 -c 'import sys, xml.dom.minidom as m; m.parse(sys.argv[1])' "$f" && echo "ok $f"
+          done
+      - uses: docker/setup-buildx-action@v3
+      - name: Build (linux/${{ matrix.arch }})
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          push: false
+          load: true
+          tags: paperrust/paperrust:ci
+          build-args: |
+            VCS_REF=${{ github.sha }}
+          cache-from: type=gha,scope=paperrust-image-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=paperrust-image-${{ matrix.arch }}
+      - name: Image size
+        run: docker image ls paperrust/paperrust:ci
+      - name: Smoke test (compose with PostgreSQL 17)
+        run: PAPERRUST_IMAGE=paperrust/paperrust:ci bash scripts/docker-smoke.sh
+
+  desktop-windows:
+    name: Desktop package Windows (pack.ps1, unsigned)
+    needs: frontend-dist
+    runs-on: windows-2025
+    timeout-minutes: 120
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}\target
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Toolchain + llvm-tools (strip Tesseract DLLs)
+        run: |
+          rustup toolchain install --profile minimal
+          rustup component add llvm-tools
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: desktop-windows
+          workspaces: |
+            . -> target
+            apps/desktop-shell -> ../../target
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+      - name: Unpack web UI + statics
+        shell: bash
+        run: tar -xf frontend-dist.tar
+      - name: Release builds
+        run: |
+          cargo build --release --locked -p pl-server --bin paperrust
+          cargo build --release --locked -p paperrust-desktop
+          cargo build --release --locked -p pl-dbmigrate --bin paperrust-migrate-db
+          cargo build --release --locked -p pl-pdftools --features engine --bin paperrust-pdftool
+      - name: Release build Tauri shell
+        working-directory: apps/desktop-shell
+        run: cargo build --release --locked
+      - name: pack.ps1 -Zip
+        shell: powershell
+        run: .\apps\desktop\pack\pack.ps1 -Zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: paperrust-windows-x64
+          path: |
+            results/desktop/*.zip
+            results/desktop/*/PACKAGE.json
+          retention-days: 7
+
+  desktop-linux:
+    name: Desktop package Linux (pack.sh, unsigned)
+    needs: frontend-dist
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: WebKitGTK / AppIndicator for the Tauri shell
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev
+      - run: rustup toolchain install --profile minimal
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: desktop-linux
+          workspaces: |
+            . -> target
+            apps/desktop-shell -> ../../target
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+      - run: tar -xf frontend-dist.tar
+      - name: Release builds
+        run: |
+          cargo build --release --locked -p pl-server --bin paperrust
+          cargo build --release --locked -p paperrust-desktop
+          cargo build --release --locked -p pl-dbmigrate --bin paperrust-migrate-db
+          cargo build --release --locked -p pl-pdftools --features engine --bin paperrust-pdftool
+          (cd apps/desktop-shell && cargo build --release --locked)
+      - name: pack.sh --tar
+        run: bash apps/desktop/pack/pack.sh --tar
+      - uses: actions/upload-artifact@v4
+        with:
+          name: paperrust-linux-x86_64
+          path: |
+            results/desktop/*.tar.gz
+            results/desktop/*/PACKAGE.json
+          retention-days: 7

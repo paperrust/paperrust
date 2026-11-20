@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Docker-HEALTHCHECK: GET /__rs/health über Loopback (ohne curl, nur bash /dev/tcp).
+# Gleiche Adresslogik wie paperrust-entrypoint (PAPERRUST_BIND bzw. PAPERRUST_BIND_ADDR/PAPERRUST_PORT, Alias PAPERLESS_…).
+set -uo pipefail
+# shellcheck source=../lib/paperrust/common.sh
+source /usr/local/lib/paperrust/common.sh
+
+read -r host port <<<"$(pr_probe_target)"
+if ! exec 3<>"/dev/tcp/$host/$port"; then
+	echo "unhealthy: keine Verbindung zu $host:$port"
+	exit 1
+fi
+printf 'GET /__rs/health HTTP/1.1\r\nHost: localhost\r\nUser-Agent: paperrust-healthcheck\r\nConnection: close\r\n\r\n' >&3
+status=""
+IFS= read -r -t 5 status <&3 || true
+exec 3<&- 3>&-
+if [[ "$status" =~ ^HTTP/1\.[01]\ 200 ]]; then
+	exit 0
+fi
+echo "unhealthy: ${status:-keine Antwort} von $host:$port/__rs/health"
+exit 1

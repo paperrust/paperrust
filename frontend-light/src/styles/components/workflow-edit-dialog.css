@@ -1,0 +1,20 @@
+/* Dialog "Edit workflow" (WorkflowEditDialog.svelte). */
+
+/* Red remove buttons stay red on hover/focus too */
+.btn.text-danger:hover,
+.btn.text-danger:focus {
+  color: rgba(var(--bs-danger-rgb), var(--bs-text-opacity)) !important;
+}
+
+.accordion-button {
+  font-size: 1rem;
+}
+
+/* Selection fields in the filter list without spacing below */
+:host ::deep .filters .paperless-input-select.mb-3 {
+  margin-bottom: 0 !important;
+}
+
+.ms-n3 {
+  margin-left: -1rem !important;
+}

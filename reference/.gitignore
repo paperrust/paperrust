@@ -1,0 +1,13 @@
+# Referenzumgebung: große/erzeugte/lokale Dateien nicht einchecken.
+/pg/
+/venv/
+/data/
+/data-test/
+/bin/
+/downloads/
+/logs/
+/run/
+/snapshot/
+/frontend/
+/build/
+__pycache__/

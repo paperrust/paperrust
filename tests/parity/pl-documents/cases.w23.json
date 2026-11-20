@@ -1,0 +1,477 @@
+{
+ "crate": "pl-documents",
+ "generated_by": "W23 B2 (Hand)",
+ "cases": [
+  {
+   "id": "documents.metadata.pdf-archive-owner-admin",
+   "route": "documents.metadata",
+   "method": "GET",
+   "path": "/api/documents/1/metadata/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.metadata.pdf-owner-alice-root-with-versions",
+   "route": "documents.metadata",
+   "method": "GET",
+   "path": "/api/documents/2/metadata/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.metadata.text-plain",
+   "route": "documents.metadata",
+   "method": "GET",
+   "path": "/api/documents/3/metadata/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.metadata.png-archive",
+   "route": "documents.metadata",
+   "method": "GET",
+   "path": "/api/documents/5/metadata/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.metadata.png-no-owner",
+   "route": "documents.metadata",
+   "method": "GET",
+   "path": "/api/documents/137/metadata/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.metadata.text-no-owner",
+   "route": "documents.metadata",
+   "method": "GET",
+   "path": "/api/documents/43/metadata/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.metadata.version-doc",
+   "route": "documents.metadata",
+   "method": "GET",
+   "path": "/api/documents/201/metadata/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.metadata.pdf-owner-bob",
+   "route": "documents.metadata",
+   "method": "GET",
+   "path": "/api/documents/6/metadata/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.metadata.version-param",
+   "route": "documents.metadata",
+   "method": "GET",
+   "path": "/api/documents/2/metadata/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "query": {
+    "version": "204"
+   }
+  },
+  {
+   "id": "documents.metadata.version-root",
+   "route": "documents.metadata",
+   "method": "GET",
+   "path": "/api/documents/2/metadata/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "query": {
+    "version": "2"
+   }
+  },
+  {
+   "id": "documents.metadata.version-invalid",
+   "route": "documents.metadata",
+   "method": "GET",
+   "path": "/api/documents/2/metadata/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "query": {
+    "version": "abc"
+   }
+  },
+  {
+   "id": "documents.metadata.version-foreign",
+   "route": "documents.metadata",
+   "method": "GET",
+   "path": "/api/documents/2/metadata/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "query": {
+    "version": "202"
+   }
+  },
+  {
+   "id": "documents.metadata.trashed",
+   "route": "documents.metadata",
+   "method": "GET",
+   "path": "/api/documents/196/metadata/",
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.metadata.missing",
+   "route": "documents.metadata",
+   "method": "GET",
+   "path": "/api/documents/999999/metadata/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.metadata.v9",
+   "route": "documents.metadata",
+   "method": "GET",
+   "path": "/api/documents/1/metadata/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "9"
+   ]
+  },
+  {
+   "id": "documents.metadata.if-none-match",
+   "route": "documents.metadata",
+   "method": "GET",
+   "path": "/api/documents/3/metadata/",
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "headers": {
+    "If-None-Match": "\"55a14a08bc7aa02adecfc8b1d1a67dcad2d5c204b906ef2ab64a2342dc3d88e4:2025-02-05T13:00:00+00:00\""
+   }
+  },
+  {
+   "id": "documents.metadata.if-none-match-stale",
+   "route": "documents.metadata",
+   "method": "GET",
+   "path": "/api/documents/3/metadata/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "headers": {
+    "If-None-Match": "\"nope\""
+   }
+  },
+  {
+   "id": "documents.metadata.if-modified-since",
+   "route": "documents.metadata",
+   "method": "GET",
+   "path": "/api/documents/1/metadata/",
+   "users": [
+    "admin",
+    "noperm"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "headers": {
+    "If-Modified-Since": "Wed, 01 Jan 2031 00:00:00 GMT"
+   }
+  },
+  {
+   "id": "documents.metadata.if-match-fail",
+   "route": "documents.metadata",
+   "method": "GET",
+   "path": "/api/documents/1/metadata/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "headers": {
+    "If-Match": "\"x\""
+   }
+  },
+  {
+   "id": "documents.metadata.indent",
+   "route": "documents.metadata",
+   "method": "GET",
+   "path": "/api/documents/3/metadata/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "headers": {
+    "Accept": "application/json; indent=2"
+   }
+  },
+  {
+   "id": "documents.suggestions.pdf-admin",
+   "route": "documents.suggestions",
+   "method": "GET",
+   "path": "/api/documents/1/suggestions/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.suggestions.pdf-alice",
+   "route": "documents.suggestions",
+   "method": "GET",
+   "path": "/api/documents/2/suggestions/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.suggestions.text",
+   "route": "documents.suggestions",
+   "method": "GET",
+   "path": "/api/documents/3/suggestions/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.suggestions.png",
+   "route": "documents.suggestions",
+   "method": "GET",
+   "path": "/api/documents/5/suggestions/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.suggestions.text-no-owner",
+   "route": "documents.suggestions",
+   "method": "GET",
+   "path": "/api/documents/43/suggestions/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.suggestions.version-doc",
+   "route": "documents.suggestions",
+   "method": "GET",
+   "path": "/api/documents/201/suggestions/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.suggestions.pdf-bob",
+   "route": "documents.suggestions",
+   "method": "GET",
+   "path": "/api/documents/6/suggestions/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.suggestions.pdf-10",
+   "route": "documents.suggestions",
+   "method": "GET",
+   "path": "/api/documents/10/suggestions/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.suggestions.pdf-50",
+   "route": "documents.suggestions",
+   "method": "GET",
+   "path": "/api/documents/50/suggestions/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.suggestions.trashed",
+   "route": "documents.suggestions",
+   "method": "GET",
+   "path": "/api/documents/196/suggestions/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.suggestions.missing",
+   "route": "documents.suggestions",
+   "method": "GET",
+   "path": "/api/documents/999999/suggestions/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "documents.suggestions.if-match",
+   "route": "documents.suggestions",
+   "method": "GET",
+   "path": "/api/documents/1/suggestions/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "headers": {
+    "If-Match": "\"x\""
+   }
+  }
+ ]
+}

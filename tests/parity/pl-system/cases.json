@@ -1,0 +1,670 @@
+{
+ "crate": "pl-system",
+ "cases": [
+  {
+   "id": "tasks.ack.ids",
+   "route": "tasks.acknowledge",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm",
+    "anon"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tasks/acknowledge/",
+     "json": {
+      "tasks": [
+       1,
+       2
+      ]
+     }
+    },
+    {
+     "sql": "select id, acknowledged from documents_paperlesstask order by id"
+    }
+   ]
+  },
+  {
+   "id": "tasks.ack.unowned",
+   "route": "tasks.acknowledge",
+   "users": [
+    "user1"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tasks/acknowledge/",
+     "json": {
+      "tasks": [
+       3,
+       6
+      ]
+     }
+    },
+    {
+     "sql": "select id, acknowledged from documents_paperlesstask order by id"
+    }
+   ]
+  },
+  {
+   "id": "tasks.ack.all",
+   "route": "tasks.acknowledge",
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tasks/acknowledge/",
+     "json": {
+      "all": true
+     }
+    },
+    {
+     "sql": "select id, acknowledged from documents_paperlesstask order by id"
+    }
+   ]
+  },
+  {
+   "id": "tasks.ack.all-false",
+   "route": "tasks.acknowledge",
+   "users": [
+    "admin"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tasks/acknowledge/",
+     "json": {
+      "all": false
+     }
+    },
+    {
+     "sql": "select id, acknowledged from documents_paperlesstask order by id"
+    }
+   ]
+  },
+  {
+   "id": "tasks.ack.both",
+   "route": "tasks.acknowledge",
+   "users": [
+    "admin"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tasks/acknowledge/",
+     "json": {
+      "all": true,
+      "tasks": [
+       1
+      ]
+     }
+    },
+    {
+     "sql": "select id, acknowledged from documents_paperlesstask order by id"
+    }
+   ]
+  },
+  {
+   "id": "tasks.ack.empty",
+   "route": "tasks.acknowledge",
+   "users": [
+    "admin"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tasks/acknowledge/",
+     "json": {}
+    },
+    {
+     "sql": "select id, acknowledged from documents_paperlesstask order by id"
+    }
+   ]
+  },
+  {
+   "id": "tasks.ack.dupe",
+   "route": "tasks.acknowledge",
+   "users": [
+    "admin"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tasks/acknowledge/",
+     "json": {
+      "tasks": [
+       1,
+       1
+      ]
+     }
+    },
+    {
+     "sql": "select id, acknowledged from documents_paperlesstask order by id"
+    }
+   ]
+  },
+  {
+   "id": "tasks.ack.missing",
+   "route": "tasks.acknowledge",
+   "users": [
+    "admin"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tasks/acknowledge/",
+     "json": {
+      "tasks": [
+       1,
+       9999
+      ]
+     }
+    },
+    {
+     "sql": "select id, acknowledged from documents_paperlesstask order by id"
+    }
+   ]
+  },
+  {
+   "id": "tasks.ack.empty-list",
+   "route": "tasks.acknowledge",
+   "users": [
+    "admin"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tasks/acknowledge/",
+     "json": {
+      "tasks": []
+     }
+    },
+    {
+     "sql": "select id, acknowledged from documents_paperlesstask order by id"
+    }
+   ]
+  },
+  {
+   "id": "tasks.ack.not-list",
+   "route": "tasks.acknowledge",
+   "users": [
+    "admin"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tasks/acknowledge/",
+     "json": {
+      "tasks": "1"
+     }
+    },
+    {
+     "sql": "select id, acknowledged from documents_paperlesstask order by id"
+    }
+   ]
+  },
+  {
+   "id": "tasks.ack.strings",
+   "route": "tasks.acknowledge",
+   "users": [
+    "admin"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tasks/acknowledge/",
+     "json": {
+      "tasks": [
+       "1",
+       "x"
+      ]
+     }
+    },
+    {
+     "sql": "select id, acknowledged from documents_paperlesstask order by id"
+    }
+   ]
+  },
+  {
+   "id": "tasks.ack.bool-ids",
+   "route": "tasks.acknowledge",
+   "users": [
+    "admin"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tasks/acknowledge/",
+     "json": {
+      "tasks": [
+       true
+      ]
+     }
+    },
+    {
+     "sql": "select id, acknowledged from documents_paperlesstask order by id"
+    }
+   ]
+  },
+  {
+   "id": "tasks.ack.all-str",
+   "route": "tasks.acknowledge",
+   "users": [
+    "admin"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tasks/acknowledge/",
+     "json": {
+      "all": "yes"
+     }
+    },
+    {
+     "sql": "select id, acknowledged from documents_paperlesstask order by id"
+    }
+   ]
+  },
+  {
+   "id": "tasks.ack.all-bad",
+   "route": "tasks.acknowledge",
+   "users": [
+    "admin"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tasks/acknowledge/",
+     "json": {
+      "all": "maybe"
+     }
+    },
+    {
+     "sql": "select id, acknowledged from documents_paperlesstask order by id"
+    }
+   ]
+  },
+  {
+   "id": "tasks.ack.null",
+   "route": "tasks.acknowledge",
+   "users": [
+    "admin"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tasks/acknowledge/",
+     "json": {
+      "tasks": null
+     }
+    },
+    {
+     "sql": "select id, acknowledged from documents_paperlesstask order by id"
+    }
+   ]
+  },
+  {
+   "id": "tasks.ack.form",
+   "route": "tasks.acknowledge",
+   "users": [
+    "admin"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tasks/acknowledge/",
+     "form": {
+      "tasks": "3"
+     }
+    },
+    {
+     "sql": "select id, acknowledged from documents_paperlesstask order by id"
+    }
+   ]
+  },
+  {
+   "id": "tasks.ack.form-all",
+   "route": "tasks.acknowledge",
+   "users": [
+    "user1"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tasks/acknowledge/",
+     "form": {
+      "all": "true"
+     }
+    },
+    {
+     "sql": "select id, acknowledged from documents_paperlesstask order by id"
+    }
+   ]
+  },
+  {
+   "id": "tasks.ack.session-csrf",
+   "route": "tasks.acknowledge",
+   "users": [
+    "admin@session"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tasks/acknowledge/",
+     "json": {
+      "tasks": [
+       7
+      ]
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/tasks/acknowledge/",
+     "json": {
+      "tasks": [
+       8
+      ]
+     },
+     "csrf": false
+    },
+    {
+     "sql": "select id, acknowledged from documents_paperlesstask order by id"
+    }
+   ]
+  },
+  {
+   "id": "tasks.ack.v9",
+   "route": "tasks.acknowledge",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "9"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tasks/acknowledge/",
+     "json": {
+      "tasks": [
+       4,
+       5
+      ]
+     }
+    },
+    {
+     "sql": "select id, acknowledged from documents_paperlesstask order by id"
+    }
+   ]
+  },
+  {
+   "id": "tasks.ack.then-list",
+   "route": "tasks.acknowledge",
+   "users": [
+    "user1"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tasks/acknowledge/",
+     "json": {
+      "all": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/api/tasks/",
+     "query": {
+      "acknowledged": "false"
+     }
+    },
+    {
+     "sql": "select id, acknowledged from documents_paperlesstask order by id"
+    }
+   ]
+  },
+  {
+   "id": "tasks.run.sanity",
+   "route": "tasks.run",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm",
+    "anon"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tasks/run/",
+     "json": {
+      "task_type": "sanity_check"
+     }
+    },
+    {
+     "sql": "select id, task_id, task_type, trigger_source, status, owner_id, input_data, result_data, acknowledged, date_created, date_started, date_done from documents_paperlesstask where id > 12 order by id"
+    }
+   ]
+  },
+  {
+   "id": "tasks.run.train",
+   "route": "tasks.run",
+   "users": [
+    "admin"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tasks/run/",
+     "json": {
+      "task_type": "train_classifier"
+     }
+    },
+    {
+     "sql": "select id, task_id, task_type, trigger_source, status, owner_id, input_data, result_data, acknowledged, date_created, date_started, date_done from documents_paperlesstask where id > 12 order by id"
+    }
+   ]
+  },
+  {
+   "id": "tasks.run.llm",
+   "route": "tasks.run",
+   "users": [
+    "admin"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tasks/run/",
+     "json": {
+      "task_type": "llm_index"
+     }
+    },
+    {
+     "sql": "select id, task_id, task_type, trigger_source, status, owner_id, input_data, result_data, acknowledged, date_created, date_started, date_done from documents_paperlesstask where id > 12 order by id"
+    }
+   ]
+  },
+  {
+   "id": "tasks.run.not-runnable",
+   "route": "tasks.run",
+   "users": [
+    "admin"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tasks/run/",
+     "json": {
+      "task_type": "consume_file"
+     }
+    },
+    {
+     "sql": "select id, task_id, task_type, trigger_source, status, owner_id, input_data, result_data, acknowledged, date_created, date_started, date_done from documents_paperlesstask where id > 12 order by id"
+    }
+   ]
+  },
+  {
+   "id": "tasks.run.bogus",
+   "route": "tasks.run",
+   "users": [
+    "admin"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tasks/run/",
+     "json": {
+      "task_type": "bogus"
+     }
+    },
+    {
+     "sql": "select id, task_id, task_type, trigger_source, status, owner_id, input_data, result_data, acknowledged, date_created, date_started, date_done from documents_paperlesstask where id > 12 order by id"
+    }
+   ]
+  },
+  {
+   "id": "tasks.run.empty",
+   "route": "tasks.run",
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tasks/run/",
+     "json": {}
+    },
+    {
+     "sql": "select id, task_id, task_type, trigger_source, status, owner_id, input_data, result_data, acknowledged, date_created, date_started, date_done from documents_paperlesstask where id > 12 order by id"
+    }
+   ]
+  },
+  {
+   "id": "tasks.run.null",
+   "route": "tasks.run",
+   "users": [
+    "admin"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tasks/run/",
+     "json": {
+      "task_type": null
+     }
+    },
+    {
+     "sql": "select id, task_id, task_type, trigger_source, status, owner_id, input_data, result_data, acknowledged, date_created, date_started, date_done from documents_paperlesstask where id > 12 order by id"
+    }
+   ]
+  },
+  {
+   "id": "tasks.run.number",
+   "route": "tasks.run",
+   "users": [
+    "admin"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tasks/run/",
+     "json": {
+      "task_type": 5
+     }
+    },
+    {
+     "sql": "select id, task_id, task_type, trigger_source, status, owner_id, input_data, result_data, acknowledged, date_created, date_started, date_done from documents_paperlesstask where id > 12 order by id"
+    }
+   ]
+  },
+  {
+   "id": "tasks.run.form",
+   "route": "tasks.run",
+   "users": [
+    "admin"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tasks/run/",
+     "form": {
+      "task_type": "sanity_check"
+     }
+    },
+    {
+     "sql": "select id, task_id, task_type, trigger_source, status, owner_id, input_data, result_data, acknowledged, date_created, date_started, date_done from documents_paperlesstask where id > 12 order by id"
+    }
+   ]
+  },
+  {
+   "id": "tasks.run.then-get",
+   "route": "tasks.run",
+   "users": [
+    "admin"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tasks/run/",
+     "json": {
+      "task_type": "sanity_check"
+     },
+     "capture": {
+      "tid": "task_id"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/api/tasks/",
+     "query": {
+      "task_id": "${tid}"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/api/tasks/active/"
+    },
+    {
+     "sql": "select id, task_id, task_type, trigger_source, status, owner_id, input_data, result_data, acknowledged, date_created, date_started, date_done from documents_paperlesstask where id > 12 order by id"
+    }
+   ]
+  }
+ ]
+}

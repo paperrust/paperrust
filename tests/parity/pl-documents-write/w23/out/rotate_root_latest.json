@@ -1,0 +1,132 @@
+{
+  "django": {
+    "status": 200,
+    "body": {
+      "result": "OK"
+    },
+    "plan": [
+      {
+        "kind": "task",
+        "task": {
+          "task": "documents.tasks.consume_file",
+          "args": [],
+          "kwargs": {
+            "input_doc": {
+              "source": 1,
+              "original_file": "<scratch>/1_rotated.pdf",
+              "root_document_id": 1,
+              "original_path": null,
+              "mailrule_id": null,
+              "mime_type": "application/pdf"
+            },
+            "overrides": {
+              "filename": null,
+              "title": "Contract Stadtwerke Zürich 001",
+              "correspondent_id": 2,
+              "document_type_id": 2,
+              "tag_ids": [
+                9,
+                4
+              ],
+              "storage_path_id": null,
+              "created": "2019-01-14",
+              "asn": null,
+              "owner_id": 2,
+              "view_users": [],
+              "view_groups": [],
+              "change_users": [],
+              "change_groups": [],
+              "custom_fields": {},
+              "skip_asn_if_exists": false,
+              "version_label": null,
+              "actor_id": 2,
+              "remote_ocr": false,
+              "barcodes": null
+            }
+          },
+          "trigger_source": "api_upload",
+          "link": [],
+          "link_error": []
+        }
+      }
+    ],
+    "files": {
+      "1_rotated.pdf": {
+        "pages": 2,
+        "rotations": [
+          270,
+          270
+        ],
+        "texts": [
+          "Contract Stadtwerke Zürich 001 ORIGINAL - page 1/2 Contract Stadtwerke Zürich 001 Reference REF-00001 From: Stadtwerke Zürich Balance due school certificate refund subscription prescription budget due report pension employer.",
+          "Contract Stadtwerke Zürich 001 ORIGINAL - page 2/2 Report statement due balance salary prescription delivery statement health electricity registration survey policy subscription delivery. Overdue health delivery shipment tuition donation. Reminder health order minutes phone property tenant meeting gas health health. Meeting subscription tenant rent certificate interest annual report registration budget. Version 2 addendum."
+        ]
+      }
+    }
+  },
+  "rust": {
+    "status": 200,
+    "body": {
+      "result": "OK"
+    },
+    "plan": [
+      {
+        "kind": "task",
+        "task": {
+          "task": "documents.tasks.consume_file",
+          "args": [],
+          "kwargs": {
+            "input_doc": {
+              "source": 1,
+              "mime_type": "application/pdf",
+              "mailrule_id": null,
+              "original_file": "<scratch>/1_rotated.pdf",
+              "original_path": null,
+              "root_document_id": 1
+            },
+            "overrides": {
+              "asn": null,
+              "title": "Contract Stadtwerke Zürich 001",
+              "created": "2019-01-14",
+              "tag_ids": [
+                9,
+                4
+              ],
+              "actor_id": 2,
+              "barcodes": null,
+              "filename": null,
+              "owner_id": 2,
+              "remote_ocr": false,
+              "view_users": [],
+              "view_groups": [],
+              "change_users": [],
+              "change_groups": [],
+              "custom_fields": {},
+              "version_label": null,
+              "storage_path_id": null,
+              "correspondent_id": 2,
+              "document_type_id": 2,
+              "skip_asn_if_exists": false
+            }
+          },
+          "trigger_source": "api_upload",
+          "link": [],
+          "link_error": []
+        }
+      }
+    ],
+    "files": {
+      "1_rotated.pdf": {
+        "pages": 2,
+        "rotations": [
+          270,
+          270
+        ],
+        "texts": [
+          "Contract Stadtwerke Zürich 001 ORIGINAL - page 1/2 Contract Stadtwerke Zürich 001 Reference REF-00001 From: Stadtwerke Zürich Balance due school certificate refund subscription prescription budget due report pension employer.",
+          "Contract Stadtwerke Zürich 001 ORIGINAL - page 2/2 Report statement due balance salary prescription delivery statement health electricity registration survey policy subscription delivery. Overdue health delivery shipment tuition donation. Reminder health order minutes phone property tenant meeting gas health health. Meeting subscription tenant rent certificate interest annual report registration budget. Version 2 addendum."
+        ]
+      }
+    }
+  }
+}

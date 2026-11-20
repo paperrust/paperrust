@@ -1,0 +1,1383 @@
+[
+ {
+  "name": "delete_ok_admin",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/delete/",
+  "body": {
+   "documents": [
+    3,
+    4
+   ]
+  }
+ },
+ {
+  "name": "delete_with_versions",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/delete/",
+  "body": {
+   "documents": [
+    1
+   ]
+  }
+ },
+ {
+  "name": "delete_version_only",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/delete/",
+  "body": {
+   "documents": [
+    202
+   ]
+  }
+ },
+ {
+  "name": "delete_owner_alice",
+  "user": "alice",
+  "method": "POST",
+  "path": "/api/documents/delete/",
+  "body": {
+   "documents": [
+    2
+   ]
+  }
+ },
+ {
+  "name": "delete_bob_no_delete_perm",
+  "user": "bob",
+  "method": "POST",
+  "path": "/api/documents/delete/",
+  "body": {
+   "documents": [
+    4
+   ]
+  }
+ },
+ {
+  "name": "delete_alice_not_owner",
+  "user": "alice",
+  "method": "POST",
+  "path": "/api/documents/delete/",
+  "body": {
+   "documents": [
+    1
+   ]
+  }
+ },
+ {
+  "name": "delete_carol_no_change",
+  "user": "carol",
+  "method": "POST",
+  "path": "/api/documents/delete/",
+  "body": {
+   "documents": [
+    5
+   ]
+  }
+ },
+ {
+  "name": "delete_empty_body",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/delete/"
+ },
+ {
+  "name": "delete_missing_doc",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/delete/",
+  "body": {
+   "documents": [
+    9999
+   ]
+  }
+ },
+ {
+  "name": "delete_excluded_without_all",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/delete/",
+  "body": {
+   "documents": [
+    3
+   ],
+   "excluded_documents": [
+    1
+   ]
+  }
+ },
+ {
+  "name": "delete_bad_types",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/delete/",
+  "body": {
+   "documents": "x",
+   "all": "maybe",
+   "filters": [
+    1
+   ],
+   "excluded_documents": [
+    null
+   ]
+  }
+ },
+ {
+  "name": "delete_list_body",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/delete/",
+  "body": [
+   1
+  ]
+ },
+ {
+  "name": "delete_anon",
+  "user": null,
+  "method": "POST",
+  "path": "/api/documents/delete/",
+  "body": {
+   "documents": [
+    3
+   ]
+  }
+ },
+ {
+  "name": "delete_trashed_doc",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/delete/",
+  "body": {
+   "documents": [
+    196
+   ]
+  }
+ },
+ {
+  "name": "delete_extra_keys_ignored",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/delete/",
+  "body": {
+   "documents": [
+    3
+   ],
+   "foo": 1
+  }
+ },
+ {
+  "name": "rotate_ok",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/rotate/",
+  "body": {
+   "documents": [
+    8
+   ],
+   "degrees": 90
+  }
+ },
+ {
+  "name": "rotate_two_docs_webui",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/rotate/",
+  "body": {
+   "documents": [
+    8,
+    10
+   ],
+   "degrees": "180",
+   "from_webui": "yes"
+  }
+ },
+ {
+  "name": "rotate_45",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/rotate/",
+  "body": {
+   "documents": [
+    8
+   ],
+   "degrees": 45
+  }
+ },
+ {
+  "name": "rotate_missing_degrees",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/rotate/",
+  "body": {
+   "documents": [
+    8
+   ]
+  }
+ },
+ {
+  "name": "rotate_bad_source_mode",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/rotate/",
+  "body": {
+   "documents": [
+    8
+   ],
+   "degrees": 90,
+   "source_mode": "newest"
+  }
+ },
+ {
+  "name": "rotate_null_fields",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/rotate/",
+  "body": {
+   "documents": [
+    8
+   ],
+   "degrees": null,
+   "source_mode": null,
+   "from_webui": null
+  }
+ },
+ {
+  "name": "rotate_version_explicit",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/rotate/",
+  "body": {
+   "documents": [
+    201
+   ],
+   "degrees": 270,
+   "source_mode": " explicit_selection "
+  }
+ },
+ {
+  "name": "rotate_root_latest",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/rotate/",
+  "body": {
+   "documents": [
+    1
+   ],
+   "degrees": -90
+  }
+ },
+ {
+  "name": "rotate_bob_not_owner",
+  "user": "bob",
+  "method": "POST",
+  "path": "/api/documents/rotate/",
+  "body": {
+   "documents": [
+    1
+   ],
+   "degrees": 90
+  }
+ },
+ {
+  "name": "rotate_dave_owner_none",
+  "user": "dave",
+  "method": "POST",
+  "path": "/api/documents/rotate/",
+  "body": {
+   "documents": [
+    7
+   ],
+   "degrees": 90
+  }
+ },
+ {
+  "name": "rotate_non_pdf",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/rotate/",
+  "body": {
+   "documents": [
+    5
+   ],
+   "degrees": 90
+  }
+ },
+ {
+  "name": "rotate_no_documents",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/rotate/",
+  "body": {
+   "degrees": 90
+  }
+ },
+ {
+  "name": "merge_ok",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/merge/",
+  "body": {
+   "documents": [
+    8,
+    10
+   ]
+  }
+ },
+ {
+  "name": "merge_metadata_delete",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/merge/",
+  "body": {
+   "documents": [
+    8,
+    10
+   ],
+   "metadata_document_id": 10,
+   "delete_originals": true
+  }
+ },
+ {
+  "name": "merge_metadata_null_fallback",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/merge/",
+  "body": {
+   "documents": [
+    10,
+    8
+   ],
+   "metadata_document_id": null,
+   "archive_fallback": "true",
+   "from_webui": true
+  }
+ },
+ {
+  "name": "merge_bob_delete_originals",
+  "user": "bob",
+  "method": "POST",
+  "path": "/api/documents/merge/",
+  "body": {
+   "documents": [
+    4,
+    10
+   ],
+   "delete_originals": true
+  }
+ },
+ {
+  "name": "merge_bob_no_delete",
+  "user": "bob",
+  "method": "POST",
+  "path": "/api/documents/merge/",
+  "body": {
+   "documents": [
+    4,
+    16
+   ]
+  }
+ },
+ {
+  "name": "merge_carol_no_add",
+  "user": "carol",
+  "method": "POST",
+  "path": "/api/documents/merge/",
+  "body": {
+   "documents": [
+    5
+   ]
+  }
+ },
+ {
+  "name": "merge_missing_documents",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/merge/",
+  "body": {
+   "archive_fallback": "x",
+   "metadata_document_id": "a"
+  }
+ },
+ {
+  "name": "merge_all_ignored",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/merge/",
+  "body": {
+   "documents": [
+    8,
+    10
+   ],
+   "all": true
+  }
+ },
+ {
+  "name": "mav_ok_asn_kept",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/merge_as_versions/",
+  "body": {
+   "documents": [
+    8,
+    10
+   ],
+   "root_document_id": 8
+  }
+ },
+ {
+  "name": "mav_asn_handover",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/merge_as_versions/",
+  "body": {
+   "documents": [
+    6,
+    10,
+    11
+   ],
+   "root_document_id": 6
+  }
+ },
+ {
+  "name": "mav_label",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/merge_as_versions/",
+  "body": {
+   "documents": [
+    8,
+    10
+   ],
+   "root_document_id": 8,
+   "version_label": "  Fassung 2 "
+  }
+ },
+ {
+  "name": "mav_label_blank",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/merge_as_versions/",
+  "body": {
+   "documents": [
+    8,
+    10
+   ],
+   "root_document_id": 8,
+   "version_label": "   "
+  }
+ },
+ {
+  "name": "mav_label_three_docs",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/merge_as_versions/",
+  "body": {
+   "documents": [
+    8,
+    10,
+    11
+   ],
+   "root_document_id": 8,
+   "version_label": "x"
+  }
+ },
+ {
+  "name": "mav_one_doc",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/merge_as_versions/",
+  "body": {
+   "documents": [
+    8
+   ],
+   "root_document_id": 8
+  }
+ },
+ {
+  "name": "mav_root_not_selected",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/merge_as_versions/",
+  "body": {
+   "documents": [
+    8,
+    10
+   ],
+   "root_document_id": 9
+  }
+ },
+ {
+  "name": "mav_version_selected",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/merge_as_versions/",
+  "body": {
+   "documents": [
+    201,
+    8
+   ],
+   "root_document_id": 8
+  }
+ },
+ {
+  "name": "mav_source_has_versions",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/merge_as_versions/",
+  "body": {
+   "documents": [
+    8,
+    1
+   ],
+   "root_document_id": 8
+  }
+ },
+ {
+  "name": "mav_root_has_versions",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/merge_as_versions/",
+  "body": {
+   "documents": [
+    1,
+    8
+   ],
+   "root_document_id": 1
+  }
+ },
+ {
+  "name": "mav_bob_no_delete",
+  "user": "bob",
+  "method": "POST",
+  "path": "/api/documents/merge_as_versions/",
+  "body": {
+   "documents": [
+    4,
+    16
+   ],
+   "root_document_id": 4
+  }
+ },
+ {
+  "name": "mav_alice_owner",
+  "user": "alice",
+  "method": "POST",
+  "path": "/api/documents/merge_as_versions/",
+  "body": {
+   "documents": [
+    2,
+    12
+   ],
+   "root_document_id": 2
+  }
+ },
+ {
+  "name": "mav_alice_not_owner",
+  "user": "alice",
+  "method": "POST",
+  "path": "/api/documents/merge_as_versions/",
+  "body": {
+   "documents": [
+    2,
+    1
+   ],
+   "root_document_id": 2
+  }
+ },
+ {
+  "name": "mav_field_errors",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/merge_as_versions/",
+  "body": {
+   "documents": [
+    8,
+    8
+   ],
+   "version_label": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+  }
+ },
+ {
+  "name": "mav_missing_root",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/merge_as_versions/",
+  "body": {
+   "documents": [
+    8,
+    10
+   ],
+   "version_label": null
+  }
+ },
+ {
+  "name": "mav_root_string",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/merge_as_versions/",
+  "body": {
+   "documents": [
+    8,
+    10
+   ],
+   "root_document_id": "10"
+  }
+ },
+ {
+  "name": "edit_ok",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/edit_pdf/",
+  "body": {
+   "documents": [
+    8
+   ],
+   "operations": [
+    {
+     "page": 1
+    },
+    {
+     "page": 2,
+     "rotate": 90
+    }
+   ]
+  }
+ },
+ {
+  "name": "edit_two_outputs_delete",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/edit_pdf/",
+  "body": {
+   "documents": [
+    8
+   ],
+   "operations": [
+    {
+     "page": 1,
+     "doc": 0
+    },
+    {
+     "page": 3,
+     "doc": 1
+    }
+   ],
+   "delete_original": true
+  }
+ },
+ {
+  "name": "edit_update_document",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/edit_pdf/",
+  "body": {
+   "documents": [
+    8
+   ],
+   "operations": [
+    {
+     "page": 2
+    },
+    {
+     "page": 1
+    }
+   ],
+   "update_document": true,
+   "include_metadata": false
+  }
+ },
+ {
+  "name": "edit_update_two_outputs",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/edit_pdf/",
+  "body": {
+   "documents": [
+    8
+   ],
+   "operations": [
+    {
+     "page": 1,
+     "doc": 0
+    },
+    {
+     "page": 2,
+     "doc": 1
+    }
+   ],
+   "update_document": true
+  }
+ },
+ {
+  "name": "edit_empty_ops",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/edit_pdf/",
+  "body": {
+   "documents": [
+    8
+   ],
+   "operations": []
+  }
+ },
+ {
+  "name": "edit_missing_ops",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/edit_pdf/",
+  "body": {
+   "documents": [
+    8
+   ]
+  }
+ },
+ {
+  "name": "edit_bad_op",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/edit_pdf/",
+  "body": {
+   "documents": [
+    8
+   ],
+   "operations": [
+    {
+     "page": 0,
+     "rotate": 45,
+     "doc": -1
+    },
+    "x"
+   ]
+  }
+ },
+ {
+  "name": "edit_two_docs",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/edit_pdf/",
+  "body": {
+   "documents": [
+    8,
+    10
+   ],
+   "operations": [
+    {
+     "page": 1
+    }
+   ]
+  }
+ },
+ {
+  "name": "edit_page_oob",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/edit_pdf/",
+  "body": {
+   "documents": [
+    8
+   ],
+   "operations": [
+    {
+     "page": 9
+    }
+   ]
+  }
+ },
+ {
+  "name": "edit_doc_index_oob",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/edit_pdf/",
+  "body": {
+   "documents": [
+    8
+   ],
+   "operations": [
+    {
+     "page": 1,
+     "doc": 1
+    }
+   ]
+  }
+ },
+ {
+  "name": "edit_empty_documents",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/edit_pdf/",
+  "body": {
+   "documents": [],
+   "operations": [
+    {
+     "page": 1
+    }
+   ]
+  }
+ },
+ {
+  "name": "edit_bob_not_owner",
+  "user": "bob",
+  "method": "POST",
+  "path": "/api/documents/edit_pdf/",
+  "body": {
+   "documents": [
+    1
+   ],
+   "operations": [
+    {
+     "page": 1
+    }
+   ]
+  }
+ },
+ {
+  "name": "edit_bad_bools",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/edit_pdf/",
+  "body": {
+   "documents": [
+    8
+   ],
+   "operations": [
+    {
+     "page": 1
+    }
+   ],
+   "update_document": "x",
+   "include_metadata": null
+  }
+ },
+ {
+  "name": "pw_ok",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/remove_password/",
+  "body": {
+   "documents": [
+    21
+   ],
+   "password": "test"
+  },
+  "accept": [
+   "db.documents_paperlesstask"
+  ],
+  "setup_files": [
+   {
+    "from": "upstream/src/documents/tests/samples/password-is-test.pdf",
+    "doc": 21
+   }
+  ]
+ },
+ {
+  "name": "pw_update_document",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/remove_password/",
+  "body": {
+   "documents": [
+    21
+   ],
+   "password": " test ",
+   "update_document": true
+  },
+  "accept": [
+   "db.documents_paperlesstask"
+  ],
+  "setup_files": [
+   {
+    "from": "upstream/src/documents/tests/samples/password-is-test.pdf",
+    "doc": 21
+   }
+  ]
+ },
+ {
+  "name": "pw_wrong_password",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/remove_password/",
+  "body": {
+   "documents": [
+    21
+   ],
+   "password": "nope",
+   "delete_original": true
+  },
+  "setup_files": [
+   {
+    "from": "upstream/src/documents/tests/samples/password-is-test.pdf",
+    "doc": 21
+   }
+  ]
+ },
+ {
+  "name": "pw_missing",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/remove_password/",
+  "body": {
+   "documents": [
+    21
+   ]
+  }
+ },
+ {
+  "name": "pw_blank",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/remove_password/",
+  "body": {
+   "documents": [
+    21
+   ],
+   "password": "  "
+  }
+ },
+ {
+  "name": "pw_not_string",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/remove_password/",
+  "body": {
+   "documents": [
+    21
+   ],
+   "password": [
+    "a"
+   ]
+  }
+ },
+ {
+  "name": "pw_bob_not_owner",
+  "user": "bob",
+  "method": "POST",
+  "path": "/api/documents/remove_password/",
+  "body": {
+   "documents": [
+    1
+   ],
+   "password": "x"
+  }
+ },
+ {
+  "name": "vdel_ok",
+  "user": "admin",
+  "method": "DELETE",
+  "path": "/api/documents/1/versions/202/"
+ },
+ {
+  "name": "vdel_first_version",
+  "user": "admin",
+  "method": "DELETE",
+  "path": "/api/documents/1/versions/201/"
+ },
+ {
+  "name": "vdel_root",
+  "user": "admin",
+  "method": "DELETE",
+  "path": "/api/documents/1/versions/1/"
+ },
+ {
+  "name": "vdel_other_root",
+  "user": "admin",
+  "method": "DELETE",
+  "path": "/api/documents/1/versions/203/"
+ },
+ {
+  "name": "vdel_via_version_pk",
+  "user": "admin",
+  "method": "DELETE",
+  "path": "/api/documents/201/versions/202/"
+ },
+ {
+  "name": "vdel_alice_not_owner",
+  "user": "alice",
+  "method": "DELETE",
+  "path": "/api/documents/1/versions/201/"
+ },
+ {
+  "name": "vdel_alice_owner",
+  "user": "alice",
+  "method": "DELETE",
+  "path": "/api/documents/2/versions/204/"
+ },
+ {
+  "name": "vdel_bob_no_delete_perm",
+  "user": "bob",
+  "method": "DELETE",
+  "path": "/api/documents/2/versions/203/"
+ },
+ {
+  "name": "vdel_missing_doc",
+  "user": "admin",
+  "method": "DELETE",
+  "path": "/api/documents/9999/versions/1/"
+ },
+ {
+  "name": "vdel_missing_version",
+  "user": "admin",
+  "method": "DELETE",
+  "path": "/api/documents/1/versions/99999/"
+ },
+ {
+  "name": "vdel_trashed_doc",
+  "user": "admin",
+  "method": "DELETE",
+  "path": "/api/documents/196/versions/1/"
+ },
+ {
+  "name": "vdel_anon",
+  "user": null,
+  "method": "DELETE",
+  "path": "/api/documents/1/versions/202/"
+ },
+ {
+  "name": "vpatch_ok",
+  "user": "admin",
+  "method": "PATCH",
+  "path": "/api/documents/1/versions/201/",
+  "body": {
+   "version_label": "  neu  "
+  }
+ },
+ {
+  "name": "vpatch_blank",
+  "user": "admin",
+  "method": "PATCH",
+  "path": "/api/documents/1/versions/201/",
+  "body": {
+   "version_label": ""
+  }
+ },
+ {
+  "name": "vpatch_null",
+  "user": "admin",
+  "method": "PATCH",
+  "path": "/api/documents/1/versions/202/",
+  "body": {
+   "version_label": null
+  }
+ },
+ {
+  "name": "vpatch_same",
+  "user": "admin",
+  "method": "PATCH",
+  "path": "/api/documents/1/versions/201/",
+  "body": {
+   "version_label": "v1"
+  }
+ },
+ {
+  "name": "vpatch_root",
+  "user": "admin",
+  "method": "PATCH",
+  "path": "/api/documents/1/versions/1/",
+  "body": {
+   "version_label": "Original"
+  }
+ },
+ {
+  "name": "vpatch_missing",
+  "user": "admin",
+  "method": "PATCH",
+  "path": "/api/documents/1/versions/201/",
+  "body": {}
+ },
+ {
+  "name": "vpatch_too_long",
+  "user": "admin",
+  "method": "PATCH",
+  "path": "/api/documents/1/versions/201/",
+  "body": {
+   "version_label": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+  }
+ },
+ {
+  "name": "vpatch_list_body",
+  "user": "admin",
+  "method": "PATCH",
+  "path": "/api/documents/1/versions/201/",
+  "body": [
+   1
+  ]
+ },
+ {
+  "name": "vpatch_carol",
+  "user": "carol",
+  "method": "PATCH",
+  "path": "/api/documents/1/versions/201/",
+  "body": {
+   "version_label": "x"
+  }
+ },
+ {
+  "name": "vpatch_bob_not_owner",
+  "user": "bob",
+  "method": "PATCH",
+  "path": "/api/documents/2/versions/203/",
+  "body": {
+   "version_label": "x"
+  }
+ },
+ {
+  "name": "vpatch_alice_owner",
+  "user": "alice",
+  "method": "PATCH",
+  "path": "/api/documents/2/versions/203/",
+  "body": {
+   "version_label": "Alice"
+  }
+ },
+ {
+  "name": "vpatch_other_root",
+  "user": "admin",
+  "method": "PATCH",
+  "path": "/api/documents/2/versions/201/",
+  "body": {
+   "version_label": "x"
+  }
+ },
+ {
+  "name": "vpatch_missing_doc",
+  "user": "admin",
+  "method": "PATCH",
+  "path": "/api/documents/9999/versions/201/",
+  "body": {
+   "version_label": "x"
+  }
+ },
+ {
+  "name": "uv_ok",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/8/update_version/",
+  "multipart": {
+   "fields": [
+    [
+     "version_label",
+     " v2 "
+    ]
+   ],
+   "file": {
+    "name": "neu.pdf",
+    "from": "upstream/src/documents/tests/samples/double-sided-odd.pdf"
+   }
+  }
+ },
+ {
+  "name": "uv_no_label",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/8/update_version/",
+  "multipart": {
+   "fields": [],
+   "file": {
+    "name": "x.pdf",
+    "from": "upstream/src/documents/tests/samples/double-sided-odd.pdf"
+   }
+  }
+ },
+ {
+  "name": "uv_blank_label",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/8/update_version/",
+  "multipart": {
+   "fields": [
+    [
+     "version_label",
+     ""
+    ]
+   ],
+   "file": {
+    "name": "x.pdf",
+    "from": "upstream/src/documents/tests/samples/double-sided-odd.pdf"
+   }
+  }
+ },
+ {
+  "name": "uv_png",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/5/update_version/",
+  "multipart": {
+   "fields": [],
+   "file": {
+    "name": "bild.png",
+    "from": "upstream/src/documents/tests/samples/simple.png"
+   }
+  }
+ },
+ {
+  "name": "uv_on_version_pk",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/201/update_version/",
+  "multipart": {
+   "fields": [],
+   "file": {
+    "name": "x.pdf",
+    "from": "upstream/src/documents/tests/samples/double-sided-odd.pdf"
+   }
+  }
+ },
+ {
+  "name": "uv_no_file",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/8/update_version/",
+  "multipart": {
+   "fields": [
+    [
+     "version_label",
+     "x"
+    ]
+   ]
+  }
+ },
+ {
+  "name": "uv_empty_file",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/8/update_version/",
+  "multipart": {
+   "fields": [],
+   "file": {
+    "name": "x.pdf",
+    "content": ""
+   }
+  }
+ },
+ {
+  "name": "uv_unsupported",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/8/update_version/",
+  "multipart": {
+   "fields": [],
+   "file": {
+    "name": "x.bin",
+    "content": "\u0000\u0001\u0002binary"
+   }
+  }
+ },
+ {
+  "name": "uv_invalid_pdf_recoverable",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/8/update_version/",
+  "multipart": {
+   "fields": [],
+   "file": {
+    "name": "kaputt.pdf",
+    "content": "\u0000\u0001\u0002binary"
+   }
+  }
+ },
+ {
+  "name": "uv_label_too_long",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/8/update_version/",
+  "multipart": {
+   "fields": [
+    [
+     "version_label",
+     "qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq"
+    ]
+   ],
+   "file": {
+    "name": "x.pdf",
+    "from": "upstream/src/documents/tests/samples/double-sided-odd.pdf"
+   }
+  }
+ },
+ {
+  "name": "uv_document_as_text",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/8/update_version/",
+  "multipart": {
+   "fields": [
+    [
+     "document",
+     "nofile"
+    ]
+   ]
+  }
+ },
+ {
+  "name": "uv_missing_doc",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/9999/update_version/",
+  "multipart": {
+   "fields": [],
+   "file": {
+    "name": "x.pdf",
+    "from": "upstream/src/documents/tests/samples/double-sided-odd.pdf"
+   }
+  }
+ },
+ {
+  "name": "uv_carol",
+  "user": "carol",
+  "method": "POST",
+  "path": "/api/documents/8/update_version/",
+  "multipart": {
+   "fields": [],
+   "file": {
+    "name": "x.pdf",
+    "from": "upstream/src/documents/tests/samples/double-sided-odd.pdf"
+   }
+  }
+ },
+ {
+  "name": "uv_bob_not_owner",
+  "user": "bob",
+  "method": "POST",
+  "path": "/api/documents/2/update_version/",
+  "multipart": {
+   "fields": [],
+   "file": {
+    "name": "x.pdf",
+    "from": "upstream/src/documents/tests/samples/double-sided-odd.pdf"
+   }
+  }
+ },
+ {
+  "name": "uv_alice_owner",
+  "user": "alice",
+  "method": "POST",
+  "path": "/api/documents/2/update_version/",
+  "multipart": {
+   "fields": [
+    [
+     "version_label",
+     "A"
+    ]
+   ],
+   "file": {
+    "name": "a b.pdf",
+    "from": "upstream/src/documents/tests/samples/double-sided-odd.pdf"
+   }
+  }
+ },
+ {
+  "name": "uv_json_body",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/8/update_version/",
+  "body": {
+   "version_label": "x"
+  }
+ },
+ {
+  "name": "uv_empty_body",
+  "user": "admin",
+  "method": "POST",
+  "path": "/api/documents/8/update_version/"
+ }
+]

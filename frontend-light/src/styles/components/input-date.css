@@ -1,0 +1,6 @@
+/* Date field with calendar (InputDate.svelte). */
+
+/* Small buttons below the calendar ("Today", "Close") */
+.btn-group-xs > .btn {
+  border-radius: 0.15rem;
+}

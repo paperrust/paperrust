@@ -1,0 +1,22 @@
+/* Filter bar above the document list: text search and filter menus (FilterEditor.svelte). */
+
+/* Search target menu attached to the left of the search field: no rounding on the right
+   (.dropdown is set by lib/dropdown.svelte.ts as placementClass) */
+.input-group .dropdown .btn {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+/* Spacing between the wrapping filter buttons */
+.d-flex.flex-wrap {
+  column-gap: 0.7rem;
+}
+
+input[type=text] {
+  min-width: 120px;
+}
+
+/* Reset button in the search field */
+.z-10 {
+  z-index: 10;
+}

@@ -1,0 +1,39 @@
+From: =?utf-8?q?Eve_=C3=96sterreich?= <eve@example.org>
+To: paperless@example.org
+Subject: =?utf-8?b?QmVsZWcgw7xiZXIgMTAwIENIRg==?=
+Date: Fri, 10 Jan 2025 12:00:00 +0000
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary=outer
+
+--outer
+Content-Type: multipart/alternative; boundary="inner"
+
+--inner
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+Gr=C3=BC=C3=9Fe
+--inner
+Content-Type: text/html; charset=utf-8
+
+<p>Hi <img src="cid:logo"></p>
+--inner--
+
+--outer
+Content-Type: image/png
+Content-ID: <logo>
+Content-Disposition: inline; filename="logo.png"
+Content-Transfer-Encoding: base64
+
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9
+awAAAABJRU5ErkJggg==
+--outer
+Content-Type: application/pdf
+Content-Disposition: attachment; filename*=utf-8''Beleg%20%C3%BCber%20100.pdf
+Content-Transfer-Encoding: base64
+
+JVBERi0xLjQKMSAwIG9iajw8L1R5cGUvQ2F0YWxvZy9QYWdlcyAyIDAgUj4+ZW5kb2JqCjIgMCBv
+Ymo8PC9UeXBlL1BhZ2VzL0tpZHNbMyAwIFJdL0NvdW50IDE+PmVuZG9iagozIDAgb2JqPDwvVHlw
+ZS9QYWdlL1BhcmVudCAyIDAgUi9NZWRpYUJveFswIDAgMjAwIDIwMF0+PmVuZG9iagp0cmFpbGVy
+PDwvUm9vdCAxIDAgUj4+CiUlRU9GCg==
+--outer--

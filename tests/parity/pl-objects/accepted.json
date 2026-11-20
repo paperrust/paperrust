@@ -1,0 +1,41 @@
+{
+ "_doc": "pl-objects (W23). Format: tests/parity/harness/plharness/rules.py.",
+ "rules": [
+  {
+   "name": "storage-path-test-windows-separator",
+   "reason": "Die Referenz-Django läuft unter Windows: str(Path(result)) nutzt dort '\\' als Trenner und clean_filepath strippt os.sep='\\' statt '/'. PaperRust verhält sich wie upstream unter Linux ('/' als Trenner, führender '/' entfernt). Kein Unterschied auf dem offiziellen Zielsystem.",
+   "ref": "docs/contract/pl-objects.md#storage_pathstest--post-apistorage_pathstest-w23-srcsp_testrs",
+   "case": "w23.storage_paths.test.[na][eb][sb]*",
+   "kind": [
+    "value"
+   ],
+   "path": "\\$"
+  },
+  {
+   "name": "tag-adjacency-no-treenode-fields",
+   "reason": "L6 Schritt 1 (upstream 8aa99a381/#14612 nachgebaut, Migration pl_objects.0001_paperrust_tag_adjacency): documents_tag hat ausser tn_parent_id keine django-treenode-Spalten mehr. Django v3.4.2 hat sie weiter in Zeilen-Snapshots (to_jsonb) und Audit-Diffs, PaperRust nicht. Hierarchie (parent/children) unveraendert.",
+   "ref": "docs/contract/pl-objects.md#tag-baum-adjazenzliste-l6-schritt-1",
+   "case": "*",
+   "kind": [
+    "missing",
+    "extra",
+    "value"
+   ],
+   "path": "(step\\d+:)?\\$.*\\.(row|changes)\\.tn_(ancestors_pks|ancestors_count|children_pks|children_count|depth|descendants_pks|descendants_count|index|level|priority|order|siblings_pks|siblings_count)(\\[\\d+\\])?",
+   "target": "b"
+  },
+  {
+   "name": "storage-path-test-form-415",
+   "reason": "Request-Körper nur JSON: Formular-Körper ergibt 415 (vor der Authentifizierung, daher ohne X-Api-Version); upstream nimmt Formulare an.",
+   "ref": "docs/contract/pl-objects.md#known-differences (5. Request-Körper); docs/contract/pl-server.md#known-differences (14.)",
+   "case": "w23.storage_paths.test.form@*",
+   "kind": [
+    "status",
+    "header",
+    "type"
+   ],
+   "path": "\\$status|header:(x-api-version|x-version)|\\$",
+   "target": "b"
+  }
+ ]
+}

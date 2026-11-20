@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "splash",
+  "description": "Nur die lokalen Seiten (Splash/Erst-Start) dürfen die IPC nutzen – die PaperRust-Oberfläche auf http://127.0.0.1 bekommt bewusst keine Rechte (keine remote-Einträge). Fenster `update` = lokale Seite update.html. Die Befehle des Updater-Plugins sind bewusst nicht freigegeben (Suchen/Einspielen nur über die eigenen Befehle).",
+  "windows": ["main", "update"],
+  "permissions": ["core:default"]
+}

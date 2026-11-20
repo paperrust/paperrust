@@ -1,0 +1,14 @@
+{
+  "_doc": "Accepted deviations of pl-search cases.",
+  "rules": [
+    {
+      "name": "more-like-this-upstream-nondeterministic-type",
+      "reason": "Ergänzt die globale Regel more-like-this-upstream-nondeterministic um die Diff-Art 'type' (andere Reihenfolge der Treffer erzeugt null-vs-Wert an derselben Position). Nachweis 2026-11-10: Django gegen Django (A=B=:8130) unterscheidet sich in 2 von 3 Läufen; more_like_id ist seit 2026-11-10 in Rust (docs/STANDALONE-GAPS.md §4.2).",
+      "ref": "docs/contract/pl-indexer.md#known-differences",
+      "case": "search.documents.more_like*",
+      "kind": [
+        "type"
+      ]
+    }
+  ]
+}

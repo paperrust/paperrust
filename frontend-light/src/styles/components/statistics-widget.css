@@ -1,0 +1,22 @@
+/* Home page tile with statistics: number of documents, file types (StatisticsWidget.svelte). */
+
+.list-group {
+  --bs-list-group-border-color: color-mix(in srgb, var(--bs-border-color) 58%, transparent);
+  --bs-list-group-bg: transparent;
+  border-radius: 0.6rem;
+  overflow: hidden;
+}
+
+.list-group-item {
+  padding: 0.7rem 0.8rem;
+}
+
+/* Bars and color dots of the file types */
+.filetypes .progress {
+  height: 0.6rem;
+}
+
+.filetypes .badge {
+  height: 0.6rem;
+  width: 0.6rem;
+}

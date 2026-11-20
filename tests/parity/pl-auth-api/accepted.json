@@ -1,0 +1,23 @@
+{
+ "rules": [
+  {
+   "name": "throttle-wait-seconds",
+   "reason": "DRF SimpleRateThrottle.wait(): 'Expected available in N seconds' hängt von der Laufzeit der vorherigen Anfragen ab (PBKDF2 im Debug-Build langsamer); Status und Text sonst identisch",
+   "ref": "docs/contract/pl-auth-api.md#known-differences",
+   "case": "w2.token.throttle*",
+   "kind": "value",
+   "path": "step[56]:\\$\\.detail"
+  },
+  {
+   "name": "users-last-login",
+   "reason": "PaperRust-Erweiterung: /api/users/ (Liste, Einzelobjekt, Antworten von POST/PUT/PATCH) liefert zusätzlich last_login (nur lesend). Der Pfad kommt nur in Benutzerobjekten vor.",
+   "ref": "docs/contract/pl-auth-api.md#known-differences (20. last_login im Benutzerobjekt)",
+   "case": "*",
+   "kind": [
+    "extra"
+   ],
+   "path": "(step\\d+:)?\\$(\\.results\\[\\d+\\])?\\.last_login",
+   "target": "b"
+  }
+ ]
+}

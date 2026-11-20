@@ -1,0 +1,230 @@
+#!/usr/bin/env bash
+# PaperRust-Container: Start wie das paperless-ngx-Image (upstream docker/rootfs/etc/s6-overlay,
+# init-*-Dienste @v3.4.2), aber ohne s6, Redis, Celery:
+#
+#   (als root)  USERMAP_UID/GID übernehmen, PAPERRUST_OCR_LANGUAGES nachinstallieren, Rechte abgeben
+#   serve       Datenbank abwarten -> manage migrate -> manage_superuser (PAPERRUST_ADMIN_USER)
+#               -> Suchindex anlegen, falls er fehlt -> exec paperrust serve [--worker|...]
+#   manage …, document_exporter …, migrate …   -> exec paperrust manage …  (ohne Init)
+#   alles andere (bash, paperrust-migrate-db …) -> exec "$@"
+#
+# Nur für dieses Skript (nicht von paperrust gelesen):
+#   PAPERRUST_INIT=no               Init-Schritte überspringen (z. B. zweiter Prozess --worker-only)
+#   PAPERRUST_INIT_DB_TIMEOUT=300   Sekunden, die auf die Datenbank gewartet wird
+set -euo pipefail
+# shellcheck source=../lib/paperrust/common.sh
+source /usr/local/lib/paperrust/common.sh
+# upstream init-env-file: PAPERLESS_*_FILE (Docker-Secrets) -> PAPERLESS_*
+pr_env_files
+
+# wie pl_cli::COMMANDS (und die Verweise in /usr/local/bin, siehe docker/Dockerfile)
+MANAGE_COMMANDS=(migrate showmigrations createsuperuser manage_superuser changepassword
+	document_exporter document_importer document_sanity_checker document_retagger document_index
+	document_create_classifier document_thumbnails document_renamer prune_audit_logs empty_trash
+	mail_fetcher document_archiver document_consumer document_fuzzy_match document_llmindex check)
+
+is_manage_command() {
+	local c
+	for c in "${MANAGE_COMMANDS[@]}"; do
+		[[ "$c" == "$1" ]] && return 0
+	done
+	return 1
+}
+
+is_true() {
+	case "${1,,}" in
+	1 | y | yes | t | true | on) return 0 ;;
+	*) return 1 ;;
+	esac
+}
+
+# ------------------------------------------------------------------------------- Art des Aufrufs
+first="${1:-serve}"
+case "$first" in
+serve | --worker | --worker-only | --no-worker) kind=serve ;;
+manage) kind=manage ;;
+*)
+	if is_manage_command "$first"; then
+		kind=manage
+	else
+		kind=exec
+	fi
+	;;
+esac
+
+# ------------------------------------------------------------------------------- root-Teil
+install_ocr_languages() {
+	# upstream: init-tesseract-langs – PAPERRUST_OCR_LANGUAGES (bzw. PAPERLESS_OCR_LANGUAGES)="tur ces" installiert Pakete beim Start.
+	local wanted pkgs="" l have
+	wanted="$(pr_env OCR_LANGUAGES)"
+	[[ -n "$wanted" ]] || return 0
+	have="$(tesseract --list-langs 2>/dev/null | tail -n +2 | tr '\n' ' ' || true)"
+	for l in $wanted; do
+		[[ " $have " == *" $l "* ]] && continue
+		l="${l,,}"
+		pkgs="$pkgs tesseract-ocr-${l//_/-}"
+	done
+	[[ -n "$pkgs" ]] || return 0
+	pr_log "installiere Tesseract-Sprachen:$pkgs"
+	if ! { apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install --yes --quiet --no-install-recommends $pkgs; }; then
+		pr_log "WARNUNG: Installation fehlgeschlagen (kein Netz?). Besser: Image mit --build-arg TESSERACT_LANGS=\"…\" bauen."
+	fi
+	rm -rf /var/lib/apt/lists/*
+}
+
+if [[ "$(id -u)" == 0 ]]; then
+	uid="$(pr_target_uid)"
+	gid="$(pr_target_gid)"
+	[[ "$kind" == serve ]] && install_ocr_languages
+	if [[ "$uid" != 0 ]]; then
+		# Ordner wie upstream init-folders: anlegen und dem Laufzeitbenutzer geben (nur die Wurzel,
+		# Inhalte bestehender Installationen gehören ihm schon).
+		for d in "$(pr_data_dir)" "$(pr_media_dir)" "$(pr_consume_dir)" "$(pr_base_dir)/export"; do
+			mkdir -p "$d"
+			if [[ "$(stat -c %u "$d")" != "$uid" ]]; then
+				pr_log "chown $uid:$gid $d"
+				chown "$uid:$gid" "$d" || pr_log "WARNUNG: chown $d fehlgeschlagen"
+			fi
+		done
+		HOME="$(pr_base_dir)"
+		export HOME
+		exec setpriv --reuid="$uid" --regid="$gid" --clear-groups -- "$0" "$@"
+	fi
+	pr_log "WARNUNG: läuft als root (USERMAP_UID=0) – nicht empfohlen"
+fi
+
+case "$kind" in
+exec) exec "$@" ;;
+manage)
+	[[ "$first" == manage ]] && shift
+	exec /usr/local/bin/paperrust manage "$@"
+	;;
+esac
+
+# ------------------------------------------------------------------------------- serve: Prüfungen
+# ohne Argumente (CMD leer) ist $# = 0 – dann nichts zu verschieben
+if [[ $# -gt 0 && "$1" == serve ]]; then shift; fi
+
+engine="$(pr_env DBENGINE)"
+dbhost="$(pr_env DBHOST)"
+conf_file=""
+for f in "${PAPERRUST_CONFIGURATION_PATH:-}" "${PAPERLESS_CONFIGURATION_PATH:-}" \
+	"$(pr_base_dir)/paperrust.conf" "$(pr_base_dir)/paperless.conf" /etc/paperrust.conf /etc/paperless.conf \
+	/usr/local/etc/paperrust.conf /usr/local/etc/paperless.conf; do
+	if [[ -n "$f" && -f "$f" ]]; then
+		conf_file="$f"
+		break
+	fi
+done
+case "${engine,,}" in
+mariadb | mysql | sqlite | sqlite3)
+	pr_log "FEHLER: PAPERRUST_DBENGINE=$engine – PaperRust braucht PostgreSQL."
+	pr_log "Umzug: paperrust-migrate-db (docs/user/migration.md#sqlite-mariadb)."
+	exit 1
+	;;
+esac
+if [[ -z "$dbhost" && -z "$conf_file" ]]; then
+	pr_log "FEHLER: PAPERRUST_DBHOST ist nicht gesetzt. Ohne ihn nähme paperless-ngx SQLite;"
+	pr_log "PaperRust braucht PostgreSQL (PAPERRUST_DBHOST/DBNAME/DBUSER/DBPASS, siehe docs/user/installation.md#docker)."
+	exit 1
+fi
+
+if is_true "${PAPERLESS_TIKA_ENABLED:-no}"; then
+	pr_log "Hinweis: Tika/Gotenberg werden nicht gebraucht – Office/Mail-Text liest PaperRust selbst"
+	pr_log "         (ohne PDF-Abbild; PAPERLESS_TIKA_* wird ignoriert)."
+fi
+if [[ -n "${PAPERLESS_REDIS:-}" ]]; then
+	pr_log "Hinweis: PAPERLESS_REDIS wird ignoriert – PaperRust braucht kein Redis, der Dienst kann weg."
+	pr_log "         (Mehrere Prozesse teilen den Cache über PAPERRUST_CACHE=postgres, siehe docs/user/installation.md#docker.)"
+fi
+if [[ -n "${PAPERLESS_WEBSERVER_WORKERS:-}" ]]; then
+	pr_log "Hinweis: PAPERLESS_WEBSERVER_WORKERS entfällt (ein Prozess, mehrere Threads; TOKIO_WORKER_THREADS)."
+fi
+
+# Tesseract-Sprachen aus PAPERRUST_OCR_LANGUAGE (z. B. deu+eng) vorhanden?
+ocr_lang="$(pr_env OCR_LANGUAGE)"
+have_langs=" $(tesseract --list-langs 2>/dev/null | tail -n +2 | tr '\n' ' ' || true) "
+missing=""
+IFS='+' read -r -a want <<<"${ocr_lang:-eng}"
+for l in "${want[@]}"; do
+	[[ -z "$l" || "$have_langs" == *" $l "* ]] || missing="$missing $l"
+done
+if [[ -n "$missing" ]]; then
+	pr_log "WARNUNG: Tesseract-Sprachen fehlen:$missing (vorhanden:$have_langs)."
+	pr_log "         Image mit --build-arg TESSERACT_LANGS=\"…\" bauen oder als root mit PAPERRUST_OCR_LANGUAGES starten."
+fi
+
+# Adresse: PAPERRUST_BIND, sonst PAPERRUST_BIND_ADDR/PAPERRUST_PORT (Alias PAPERLESS_…) (Standard 0.0.0.0:8000 wie upstream-Port)
+PAPERRUST_BIND="$(pr_bind)"
+export PAPERRUST_BIND
+
+# ------------------------------------------------------------------------------- serve: Init
+if is_true "${PAPERRUST_INIT:-yes}"; then
+	for d in "$(pr_data_dir)" "$(pr_media_dir)" "$(pr_consume_dir)"; do
+		mkdir -p "$d" 2>/dev/null || true
+		[[ -w "$d" ]] || pr_log "WARNUNG: $d ist für UID $(id -u) nicht beschreibbar (Volume-Rechte, USERMAP_UID?)"
+	done
+
+	# upstream: init-wait-for-db
+	if [[ -n "$dbhost" && "$dbhost" != /* ]]; then
+		dbport="$(pr_env DBPORT)"
+		dbport="${dbport:-5432}"
+		limit="${PAPERRUST_INIT_DB_TIMEOUT:-300}"
+		pr_log "warte auf PostgreSQL $dbhost:$dbport (höchstens ${limit}s)"
+		start=$SECONDS
+		until timeout 3 bash -c ">/dev/tcp/$dbhost/$dbport" 2>/dev/null; do
+			if ((SECONDS - start >= limit)); then
+				pr_log "FEHLER: PostgreSQL unter $dbhost:$dbport nach ${limit}s nicht erreichbar"
+				exit 1
+			fi
+			sleep 2
+		done
+	fi
+
+	# upstream: init-migrations (manage.py migrate). PaperRust: legt auf leerer DB das v3.4.2-Schema an
+	# bzw. prüft eine bestehende DB und spielt nur eigene paperrust_*-Migrationen ein.
+	pr_log "paperrust manage migrate"
+	/usr/local/bin/paperrust manage migrate
+
+	# upstream: init-system-checks (manage.py check). PaperRust: Fehler werden gemeldet, der Start geht
+	# weiter (upstream bricht ab) – siehe docs/contract/pl-cli.md, Known difference 15.
+	/usr/local/bin/paperrust manage check || pr_log "WARNUNG: Systemprüfung meldet Fehler (siehe oben)"
+
+	# upstream: init-superuser
+	if [[ -n "$(pr_env ADMIN_USER)" ]]; then
+		/usr/local/bin/paperrust manage manage_superuser
+	fi
+
+	# upstream: init-search-index (Neuaufbau nur, wenn der Index fehlt; bestehende paperless-ngx-Indizes
+	# haben dasselbe tantivy-Format und werden weiter benutzt)
+	index="$(pr_data_dir)/index"
+	if [[ ! -d "$index" ]] || [[ -z "$(ls -A "$index" 2>/dev/null)" ]]; then
+		mkdir -p "$index"
+		pr_log "Suchindex fehlt – paperrust manage document_index reindex"
+		/usr/local/bin/paperrust manage document_index reindex || pr_log "WARNUNG: Indexaufbau fehlgeschlagen"
+	fi
+fi
+
+pr_log "starte paperrust serve $* auf $PAPERRUST_BIND"
+# Neustart aus der Oberfläche (docs/SETTINGS.md E9): Exit-Code 75 heißt „neu starten“, alles andere
+# beendet den Container wie bisher. SIGTERM/SIGINT (von tini weitergereicht) gehen an paperrust.
+export PAPERRUST_RESTART_SUPERVISED=1
+child=0
+stopping=0
+trap 'stopping=1; if (( child > 0 )); then kill -TERM "$child" 2>/dev/null || true; fi' TERM INT
+while :; do
+	/usr/local/bin/paperrust serve "$@" &
+	child=$!
+	rc=0
+	wait "$child" || rc=$?
+	# wait kehrt bei einem Signal vorzeitig zurück: auf das tatsächliche Ende warten
+	while kill -0 "$child" 2>/dev/null; do
+		rc=0
+		wait "$child" || rc=$?
+	done
+	child=0
+	if (( rc != 75 || stopping )); then
+		exit "$rc"
+	fi
+	pr_log "Neustart angefordert (Exit-Code 75) – starte paperrust serve neu"
+done

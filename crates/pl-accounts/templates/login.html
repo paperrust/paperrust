@@ -1,0 +1,40 @@
+{% extends "layout.html" %}
+{% set page_title = t("auth.page.sign_in") %}
+{% block body %}
+    {%- if FIRST_INSTALL and not DISABLE_REGULAR_LOGIN %}
+    <script>
+      // Noch kein Benutzer: direkt zur Registrierung des ersten Kontos
+      window.location.href = "{{ signup_url }}";
+    </script>
+    {%- endif %}
+    {%- if DESKTOP_HINT %}
+    <p class="muted" id="desktop-hint">{{ t("auth.login.desktop_hint") }}</p>
+    {%- endif %}
+    {%- if not DISABLE_REGULAR_LOGIN %}
+    <p class="muted">{{ t("auth.login.intro") }}</p>
+    <form id="form-account" method="post">
+      {{ csrf_input }}
+      <div class="field">
+        <label for="inputUsername">{{ t("auth.field.username") }}</label>
+        <input type="text" name="login" id="inputUsername" autocomplete="username" autocorrect="off" autocapitalize="none" required autofocus>
+      </div>
+      <div class="field">
+        <label for="inputPassword">{{ t("auth.field.password") }}</label>
+        <input type="password" name="password" id="inputPassword" autocomplete="current-password" required>
+      </div>
+      <button class="btn" type="submit">{{ t("auth.login.submit") }}</button>
+    </form>
+    {%- endif %}
+    {%- set sso_auto = true %}
+    {% include "providers.html" %}
+    {%- if (not DISABLE_REGULAR_LOGIN and EMAIL_ENABLED) or ACCOUNT_ALLOW_SIGNUPS %}
+    <div class="links">
+      {%- if not DISABLE_REGULAR_LOGIN and EMAIL_ENABLED %}
+      <p><a href="{{ urls.account_reset_password }}">{{ t("auth.login.forgot") }}</a></p>
+      {%- endif %}
+      {%- if ACCOUNT_ALLOW_SIGNUPS %}
+      <p>{{ t("auth.login.no_account") }} <a href="{{ signup_url }}">{{ t("auth.login.create") }}</a></p>
+      {%- endif %}
+    </div>
+    {%- endif %}
+{% endblock %}

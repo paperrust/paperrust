@@ -1,0 +1,155 @@
+# PaperRust CI – runs on every push and pull request (Linux only).
+#
+# - Rust: rustfmt, clippy (-D warnings) and tests, split into crate groups that run in parallel.
+#   Tests that need the PostgreSQL reference database or a paperless-ngx instance are #[ignore]
+#   and are not run here (see parity.yml). Tests that need Tesseract/PDFium skip themselves.
+# - Tauri desktop shell (separate workspace in apps/desktop-shell).
+# - Web UI (frontend-light): svelte-check, Vitest, i18n check, build, size budgets.
+#
+# Nothing is published: no registry login, no push, no release. Heavier jobs (Windows, Docker images,
+# desktop packages) are in extended.yml.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  CARGO_NET_RETRY: "10"
+  # smaller build artifacts and cache; backtraces still have function names
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+  RUST_BACKTRACE: short
+
+jobs:
+  lint:
+    name: rustfmt + naming checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain from rust-toolchain.toml
+        run: rustup toolchain install --profile minimal
+      - name: cargo fmt
+        run: cargo fmt --all -- --check
+      - name: No new Django table names (docs/DATAMODEL-V2.md)
+        run: python3 tools/check_django_names.py
+
+  rust:
+    name: Rust (${{ matrix.group }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - group: foundation
+            packages: >-
+              pl-core pl-authz pl-domain pl-store pl-envlive pl-settings pl-guard pl-sync
+              pl-sync-client pl-timeline pl-templating pl-matching pl-labels pl-queue
+          - group: api
+            packages: >-
+              pl-documents pl-docfilter pl-auth-api pl-objects pl-files pl-documents-write
+              pl-fields-views pl-api-v2 pl-accounts pl-system pl-search pl-workflows pl-mail
+          - group: worker
+            packages: >-
+              pl-parsers pl-ocr pl-classifier pl-indexer pl-consumer pl-pdfops pl-pdftools
+              pl-scan pl-ai pl-automation
+          - group: server
+            packages: >-
+              pl-server pl-cli pl-dbmigrate paperrust-desktop
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # upstream/ (paperless-ngx v3.4.2) is required: embedded files and test samples
+          submodules: true
+      - name: Toolchain from rust-toolchain.toml (stable + rustfmt + clippy)
+        run: rustup toolchain install --profile minimal
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ci-${{ matrix.group }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Package arguments
+        env:
+          PACKAGES: ${{ matrix.packages }}
+        run: |
+          args=""
+          for p in $PACKAGES; do args="$args -p $p"; done
+          echo "PKG_ARGS=$args" >> "$GITHUB_ENV"
+      - name: cargo clippy
+        run: cargo clippy $PKG_ARGS --all-targets --locked -- -D warnings
+      - name: cargo test
+        run: cargo test $PKG_ARGS --locked
+      - name: cargo test pl-pdftools (child process paperrust-pdftool, isolation)
+        if: matrix.group == 'worker'
+        run: cargo test -p pl-pdftools --features engine --locked
+
+  desktop-shell:
+    name: Desktop shell (Tauri)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: WebKitGTK / AppIndicator
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev
+      - run: rustup toolchain install --profile minimal
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ci-desktop-shell
+          workspaces: apps/desktop-shell
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: cargo clippy (own workspace)
+        working-directory: apps/desktop-shell
+        run: cargo clippy --locked --all-targets -- -D warnings
+      - name: cargo test
+        working-directory: apps/desktop-shell
+        run: cargo test --locked
+
+  frontend:
+    name: Web UI (frontend-light)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend-light
+    steps:
+      - uses: actions/checkout@v4
+      - name: pnpm (version from packageManager in package.json)
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend-light/package.json
+      - uses: actions/setup-node@v4
+        with:
+          # engines.node in package.json
+          node-version-file: frontend-light/package.json
+          cache: pnpm
+          cache-dependency-path: frontend-light/pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: svelte-check
+        run: pnpm check
+      - name: Unit tests (Vitest)
+        run: pnpm test
+      - name: i18n check (10 languages complete)
+        run: pnpm i18n:check
+      - name: Build
+        run: pnpm build
+      - name: Budget first page load
+        run: pnpm budget -- --lang de-DE
+      - name: Budget PaperRust design
+        run: node tools/budget-design2.mjs --lang de-DE

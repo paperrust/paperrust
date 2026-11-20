@@ -1,0 +1,212 @@
+## eine Vorlage je Zeile; \n = Zeilenumbruch, \t = Tab
+Doc from {correspondent}
+Action Title
+{# this is a comment #}foo{% if created_year < 2000 %}bar{% endif %}{{ "{:04d}".format(42) }}
+{{created_year}
+{{ created_year | foo }}
+{{creation_year}}
+{{ correspondent }} - {{ document_type }} {{ added_year }}
+{{ a }}{{ b }}{{ c }}
+{{ correspondent|upper }}
+{{ correspondent|slugify }}
+{{ created|datetime("%Y") }}
+{{ created|localize_date("short") }}
+{{ custom_fields|get_cf_value("x") }}
+{{ x|bar|foo }}
+{{ (correspondent|bar)|foo }}
+{% if correspondent %}{{ correspondent|nofilter }}{% endif %}
+{% if correspondent is nottest %}x{% endif %}
+{{ correspondent is nottest }}
+{{ correspondent is defined }}
+{{ 1 if correspondent|zzz else 2 }}
+{% for x in range(3) %}{{ x|zzz }}{% endfor %}
+{% for x in range(3) %}{{ x }}{% endfor %}
+{% for x in items %}{{ x }}{% endfor %}
+{% for x in range(3) %}{{ loop.index }}{% endfor %}
+{% for loop in range(3) %}{% endfor %}
+{% for x in range(3) %}{% set loop = 1 %}{% endfor %}
+{% for x in range(3) if x > y %}{{ x }}{% else %}{{ z }}{% endfor %}
+{% for a, b in pairs %}{{ a }}{{ b }}{% endfor %}
+{% for x in range(3) recursive %}{{ loop(x) }}{% endfor %}
+{% set x = 1 %}{{ x }}
+{{ x }}{% set x = 1 %}
+{% if created_year %}{% set foo = 1 %}{% endif %}
+{% if created_year %}{% set foo = 1 %}{% else %}{% set foo = 2 %}{% endif %}{{ foo }}
+{% set foo = 0 %}{% if created_year %}{% set foo = 1 %}{% endif %}{{ foo }}
+{% set ns = namespace(a=1) %}{% set ns.a = 2 %}{{ ns.a }}
+{% set x %}abc{% endset %}{{ x }}
+{% set x | upper %}abc{% endset %}{{ x }}
+{% set x | nope %}abc{% endset %}
+{% set x | upper(y) %}abc{% endset %}
+{% macro m(a, b=2) %}{{ a }}{{ b }}{{ c }}{% endmacro %}{{ m(1) }}
+{% macro m(a) %}{{ caller() }}{% endmacro %}
+{% macro m(caller, a) %}{{ caller() }}{% endmacro %}
+{% macro m(a, caller=1) %}{{ caller() }}{{ kwargs }}{{ varargs }}{% endmacro %}
+{% macro m(a=1, b) %}{% endmacro %}
+{% call m(1) %}inner {{ q }}{% endcall %}
+{% call(x) m(1) %}{{ x }}{% endcall %}
+{% call m %}x{% endcall %}
+{% filter upper %}{{ correspondent }}{% endfilter %}
+{% filter nope %}x{% endfilter %}
+{% with a = 1, b = correspondent %}{{ a }}{{ b }}{{ c }}{% endwith %}
+{% with a = b %}{% endwith %}
+{% autoescape true %}{{ correspondent }}{% endautoescape %}
+{% block x %}{{ correspondent }}{% endblock %}
+{% block x %}{% endblock %}{% block x %}{% endblock %}
+{% block x-y %}{% endblock %}
+{% block x required %}a{% endblock %}
+{% block x required %} {% endblock %}
+{% block x %}{{ self.y() }}{{ super() }}{{ q }}{% endblock %}
+{{ self }}
+{% extends "base.html" %}{{ x|nope }}
+{{ x|nope }}{% extends "base.html" %}
+{% if a %}{% extends "b" %}{% endif %}
+{% for x in y %}{% extends "b" %}{% endfor %}
+{% extends "a" %}{% extends "b" %}{{ q }}
+{% include "x" %}
+{% include "x" ignore missing with context %}
+{% import "x" as y %}{{ y.z }}
+{% from "x" import a, b as c with context %}{{ a }}{{ c }}
+{% from "x" import _a %}
+{% from "x" import %}
+{% print correspondent, document_type %}
+{% print %}
+{% raw %}{{ not parsed }}{% endraw %}
+{% raw %}{{ unclosed
+{# unclosed comment
+{# closed #}{{ correspondent }}
+{% foo %}
+{% endif %}
+{% if x %}
+{% if x %}{% endfor %}
+{% for x in y %}{% endif %}{% endfor %}
+{% if x %}{% for y in z %}{% endif %}
+{% %}
+{% 1 %}
+{{ }}
+{{ ( }}
+{{ ) }}
+{{ [1, 2 }}
+{{ {1: 2] }}
+{{ x ) }}
+{{ 'unterminated }}
+{{ "a" "b" }}
+{{ x.1 }}
+{{ x.y.z }}
+{{ x[1:2] }}
+{{ x[::2] }}
+{{ x[1, 2] }}
+{{ x. }}
+{{ x.( }}
+{{ x(1, a=2, *b, **c) }}
+{{ x(a=1, 2) }}
+{{ x(*a, *b) }}
+{{ x(class=1) }}
+{{ x is divisibleby 3 }}
+{{ x is divisibleby(3) }}
+{{ x is not none }}
+{{ x is is none }}
+{{ x is defined is defined }}
+{{ not x }}
+{{ x and y or not z }}
+{{ x in y }}
+{{ x not in y }}
+{{ 1 < 2 <= 3 > 0 >= -1 == 1 != 2 }}
+{{ 1 + 2 - 3 * 4 / 5 // 6 % 7 ** 8 }}
+{{ "a" ~ "b" ~ c }}
+{{ -x }}{{ +y }}
+{{ x if y }}
+{{ x if y else z }}
+{{ [1, 2, 3] }}{{ (1, 2) }}{{ {"a": 1} }}{{ () }}{{ (1,) }}
+{{ 0x1F + 0b11 + 0o17 + 1_000 + 1.5e3 + 2.5 }}
+{{ 1abc }}
+{{ x @ y }}
+{{ $ }}
+{{ x | }}
+{{ x |upper( }}
+{{ "\x" }}
+{{ "\u12" }}
+{{ "\N{foo" }}
+{{ "\n\t\\ ok" }}
+{% set 1 = 2 %}
+{% set x.y = 2 %}
+{% set (a, b) = (1, 2) %}{{ a }}{{ b }}
+{% set a, b = 1, 2 %}{{ a }}{{ b }}
+{% set true = 1 %}
+{% set a = %}
+{% for x in %}{% endfor %}
+{% for in y %}{% endfor %}
+{% for x y %}{% endfor %}
+{% for x in y %}
+{% if x %}a{% elif y %}b{% else %}c{% endif %}
+{% if x %}a{% elif y|zz %}b{% endif %}
+{% if x %}a{% else %}b{% else %}c{% endif %}
+{% break %}
+{% for x in y %}{% if x %}{% break %}{% endif %}{% continue %}{% endfor %}
+{% macro true() %}{% endmacro %}
+{{ x }}\n{{ y|nope }}
+line1\n\nline3 {{ z|nope }}
+{% if x %}\n  {{ y }}\n{% endif %}\n{{ q|nope }}
+{%- if x -%} a {%- endif -%}{{ b|nope }}
+{{- x -}}
+{% if x +%}a{% endif %}
+{{ x }}{% if %}{% endif %}
+{{ x|default("a")|upper|nope2 }}
+{{ x.y|nope3(z) }}
+{{ lipsum() }}{{ range(1) }}{{ dict() }}{{ cycler() }}{{ joiner() }}
+{{ doc_url }}{{ doc_id }}{{ doc_title }}{{ owner_username }}{{ original_filename }}{{ filename }}
+{{ custom_fields }}{{ created_time }}{{ added_time }}{{ added }}
+{{ x }}{{ y }}{{ x }}
+{{ zeta }}{{ alpha }}{{ mid }}
+{% set x = x + 1 %}
+{% for x in x %}{{ x }}{% endfor %}
+{% with x = 1 %}{% set y = x %}{% endwith %}{{ y }}
+{{ "%s"|format(x) }}
+{{ x|map(attribute="a")|join(",") }}
+{{ x|selectattr("a", "equalto", 1)|list }}
+{{ x[y] }}
+{{ x }}}
+{{ x }} }}
+{% if x %}}{% endif %}
+{{ x %}
+{% if x }}{% endif %}
+{{ {"a": 1}["a"] }}
+{{ x(y)(z) }}
+{{ x | upper | lower }}
+{% set x = [1, 2] %}{% for i in x %}{{ i }}{% endfor %}
+{% for i in [1,2] %}{% set q = i %}{% endfor %}{{ q }}
+{% filter upper %}{% set inner = 1 %}{{ inner }}{% endfilter %}{{ inner }}
+{% macro m() %}{{ outer }}{% endmacro %}{% set outer = 1 %}{{ m() }}
+{% set outer = 1 %}{% macro m() %}{{ outer }}{% endmacro %}{{ m() }}
+\t{% if x %}a{% endif %}
+abc   {%+ if x %}a{% endif %}
+{% for x in y if x|nope %}{% endfor %}
+{% for x in y if z %}{% endfor %}
+{{ x is undefined }}{{ y is sameas z }}
+{{ x is foo.bar }}
+{{ x|foo.bar }}
+{{ "é" }}{{ "日本" }}
+{{ ärger }}
+{{ x·y }}
+{{ 1 if x else y|nope }}
+{% if x|nope %}a{% endif %}
+{% if x %}{% for i in j %}{{ i|nope }}{% endfor %}{% endif %}
+{% set x = y if z else w|nope %}
+{{ x.__class__ }}
+{{ 2 ** 3 ** 2 }}
+{{ x[] }}
+{{ x[1:2:3] }}
+{{ x[:] }}
+{%- raw -%} a {%- endraw -%}
+{% raw %}a{% endraw %}{{ b }}
+{{ "a\nb" }}
+{{ 'it''s' }}
+{{ 1.e5 }}
+{{ 1e }}
+{{ .5 }}
+{{ 1..2 }}
+{{ x.0 }}
+{{ 00 }}
+{{ 01 }}
+{{ 0_0 }}
+{{ 1__0 }}

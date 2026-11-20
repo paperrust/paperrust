@@ -1,0 +1,97 @@
+[package]
+name = "pl-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = ["ai", "mimalloc"]
+# AI routes (pl-ai). Can be switched off so that server/worker build independently of pl-ai.
+ai = ["dep:pl-ai", "pl-api-v2/ai", "pl-cli/ai", "pl-automation/ai"]
+# mimalloc instead of the system allocator (O1: +4–8 % throughput, in exchange for ~25–60 MB more private bytes).
+# Default since 2026-11-13; switch off with `--no-default-features --features ai`
+# (see docs/contract/pl-server.md "Start und Leistung").
+mimalloc = ["dep:mimalloc"]
+
+# Single program: `paperrust serve [--worker|--worker-only|--no-worker]`, `paperrust manage …`.
+[[bin]]
+name = "paperrust"
+path = "src/bin/paperrust.rs"
+
+[dependencies]
+pl-core.workspace = true
+pl-authz.workspace = true
+pl-auth-api.workspace = true
+pl-objects.workspace = true
+pl-documents.workspace = true
+pl-docfilter.workspace = true
+pl-files.workspace = true
+pl-documents-write.workspace = true
+pl-fields-views.workspace = true
+pl-workflows.workspace = true
+pl-search.workspace = true
+pl-system.workspace = true
+pl-mail.workspace = true
+pl-accounts.workspace = true
+pl-ai = { workspace = true, optional = true }
+# Worker (wave 3, W1): queue, ingestion, index, classifier.
+pl-queue.workspace = true
+# Sync sequencer (P2)
+pl-sync.workspace = true
+# System settings: snapshot + live adoption, restart (docs/SETTINGS.md WP3)
+pl-settings.workspace = true
+# Native API v2 (P3)
+# without default features: /ask (pl-ai) only with feature `ai`
+pl-api-v2 = { path = "../pl-api-v2", default-features = false }
+# "Automation" area /rs/api/v2/automation (docs/WORKFLOWS-NEU.md; path instead of workspace entry, CORE-REQUEST)
+pl-automation = { path = "../pl-automation", default-features = false }
+# PaperRust UI: deadlines after ingestion, backfill task (path instead of workspace entry, CORE-REQUEST)
+pl-timeline = { path = "../pl-timeline" }
+# Scanner integration: eSCL scanning + SMTP reception for devices (path instead of workspace entry, CORE-REQUEST)
+pl-scan = { path = "../pl-scan" }
+# Ransomware protection: watchdog, read-only mode, backups (path instead of workspace entry, CORE-REQUEST)
+pl-guard = { path = "../pl-guard" }
+pl-store.workspace = true
+pl-domain.workspace = true
+pl-consumer.workspace = true
+pl-indexer.workspace = true
+pl-classifier.workspace = true
+pl-parsers.workspace = true
+pl-templating.workspace = true
+# `paperrust manage …` and OpenAPI routes (W7, wired in by W10). `document_llmindex` (pl-ai) only
+# with feature `ai`.
+pl-cli = { workspace = true, default-features = false }
+uuid.workspace = true
+chrono.workspace = true
+chrono-tz.workspace = true
+rand.workspace = true
+unicode-normalization.workspace = true
+axum.workspace = true
+tokio.workspace = true
+tower.workspace = true
+hyper = { workspace = true, features = ["http1", "http2", "client", "server"] }
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+pulldown-cmark.workspace = true
+futures.workspace = true
+regex.workspace = true
+thiserror.workspace = true
+hyper-util.workspace = true
+http-body-util.workspace = true
+bytes.workspace = true
+toml.workspace = true
+tokio-util.workspace = true
+async-compression.workspace = true
+mimalloc = { workspace = true, optional = true }
+
+[dev-dependencies]
+sea-query.workspace = true
+tokio-tungstenite.workspace = true
+tempfile.workspace = true

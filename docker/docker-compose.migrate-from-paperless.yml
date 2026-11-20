@@ -1,0 +1,80 @@
+# Umstieg von paperless-ngx (Docker, PostgreSQL) auf PaperRust – gleiche Datenbank, gleiche Volumes.
+#
+# Diese Datei ist das upstream-Beispiel docker/compose/docker-compose.postgres-tika.yml (v3.4.2) mit
+# genau diesen Änderungen:
+#   - webserver: Image paperrust statt paperless-ngx (Dienstname bleibt `webserver`, damit
+#     `docker compose exec webserver document_exporter ../export` usw. weiter gehen)
+#   - broker (Redis/Valkey), gotenberg, tika: entfernt – PaperRust braucht sie nicht
+#   - PAPERLESS_REDIS, PAPERLESS_TIKA_*: entfernt (würden ignoriert)
+#   - user: root, damit USERMAP_UID/USERMAP_GID aus docker-compose.env wie bei upstream wirken
+#     (der Prozess läuft danach als diese UID)
+#
+# ABLAUF (Einzelheiten: docs/user/installation.md#docker, docs/user/migration.md)
+#  1. Sichern:   docker compose exec db pg_dump -U paperless -Fc paperless > paperless-vorher.pgdump
+#                + Volumes data/ und media/ (bzw. docker compose exec webserver document_exporter ../export)
+#  2. Offene Aufgaben in paperless-ngx abarbeiten lassen. paperless-ngx muss mindestens v3.0.0 sein;
+#     ein Update auf 3.4.2 ist NICHT nötig (PaperRust holt fehlende Migrationen ab 3.0.0 selbst nach).
+#  3. docker compose down   (alle Dienste; die Volumes bleiben erhalten)
+#  4. Diese Datei als docker-compose.yml in DASSELBE Verzeichnis legen (gleicher Projektname =>
+#     gleiche Volumes <projekt>_data, <projekt>_media, <projekt>_pgdata). Werte unten mit der
+#     bisherigen Datei abgleichen: DB-Image (gleiche Hauptversion!), Ports, Pfade, env_file.
+#  5. docker compose up -d && docker compose logs -f webserver
+#     PaperRust prüft beim Start den Migrationsstand: bei paperless-ngx 3.0.0–3.4.1 holt es die
+#     fehlenden Migrationen nach (wie paperless-ngx beim Update), dann legt es eigene Tabellen
+#     paperrust_* an. Mit Abgleich und automatischer Sicherung stattdessen vorher:
+#       docker compose up -d db
+#       docker compose run --rm webserver paperrust migrate --from "postgres://paperless:paperless@db:5432/paperless"
+#     (Anleitung in einfachen Worten: docs/user/umstieg.md)
+#  6. Zurück: Image wieder auf ghcr.io/paperless-ngx/paperless-ngx:3.4.2 setzen (war die Version älter:
+#     Sicherung aus Schritt 1 bzw. die Server-Kopie *_vor_umstieg_* zurückholen), broker/tika/
+#     gotenberg aus der alten Datei wieder aufnehmen, up -d. Die paperrust_*-Tabellen stören nicht.
+#
+# Gleich bleiben MÜSSEN: PAPERLESS_SECRET_KEY, PAPERLESS_DB*, PAPERLESS_FILENAME_FORMAT, Volumes.
+# Was sich bemerkbar ändert (kein PDF-Abbild für Office, keine Bildbereinigung bei OCR, eigener
+# Klassifikator): docs/user/migration.md#differences
+
+services:
+  db:
+    # GLEICHE Hauptversion wie bisher verwenden (Datenverzeichnis ist versionsgebunden), z. B. 17.
+    image: docker.io/library/postgres:17
+    restart: unless-stopped
+    volumes:
+      # postgres:17 und älter: /var/lib/postgresql/data; postgres:18: /var/lib/postgresql
+      - pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: paperless
+      POSTGRES_USER: paperless
+      POSTGRES_PASSWORD: paperless
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paperless -d paperless"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  webserver:
+    # vorher: ghcr.io/paperless-ngx/paperless-ngx:latest
+    # Solange kein Image veröffentlicht ist, vorher im PaperRust-Repository bauen:
+    #   docker build -f docker/Dockerfile -t paperrust/paperrust:local .
+    image: ${PAPERRUST_IMAGE:-paperrust/paperrust:local}
+    restart: unless-stopped
+    user: root
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - data:/usr/src/paperless/data
+      - media:/usr/src/paperless/media
+      - ./export:/usr/src/paperless/export
+      - ./consume:/usr/src/paperless/consume
+    env_file: docker-compose.env
+    environment:
+      PAPERLESS_DBHOST: db
+      PAPERLESS_DBENGINE: postgresql
+    stop_grace_period: 45s
+
+volumes:
+  data:
+  media:
+  pgdata:

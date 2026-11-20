@@ -1,0 +1,31 @@
+[package]
+name = "pl-auth-api"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+pl-core.workspace = true
+pl-authz.workspace = true
+axum.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+sea-query.workspace = true
+sea-query-binder.workspace = true
+chrono.workspace = true
+chrono-tz.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+hmac.workspace = true
+rand.workspace = true
+flate2.workspace = true
+base64.workspace = true
+percent-encoding.workspace = true
+sha1.workspace = true
+
+[dev-dependencies]
+reqwest.workspace = true
+tower.workspace = true
+tokio.workspace = true

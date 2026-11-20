@@ -1,0 +1,49 @@
+[package]
+name = "pl-consumer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+# Worker building blocks (from [workspace.dependencies]).
+pl-parsers.workspace = true
+pl-ocr.workspace = true
+pl-matching.workspace = true
+pl-classifier.workspace = true
+pl-templating.workspace = true
+pl-indexer.workspace = true
+pl-queue.workspace = true
+pl-authz.workspace = true
+# pyset (m2m order like CPython set), W11.
+pl-core.workspace = true
+# Barcodes, TIFF→PDF, qpdf replacement, text thumbnails (docs/contract/pl-pdfops.md §5).
+pl-pdfops.workspace = true
+# PDF tools (PdfCraft in the child process): repair/shrink on ingestion. CORE-REQUEST: [workspace.dependencies]
+pl-pdftools = { path = "../pl-pdftools" }
+# filter_custom_field_query of the workflow triggers (final security review K-N1).
+pl-docfilter.workspace = true
+# Number ranges/storage-location hook (asn_location.rs). CORE-REQUEST: pl-labels in [workspace.dependencies]
+pl-labels = { path = "../pl-labels" }
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+sea-query.workspace = true
+sea-query-binder.workspace = true
+chrono.workspace = true
+chrono-tz.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tokio.workspace = true
+sha2.workspace = true
+regex.workspace = true
+uuid.workspace = true
+futures.workspace = true
+lopdf.workspace = true
+# Folder watching with file events (E16; watchfiles uses the same crate).
+notify.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+# Engine without the `routes` feature: by path, because the workspace dependency carries the default features.
+pl-search = { path = "../pl-search", default-features = false }

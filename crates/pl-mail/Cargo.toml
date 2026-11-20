@@ -1,0 +1,43 @@
+[package]
+name = "pl-mail"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+pl-core.workspace = true
+pl-authz.workspace = true
+pl-files.workspace = true
+sea-query.workspace = true
+sea-query-binder.workspace = true
+axum.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+tokio.workspace = true
+chrono.workspace = true
+chrono-tz.workspace = true
+tracing.workspace = true
+base64.workspace = true
+reqwest = { workspace = true, features = ["json"] }
+percent-encoding.workspace = true
+imap-proto.workspace = true
+tokio-rustls.workspace = true
+rustls-native-certs.workspace = true
+# Mail-Worker (fetch/, effects/) – alles aus [workspace.dependencies]
+pl-queue.workspace = true
+pl-consumer.workspace = true
+pl-parsers.workspace = true
+pl-templating.workspace = true
+pl-matching.workspace = true
+encoding_rs.workspace = true
+unicode-normalization.workspace = true
+uuid.workspace = true
+rand.workspace = true
+url.workspace = true
+
+[dev-dependencies]
+futures.workspace = true
+tower = { workspace = true, features = ["util"] }
+sha2.workspace = true

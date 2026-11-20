@@ -1,0 +1,34 @@
+{
+  "django": {
+    "status": 400,
+    "body": {
+      "documents": [
+        "This field is required."
+      ],
+      "metadata_document_id": [
+        "A valid integer is required."
+      ],
+      "archive_fallback": [
+        "Must be a valid boolean."
+      ]
+    },
+    "plan": [],
+    "files": {}
+  },
+  "rust": {
+    "status": 400,
+    "body": {
+      "documents": [
+        "This field is required."
+      ],
+      "metadata_document_id": [
+        "A valid integer is required."
+      ],
+      "archive_fallback": [
+        "Must be a valid boolean."
+      ]
+    },
+    "plan": [],
+    "files": {}
+  }
+}

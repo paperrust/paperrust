@@ -1,0 +1,4 @@
+ARC-Seal: i=1; a=rsa-sha256
+From: a@example.com
+
+Text

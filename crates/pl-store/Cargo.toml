@@ -1,0 +1,32 @@
+[package]
+name = "pl-store"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+# Implementation of the pl-domain repos on Django tables + paperrust_sync_object (ARCHITECTURE-V2 §2).
+# The only place that knows the Django table names for v2. No dependency on pl-documents.
+[dependencies]
+pl-domain.workspace = true
+pl-core.workspace = true
+pl-authz.workspace = true
+pl-docfilter.workspace = true
+pl-files.workspace = true
+axum.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+sea-query.workspace = true
+sea-query-binder.workspace = true
+chrono.workspace = true
+chrono-tz.workspace = true
+uuid.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+http-body-util.workspace = true
+tower = { workspace = true, features = ["util"] }
+
+[dev-dependencies]
+rand.workspace = true
+url.workspace = true

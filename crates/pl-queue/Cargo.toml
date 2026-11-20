@@ -1,0 +1,28 @@
+[package]
+name = "pl-queue"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+pl-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+sqlx.workspace = true
+sea-query.workspace = true
+sea-query-binder.workspace = true
+chrono.workspace = true
+chrono-tz.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+futures.workspace = true
+regex.workspace = true
+sha2.workspace = true
+rand.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
+tracing-subscriber.workspace = true

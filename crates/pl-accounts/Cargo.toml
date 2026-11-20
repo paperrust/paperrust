@@ -1,0 +1,36 @@
+[package]
+name = "pl-accounts"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+pl-core.workspace = true
+pl-authz.workspace = true
+pl-auth-api.workspace = true
+axum.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+chrono.workspace = true
+tracing.workspace = true
+rand.workspace = true
+hmac.workspace = true
+sha2.workspace = true
+sha1.workspace = true
+base64.workspace = true
+percent-encoding.workspace = true
+url.workspace = true
+reqwest.workspace = true
+minijinja.workspace = true
+tokio-rustls.workspace = true
+rustls-native-certs.workspace = true
+
+[dev-dependencies]
+# only reference parity tests: clear/prefill the cache of the reference Django instance (Garnet)
+redis.workspace = true
+tower.workspace = true
+regex.workspace = true
+flate2.workspace = true

@@ -1,0 +1,18 @@
+{
+  "django": {
+    "status": 404,
+    "body": {
+      "detail": "Not found."
+    },
+    "plan": [],
+    "files": {}
+  },
+  "rust": {
+    "status": 404,
+    "body": {
+      "detail": "Not found."
+    },
+    "plan": [],
+    "files": {}
+  }
+}

@@ -1,0 +1,32 @@
+Return-Path: <bob@example.org>
+Received: from mx.example.org by imap.example.org; Tue, 07 Jan 2025 09:00:00 +0100
+From: "Bob, the Builder" <bob@example.org>
+To: paperless@example.org
+Subject: Invoice 2025-001
+Date: Tue, 07 Jan 2025 09:00:00 +0100
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="XYZ"
+
+This is a multi-part message in MIME format.
+--XYZ
+Content-Type: text/plain; charset=utf-8
+
+Please find the invoice attached.
+--XYZ
+Content-Type: application/pdf; name="invoice-2025-001.pdf"
+Content-Disposition: attachment; filename="invoice-2025-001.pdf"
+Content-Transfer-Encoding: base64
+
+JVBERi0xLjQKMSAwIG9iajw8L1R5cGUvQ2F0YWxvZy9QYWdlcyAyIDAgUj4+ZW5kb2JqCjIgMCBv
+Ymo8PC9UeXBlL1BhZ2VzL0tpZHNbMyAwIFJdL0NvdW50IDE+PmVuZG9iagozIDAgb2JqPDwvVHlw
+ZS9QYWdlL1BhcmVudCAyIDAgUi9NZWRpYUJveFswIDAgMjAwIDIwMF0+PmVuZG9iagp0cmFpbGVy
+PDwvUm9vdCAxIDAgUj4+CiUlRU9GCg==
+--XYZ
+Content-Type: application/octet-stream
+Content-Disposition: attachment; filename="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+abc
+-----END PGP SIGNATURE-----
+--XYZ--
+epilogue text

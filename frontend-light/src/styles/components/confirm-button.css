@@ -1,0 +1,21 @@
+/* Button with confirmation bubble (ConfirmButton.svelte). */
+
+/* In button and input groups <pngx-confirm-button> sits between group and button;
+   still make the corners at the seams straight as with direct children. */
+::deep .input-group > pngx-confirm-button:not(:first-child):not(.dropdown-menu):not(.valid-tooltip):not(.valid-feedback):not(.invalid-tooltip):not(.invalid-feedback) > button,
+::deep .btn-group > pngx-confirm-button:not(:first-child):not(.dropdown-menu):not(.valid-tooltip):not(.valid-feedback):not(.invalid-tooltip):not(.invalid-feedback) > button {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+::deep .input-group:not(.has-validation) > pngx-confirm-button:not(:last-child):not(.dropdown-toggle):not(.dropdown-menu):not(.form-floating) > button,
+::deep .btn-group:not(.has-validation) > pngx-confirm-button:not(:last-child):not(.dropdown-toggle):not(.dropdown-menu):not(.form-floating) > button {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+/* Confirmation bubble with little padding (was previously in the frame stylesheet) */
+::deep .popover-slim .popover-body {
+  --bs-popover-body-padding-x: .5rem;
+  --bs-popover-body-padding-y: .5rem;
+}

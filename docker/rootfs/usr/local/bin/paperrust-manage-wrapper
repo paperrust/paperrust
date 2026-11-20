@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Verwaltungsbefehle wie im paperless-ngx-Image (upstream docker/management_script.sh @v3.4.2):
+#   docker compose exec webserver document_exporter ../export
+# /usr/local/bin/<befehl> ist ein Verweis auf dieses Skript und ruft `paperrust manage <befehl>` auf.
+set -euo pipefail
+cmd="$(basename "$0")"
+if [[ "$cmd" == paperrust-manage-wrapper ]]; then
+	cmd="${1:?Befehl fehlt, z. B. paperrust-manage-wrapper document_exporter ../export}"
+	shift
+fi
+# `docker compose exec` als root (Container mit user: root für USERMAP_UID): Rechte abgeben,
+# damit Export-/Indexdateien dem Laufzeitbenutzer gehören.
+# Ziel wie im Entrypoint: USERMAP_UID/GID, sonst PUID/PGID, sonst 1000.
+# shellcheck source=../lib/paperrust/common.sh
+source /usr/local/lib/paperrust/common.sh
+uid="$(pr_target_uid)"
+gid="$(pr_target_gid)"
+if [[ "$(id -u)" == 0 && "$uid" != 0 ]]; then
+	exec setpriv --reuid="$uid" --regid="$gid" --clear-groups -- \
+		/usr/local/bin/paperrust manage "$cmd" "$@"
+fi
+exec /usr/local/bin/paperrust manage "$cmd" "$@"

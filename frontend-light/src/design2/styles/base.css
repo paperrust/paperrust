@@ -1,0 +1,337 @@
+/* PaperRust design – base layout and shared components (docs/DESIGN2.md §3/§4).
+   Rule "no page scrolling": html/body have a fixed height without overflow; scrolling only in .d2-scroll. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+body {
+  background: var(--d2-bg);
+  color: var(--d2-text);
+  font-family: var(--d2-font);
+  font-size: var(--d2-fs-md);
+  line-height: var(--d2-lh);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'cv11', 'ss01';
+}
+#d2-root {
+  height: 100%;
+}
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-weight: 600;
+  line-height: 1.25;
+}
+p {
+  margin: 0;
+}
+a {
+  color: var(--d2-link);
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+:focus-visible {
+  outline: 2px solid var(--d2-accent);
+  outline-offset: 2px;
+}
+.d2-scroll {
+  overflow: auto;
+  min-height: 0;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--d2-border-strong) transparent;
+}
+.d2-sr {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.d2-ico {
+  display: inline-flex;
+  width: 1em;
+  height: 1em;
+  flex: none;
+}
+.d2-ico svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
+/* Buttons */
+.d2-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--d2-s2);
+  height: var(--d2-control-h);
+  padding: 0 var(--d2-s3);
+  border: 1px solid var(--d2-border-strong);
+  border-radius: var(--d2-r1);
+  background: var(--d2-surface);
+  color: var(--d2-text);
+  font-size: var(--d2-fs-md);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  text-decoration: none;
+}
+.d2-btn:hover {
+  background: var(--d2-surface-2);
+}
+.d2-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.d2-btn.primary {
+  background: var(--d2-accent);
+  border-color: var(--d2-accent);
+  color: var(--d2-on-accent);
+}
+.d2-btn.primary:hover {
+  background: var(--d2-accent-hover);
+}
+.d2-btn.ghost {
+  border-color: transparent;
+  background: transparent;
+}
+.d2-btn.ghost:hover {
+  background: var(--d2-surface-2);
+}
+.d2-btn.danger {
+  color: var(--d2-danger);
+}
+.d2-btn.icon {
+  width: var(--d2-control-h);
+  padding: 0;
+}
+.d2-btn.sm {
+  height: 26px;
+  font-size: var(--d2-fs-sm);
+  padding: 0 var(--d2-s2);
+}
+.d2-btn.sm.icon {
+  width: 26px;
+  padding: 0;
+}
+
+/* Inputs */
+.d2-input,
+.d2-select,
+.d2-textarea {
+  width: 100%;
+  min-height: var(--d2-control-h);
+  padding: 5px var(--d2-s2);
+  border: 1px solid var(--d2-border-strong);
+  border-radius: var(--d2-r1);
+  background: var(--d2-surface);
+  color: var(--d2-text);
+  font-size: var(--d2-fs-md);
+}
+.d2-input:focus,
+.d2-select:focus,
+.d2-textarea:focus {
+  border-color: var(--d2-accent);
+  outline: 2px solid color-mix(in srgb, var(--d2-accent) 35%, transparent);
+  outline-offset: 0;
+}
+.d2-textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+.d2-label {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--d2-text-2);
+  font-size: var(--d2-fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.d2-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--d2-s2);
+  cursor: pointer;
+}
+.d2-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--d2-accent);
+}
+
+/* Chips, badges */
+.d2-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--d2-r-pill);
+  background: var(--d2-surface-3);
+  color: var(--d2-text);
+  font-size: var(--d2-fs-xs);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: 0;
+}
+button.d2-chip {
+  cursor: pointer;
+}
+.d2-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: var(--d2-r-pill);
+  background: var(--d2-surface-3);
+  color: var(--d2-text-2);
+  font-size: var(--d2-fs-xs);
+  font-weight: 600;
+}
+.d2-badge.accent {
+  background: var(--d2-accent);
+  color: var(--d2-on-accent);
+}
+
+/* Panes and headers */
+.d2-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--d2-surface);
+}
+.d2-pane-head {
+  display: flex;
+  align-items: center;
+  gap: var(--d2-s2);
+  flex: none;
+  min-height: 48px;
+  padding: var(--d2-s2) var(--d2-s4);
+  border-bottom: 1px solid var(--d2-border);
+}
+.d2-pane-head h1,
+.d2-pane-head h2 {
+  font-size: var(--d2-fs-lg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.d2-muted {
+  color: var(--d2-text-3);
+}
+.d2-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--d2-s2);
+  height: 100%;
+  padding: var(--d2-s6);
+  color: var(--d2-text-3);
+  text-align: center;
+}
+.d2-kbd {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 5px;
+  border: 1px solid var(--d2-border-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--d2-surface);
+  color: var(--d2-text-2);
+  font-family: var(--d2-font);
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+}
+
+/* Menu (dropdown) */
+.d2-menu {
+  position: absolute;
+  z-index: 40;
+  min-width: 220px;
+  padding: var(--d2-s1);
+  border: 1px solid var(--d2-border);
+  border-radius: var(--d2-r2);
+  background: var(--d2-surface);
+  box-shadow: var(--d2-shadow-2);
+}
+.d2-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--d2-s2);
+  width: 100%;
+  padding: 7px var(--d2-s2);
+  border: 0;
+  border-radius: var(--d2-r1);
+  background: none;
+  color: var(--d2-text);
+  font-size: var(--d2-fs-md);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.d2-menu-item:hover,
+.d2-menu-item:focus-visible {
+  background: var(--d2-surface-2);
+}
+.d2-menu-sep {
+  height: 1px;
+  margin: var(--d2-s1) 0;
+  background: var(--d2-border);
+}
+.d2-menu-label {
+  padding: 6px var(--d2-s2) 2px;
+  color: var(--d2-text-3);
+  font-size: var(--d2-fs-xs);
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* Flash after jump from the search (lib/settings-index.ts flashSetting) */
+@keyframes pr-flash {
+  0%, 60% { background-color: var(--d2-accent-soft); box-shadow: 0 0 0 3px var(--d2-accent); }
+  100% { background-color: transparent; box-shadow: 0 0 0 3px transparent; }
+}
+.pr-flash {
+  border-radius: var(--d2-r1, 6px);
+  animation: pr-flash 2.4s ease-out;
+  scroll-margin: 30vh;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pr-flash { animation: none; background-color: var(--d2-accent-soft); box-shadow: 0 0 0 3px var(--d2-accent); }
+}

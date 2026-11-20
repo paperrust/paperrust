@@ -1,0 +1,672 @@
+{
+ "crate": "pl-fields-views",
+ "note": "Fach-Coder-Fälle (Schreibabläufe + Validierung). Lesefälle stehen in cases.base.json.",
+ "vars": {
+  "doc_id": {
+   "get": "/api/documents/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1,
+    "fields": "id"
+   }
+  },
+  "cf_select_id": {
+   "get": "/api/custom_fields/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1
+   },
+   "where": {
+    "data_type": "select"
+   },
+   "default": 999999
+  },
+  "saved_view_id": {
+   "get": "/api/saved_views/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1
+   },
+   "default": 999999
+  }
+ },
+ "cases": [
+  {
+   "id": "cf.create.string",
+   "route": "custom_fields.create",
+   "method": "POST",
+   "path": "/api/custom_fields/",
+   "json": {
+    "name": "parity-string",
+    "data_type": "string"
+   },
+   "users": [
+    "admin",
+    "user1",
+    "noperm"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true
+  },
+  {
+   "id": "cf.create.select_with_ids",
+   "route": "custom_fields.create",
+   "method": "POST",
+   "path": "/api/custom_fields/",
+   "json": {
+    "name": "parity-select",
+    "data_type": "select",
+    "extra_data": {
+     "select_options": [
+      {
+       "label": "A",
+       "id": "abc-123"
+      },
+      {
+       "id": "def",
+       "label": "B"
+      }
+     ]
+    }
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ],
+   "write": true
+  },
+  {
+   "id": "cf.create.select_generated_ids",
+   "route": "custom_fields.create",
+   "method": "POST",
+   "path": "/api/custom_fields/",
+   "json": {
+    "name": "parity-select-gen",
+    "data_type": "select",
+    "extra_data": {
+     "select_options": [
+      {
+       "label": "A"
+      },
+      {
+       "label": "B",
+       "id": null
+      }
+     ]
+    }
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true
+  },
+  {
+   "id": "cf.create.errors",
+   "route": "custom_fields.create",
+   "method": "POST",
+   "path": "/api/custom_fields/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "json": {
+      "name": "",
+      "data_type": "nope"
+     }
+    },
+    {
+     "json": {
+      "data_type": "string"
+     }
+    },
+    {
+     "json": {
+      "name": "x",
+      "data_type": "select"
+     }
+    },
+    {
+     "json": {
+      "name": "x",
+      "data_type": "select",
+      "extra_data": {
+       "select_options": "nope"
+      }
+     }
+    },
+    {
+     "json": {
+      "name": "x",
+      "data_type": "select",
+      "extra_data": {
+       "select_options": [
+        {
+         "label": ""
+        }
+       ]
+      }
+     }
+    },
+    {
+     "json": {
+      "name": "x",
+      "data_type": "monetary",
+      "extra_data": {
+       "default_currency": "EU"
+      }
+     }
+    },
+    {
+     "json": {
+      "name": "x",
+      "data_type": "monetary",
+      "extra_data": {
+       "default_currency": 123
+      }
+     }
+    },
+    {
+     "json": {
+      "name": "x",
+      "data_type": "monetary",
+      "extra_data": {
+       "default_currency": "EUR"
+      }
+     }
+    },
+    {
+     "json": {
+      "name": "x",
+      "data_type": "string"
+     }
+    },
+    {
+     "json": [
+      1,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "id": "cf.update.flow",
+   "route": "custom_fields.partial_update",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/custom_fields/",
+     "json": {
+      "name": "parity-upd",
+      "data_type": "integer"
+     },
+     "capture": {
+      "cf": "id"
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/custom_fields/${cf}/",
+     "json": {
+      "name": "parity-upd-2"
+     }
+    },
+    {
+     "method": "PUT",
+     "path": "/api/custom_fields/${cf}/",
+     "json": {
+      "name": "parity-upd-3"
+     }
+    },
+    {
+     "method": "PUT",
+     "path": "/api/custom_fields/${cf}/",
+     "json": {
+      "name": "parity-upd-3",
+      "data_type": "float"
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/custom_fields/abc/",
+     "json": {
+      "name": "x"
+     }
+    },
+    {
+     "method": "DELETE",
+     "path": "/api/custom_fields/${cf}/"
+    },
+    {
+     "method": "GET",
+     "path": "/api/custom_fields/${cf}/"
+    }
+   ]
+  },
+  {
+   "id": "cf.update.select_without_extra",
+   "route": "custom_fields.partial_update",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/custom_fields/",
+     "json": {
+      "name": "parity-sel-upd",
+      "data_type": "select",
+      "extra_data": {
+       "select_options": [
+        {
+         "label": "A",
+         "id": "a1"
+        }
+       ]
+      }
+     },
+     "capture": {
+      "cf": "id"
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/custom_fields/${cf}/",
+     "json": {
+      "name": "renamed"
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/custom_fields/${cf}/",
+     "json": {
+      "extra_data": {
+       "select_options": [
+        {
+         "label": "A",
+         "id": "a1"
+        },
+        {
+         "label": "C",
+         "id": "c3"
+        }
+       ]
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "sv.create.flow",
+   "route": "saved_views.create",
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/saved_views/",
+     "json": {
+      "name": "parity-view",
+      "sort_field": "created",
+      "sort_reverse": true,
+      "filter_rules": [
+       {
+        "rule_type": 4,
+        "value": "1"
+       },
+       {
+        "rule_type": "6",
+        "value": null
+       }
+      ],
+      "page_size": 20,
+      "display_mode": "smallCards",
+      "display_fields": [
+       "title",
+       "created"
+      ],
+      "show_on_dashboard": true
+     },
+     "capture": {
+      "sv": "id"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/saved_views/",
+     "json": {
+      "name": "parity-view",
+      "filter_rules": []
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/saved_views/${sv}/",
+     "json": {
+      "display_fields": [],
+      "icon": "receipt",
+      "show_in_sidebar": "yes"
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/saved_views/${sv}/",
+     "json": {
+      "display_fields": [
+       "foobar"
+      ]
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/saved_views/${sv}/",
+     "json": {
+      "display_fields": [
+       "custom_field_999999"
+      ]
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/saved_views/${sv}/",
+     "json": {
+      "icon": "not-an-icon",
+      "page_size": 0
+     }
+    },
+    {
+     "method": "PUT",
+     "path": "/api/saved_views/${sv}/",
+     "json": {
+      "name": "parity-view-2"
+     }
+    },
+    {
+     "method": "PUT",
+     "path": "/api/saved_views/${sv}/",
+     "json": {
+      "name": "parity-view-2",
+      "filter_rules": [
+       {
+        "rule_type": 99
+       },
+       {
+        "value": "x"
+       }
+      ]
+     }
+    },
+    {
+     "method": "PUT",
+     "path": "/api/saved_views/${sv}/",
+     "json": {
+      "name": "parity-view-2",
+      "filter_rules": []
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/api/saved_views/${sv}/",
+     "query": {
+      "full_perms": "true"
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/saved_views/${sv}/",
+     "json": {
+      "set_permissions": {
+       "view": {
+        "users": [
+         999999
+        ]
+       }
+      }
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/saved_views/${sv}/",
+     "json": {
+      "set_permissions": {
+       "bogus": {}
+      }
+     }
+    },
+    {
+     "method": "DELETE",
+     "path": "/api/saved_views/${sv}/"
+    }
+   ]
+  },
+  {
+   "id": "sl.create.flow",
+   "route": "share_links.create",
+   "users": [
+    "admin",
+    "user1",
+    "noperm"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/share_links/",
+     "json": {
+      "document": "${doc_id}",
+      "file_version": "original",
+      "expiration": "2099-01-01T10:00:00+01:00"
+     },
+     "capture": {
+      "sl": "id"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/share_links/",
+     "json": {
+      "document": 999999
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/share_links/",
+     "json": {
+      "document": "abc",
+      "file_version": "x",
+      "expiration": "x"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/share_links/",
+     "json": {
+      "document": "${doc_id}",
+      "expiration": "2099-01-01"
+     }
+    },
+    {
+     "method": "DELETE",
+     "path": "/api/share_links/${sl}/"
+    },
+    {
+     "method": "GET",
+     "path": "/api/share_links/${sl}/"
+    }
+   ]
+  },
+  {
+   "id": "slb.create.errors",
+   "route": "share_link_bundles.create",
+   "method": "POST",
+   "path": "/api/share_link_bundles/",
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "json": {}
+    },
+    {
+     "json": {
+      "document_ids": []
+     }
+    },
+    {
+     "json": {
+      "document_ids": "1"
+     }
+    },
+    {
+     "json": {
+      "document_ids": [
+       0,
+       "x"
+      ]
+     }
+    },
+    {
+     "json": {
+      "document_ids": [
+       "${doc_id}",
+       "${doc_id}"
+      ]
+     }
+    },
+    {
+     "json": {
+      "document_ids": [
+       999999,
+       999998
+      ]
+     }
+    },
+    {
+     "json": {
+      "document_ids": [
+       "${doc_id}"
+      ],
+      "expiration_days": 0,
+      "file_version": "x"
+     }
+    }
+   ]
+  },
+  {
+   "id": "slb.create.flow",
+   "route": "share_link_bundles.create",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true,
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/share_link_bundles/",
+     "json": {
+      "document_ids": [
+       "${doc_id}"
+      ],
+      "file_version": "archive",
+      "expiration_days": 7
+     },
+     "capture": {
+      "b": "id"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/share_link_bundles/${b}/rebuild/"
+    },
+    {
+     "method": "DELETE",
+     "path": "/api/share_link_bundles/${b}/"
+    },
+    {
+     "method": "GET",
+     "path": "/api/share_link_bundles/${b}/"
+    }
+   ]
+  },
+  {
+   "id": "sv.patch.foreign",
+   "route": "saved_views.partial_update",
+   "method": "PATCH",
+   "path": "/api/saved_views/${saved_view_id}/",
+   "json": {
+    "sort_field": "added"
+   },
+   "users": [
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true
+  },
+  {
+   "id": "sv.delete.foreign",
+   "route": "saved_views.destroy",
+   "method": "DELETE",
+   "path": "/api/saved_views/${saved_view_id}/",
+   "users": [
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "write": true
+  }
+ ]
+}

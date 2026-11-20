@@ -1,0 +1,62 @@
+# PaperRust + PostgreSQL 17 – Neuinstallation.
+#
+# Ein Dienst statt fünf: kein Redis, kein Celery-Worker, kein Tika, kein Gotenberg. Webserver,
+# Worker, Zeitplaner und Eingangsordner laufen in einem Prozess (`paperrust serve --worker`).
+#
+#   cd docker
+#   cp docker-compose.env .env.paperrust      # optional: eigene Kopie, dann env_file anpassen
+#   docker compose -f docker-compose.postgres.yml build     # bis ein Image veröffentlicht ist
+#   docker compose -f docker-compose.postgres.yml up -d
+#   docker compose -f docker-compose.postgres.yml logs -f paperrust
+#
+# Oberfläche: http://localhost:8000 (Administrator per PAPERRUST_ADMIN_USER/PASSWORD in
+# docker-compose.env oder: docker compose -f docker-compose.postgres.yml exec paperrust createsuperuser)
+# Ausführlich: docs/user/installation.md#docker
+
+services:
+  db:
+    image: docker.io/library/postgres:17
+    restart: unless-stopped
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: paperless
+      POSTGRES_USER: paperless
+      POSTGRES_PASSWORD: paperless
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paperless -d paperless"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  paperrust:
+    # Noch nicht veröffentlicht: `build` baut das Image lokal aus diesem Repository.
+    image: ${PAPERRUST_IMAGE:-paperrust/paperrust:local}
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - data:/usr/src/paperless/data
+      - media:/usr/src/paperless/media
+      - ./export:/usr/src/paperless/export
+      - ./consume:/usr/src/paperless/consume
+    env_file: docker-compose.env
+    environment:
+      PAPERRUST_DBENGINE: postgresql
+      PAPERRUST_DBHOST: db
+      PAPERRUST_DBNAME: paperless
+      PAPERRUST_DBUSER: paperless
+      PAPERRUST_DBPASS: paperless
+    # laufende Aufgaben bekommen PAPERRUST_QUEUE_SHUTDOWN_GRACE (30 s) zum Abschließen
+    stop_grace_period: 45s
+
+volumes:
+  data:
+  media:
+  pgdata:

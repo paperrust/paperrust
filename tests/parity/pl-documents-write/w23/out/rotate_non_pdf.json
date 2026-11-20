@@ -1,0 +1,18 @@
+{
+  "django": {
+    "status": 200,
+    "body": {
+      "result": "OK"
+    },
+    "plan": [],
+    "files": {}
+  },
+  "rust": {
+    "status": 200,
+    "body": {
+      "result": "OK"
+    },
+    "plan": [],
+    "files": {}
+  }
+}

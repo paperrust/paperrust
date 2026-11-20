@@ -1,0 +1,23 @@
+/* Filter by owner/permission in the filter bar (PermissionsFilterDropdown.svelte). */
+
+.user-select {
+  min-width: 15rem;
+}
+
+/* Checkmark column of the selection */
+.selected-icon {
+  min-width: 1em;
+  min-height: 1em;
+}
+
+/* Icon changes on hover/focus */
+.focus-variants .variant-focused,
+.focus-variants:hover .variant-unfocused,
+.focus-variants:focus .variant-unfocused {
+  display: none;
+}
+
+.focus-variants:hover .variant-focused,
+.focus-variants:focus .variant-focused {
+  display: block;
+}

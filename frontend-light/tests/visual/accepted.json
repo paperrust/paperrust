@@ -1,0 +1,15 @@
+{
+  "_comment": "Begründete Ausnahmen vom Bildvergleich (> 0,5 % Pixel). Muster tests/parity/accepted.json: case = '<screen>/<lang>/<theme>/<viewport>' (Suffix * = Präfix), reason = Begründung, since = Datum. Jede Ausnahme braucht eine Begründung und wird in P4 erneut geprüft.",
+  "cases": [
+    {
+      "case": "dashboard-upload/en-US/dark/mobile",
+      "reason": "Upload-Fortschritt: Light zeigt nach dem Hochladen 20 % (Phase UPLOADING per XHR-upload.onprogress, wie FileStatus.getProgress vorsieht). Angular nutzt provideHttpClient(withFetch()) – fetch liefert keine HttpEventType.UploadProgress-Ereignisse, der Balken bleibt dort bei 0 % (Upstream-Fehler). Nur dunkel/mobil > 0,5 % (Balken mit mix-blend-mode soft-light auf dunklem Grund), sonst ≤ 0,3 %. Entscheidung Koordinator 2026-11-09: echter Fortschrittsbalken bleibt (besseres Verhalten; Angulars 0 % ist ein Artefakt des schnellen lokalen Uploads ohne Fortschrittsereignisse).",
+      "since": "2026-11-09"
+    },
+    {
+      "case": "dashboard-upload/de-DE/dark/mobile",
+      "reason": "Upload-Fortschritt: Light zeigt nach dem Hochladen 20 % (Phase UPLOADING per XHR-upload.onprogress, wie FileStatus.getProgress vorsieht). Angular nutzt provideHttpClient(withFetch()) – fetch liefert keine HttpEventType.UploadProgress-Ereignisse, der Balken bleibt dort bei 0 % (Upstream-Fehler). Nur dunkel/mobil > 0,5 % (Balken mit mix-blend-mode soft-light auf dunklem Grund), sonst ≤ 0,3 %. Entscheidung Koordinator 2026-11-09: echter Fortschrittsbalken bleibt (besseres Verhalten; Angulars 0 % ist ein Artefakt des schnellen lokalen Uploads ohne Fortschrittsereignisse).",
+      "since": "2026-11-09"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+Delivered-To: fwd@example.com
+From: Weiterleiter <fwd@example.com>
+To: ziel@example.com
+Subject: Fwd: Innere Nachricht
+Date: Sun, 12 Jan 2025 23:59:59 +0530
+Content-Type: multipart/mixed; boundary=OUTER
+
+--OUTER
+Content-Type: text/plain
+
+Siehe weitergeleitete Nachricht.
+--OUTER
+Content-Type: message/rfc822
+Content-Disposition: attachment
+
+From: Original <orig@example.com>
+To: x@example.com
+Subject: Innere Nachricht
+Date: Sat, 11 Jan 2025 12:00:00 +0100
+Content-Type: multipart/mixed; boundary=INNER
+
+--INNER
+Content-Type: text/plain
+
+Innerer Text.
+--INNER
+Content-Type: text/csv; name=liste.csv
+
+a,b
+1,2
+--INNER--
+--OUTER--

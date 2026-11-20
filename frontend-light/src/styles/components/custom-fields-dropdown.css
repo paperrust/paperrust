@@ -1,0 +1,5 @@
+/* Selection menu for custom fields in the document (CustomFieldsDropdown.svelte). */
+
+.custom-fields-dropdown {
+  min-width: 300px;
+}

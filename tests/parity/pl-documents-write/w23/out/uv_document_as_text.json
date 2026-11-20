@@ -1,0 +1,22 @@
+{
+  "django": {
+    "status": 400,
+    "body": {
+      "document": [
+        "The submitted data was not a file. Check the encoding type on the form."
+      ]
+    },
+    "plan": [],
+    "files": {}
+  },
+  "rust": {
+    "status": 400,
+    "body": {
+      "document": [
+        "The submitted data was not a file. Check the encoding type on the form."
+      ]
+    },
+    "plan": [],
+    "files": {}
+  }
+}

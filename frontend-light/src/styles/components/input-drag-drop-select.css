@@ -1,0 +1,14 @@
+/* Selection by drag and drop (DragDropSelect.svelte). */
+
+.badge {
+  cursor: move;
+}
+
+/* Locked: nothing can be grabbed anymore */
+.cdk-drop-list-disabled {
+  cursor: not-allowed !important;
+}
+
+.cdk-drop-list-disabled * {
+  pointer-events: none !important;
+}

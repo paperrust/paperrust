@@ -1,0 +1,14 @@
+/* Bulk edit: button bar above the document list (BulkEditor.svelte). */
+
+.dropdown-toggle-split {
+  --bs-border-radius: .45rem;
+}
+
+.dropdown-menu {
+  --bs-dropdown-min-width: 12rem;
+}
+
+/* Do not wrap button labels */
+.btn-group .btn {
+  white-space: nowrap;
+}

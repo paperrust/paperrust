@@ -1,0 +1,6 @@
+# sequence	last_value  (Sequenzen mit Wert nach upstream migrate)
+auth_permission_id_seq	170
+auth_user_id_seq	1
+django_content_type_id_seq	42
+django_migrations_id_seq	247
+paperless_applicationconfiguration_id_seq	1

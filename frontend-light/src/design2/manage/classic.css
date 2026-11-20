@@ -1,0 +1,97 @@
+/* Classic components (administration/settings) in the PaperRust design (docs/DESIGN2.md §4.6).
+   Loaded lazily only with the Bootstrap style of the classic UI. Bootstrap variables → design tokens,
+   dialogs as side sheets, protect the shell's own base rules against Bootstrap reboot. */
+html.d2 {
+  --bs-body-font-family: var(--d2-font);
+  --bs-body-bg: var(--d2-surface);
+  --bs-body-color: var(--d2-text);
+  --bs-border-color: var(--d2-border);
+  --bs-secondary-color: var(--d2-text-2);
+  --bs-tertiary-bg: var(--d2-surface-2);
+  --bs-emphasis-color: var(--d2-text);
+  --bs-border-radius: var(--d2-r1);
+  --pr-bg-alt: var(--d2-surface-2);
+}
+html.d2 body {
+  height: 100%;
+  background: var(--d2-bg);
+  font-family: var(--d2-font);
+  font-size: var(--d2-fs-md);
+  letter-spacing: 0;
+}
+/* Shell elements keep their look (reboot sets spacing on headings/paragraphs/lists) */
+:where(.d2-app) :is(h1, h2, h3, h4, p):not(.d2-classic *) {
+  margin: 0;
+}
+.d2-classic {
+  padding: var(--d2-s4) var(--d2-s5) var(--d2-s6);
+  background: var(--d2-surface);
+}
+.d2-classic :is(h1, h2, h3, h4, h5, h6) {
+  margin-bottom: 0.5rem;
+}
+.d2-classic p {
+  margin-bottom: 1rem;
+}
+/* Page header of the classic components: not sticky, the shell already has a fixed header */
+.d2-classic .sticky-top {
+  position: static;
+}
+/* Dialogs as side sheet on the right, full height */
+html.d2 .modal {
+  overflow: hidden;
+}
+html.d2 .modal-dialog {
+  height: 100%;
+  max-width: min(680px, 100vw);
+  margin: 0 0 0 auto;
+}
+html.d2 .modal-dialog.modal-xl,
+html.d2 .modal-dialog.modal-lg {
+  max-width: min(960px, 100vw);
+}
+html.d2 .modal-content {
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--d2-shadow-2);
+}
+html.d2 .modal-body {
+  overflow: auto;
+}
+html.d2 .btn-primary {
+  --bs-btn-bg: var(--d2-accent);
+  --bs-btn-border-color: var(--d2-accent);
+  --bs-btn-hover-bg: var(--d2-accent-hover);
+  --bs-btn-hover-border-color: var(--d2-accent-hover);
+}
+/* Density (Settings → Appearance): row height of the tables and lists of the classic components */
+html.d2 .d2-classic .table > :not(caption) > * > * {
+  padding-top: var(--d2-cell-py);
+  padding-bottom: var(--d2-cell-py);
+}
+html.d2 .d2-classic .list-group-item {
+  padding-top: calc(var(--d2-cell-py) + 0.125rem);
+  padding-bottom: calc(var(--d2-cell-py) + 0.125rem);
+}
+/* Rust sparingly: links of the classic components without rust (rust only for primary button, selection, focus) */
+html.d2 .d2-classic a:not(.btn):not(.nav-link):not(.dropdown-item):not(.list-group-item) {
+  color: var(--d2-link);
+}
+/* Row actions of the attribute lists always in one row (correspondents has one column more than
+   document types and wrapped otherwise; feedback 2026-11-17). */
+html.d2 .d2-classic td:last-child .btn-toolbar { flex-wrap: nowrap; }
+html.d2 .d2-classic td:last-child { white-space: nowrap; width: 1%; }
+/* Labels (Bootstrap text-bg-*) in classic components: design colors with enough contrast in light and
+   dark instead of the Bootstrap default colors (Configuration → Server was hard to read; feedback 2026-11-17). */
+html.d2 .d2-classic .badge { font-weight: 500; border: 1px solid var(--d2-border); }
+html.d2 .d2-classic .badge.text-bg-light,
+html.d2 .d2-classic .badge.text-bg-secondary { background: var(--d2-surface-2) !important; color: var(--d2-text) !important; }
+html.d2 .d2-classic .badge.text-bg-dark { background: var(--d2-surface-3) !important; color: var(--d2-text) !important; }
+html.d2 .d2-classic .badge.text-bg-info { background: var(--d2-info-soft) !important; color: var(--d2-text) !important; }
+html.d2 .d2-classic .badge.text-bg-warning { background: var(--d2-warn-soft) !important; color: var(--d2-text) !important; }
+html.d2 .d2-classic .badge.text-bg-danger { background: var(--d2-danger-soft) !important; color: var(--d2-text) !important; }
+html.d2 .d2-classic .badge.text-bg-success { background: var(--d2-ok-soft) !important; color: var(--d2-text) !important; }
+
+/* OK mark green instead of rust (feedback 2026-11-18: checkmark could be confused with red) */
+html.d2 .d2-classic .text-success, html.d2 .modal .text-success { color: var(--d2-ok) !important; }

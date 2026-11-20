@@ -1,0 +1,674 @@
+/* Frame of the UI (AppFrame.svelte): sidebar with narrow mode,
+   header bar with brand, search, upload and user menu, main area. */
+
+/* ---------- Sidebar: basic structure ---------- */
+
+.sidebar {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 995; /* sits below the header bar */
+  padding: 64px 0 0; /* space for the header bar */
+  border-right: 1px solid color-mix(in srgb, var(--bs-border-color) 65%, transparent);
+  overflow-y: auto;
+  --pr-sidebar-width: 100%;
+  width: var(--pr-sidebar-width);
+  max-width: var(--pr-sidebar-width);
+  transition: all 0.2s ease;
+}
+
+.sidebar .sidebar-heading .spinner-border {
+  width: 0.8em;
+  height: 0.8em;
+}
+
+.sidebar .sidebar-heading {
+  letter-spacing: 0.06em;
+}
+
+.sidebar .view-name {
+  max-width: calc(100% - 55px);
+}
+
+/* Groups without a visible entry get no heading */
+.sidebar .nav-group:not(:has(.app-link)) .sidebar-heading {
+  display: none !important;
+}
+
+@media (min-width: 768px) {
+  .sidebar {
+    --pr-sidebar-width: var(--pr-sidebar-expanded-width);
+  }
+}
+
+/* Mobile: bar starts below header bar and search */
+@media (max-width: 767.98px) {
+  .sidebar {
+    top: 4rem;
+  }
+
+  .search-container {
+    max-height: 4.5rem;
+    overflow: visible;
+    transition: max-height 0.2s ease, opacity 0.2s ease, padding-top 0.2s ease, padding-bottom 0.2s ease;
+  }
+
+  .navbar-toggler {
+    padding-left: calc(12px - 0.234375em);
+  }
+}
+
+/* ---------- Search area and main area ---------- */
+
+.search-container {
+  min-width: 0;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+main {
+  transition: all 0.2s ease;
+  padding-top: 118px;
+  background: var(--pr-bg-darker);
+  min-height: 100vh;
+}
+
+@media (min-width: 768px) {
+  main {
+    padding-top: 64px;
+  }
+}
+
+/* ---------- Narrow mode of the sidebar ---------- */
+
+.sidebar-slim-toggler {
+  display: none;
+}
+
+.sidebar li.nav-item span,
+.sidebar .sidebar-heading span {
+  transition: opacity 0.1s ease;
+}
+
+@media (min-width: 768px) {
+  /* Without a running animation no transitions (we never set the class .animating) */
+  .sidebar:not(.animating),
+  .sidebar:not(.animating) ~ main,
+  .sidebar:not(.animating) .sidebar-slim-toggler {
+    transition: none;
+  }
+
+  .sidebar.slim {
+    max-width: 55px;
+  }
+
+  .sidebar.slim li.nav-item span.badge {
+    display: inline-block;
+    margin-right: -4px;
+  }
+
+  /* narrow: icons only, centered */
+  .sidebar.slim:not(.animating) li.nav-item span,
+  .sidebar.slim:not(.animating) .sidebar-heading span {
+    display: none;
+  }
+
+  .sidebar.slim:not(.animating) .nav-link,
+  .sidebar.slim:not(.animating) .nav-anchor {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .sidebar.slim:not(.animating) .nav-link pngx-bs-icon,
+  .sidebar.slim:not(.animating) .nav-anchor pngx-bs-icon {
+    margin-right: 0 !important;
+  }
+
+  /* wide: show labels normally */
+  .sidebar:not(.slim):not(.animating) li.nav-item span,
+  .sidebar:not(.slim):not(.animating) .sidebar-heading span {
+    position: unset;
+    opacity: 1;
+    overflow: auto;
+  }
+
+  /* Toggle button sits at the right edge of the bar */
+  .sidebar-slim-toggler {
+    display: block;
+    position: fixed;
+    left: calc(var(--pr-sidebar-width) - 12px);
+    bottom: 16px;
+    z-index: 996;
+    --bs-btn-padding-x: 0.35rem;
+    --bs-btn-padding-y: 0.125rem;
+    transition: left 0.2s ease;
+  }
+
+  .sidebar.slim .sidebar-slim-toggler {
+    --pr-sidebar-width: 56px !important;
+  }
+}
+
+/* ---------- Fade-in of the navigation groups ---------- */
+
+@media (prefers-reduced-motion: no-preference) {
+  .sidebar-sticky > ul,
+  .sidebar-sticky > .nav-group {
+    animation: sidebar-nav-in 0.3s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+  }
+
+  /* staggered, 40 ms later per group */
+  .sidebar-sticky > :nth-child(2) {
+    animation-delay: 0.04s;
+  }
+
+  .sidebar-sticky > :nth-child(3) {
+    animation-delay: 0.08s;
+  }
+
+  .sidebar-sticky > :nth-child(4) {
+    animation-delay: 0.12s;
+  }
+
+  .sidebar-sticky > :nth-child(5) {
+    animation-delay: 0.16s;
+  }
+}
+
+@keyframes sidebar-nav-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.sidebar-sticky {
+  position: relative;
+  top: 0;
+  height: 100%;
+  padding: 0.75rem 0.5rem 1rem;
+  overflow-x: hidden;
+  overflow-y: auto; /* own scrolling if the window is too short */
+  min-height: min-content;
+}
+
+@supports (position: -webkit-sticky) or (position: sticky) {
+  .sidebar-sticky {
+    position: -webkit-sticky;
+    position: sticky;
+  }
+}
+
+/* ---------- Sidebar entries ---------- */
+
+.sidebar .nav-link {
+  font-weight: 500;
+  white-space: nowrap;
+  border-radius: 0.55rem;
+  margin: 1px 0;
+  padding: 0.55rem 0.7rem;
+  transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out;
+}
+
+.sidebar .nav-link:hover,
+.sidebar .nav-link:focus {
+  color: var(--bs-primary);
+  background-color: color-mix(in srgb, var(--bs-primary) 8%, transparent);
+}
+
+.sidebar .nav-link:focus-visible {
+  outline: none;
+  background-color: var(--bs-body-bg);
+}
+
+.sidebar .nav-link.active {
+  font-weight: 600;
+  color: var(--bs-primary);
+  background-color: color-mix(in srgb, var(--bs-primary) 13%, transparent);
+}
+
+/* "Close all": subtle, without background */
+.sidebar .nav-link.nav-link-action {
+  color: var(--bs-secondary-color);
+  font-weight: 400;
+  background-color: transparent;
+}
+
+.sidebar .nav-link.nav-link-action:hover,
+.sidebar .nav-link.nav-link-action:focus {
+  color: var(--bs-primary);
+  background-color: transparent;
+}
+
+.sidebar .nav-link pngx-bs-icon {
+  position: relative;
+  top: -1px;
+}
+
+/* Entries with label: truncate long names with ellipsis */
+.sidebar .nav-link:has(> .nav-link-label) {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.sidebar .nav-link:has(> .nav-link-label) > pngx-bs-icon {
+  flex: 0 0 auto;
+}
+
+.sidebar .nav-link:has(> .nav-link-label) > .nav-link-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar:not(.slim):not(.animating) .nav-link > .nav-link-label {
+  overflow: hidden;
+}
+
+.sidebar .nav-anchor,
+.sidebar .nav-label {
+  padding: 0.25rem 0.7rem;
+}
+
+/* "Attributes" row with expand/collapse button: highlight covers the whole row */
+.attributes-row {
+  border-radius: 0.55rem;
+  margin: 0.1rem 0;
+  transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out;
+}
+
+.attributes-row > .nav-link {
+  margin: 0;
+}
+
+.attributes-row > .nav-link:hover,
+.attributes-row > .nav-link:focus,
+.attributes-row > .nav-link.active {
+  background-color: transparent;
+}
+
+.attributes-row:hover,
+.attributes-row:has(> .nav-link:focus-visible) {
+  background-color: color-mix(in srgb, var(--bs-primary) 8%, transparent);
+}
+
+.attributes-row:has(> .nav-link.active) {
+  background-color: color-mix(in srgb, var(--bs-primary) 13%, transparent);
+}
+
+.attributes-row .attributes-expand-btn {
+  opacity: 0.2;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin-right: 0.35rem !important;
+  border-radius: 50%;
+  box-shadow: none !important;
+  transition: opacity 0.15s ease-in-out;
+}
+
+.attributes-row .attributes-expand-btn:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--bs-primary) 55%, transparent);
+  outline-offset: 1px;
+  opacity: 1;
+}
+
+.attributes-row:hover .attributes-expand-btn {
+  opacity: 1;
+}
+
+.sidebar-heading {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  font-weight: 700;
+  opacity: 0.75;
+}
+
+.nav {
+  flex-wrap: nowrap;
+}
+
+.nav-item {
+  position: relative;
+  list-style-type: none;
+}
+
+/* Close cross on open documents appears only on hover */
+.nav-item:hover .close {
+  display: flex;
+}
+
+.nav-item .close {
+  display: none;
+  position: absolute !important;
+  cursor: pointer;
+  opacity: 1;
+  top: 0;
+  padding: 0.25rem 0.3rem 0;
+  right: 0.4rem;
+  width: 1.8rem;
+  height: 100%;
+}
+
+.nav-item .close pngx-bs-icon {
+  opacity: 0.5;
+}
+
+.nav-item .close:hover pngx-bs-icon {
+  opacity: 1;
+}
+
+/* ---------- Header bar: brand ---------- */
+
+.navbar-brand {
+  --pr-navbar-brand-shadow-rgb: 0, 0, 0;
+  font-size: 1.0625rem;
+  min-height: 64px;
+  letter-spacing: -0.015em;
+}
+
+.navbar-brand:hover ::deep .navbar-official-logo,
+.navbar-brand:hover .brand-mark,
+.navbar-brand:hover .brand-logo,
+.navbar-brand:focus-visible ::deep .navbar-official-logo,
+.navbar-brand:focus-visible .brand-mark,
+.navbar-brand:focus-visible .brand-logo {
+  filter: drop-shadow(0 2px 3px rgba(var(--pr-navbar-brand-shadow-rgb), 0.5));
+}
+
+.navbar-brand ::deep .navbar-official-logo {
+  will-change: filter;
+  filter: drop-shadow(0 1px 2px rgba(var(--pr-navbar-brand-shadow-rgb), 0.3));
+  transition: filter 0.15s ease-in-out;
+}
+
+@media screen and (max-width: 575.98px) {
+  .navbar-brand ::deep .navbar-official-logo {
+    max-height: 2rem;
+  }
+}
+
+.navbar-brand .brand-mark {
+  width: 1.65rem;
+  height: 1.65rem;
+  flex: 0 0 auto;
+  will-change: filter;
+  filter: drop-shadow(0 2px 3px rgba(var(--pr-navbar-brand-shadow-rgb), 0));
+  transition: filter 0.15s ease-in-out;
+}
+
+.navbar-brand .brand-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  line-height: 1.1;
+  transition: transform 0.15s ease-in-out;
+}
+
+.navbar-brand .brand-title {
+  font-weight: 600;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.navbar-brand .byline {
+  margin-top: 0.15rem;
+  font-size: 0.5rem;
+  font-weight: 500;
+  letter-spacing: 0.1rem;
+  opacity: 0.8;
+}
+
+.navbar-brand .brand-logo {
+  width: auto;
+  height: 2.75rem;
+  max-width: 5rem;
+  flex: 0 0 auto;
+  object-fit: contain;
+  will-change: filter;
+  filter: drop-shadow(0 2px 3px rgba(var(--pr-navbar-brand-shadow-rgb), 0));
+  transition: filter 0.15s ease-in-out, transform 0.15s ease-in-out;
+}
+
+/* light primary color: light shadow instead of dark one */
+:host-context(.primary-light) .navbar-brand {
+  --pr-navbar-brand-shadow-rgb: 255, 255, 255;
+}
+
+/* Logo parts in the colors of the header bar */
+:host ::deep .navbar-official-logo .leaf {
+  fill: color-mix(in srgb, var(--pr-primary-text-contrast) 85%, var(--bs-primary)) !important;
+}
+
+:host ::deep .navbar-official-logo .text,
+:host ::deep .navbar-official-logo .paper {
+  fill: var(--pr-primary-text-contrast) !important;
+}
+
+:host ::deep .navbar-official-logo .corner {
+  fill: var(--pr-primary-darken-15) !important;
+}
+
+:host ::deep .navbar-official-logo .lines {
+  fill: var(--bs-primary) !important;
+}
+
+/* ---------- Header bar: structure and buttons ---------- */
+
+.navbar {
+  min-height: 64px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12), 0 4px 18px rgba(0, 0, 0, 0.08) !important;
+}
+
+.navbar > ul {
+  align-items: center;
+  gap: 0.125rem;
+  padding-right: 0.5rem;
+}
+
+@media (min-width: 768px) {
+  .search-container {
+    flex-basis: 55rem;
+  }
+
+  /* Brand on the left and buttons on the right share the rest evenly */
+  .navbar-brand-container,
+  .navbar > ul {
+    display: flex;
+    flex: 1 1 0;
+  }
+
+  .navbar > ul {
+    justify-content: flex-end;
+  }
+}
+
+/* also applies to the bell button in the notifications component */
+:host ::deep .navbar-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 0.6rem;
+  transition: background-color 0.15s ease-in-out, opacity 0.15s ease-in-out;
+}
+
+:host ::deep .navbar-action:hover,
+:host ::deep .navbar-action:focus-visible {
+  background-color: rgba(0, 0, 0, 0.14);
+}
+
+#userDropdown {
+  padding-left: 0.75rem;
+}
+
+.header-search {
+  width: 100%;
+  max-width: 50rem;
+}
+
+.header-search pngx-global-search {
+  min-width: 0;
+}
+
+/* Upload buttons: semi-transparent on the primary color */
+.header-upload {
+  --bs-btn-bg: rgba(255, 255, 255, .15);
+  --bs-btn-hover-bg: rgba(255, 255, 255, .22);
+  --bs-btn-active-bg: rgba(255, 255, 255, .3);
+  color: var(--pr-primary-text-contrast) !important;
+}
+
+.header-upload + .header-upload {
+  border-left: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+.header-upload:focus {
+  box-shadow: none;
+}
+
+.header-upload:focus-visible {
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.5);
+}
+
+.header-upload-group {
+  border-radius: var(--bs-border-radius-sm);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35), 0 1px 1px rgba(0, 0, 0, 0.2);
+}
+
+/* Phone: grid with menu button | brand | buttons, search below */
+@media screen and (max-width: 575.98px) {
+  .navbar {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    grid-template-areas: "toggler brand actions" "search search search";
+  }
+
+  .navbar-toggler {
+    grid-area: toggler;
+    color: var(--pr-primary-text-contrast);
+    text-align: left;
+  }
+
+  .navbar-brand-container,
+  .navbar-brand {
+    grid-area: brand;
+    min-width: 0;
+    max-width: 100%;
+    justify-self: center;
+    overflow: hidden;
+  }
+
+  .navbar-brand > div {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .navbar-brand-container .byline,
+  .navbar-brand .byline {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .search-container {
+    grid-area: search;
+    width: 100%;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .navbar > ul {
+    grid-area: actions;
+    justify-self: end;
+    flex-wrap: nowrap;
+    gap: 0;
+    padding-right: 0.25rem;
+  }
+
+  :host ::deep .navbar-action {
+    min-width: 2.25rem;
+    padding-right: 0.4rem;
+    padding-left: 0.4rem;
+  }
+
+  #userDropdown {
+    padding-right: 0.35rem;
+    padding-left: 0.45rem;
+  }
+}
+
+/* narrow sidebar: brand only as a symbol */
+@media screen and (min-width: 768px) {
+  .navbar-brand.slim {
+    max-width: 55px;
+  }
+
+  .navbar-brand.slim .brand-logo {
+    width: 1.65rem;
+    max-width: 1.65rem;
+  }
+
+  .navbar-brand.slim .brand-mark-slim {
+    display: block !important;
+  }
+
+  :host ::deep .navbar-brand.slim .navbar-official-logo {
+    display: none;
+  }
+}
+
+/* ---------- User menu ---------- */
+
+:host ::deep .dropdown.show .dropdown-toggle,
+:host ::deep .dropdown-toggle:hover {
+  opacity: 1;
+}
+
+.dropdown-toggle::after {
+  display: none;
+}
+
+.navbar .dropdown-menu {
+  font-size: 0.875rem;
+}
+
+.navbar .dropdown-menu a pngx-bs-icon,
+.navbar .dropdown-menu button pngx-bs-icon {
+  opacity: 0.6;
+}
+
+/* ---------- Version note and drag handle ---------- */
+
+.version-check {
+  animation: pulse 2s ease-in-out 0s 1;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0;
+  }
+  25% {
+    opacity: 100%;
+  }
+  75% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 100%;
+  }
+}
+
+/* Handle for reordering saved views */
+.nav-item > .position-absolute {
+  cursor: move;
+}

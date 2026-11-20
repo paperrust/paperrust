@@ -1,0 +1,15 @@
+/* Monetary amount with currency (InputMonetary.svelte). */
+
+.input-group-text {
+  font-size: inherit;
+}
+
+/* Dimmed fields are displayed normally while editing */
+.text-muted:focus-within {
+  color: var(--bs-body-color) !important;
+}
+
+/* Currency field (three letters) */
+.mw-60 {
+  max-width: 60px;
+}

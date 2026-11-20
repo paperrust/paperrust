@@ -1,0 +1,401 @@
+{
+ "crate": "pl-files",
+ "generated_by": "tests/parity/harness/gen_base_catalog.py (do not edit; add cases.json instead)",
+ "vars": {
+  "doc_id": {
+   "get": "/api/documents/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1,
+    "fields": "id"
+   }
+  },
+  "share_link_slug": {
+   "get": "/api/share_links/",
+   "json": "results.0.slug",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1
+   }
+  }
+ },
+ "cases": [
+  {
+   "id": "files.download",
+   "route": "documents.download",
+   "method": "GET",
+   "path": "/api/documents/${doc_id}/download/",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "files.download.unknown",
+   "route": "documents.download",
+   "method": "GET",
+   "path": "/api/documents/999999999/download/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "files.download.version-unknown",
+   "route": "documents.download",
+   "method": "GET",
+   "path": "/api/documents/${doc_id}/download/",
+   "query": {
+    "version": 999999999
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "files.download.original",
+   "route": "documents.download",
+   "method": "GET",
+   "path": "/api/documents/${doc_id}/download/",
+   "query": {
+    "original": "true"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "files.preview",
+   "route": "documents.preview",
+   "method": "GET",
+   "path": "/api/documents/${doc_id}/preview/",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "files.preview.unknown",
+   "route": "documents.preview",
+   "method": "GET",
+   "path": "/api/documents/999999999/preview/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "files.preview.version-unknown",
+   "route": "documents.preview",
+   "method": "GET",
+   "path": "/api/documents/${doc_id}/preview/",
+   "query": {
+    "version": 999999999
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "files.preview.original",
+   "route": "documents.preview",
+   "method": "GET",
+   "path": "/api/documents/${doc_id}/preview/",
+   "query": {
+    "original": "true"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "files.thumb",
+   "route": "documents.thumb",
+   "method": "GET",
+   "path": "/api/documents/${doc_id}/thumb/",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "files.thumb.unknown",
+   "route": "documents.thumb",
+   "method": "GET",
+   "path": "/api/documents/999999999/thumb/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "files.thumb.version-unknown",
+   "route": "documents.thumb",
+   "method": "GET",
+   "path": "/api/documents/${doc_id}/thumb/",
+   "query": {
+    "version": 999999999
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "files.download.follow-formatting",
+   "route": "documents.download",
+   "method": "GET",
+   "path": "/api/documents/${doc_id}/download/",
+   "query": {
+    "follow_formatting": "true"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "files.download.session",
+   "route": "documents.download",
+   "method": "GET",
+   "path": "/api/documents/${doc_id}/download/",
+   "users": [
+    "admin@session"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "files.share.valid",
+   "route": "share",
+   "method": "GET",
+   "path": "/share/${share_link_slug}",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "files.share.valid-slash",
+   "route": "share",
+   "method": "GET",
+   "path": "/share/${share_link_slug}/",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "files.share.unknown",
+   "route": "share",
+   "method": "GET",
+   "path": "/share/doesnotexist123",
+   "users": [
+    "anon",
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "files.share.traversal",
+   "route": "share",
+   "method": "GET",
+   "path": "/share/..%2F..%2Fetc%2Fpasswd",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "files.logo",
+   "route": "logo",
+   "method": "GET",
+   "path": "/logo/",
+   "users": [
+    "anon",
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "files.logo.unknown",
+   "route": "logo",
+   "method": "GET",
+   "path": "/logo/does-not-exist.png",
+   "users": [
+    "anon",
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "files.logo.traversal",
+   "route": "logo",
+   "method": "GET",
+   "path": "/logo/..%2F..%2Fpaperless.conf",
+   "users": [
+    "anon",
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "files.logo.traversal2",
+   "route": "logo",
+   "method": "GET",
+   "path": "/logo/../../../../etc/passwd",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "files.fetch.doc",
+   "route": "fetch",
+   "method": "GET",
+   "path": "/fetch/doc/${doc_id}",
+   "users": [
+    "admin",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "files.fetch.thumb",
+   "route": "fetch",
+   "method": "GET",
+   "path": "/fetch/thumb/${doc_id}",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "files.fetch.preview",
+   "route": "fetch",
+   "method": "GET",
+   "path": "/fetch/preview/${doc_id}",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "files.bulk_download.get",
+   "route": "bulk_download",
+   "method": "GET",
+   "path": "/api/documents/bulk_download/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "files.bulk_download.archive",
+   "route": "bulk_download",
+   "method": "POST",
+   "path": "/api/documents/bulk_download/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "json": {
+    "documents": [
+     "${doc_id}"
+    ],
+    "content": "archive",
+    "compression": "none"
+   },
+   "compare": "status+headers"
+  },
+  {
+   "id": "files.bulk_download.invalid",
+   "route": "bulk_download",
+   "method": "POST",
+   "path": "/api/documents/bulk_download/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "json": {
+    "documents": [
+     999999999
+    ]
+   }
+  }
+ ]
+}

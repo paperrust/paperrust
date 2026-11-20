@@ -1,0 +1,167 @@
+{
+ "_doc": "pl-server (W22). Format: tests/parity/harness/plharness/rules.py.",
+ "rules": [
+  {
+   "name": "index-loading-text-compiled-catalogs",
+   "reason": "Ladebildschirm-Texte des Angular-Index ({% translate %} in index.html) übersetzt wie im Docker-Image (compilemessages, dieselben Kataloge wie pl-accounts). Die Referenz hat nur .po-Dateien und zeigt Englisch. Manuell geprüft 2026-11-08 (alice/de, admin/de, admin/fr): einziger Unterschied sind diese drei Texte; Header identisch.",
+   "ref": "docs/contract/pl-server.md#known-differences-frontendohne-django",
+   "case": "ui.index.lang-[df][er]@*",
+   "kind": [
+    "body"
+   ],
+   "path": "\\$body"
+  },
+  {
+   "name": "rs-app-redirect-ui-index",
+   "reason": "Index/alte SPA-Adressen leiten seit 2026-11-16 (Testprotokoll D-100) immer per 302 (no-store) auf denselben Pfad unter /rs/app/ um, auch angemeldet; die Angular-Index-Seite (200, csrftoken/messages-Cookie, X-Api-Version) bzw. die Login-Weiterleitung von upstream gibt es nicht mehr.",
+   "ref": "docs/contract/pl-server.md#known-differences-frontend (8. Index leitet immer um)",
+   "case": "ui.index.*",
+   "kind": [
+    "status",
+    "header",
+    "body"
+   ],
+   "path": "\\$status|\\$body|header:(cache-control|content-type|location|set-cookie\\(names\\)|vary|x-api-version|x-version)",
+   "target": "b"
+  },
+  {
+   "name": "rs-app-redirect-server-index",
+   "reason": "Index/alte SPA-Adressen leiten seit 2026-11-16 (Testprotokoll D-100) immer per 302 (no-store) auf denselben Pfad unter /rs/app/ um, auch angemeldet; die Angular-Index-Seite (200, csrftoken/messages-Cookie, X-Api-Version) bzw. die Login-Weiterleitung von upstream gibt es nicht mehr.",
+   "ref": "docs/contract/pl-server.md#known-differences-frontend (8. Index leitet immer um)",
+   "case": "server.index*",
+   "kind": [
+    "status",
+    "header",
+    "body"
+   ],
+   "path": "\\$status|\\$body|header:(cache-control|content-type|location|set-cookie\\(names\\)|vary|x-api-version|x-version)",
+   "target": "b"
+  },
+  {
+   "name": "rs-app-redirect-static",
+   "reason": "Index/alte SPA-Adressen leiten seit 2026-11-16 (Testprotokoll D-100) immer per 302 (no-store) auf denselben Pfad unter /rs/app/ um, auch angemeldet; die Angular-Index-Seite (200, csrftoken/messages-Cookie, X-Api-Version) bzw. die Login-Weiterleitung von upstream gibt es nicht mehr. Betrifft auch nicht vorhandene /static/-Dateien, die upstream über den Catch-all auf die Anmeldung leitet.",
+   "ref": "docs/contract/pl-server.md#known-differences-frontend (8. Index leitet immer um)",
+   "case": "static.files.*",
+   "kind": [
+    "status",
+    "header",
+    "body"
+   ],
+   "path": "\\$status|\\$body|header:(cache-control|content-type|location|set-cookie\\(names\\)|vary|x-api-version|x-version)",
+   "target": "b"
+  },
+  {
+   "name": "unknown-api-json-404-noslash",
+   "reason": "Unbekannte bzw. nicht passende /api/-Pfade (auch ohne abschließenden Schrägstrich, z. B. /api/tags/18) liefern JSON-404 {\"detail\":\"Not found.\"} statt upstreams Catch-all (Login-Weiterleitung bzw. Angular-Index).",
+   "ref": "docs/contract/pl-server.md#known-differences (13. Unbekannte /api/-Pfade)",
+   "case": "*.detail-noslash@*",
+   "kind": [
+    "status",
+    "header",
+    "body-kind"
+   ],
+   "path": "\\$status|\\$body|header:(content-type|location)",
+   "target": "b"
+  },
+  {
+   "name": "unknown-api-json-404-server",
+   "reason": "Unbekannte bzw. nicht passende /api/-Pfade (auch ohne abschließenden Schrägstrich, z. B. /api/tags/18) liefern JSON-404 {\"detail\":\"Not found.\"} statt upstreams Catch-all (Login-Weiterleitung bzw. Angular-Index).",
+   "ref": "docs/contract/pl-server.md#known-differences (13. Unbekannte /api/-Pfade)",
+   "case": "server.unknown-api*",
+   "kind": [
+    "status",
+    "header",
+    "body-kind"
+   ],
+   "path": "\\$status|\\$body|header:(content-type|location)",
+   "target": "b"
+  },
+  {
+   "name": "unknown-api-json-404-trailing-slash",
+   "reason": "Unbekannte bzw. nicht passende /api/-Pfade (auch ohne abschließenden Schrägstrich, z. B. /api/tags/18) liefern JSON-404 {\"detail\":\"Not found.\"} statt upstreams Catch-all (Login-Weiterleitung bzw. Angular-Index).",
+   "ref": "docs/contract/pl-server.md#known-differences (13. Unbekannte /api/-Pfade)",
+   "case": "server.trailing-slash@*",
+   "kind": [
+    "status",
+    "header",
+    "body-kind"
+   ],
+   "path": "\\$status|\\$body|header:(content-type|location)",
+   "target": "b"
+  },
+  {
+   "name": "unknown-api-json-404-ui",
+   "reason": "Unbekannte bzw. nicht passende /api/-Pfade (auch ohne abschließenden Schrägstrich, z. B. /api/tags/18) liefern JSON-404 {\"detail\":\"Not found.\"} statt upstreams Catch-all (Login-Weiterleitung bzw. Angular-Index).",
+   "ref": "docs/contract/pl-server.md#known-differences (13. Unbekannte /api/-Pfade)",
+   "case": "ui.index.anon-api-*",
+   "kind": [
+    "status",
+    "header",
+    "body-kind"
+   ],
+   "path": "\\$status|\\$body|header:(content-type|location)",
+   "target": "b"
+  },
+  {
+   "name": "unknown-api-json-404-logs-traversal",
+   "reason": "Unbekannte bzw. nicht passende /api/-Pfade (auch ohne abschließenden Schrägstrich, z. B. /api/tags/18) liefern JSON-404 {\"detail\":\"Not found.\"} statt upstreams Catch-all (Login-Weiterleitung bzw. Angular-Index). Hier passt der dekodierte Pfad auf die Logs-Route (pk '../../paperless' ergibt 404), deshalb zusätzlich Allow/Vary/X-Api-Version der Route.",
+   "ref": "docs/contract/pl-server.md#known-differences (13. Unbekannte /api/-Pfade)",
+   "case": "logs.retrieve.traversal@*",
+   "kind": [
+    "status",
+    "header",
+    "body-kind"
+   ],
+   "path": "\\$status|\\$body|header:(content-type|location|allow|vary|x-api-version|x-version)",
+   "target": "b"
+  },
+  {
+   "name": "django-admin-not-served",
+   "reason": "Django-Admin (/admin/) ist nicht portiert und wird bewusst nicht bedient: 404 statt Weiterleitung auf /admin/login/.",
+   "ref": "docs/contract/pl-server.md#nicht-bediente-pfade-seit-2026-11-14-immer-vorher-nur-mit-paperrust_django_urloff; docs/STANDALONE-GAPS.md",
+   "case": "server.admin@*",
+   "kind": [
+    "status",
+    "header"
+   ],
+   "path": "\\$status|header:(cache-control|location)",
+   "target": "b"
+  },
+  {
+   "name": "allauth-headless-not-served",
+   "reason": "allauth-headless-API (/api/auth/headless/...) ist nicht portiert (vom Frontend nicht benutzt): JSON-404 statt der headless-Konfiguration.",
+   "ref": "docs/contract/pl-server.md#nicht-bediente-pfade-seit-2026-11-14-immer-vorher-nur-mit-paperrust_django_urloff; docs/STANDALONE-GAPS.md",
+   "case": "server.headless-config@*",
+   "kind": [
+    "status",
+    "header",
+    "missing",
+    "extra"
+   ],
+   "path": "\\$status|header:(cache-control|set-cookie\\(names\\))|\\$\\.(status|data|detail)",
+   "target": "b"
+  },
+  {
+   "name": "accounts-own-pages",
+   "reason": "Eigene Konto-Seiten seit 2026-11-14: keine Vorlage und kein Text mehr aus paperless-ngx/allauth, eigenes Layout (Titel 'Sign in · PaperRust'); Formularfelder und Ziele wie upstream.",
+   "ref": "docs/contract/pl-accounts.md#eigene-konto-seiten-seit-2026-11-14",
+   "case": "server.accounts-login@*",
+   "kind": [
+    "body"
+   ],
+   "path": "\\$body",
+   "target": "b"
+  },
+  {
+   "name": "schema-title-paperrust",
+   "reason": "Schema-Titel ist PaperRust REST API (Branding), daher heißt auch der Dateiname in Content-Disposition so; Inhalt unverändert.",
+   "ref": "docs/contract/pl-cli.md#known-differences (20. Schema-Titel)",
+   "case": "server.schema@*",
+   "kind": [
+    "header"
+   ],
+   "path": "header:content-disposition",
+   "target": "b"
+  }
+ ]
+}

@@ -1,0 +1,22 @@
+{
+  "django": {
+    "status": 400,
+    "body": {
+      "password": [
+        "Not a valid string."
+      ]
+    },
+    "plan": [],
+    "files": {}
+  },
+  "rust": {
+    "status": 400,
+    "body": {
+      "password": [
+        "Not a valid string."
+      ]
+    },
+    "plan": [],
+    "files": {}
+  }
+}

@@ -1,0 +1,389 @@
+{
+ "crate": "pl-objects",
+ "vars": {
+  "doc_id": {
+   "get": "/api/documents/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1,
+    "fields": "id"
+   }
+  }
+ },
+ "cases": [
+  {
+   "id": "w23.storage_paths.test.title",
+   "route": "storage_paths.test",
+   "method": "POST",
+   "path": "/api/storage_paths/test/",
+   "json": {
+    "path": "{{ title }}",
+    "document": "${doc_id}"
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.storage_paths.test.nested",
+   "route": "storage_paths.test",
+   "method": "POST",
+   "path": "/api/storage_paths/test/",
+   "json": {
+    "path": "{{ created_year }}-{{ created_month }}/{{ title }}",
+    "document": "${doc_id}"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.storage_paths.test.correspondent",
+   "route": "storage_paths.test",
+   "method": "POST",
+   "path": "/api/storage_paths/test/",
+   "json": {
+    "path": "{{ correspondent }} {{ document_type }} {{ asn }}",
+    "document": "${doc_id}"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.storage_paths.test.tags",
+   "route": "storage_paths.test",
+   "method": "POST",
+   "path": "/api/storage_paths/test/",
+   "json": {
+    "path": "{{ tag_list }} {{ owner_username }} {{ original_name }}",
+    "document": "${doc_id}"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.storage_paths.test.custom",
+   "route": "storage_paths.test",
+   "method": "POST",
+   "path": "/api/storage_paths/test/",
+   "json": {
+    "path": "{{ custom_fields|length }} {{ added_year }}",
+    "document": "${doc_id}"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.storage_paths.test.syntax",
+   "route": "storage_paths.test",
+   "method": "POST",
+   "path": "/api/storage_paths/test/",
+   "json": {
+    "path": "{{ title",
+    "document": "${doc_id}"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.storage_paths.test.unknownfilter",
+   "route": "storage_paths.test",
+   "method": "POST",
+   "path": "/api/storage_paths/test/",
+   "json": {
+    "path": "{{ title|nosuchfilter }}",
+    "document": "${doc_id}"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.storage_paths.test.abs",
+   "route": "storage_paths.test",
+   "method": "POST",
+   "path": "/api/storage_paths/test/",
+   "json": {
+    "path": "/etc/{{ title }}",
+    "document": "${doc_id}"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.storage_paths.test.dotdot",
+   "route": "storage_paths.test",
+   "method": "POST",
+   "path": "/api/storage_paths/test/",
+   "json": {
+    "path": "../{{ title }}",
+    "document": "${doc_id}"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.storage_paths.test.empty_render",
+   "route": "storage_paths.test",
+   "method": "POST",
+   "path": "/api/storage_paths/test/",
+   "json": {
+    "path": "{{ '' }}",
+    "document": "${doc_id}"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.storage_paths.test.none",
+   "route": "storage_paths.test",
+   "method": "POST",
+   "path": "/api/storage_paths/test/",
+   "json": {
+    "path": "{{ correspondent }}",
+    "document": "${doc_id}"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.storage_paths.test.number",
+   "route": "storage_paths.test",
+   "method": "POST",
+   "path": "/api/storage_paths/test/",
+   "json": {
+    "path": 12345,
+    "document": "${doc_id}"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.storage_paths.test.missing",
+   "route": "storage_paths.test",
+   "method": "POST",
+   "path": "/api/storage_paths/test/",
+   "json": {},
+   "users": [
+    "admin",
+    "user1",
+    "user2"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.storage_paths.test.blank",
+   "route": "storage_paths.test",
+   "method": "POST",
+   "path": "/api/storage_paths/test/",
+   "json": {
+    "path": "  ",
+    "document": ""
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.storage_paths.test.null",
+   "route": "storage_paths.test",
+   "method": "POST",
+   "path": "/api/storage_paths/test/",
+   "json": {
+    "path": null,
+    "document": null
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.storage_paths.test.nodoc",
+   "route": "storage_paths.test",
+   "method": "POST",
+   "path": "/api/storage_paths/test/",
+   "json": {
+    "path": "x",
+    "document": 999999
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.storage_paths.test.strdoc",
+   "route": "storage_paths.test",
+   "method": "POST",
+   "path": "/api/storage_paths/test/",
+   "json": {
+    "path": "x",
+    "document": "abc"
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.storage_paths.test.booldoc",
+   "route": "storage_paths.test",
+   "method": "POST",
+   "path": "/api/storage_paths/test/",
+   "json": {
+    "path": "x",
+    "document": true
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.storage_paths.test.listbody",
+   "route": "storage_paths.test",
+   "method": "POST",
+   "path": "/api/storage_paths/test/",
+   "json": [
+    1,
+    2
+   ],
+   "users": [
+    "admin",
+    "user1",
+    "user2"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.storage_paths.test.other_owner",
+   "route": "storage_paths.test",
+   "method": "POST",
+   "path": "/api/storage_paths/test/",
+   "json": {
+    "path": "{{ title }}",
+    "document": 2
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.storage_paths.test.strpk",
+   "route": "storage_paths.test",
+   "method": "POST",
+   "path": "/api/storage_paths/test/",
+   "json": {
+    "path": "{{ title }}",
+    "document": "3"
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "w23.storage_paths.test.form",
+   "route": "storage_paths.test",
+   "method": "POST",
+   "path": "/api/storage_paths/test/",
+   "form": {
+    "path": "{{ title }}",
+    "document": "1"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "note": "Form → Django (mit Fallback) bzw. 404 ohne Django"
+  }
+ ]
+}

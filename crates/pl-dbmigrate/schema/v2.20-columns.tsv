@@ -1,0 +1,457 @@
+# table	column	ordinal	udt	maxlen	nullable	generated	pk
+account_emailaddress	id	1	int4		0	0	1
+account_emailaddress	email	2	varchar	254	0	0	0
+account_emailaddress	verified	3	bool		0	0	0
+account_emailaddress	primary	4	bool		0	0	0
+account_emailaddress	user_id	5	int4		0	0	0
+account_emailconfirmation	id	1	int4		0	0	1
+account_emailconfirmation	created	2	timestamptz		0	0	0
+account_emailconfirmation	sent	3	timestamptz		1	0	0
+account_emailconfirmation	key	4	varchar	64	0	0	0
+account_emailconfirmation	email_address_id	5	int4		0	0	0
+auditlog_logentry	id	1	int4		0	0	1
+auditlog_logentry	object_pk	2	varchar	255	0	0	0
+auditlog_logentry	object_id	3	int8		1	0	0
+auditlog_logentry	object_repr	4	text		0	0	0
+auditlog_logentry	action	5	int2		0	0	0
+auditlog_logentry	changes	6	jsonb		1	0	0
+auditlog_logentry	timestamp	7	timestamptz		0	0	0
+auditlog_logentry	actor_id	8	int4		1	0	0
+auditlog_logentry	content_type_id	9	int4		0	0	0
+auditlog_logentry	remote_addr	10	inet		1	0	0
+auditlog_logentry	additional_data	11	jsonb		1	0	0
+auditlog_logentry	serialized_data	12	jsonb		1	0	0
+auditlog_logentry	cid	13	varchar	255	1	0	0
+auditlog_logentry	changes_text	14	text		0	0	0
+auditlog_logentry	remote_port	15	int4		1	0	0
+auditlog_logentry	actor_email	16	varchar	254	1	0	0
+auth_group	id	1	int4		0	0	1
+auth_group	name	2	varchar	150	0	0	0
+auth_group_permissions	id	1	int4		0	0	1
+auth_group_permissions	group_id	2	int4		0	0	0
+auth_group_permissions	permission_id	3	int4		0	0	0
+auth_permission	id	1	int4		0	0	1
+auth_permission	name	2	varchar	255	0	0	0
+auth_permission	content_type_id	3	int4		0	0	0
+auth_permission	codename	4	varchar	100	0	0	0
+auth_user	id	1	int4		0	0	1
+auth_user	password	2	varchar	128	0	0	0
+auth_user	last_login	3	timestamptz		1	0	0
+auth_user	is_superuser	4	bool		0	0	0
+auth_user	username	5	varchar	150	0	0	0
+auth_user	first_name	6	varchar	150	0	0	0
+auth_user	last_name	7	varchar	150	0	0	0
+auth_user	email	8	varchar	254	0	0	0
+auth_user	is_staff	9	bool		0	0	0
+auth_user	is_active	10	bool		0	0	0
+auth_user	date_joined	11	timestamptz		0	0	0
+auth_user_groups	id	1	int4		0	0	1
+auth_user_groups	user_id	2	int4		0	0	0
+auth_user_groups	group_id	3	int4		0	0	0
+auth_user_user_permissions	id	1	int4		0	0	1
+auth_user_user_permissions	user_id	2	int4		0	0	0
+auth_user_user_permissions	permission_id	3	int4		0	0	0
+authtoken_token	key	1	varchar	40	0	0	1
+authtoken_token	created	2	timestamptz		0	0	0
+authtoken_token	user_id	3	int4		0	0	0
+django_admin_log	id	1	int4		0	0	1
+django_admin_log	action_time	2	timestamptz		0	0	0
+django_admin_log	object_id	3	text		1	0	0
+django_admin_log	object_repr	4	varchar	200	0	0	0
+django_admin_log	action_flag	5	int2		0	0	0
+django_admin_log	change_message	6	text		0	0	0
+django_admin_log	content_type_id	7	int4		1	0	0
+django_admin_log	user_id	8	int4		0	0	0
+django_content_type	id	1	int4		0	0	1
+django_content_type	app_label	3	varchar	100	0	0	0
+django_content_type	model	4	varchar	100	0	0	0
+django_migrations	id	1	int4		0	0	1
+django_migrations	app	2	varchar	255	0	0	0
+django_migrations	name	3	varchar	255	0	0	0
+django_migrations	applied	4	timestamptz		0	0	0
+django_session	session_key	1	varchar	40	0	0	1
+django_session	session_data	2	text		0	0	0
+django_session	expire_date	3	timestamptz		0	0	0
+documents_correspondent	id	1	int4		0	0	1
+documents_correspondent	name	2	varchar	128	0	0	0
+documents_correspondent	match	4	varchar	256	0	0	0
+documents_correspondent	matching_algorithm	5	int4		0	0	0
+documents_correspondent	is_insensitive	6	bool		0	0	0
+documents_correspondent	owner_id	7	int4		1	0	0
+documents_customfield	id	1	int4		0	0	1
+documents_customfield	created	2	timestamptz		0	0	0
+documents_customfield	name	3	varchar	128	0	0	0
+documents_customfield	data_type	4	varchar	50	0	0	0
+documents_customfield	extra_data	5	jsonb		1	0	0
+documents_customfieldinstance	id	1	int4		0	0	1
+documents_customfieldinstance	created	2	timestamptz		0	0	0
+documents_customfieldinstance	value_text	3	varchar	128	1	0	0
+documents_customfieldinstance	value_bool	4	bool		1	0	0
+documents_customfieldinstance	value_url	5	varchar	200	1	0	0
+documents_customfieldinstance	value_date	6	date		1	0	0
+documents_customfieldinstance	value_int	7	int4		1	0	0
+documents_customfieldinstance	value_float	8	float8		1	0	0
+documents_customfieldinstance	value_monetary	9	varchar	128	1	0	0
+documents_customfieldinstance	document_id	10	int4		0	0	0
+documents_customfieldinstance	field_id	11	int4		0	0	0
+documents_customfieldinstance	value_document_ids	12	jsonb		1	0	0
+documents_customfieldinstance	value_select	13	varchar	16	1	0	0
+documents_customfieldinstance	value_monetary_amount	14	numeric		1	1	0
+documents_customfieldinstance	deleted_at	15	timestamptz		1	0	0
+documents_customfieldinstance	restored_at	16	timestamptz		1	0	0
+documents_customfieldinstance	transaction_id	17	uuid		1	0	0
+documents_customfieldinstance	value_long_text	18	text		1	0	0
+documents_document	id	1	int4		0	0	1
+documents_document	title	3	varchar	128	0	0	0
+documents_document	content	4	text		0	0	0
+documents_document	modified	6	timestamptz		0	0	0
+documents_document	correspondent_id	7	int4		1	0	0
+documents_document	checksum	9	varchar	32	0	0	0
+documents_document	added	10	timestamptz		0	0	0
+documents_document	storage_type	11	varchar	11	0	0	0
+documents_document	filename	12	varchar	1024	1	0	0
+documents_document	archive_serial_number	13	int4		1	0	0
+documents_document	document_type_id	14	int4		1	0	0
+documents_document	mime_type	15	varchar	256	0	0	0
+documents_document	archive_checksum	16	varchar	32	1	0	0
+documents_document	archive_filename	17	varchar	1024	1	0	0
+documents_document	storage_path_id	18	int4		1	0	0
+documents_document	original_filename	19	varchar	1024	1	0	0
+documents_document	owner_id	20	int4		1	0	0
+documents_document	deleted_at	21	timestamptz		1	0	0
+documents_document	restored_at	22	timestamptz		1	0	0
+documents_document	transaction_id	23	uuid		1	0	0
+documents_document	page_count	24	int4		1	0	0
+documents_document	created	25	date		0	0	0
+documents_document_tags	id	1	int4		0	0	1
+documents_document_tags	document_id	2	int4		0	0	0
+documents_document_tags	tag_id	3	int4		0	0	0
+documents_documenttype	id	1	int4		0	0	1
+documents_documenttype	name	2	varchar	128	0	0	0
+documents_documenttype	match	4	varchar	256	0	0	0
+documents_documenttype	matching_algorithm	5	int4		0	0	0
+documents_documenttype	is_insensitive	6	bool		0	0	0
+documents_documenttype	owner_id	7	int4		1	0	0
+documents_note	id	1	int4		0	0	1
+documents_note	note	2	text		0	0	0
+documents_note	created	3	timestamptz		0	0	0
+documents_note	document_id	4	int4		1	0	0
+documents_note	user_id	5	int4		1	0	0
+documents_note	deleted_at	6	timestamptz		1	0	0
+documents_note	restored_at	7	timestamptz		1	0	0
+documents_note	transaction_id	8	uuid		1	0	0
+documents_paperlesstask	id	1	int4		0	0	1
+documents_paperlesstask	task_id	2	varchar	255	0	0	0
+documents_paperlesstask	acknowledged	3	bool		0	0	0
+documents_paperlesstask	date_created	5	timestamptz		1	0	0
+documents_paperlesstask	date_done	6	timestamptz		1	0	0
+documents_paperlesstask	date_started	7	timestamptz		1	0	0
+documents_paperlesstask	result	8	text		1	0	0
+documents_paperlesstask	status	9	varchar	30	0	0	0
+documents_paperlesstask	task_name	10	varchar	255	1	0	0
+documents_paperlesstask	task_file_name	11	varchar	255	1	0	0
+documents_paperlesstask	owner_id	12	int4		1	0	0
+documents_paperlesstask	type	13	varchar	30	0	0	0
+documents_savedview	id	1	int4		0	0	1
+documents_savedview	name	2	varchar	128	0	0	0
+documents_savedview	show_on_dashboard	3	bool		0	0	0
+documents_savedview	show_in_sidebar	4	bool		0	0	0
+documents_savedview	sort_field	5	varchar	128	1	0	0
+documents_savedview	sort_reverse	6	bool		0	0	0
+documents_savedview	owner_id	7	int4		1	0	0
+documents_savedview	display_mode	8	varchar	128	1	0	0
+documents_savedview	page_size	9	int4		1	0	0
+documents_savedview	display_fields	10	jsonb		1	0	0
+documents_savedviewfilterrule	id	1	int4		0	0	1
+documents_savedviewfilterrule	rule_type	2	int4		0	0	0
+documents_savedviewfilterrule	value	3	varchar	255	1	0	0
+documents_savedviewfilterrule	saved_view_id	4	int4		0	0	0
+documents_sharelink	id	1	int4		0	0	1
+documents_sharelink	created	2	timestamptz		0	0	0
+documents_sharelink	expiration	3	timestamptz		1	0	0
+documents_sharelink	slug	4	varchar	50	0	0	0
+documents_sharelink	file_version	5	varchar	50	0	0	0
+documents_sharelink	document_id	6	int4		0	0	0
+documents_sharelink	owner_id	7	int4		1	0	0
+documents_sharelink	deleted_at	8	timestamptz		1	0	0
+documents_sharelink	restored_at	9	timestamptz		1	0	0
+documents_sharelink	transaction_id	10	uuid		1	0	0
+documents_storagepath	id	1	int4		0	0	1
+documents_storagepath	name	2	varchar	128	0	0	0
+documents_storagepath	match	3	varchar	256	0	0	0
+documents_storagepath	matching_algorithm	4	int4		0	0	0
+documents_storagepath	is_insensitive	5	bool		0	0	0
+documents_storagepath	path	6	text		0	0	0
+documents_storagepath	owner_id	7	int4		1	0	0
+documents_tag	id	1	int4		0	0	1
+documents_tag	name	2	varchar	128	0	0	0
+documents_tag	match	5	varchar	256	0	0	0
+documents_tag	matching_algorithm	6	int4		0	0	0
+documents_tag	is_insensitive	7	bool		0	0	0
+documents_tag	is_inbox_tag	8	bool		0	0	0
+documents_tag	color	9	varchar	7	0	0	0
+documents_tag	owner_id	10	int4		1	0	0
+documents_tag	tn_ancestors_count	11	int4		0	0	0
+documents_tag	tn_ancestors_pks	12	text		0	0	0
+documents_tag	tn_children_count	13	int4		0	0	0
+documents_tag	tn_children_pks	14	text		0	0	0
+documents_tag	tn_depth	15	int4		0	0	0
+documents_tag	tn_descendants_count	16	int4		0	0	0
+documents_tag	tn_descendants_pks	17	text		0	0	0
+documents_tag	tn_index	18	int4		0	0	0
+documents_tag	tn_level	19	int4		0	0	0
+documents_tag	tn_order	20	int4		0	0	0
+documents_tag	tn_parent_id	21	int4		1	0	0
+documents_tag	tn_priority	22	int4		0	0	0
+documents_tag	tn_siblings_count	23	int4		0	0	0
+documents_tag	tn_siblings_pks	24	text		0	0	0
+documents_uisettings	id	1	int4		0	0	1
+documents_uisettings	settings	2	jsonb		1	0	0
+documents_uisettings	user_id	3	int4		0	0	0
+documents_workflow	id	1	int4		0	0	1
+documents_workflow	name	2	varchar	256	0	0	0
+documents_workflow	order	3	int4		0	0	0
+documents_workflow	enabled	4	bool		0	0	0
+documents_workflow_actions	id	1	int4		0	0	1
+documents_workflow_actions	workflow_id	2	int4		0	0	0
+documents_workflow_actions	workflowaction_id	3	int4		0	0	0
+documents_workflow_triggers	id	1	int4		0	0	1
+documents_workflow_triggers	workflow_id	2	int4		0	0	0
+documents_workflow_triggers	workflowtrigger_id	3	int4		0	0	0
+documents_workflowaction	id	1	int4		0	0	1
+documents_workflowaction	type	2	int4		0	0	0
+documents_workflowaction	assign_title	3	text		1	0	0
+documents_workflowaction	assign_correspondent_id	4	int4		1	0	0
+documents_workflowaction	assign_document_type_id	5	int4		1	0	0
+documents_workflowaction	assign_owner_id	6	int4		1	0	0
+documents_workflowaction	assign_storage_path_id	7	int4		1	0	0
+documents_workflowaction	remove_all_correspondents	8	bool		0	0	0
+documents_workflowaction	remove_all_custom_fields	9	bool		0	0	0
+documents_workflowaction	remove_all_document_types	10	bool		0	0	0
+documents_workflowaction	remove_all_owners	11	bool		0	0	0
+documents_workflowaction	remove_all_permissions	12	bool		0	0	0
+documents_workflowaction	remove_all_storage_paths	13	bool		0	0	0
+documents_workflowaction	remove_all_tags	14	bool		0	0	0
+documents_workflowaction	email_id	15	int4		1	0	0
+documents_workflowaction	webhook_id	16	int4		1	0	0
+documents_workflowaction	assign_custom_fields_values	17	jsonb		1	0	0
+documents_workflowaction	order	18	int4		0	0	0
+documents_workflowaction_assign_change_groups	id	1	int4		0	0	1
+documents_workflowaction_assign_change_groups	workflowaction_id	2	int4		0	0	0
+documents_workflowaction_assign_change_groups	group_id	3	int4		0	0	0
+documents_workflowaction_assign_change_users	id	1	int4		0	0	1
+documents_workflowaction_assign_change_users	workflowaction_id	2	int4		0	0	0
+documents_workflowaction_assign_change_users	user_id	3	int4		0	0	0
+documents_workflowaction_assign_custom_fields	id	1	int4		0	0	1
+documents_workflowaction_assign_custom_fields	workflowaction_id	2	int4		0	0	0
+documents_workflowaction_assign_custom_fields	customfield_id	3	int4		0	0	0
+documents_workflowaction_assign_tags	id	1	int4		0	0	1
+documents_workflowaction_assign_tags	workflowaction_id	2	int4		0	0	0
+documents_workflowaction_assign_tags	tag_id	3	int4		0	0	0
+documents_workflowaction_assign_view_groups	id	1	int4		0	0	1
+documents_workflowaction_assign_view_groups	workflowaction_id	2	int4		0	0	0
+documents_workflowaction_assign_view_groups	group_id	3	int4		0	0	0
+documents_workflowaction_assign_view_users	id	1	int4		0	0	1
+documents_workflowaction_assign_view_users	workflowaction_id	2	int4		0	0	0
+documents_workflowaction_assign_view_users	user_id	3	int4		0	0	0
+documents_workflowaction_remove_change_groups	id	1	int4		0	0	1
+documents_workflowaction_remove_change_groups	workflowaction_id	2	int4		0	0	0
+documents_workflowaction_remove_change_groups	group_id	3	int4		0	0	0
+documents_workflowaction_remove_change_users	id	1	int4		0	0	1
+documents_workflowaction_remove_change_users	workflowaction_id	2	int4		0	0	0
+documents_workflowaction_remove_change_users	user_id	3	int4		0	0	0
+documents_workflowaction_remove_correspondents	id	1	int4		0	0	1
+documents_workflowaction_remove_correspondents	workflowaction_id	2	int4		0	0	0
+documents_workflowaction_remove_correspondents	correspondent_id	3	int4		0	0	0
+documents_workflowaction_remove_custom_fields	id	1	int4		0	0	1
+documents_workflowaction_remove_custom_fields	workflowaction_id	2	int4		0	0	0
+documents_workflowaction_remove_custom_fields	customfield_id	3	int4		0	0	0
+documents_workflowaction_remove_document_types	id	1	int4		0	0	1
+documents_workflowaction_remove_document_types	workflowaction_id	2	int4		0	0	0
+documents_workflowaction_remove_document_types	documenttype_id	3	int4		0	0	0
+documents_workflowaction_remove_owners	id	1	int4		0	0	1
+documents_workflowaction_remove_owners	workflowaction_id	2	int4		0	0	0
+documents_workflowaction_remove_owners	user_id	3	int4		0	0	0
+documents_workflowaction_remove_storage_paths	id	1	int4		0	0	1
+documents_workflowaction_remove_storage_paths	workflowaction_id	2	int4		0	0	0
+documents_workflowaction_remove_storage_paths	storagepath_id	3	int4		0	0	0
+documents_workflowaction_remove_tags	id	1	int4		0	0	1
+documents_workflowaction_remove_tags	workflowaction_id	2	int4		0	0	0
+documents_workflowaction_remove_tags	tag_id	3	int4		0	0	0
+documents_workflowaction_remove_view_groups	id	1	int4		0	0	1
+documents_workflowaction_remove_view_groups	workflowaction_id	2	int4		0	0	0
+documents_workflowaction_remove_view_groups	group_id	3	int4		0	0	0
+documents_workflowaction_remove_view_users	id	1	int4		0	0	1
+documents_workflowaction_remove_view_users	workflowaction_id	2	int4		0	0	0
+documents_workflowaction_remove_view_users	user_id	3	int4		0	0	0
+documents_workflowactionemail	id	1	int4		0	0	1
+documents_workflowactionemail	subject	2	varchar	256	0	0	0
+documents_workflowactionemail	body	3	text		0	0	0
+documents_workflowactionemail	to	4	text		0	0	0
+documents_workflowactionemail	include_document	5	bool		0	0	0
+documents_workflowactionwebhook	id	1	int4		0	0	1
+documents_workflowactionwebhook	url	2	varchar	256	0	0	0
+documents_workflowactionwebhook	use_params	3	bool		0	0	0
+documents_workflowactionwebhook	params	4	jsonb		1	0	0
+documents_workflowactionwebhook	body	5	text		1	0	0
+documents_workflowactionwebhook	headers	6	jsonb		1	0	0
+documents_workflowactionwebhook	include_document	7	bool		0	0	0
+documents_workflowactionwebhook	as_json	8	bool		0	0	0
+documents_workflowrun	id	1	int4		0	0	1
+documents_workflowrun	type	2	int4		1	0	0
+documents_workflowrun	run_at	3	timestamptz		0	0	0
+documents_workflowrun	document_id	4	int4		1	0	0
+documents_workflowrun	workflow_id	5	int4		0	0	0
+documents_workflowrun	deleted_at	6	timestamptz		1	0	0
+documents_workflowrun	restored_at	7	timestamptz		1	0	0
+documents_workflowrun	transaction_id	8	uuid		1	0	0
+documents_workflowtrigger	id	1	int4		0	0	1
+documents_workflowtrigger	type	2	int4		0	0	0
+documents_workflowtrigger	sources	3	varchar	7	0	0	0
+documents_workflowtrigger	filter_path	4	varchar	256	1	0	0
+documents_workflowtrigger	filter_filename	5	varchar	256	1	0	0
+documents_workflowtrigger	filter_mailrule_id	6	int4		1	0	0
+documents_workflowtrigger	matching_algorithm	7	int4		0	0	0
+documents_workflowtrigger	match	8	varchar	256	0	0	0
+documents_workflowtrigger	is_insensitive	9	bool		0	0	0
+documents_workflowtrigger	filter_has_document_type_id	10	int4		1	0	0
+documents_workflowtrigger	filter_has_correspondent_id	11	int4		1	0	0
+documents_workflowtrigger	schedule_date_custom_field_id	12	int4		1	0	0
+documents_workflowtrigger	schedule_date_field	13	varchar	20	0	0	0
+documents_workflowtrigger	schedule_is_recurring	14	bool		0	0	0
+documents_workflowtrigger	schedule_offset_days	15	int4		0	0	0
+documents_workflowtrigger	schedule_recurring_interval_days	16	int4		0	0	0
+documents_workflowtrigger	filter_has_storage_path_id	17	int4		1	0	0
+documents_workflowtrigger	filter_custom_field_query	18	text		1	0	0
+documents_workflowtrigger_filter_has_all_tags	id	1	int4		0	0	1
+documents_workflowtrigger_filter_has_all_tags	workflowtrigger_id	2	int4		0	0	0
+documents_workflowtrigger_filter_has_all_tags	tag_id	3	int4		0	0	0
+documents_workflowtrigger_filter_has_not_correspondents	id	1	int4		0	0	1
+documents_workflowtrigger_filter_has_not_correspondents	workflowtrigger_id	2	int4		0	0	0
+documents_workflowtrigger_filter_has_not_correspondents	correspondent_id	3	int4		0	0	0
+documents_workflowtrigger_filter_has_not_document_types	id	1	int4		0	0	1
+documents_workflowtrigger_filter_has_not_document_types	workflowtrigger_id	2	int4		0	0	0
+documents_workflowtrigger_filter_has_not_document_types	documenttype_id	3	int4		0	0	0
+documents_workflowtrigger_filter_has_not_storage_paths	id	1	int4		0	0	1
+documents_workflowtrigger_filter_has_not_storage_paths	workflowtrigger_id	2	int4		0	0	0
+documents_workflowtrigger_filter_has_not_storage_paths	storagepath_id	3	int4		0	0	0
+documents_workflowtrigger_filter_has_not_tags	id	1	int4		0	0	1
+documents_workflowtrigger_filter_has_not_tags	workflowtrigger_id	2	int4		0	0	0
+documents_workflowtrigger_filter_has_not_tags	tag_id	3	int4		0	0	0
+documents_workflowtrigger_filter_has_tags	id	1	int4		0	0	1
+documents_workflowtrigger_filter_has_tags	workflowtrigger_id	2	int4		0	0	0
+documents_workflowtrigger_filter_has_tags	tag_id	3	int4		0	0	0
+guardian_groupobjectpermission	id	1	int4		0	0	1
+guardian_groupobjectpermission	object_pk	2	varchar	255	0	0	0
+guardian_groupobjectpermission	content_type_id	3	int4		0	0	0
+guardian_groupobjectpermission	group_id	4	int4		0	0	0
+guardian_groupobjectpermission	permission_id	5	int4		0	0	0
+guardian_userobjectpermission	id	1	int4		0	0	1
+guardian_userobjectpermission	object_pk	2	varchar	255	0	0	0
+guardian_userobjectpermission	content_type_id	3	int4		0	0	0
+guardian_userobjectpermission	permission_id	4	int4		0	0	0
+guardian_userobjectpermission	user_id	5	int4		0	0	0
+mfa_authenticator	id	1	int8		0	0	1
+mfa_authenticator	type	2	varchar	20	0	0	0
+mfa_authenticator	data	3	jsonb		0	0	0
+mfa_authenticator	user_id	4	int4		0	0	0
+mfa_authenticator	created_at	5	timestamptz		0	0	0
+mfa_authenticator	last_used_at	6	timestamptz		1	0	0
+paperless_applicationconfiguration	id	1	int4		0	0	1
+paperless_applicationconfiguration	output_type	2	varchar	8	1	0	0
+paperless_applicationconfiguration	pages	3	int4		1	0	0
+paperless_applicationconfiguration	language	4	varchar	32	1	0	0
+paperless_applicationconfiguration	mode	5	varchar	16	1	0	0
+paperless_applicationconfiguration	skip_archive_file	6	varchar	16	1	0	0
+paperless_applicationconfiguration	image_dpi	7	int4		1	0	0
+paperless_applicationconfiguration	unpaper_clean	8	varchar	16	1	0	0
+paperless_applicationconfiguration	deskew	9	bool		1	0	0
+paperless_applicationconfiguration	rotate_pages	10	bool		1	0	0
+paperless_applicationconfiguration	rotate_pages_threshold	11	float8		1	0	0
+paperless_applicationconfiguration	max_image_pixels	12	float8		1	0	0
+paperless_applicationconfiguration	color_conversion_strategy	13	varchar	32	1	0	0
+paperless_applicationconfiguration	user_args	14	jsonb		1	0	0
+paperless_applicationconfiguration	app_logo	15	varchar	100	1	0	0
+paperless_applicationconfiguration	app_title	16	varchar	48	1	0	0
+paperless_applicationconfiguration	barcode_asn_prefix	17	varchar	32	1	0	0
+paperless_applicationconfiguration	barcode_dpi	18	int4		1	0	0
+paperless_applicationconfiguration	barcode_enable_asn	19	bool		1	0	0
+paperless_applicationconfiguration	barcode_enable_tag	20	bool		1	0	0
+paperless_applicationconfiguration	barcode_enable_tiff_support	21	bool		1	0	0
+paperless_applicationconfiguration	barcode_max_pages	22	int4		1	0	0
+paperless_applicationconfiguration	barcode_retain_split_pages	23	bool		1	0	0
+paperless_applicationconfiguration	barcode_string	24	varchar	32	1	0	0
+paperless_applicationconfiguration	barcode_tag_mapping	25	jsonb		1	0	0
+paperless_applicationconfiguration	barcode_upscale	26	float8		1	0	0
+paperless_applicationconfiguration	barcodes_enabled	27	bool		1	0	0
+paperless_mail_mailaccount	id	1	int4		0	0	1
+paperless_mail_mailaccount	name	2	varchar	256	0	0	0
+paperless_mail_mailaccount	imap_server	3	varchar	256	0	0	0
+paperless_mail_mailaccount	imap_port	4	int4		1	0	0
+paperless_mail_mailaccount	imap_security	5	int4		0	0	0
+paperless_mail_mailaccount	username	6	varchar	256	0	0	0
+paperless_mail_mailaccount	password	7	text		0	0	0
+paperless_mail_mailaccount	character_set	8	varchar	256	0	0	0
+paperless_mail_mailaccount	owner_id	9	int4		1	0	0
+paperless_mail_mailaccount	is_token	10	bool		0	0	0
+paperless_mail_mailaccount	expiration	11	timestamptz		1	0	0
+paperless_mail_mailaccount	account_type	12	int4		0	0	0
+paperless_mail_mailaccount	refresh_token	13	text		1	0	0
+paperless_mail_mailrule	id	1	int4		0	0	1
+paperless_mail_mailrule	name	2	varchar	256	0	0	0
+paperless_mail_mailrule	folder	3	varchar	256	0	0	0
+paperless_mail_mailrule	filter_from	4	varchar	256	1	0	0
+paperless_mail_mailrule	filter_subject	5	varchar	256	1	0	0
+paperless_mail_mailrule	filter_body	6	varchar	256	1	0	0
+paperless_mail_mailrule	maximum_age	7	int4		0	0	0
+paperless_mail_mailrule	action	8	int4		0	0	0
+paperless_mail_mailrule	action_parameter	9	varchar	256	1	0	0
+paperless_mail_mailrule	assign_title_from	10	int4		0	0	0
+paperless_mail_mailrule	assign_correspondent_from	11	int4		0	0	0
+paperless_mail_mailrule	account_id	12	int4		0	0	0
+paperless_mail_mailrule	assign_correspondent_id	13	int4		1	0	0
+paperless_mail_mailrule	assign_document_type_id	14	int4		1	0	0
+paperless_mail_mailrule	order	16	int4		0	0	0
+paperless_mail_mailrule	attachment_type	17	int4		0	0	0
+paperless_mail_mailrule	filter_attachment_filename_include	18	varchar	256	1	0	0
+paperless_mail_mailrule	consumption_scope	19	int4		0	0	0
+paperless_mail_mailrule	owner_id	20	int4		1	0	0
+paperless_mail_mailrule	filter_to	21	varchar	256	1	0	0
+paperless_mail_mailrule	assign_owner_from_rule	22	bool		0	0	0
+paperless_mail_mailrule	filter_attachment_filename_exclude	23	varchar	256	1	0	0
+paperless_mail_mailrule	enabled	24	bool		0	0	0
+paperless_mail_mailrule	pdf_layout	25	int4		0	0	0
+paperless_mail_mailrule_assign_tags	id	1	int4		0	0	1
+paperless_mail_mailrule_assign_tags	mailrule_id	2	int4		0	0	0
+paperless_mail_mailrule_assign_tags	tag_id	3	int4		0	0	0
+paperless_mail_processedmail	id	1	int4		0	0	1
+paperless_mail_processedmail	folder	2	varchar	256	0	0	0
+paperless_mail_processedmail	uid	3	varchar	256	0	0	0
+paperless_mail_processedmail	subject	4	varchar	256	0	0	0
+paperless_mail_processedmail	received	5	timestamptz		0	0	0
+paperless_mail_processedmail	processed	6	timestamptz		0	0	0
+paperless_mail_processedmail	status	7	varchar	256	0	0	0
+paperless_mail_processedmail	error	8	text		1	0	0
+paperless_mail_processedmail	owner_id	9	int4		1	0	0
+paperless_mail_processedmail	rule_id	10	int4		0	0	0
+socialaccount_socialaccount	id	1	int4		0	0	1
+socialaccount_socialaccount	provider	2	varchar	200	0	0	0
+socialaccount_socialaccount	uid	3	varchar	191	0	0	0
+socialaccount_socialaccount	last_login	4	timestamptz		0	0	0
+socialaccount_socialaccount	date_joined	5	timestamptz		0	0	0
+socialaccount_socialaccount	extra_data	6	jsonb		0	0	0
+socialaccount_socialaccount	user_id	7	int4		0	0	0
+socialaccount_socialapp	id	1	int4		0	0	1
+socialaccount_socialapp	provider	2	varchar	30	0	0	0
+socialaccount_socialapp	name	3	varchar	40	0	0	0
+socialaccount_socialapp	client_id	4	varchar	191	0	0	0
+socialaccount_socialapp	secret	5	varchar	191	0	0	0
+socialaccount_socialapp	key	6	varchar	191	0	0	0
+socialaccount_socialapp	provider_id	7	varchar	200	0	0	0
+socialaccount_socialapp	settings	8	jsonb		0	0	0
+socialaccount_socialtoken	id	1	int4		0	0	1
+socialaccount_socialtoken	token	2	text		0	0	0
+socialaccount_socialtoken	token_secret	3	text		0	0	0
+socialaccount_socialtoken	expires_at	4	timestamptz		1	0	0
+socialaccount_socialtoken	account_id	5	int4		0	0	0
+socialaccount_socialtoken	app_id	6	int4		1	0	0

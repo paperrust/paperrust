@@ -1,0 +1,67 @@
+[package]
+name = "pl-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+pl-core.workspace = true
+pl-authz.workspace = true
+pl-files.workspace = true
+pl-templating.workspace = true
+pl-matching.workspace = true
+pl-indexer.workspace = true
+pl-classifier.workspace = true
+pl-queue.workspace = true
+pl-sync.workspace = true
+pl-store.workspace = true
+pl-settings.workspace = true
+# Migration paperrust_asn_print (ASN labels); path instead of workspace entry (CORE-REQUEST)
+pl-labels = { path = "../pl-labels" }
+# Migration + timeline_backfill (PaperRust UI); path instead of workspace entry (CORE-REQUEST)
+pl-timeline = { path = "../pl-timeline" }
+# Migration paperrust_scanner/paperrust_scan_device (scanner integration); path instead of workspace entry (CORE-REQUEST)
+pl-scan = { path = "../pl-scan" }
+# Ransomware protection: migration, `manage guard`, `manage backup` (path instead of workspace entry, CORE-REQUEST)
+pl-guard = { path = "../pl-guard" }
+pl-consumer.workspace = true
+# Tag migration (adjacency list) + treenode projection for the v3.4.2 export
+pl-objects.workspace = true
+pl-ocr.workspace = true
+axum.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+chrono.workspace = true
+chrono-tz.workspace = true
+uuid.workspace = true
+tracing.workspace = true
+sha2.workspace = true
+hmac.workspace = true
+pbkdf2.workspace = true
+base64.workspace = true
+rand.workspace = true
+flate2.workspace = true
+# Fernet (AES-128-CBC) for --passphrase; version is already in Cargo.lock (CORE-REQUEST).
+aes.workspace = true
+
+# Trash cascade for `document_fuzzy_match --delete` (like bulk_edit/worker)
+pl-documents-write.workspace = true
+# `document_llmindex`, AI index after `document_archiver` (feature `ai`, default)
+pl-ai = { workspace = true, optional = true }
+# B6: ZIP compression bzip2/lzma/zstd like CPython zipfile.
+bzip2.workspace = true
+xz2.workspace = true
+zstd.workspace = true
+
+[features]
+default = ["ai"]
+ai = ["dep:pl-ai"]
+
+[dev-dependencies]
+tempfile.workspace = true
+sea-query.workspace = true
+sea-query-binder.workspace = true
+pl-fields-views.workspace = true

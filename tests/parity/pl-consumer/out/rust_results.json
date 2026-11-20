@@ -1,0 +1,191 @@
+{
+  "media_root": "<tmp>\\pl_consumer_parity_6464\\media",
+  "cases": {
+    "plain_text": {
+      "state": "SUCCESS",
+      "result": {
+        "document_id": 205
+      },
+      "new_ids": [
+        205
+      ],
+      "file_left": false
+    },
+    "overrides": {
+      "state": "SUCCESS",
+      "result": {
+        "document_id": 206
+      },
+      "new_ids": [
+        206
+      ],
+      "file_left": false
+    },
+    "match_any_storage_path": {
+      "state": "SUCCESS",
+      "result": {
+        "document_id": 207
+      },
+      "new_ids": [
+        207
+      ],
+      "file_left": false
+    },
+    "match_regex": {
+      "state": "SUCCESS",
+      "result": {
+        "document_id": 208
+      },
+      "new_ids": [
+        208
+      ],
+      "file_left": false
+    },
+    "workflow_added": {
+      "state": "SUCCESS",
+      "result": {
+        "document_id": 209
+      },
+      "new_ids": [
+        209
+      ],
+      "file_left": false
+    },
+    "owner_permissions": {
+      "state": "SUCCESS",
+      "result": {
+        "document_id": 210
+      },
+      "new_ids": [
+        210
+      ],
+      "file_left": false
+    },
+    "duplicate_consumed": {
+      "state": "SUCCESS",
+      "result": {
+        "document_id": 211
+      },
+      "new_ids": [
+        211
+      ],
+      "file_left": false
+    },
+    "duplicate_deleted": {
+      "state": "SUCCESS",
+      "result": {
+        "duplicate_of": 205,
+        "duplicate_in_trash": false
+      },
+      "new_ids": [],
+      "file_left": false
+    },
+    "asn_exists": {
+      "state": "FAILURE",
+      "error": "asn.txt: Not consuming asn.txt: Given ASN 987654 already exists!",
+      "error_type": "ConsumerError",
+      "new_ids": [],
+      "file_left": true
+    },
+    "filename_format": {
+      "state": "SUCCESS",
+      "result": {
+        "document_id": 212
+      },
+      "new_ids": [
+        212
+      ],
+      "file_left": false
+    },
+    "filename_collision": {
+      "state": "SUCCESS",
+      "result": {
+        "document_id": 213
+      },
+      "new_ids": [
+        213
+      ],
+      "file_left": false
+    },
+    "pdf_ocr_off": {
+      "state": "SUCCESS",
+      "result": {
+        "document_id": 214
+      },
+      "new_ids": [
+        214
+      ],
+      "file_left": false
+    },
+    "barcode_split_patcht": {
+      "state": "SUCCESS",
+      "result": {
+        "reason": "Barcode splitting complete!"
+      },
+      "children": [
+        {
+          "state": "SUCCESS",
+          "result": {
+            "document_id": 215
+          }
+        },
+        {
+          "state": "SUCCESS",
+          "result": {
+            "document_id": 216
+          }
+        }
+      ],
+      "new_ids": [
+        215,
+        216
+      ],
+      "file_left": false
+    },
+    "barcode_asn": {
+      "state": "SUCCESS",
+      "result": {
+        "document_id": 217
+      },
+      "new_ids": [
+        217
+      ],
+      "file_left": false
+    },
+    "barcode_tiff_split": {
+      "state": "SUCCESS",
+      "result": {
+        "reason": "Barcode splitting complete!"
+      },
+      "children": [
+        {
+          "state": "SUCCESS",
+          "result": {
+            "document_id": 218
+          }
+        },
+        {
+          "state": "SUCCESS",
+          "result": {
+            "document_id": 219
+          }
+        }
+      ],
+      "new_ids": [
+        218,
+        219
+      ],
+      "file_left": false
+    },
+    "barcode_tags_app_config": {
+      "state": "SUCCESS",
+      "result": {
+        "document_id": 220
+      },
+      "new_ids": [
+        220
+      ],
+      "file_left": false
+    }
+  }
+}

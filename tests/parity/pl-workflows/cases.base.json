@@ -1,0 +1,872 @@
+{
+ "crate": "pl-workflows",
+ "generated_by": "tests/parity/harness/gen_base_catalog.py (do not edit; add cases.json instead)",
+ "vars": {
+  "workflow_action_id": {
+   "get": "/api/workflow_actions/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1
+   }
+  },
+  "workflow_id": {
+   "get": "/api/workflows/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1
+   }
+  },
+  "workflow_trigger_id": {
+   "get": "/api/workflow_triggers/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1
+   }
+  }
+ },
+ "cases": [
+  {
+   "id": "workflows.list.default",
+   "route": "workflows.list",
+   "method": "GET",
+   "path": "/api/workflows/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "workflows.list.page1",
+   "route": "workflows.list",
+   "method": "GET",
+   "path": "/api/workflows/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "workflows.list.listall",
+   "route": "workflows.list",
+   "method": "GET",
+   "path": "/api/workflows/",
+   "query": {
+    "page": 1,
+    "page_size": 100000
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "workflows.list.page2",
+   "route": "workflows.list",
+   "method": "GET",
+   "path": "/api/workflows/",
+   "query": {
+    "page": 2,
+    "page_size": 1
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflows.list.page-too-high",
+   "route": "workflows.list",
+   "method": "GET",
+   "path": "/api/workflows/",
+   "query": {
+    "page": 99999,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflows.list.page-invalid",
+   "route": "workflows.list",
+   "method": "GET",
+   "path": "/api/workflows/",
+   "query": {
+    "page": "abc"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflows.list.page-zero",
+   "route": "workflows.list",
+   "method": "GET",
+   "path": "/api/workflows/",
+   "query": {
+    "page": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflows.list.page-size-invalid",
+   "route": "workflows.list",
+   "method": "GET",
+   "path": "/api/workflows/",
+   "query": {
+    "page_size": "x"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflows.list.page-size-zero",
+   "route": "workflows.list",
+   "method": "GET",
+   "path": "/api/workflows/",
+   "query": {
+    "page_size": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflows.list.page-size-huge",
+   "route": "workflows.list",
+   "method": "GET",
+   "path": "/api/workflows/",
+   "query": {
+    "page_size": 10000000
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflows.list.ordering-unknown",
+   "route": "workflows.list",
+   "method": "GET",
+   "path": "/api/workflows/",
+   "query": {
+    "ordering": "does_not_exist"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflows.list.auth",
+   "route": "workflows.list",
+   "method": "GET",
+   "path": "/api/workflows/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "anon",
+    "badtoken",
+    "inactive",
+    "admin@session",
+    "admin@basic"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflows.list.apiver",
+   "route": "workflows.list",
+   "method": "GET",
+   "path": "/api/workflows/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "none",
+    "99",
+    "abc"
+   ]
+  },
+  {
+   "id": "workflows.detail",
+   "route": "workflows.retrieve",
+   "method": "GET",
+   "path": "/api/workflows/${workflow_id}/",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "workflows.detail-unknown",
+   "route": "workflows.retrieve",
+   "method": "GET",
+   "path": "/api/workflows/999999999/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflows.detail-nonint",
+   "route": "workflows.retrieve",
+   "method": "GET",
+   "path": "/api/workflows/abc/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflows.detail-anon",
+   "route": "workflows.retrieve",
+   "method": "GET",
+   "path": "/api/workflows/${workflow_id}/",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflows.detail-noslash",
+   "route": "workflows.retrieve",
+   "method": "GET",
+   "path": "/api/workflows/${workflow_id}",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "follow": false
+  },
+  {
+   "id": "workflow_triggers.list.default",
+   "route": "workflow_triggers.list",
+   "method": "GET",
+   "path": "/api/workflow_triggers/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "workflow_triggers.list.page1",
+   "route": "workflow_triggers.list",
+   "method": "GET",
+   "path": "/api/workflow_triggers/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "workflow_triggers.list.listall",
+   "route": "workflow_triggers.list",
+   "method": "GET",
+   "path": "/api/workflow_triggers/",
+   "query": {
+    "page": 1,
+    "page_size": 100000
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "workflow_triggers.list.page2",
+   "route": "workflow_triggers.list",
+   "method": "GET",
+   "path": "/api/workflow_triggers/",
+   "query": {
+    "page": 2,
+    "page_size": 1
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflow_triggers.list.page-too-high",
+   "route": "workflow_triggers.list",
+   "method": "GET",
+   "path": "/api/workflow_triggers/",
+   "query": {
+    "page": 99999,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflow_triggers.list.page-invalid",
+   "route": "workflow_triggers.list",
+   "method": "GET",
+   "path": "/api/workflow_triggers/",
+   "query": {
+    "page": "abc"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflow_triggers.list.page-zero",
+   "route": "workflow_triggers.list",
+   "method": "GET",
+   "path": "/api/workflow_triggers/",
+   "query": {
+    "page": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflow_triggers.list.page-size-invalid",
+   "route": "workflow_triggers.list",
+   "method": "GET",
+   "path": "/api/workflow_triggers/",
+   "query": {
+    "page_size": "x"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflow_triggers.list.page-size-zero",
+   "route": "workflow_triggers.list",
+   "method": "GET",
+   "path": "/api/workflow_triggers/",
+   "query": {
+    "page_size": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflow_triggers.list.page-size-huge",
+   "route": "workflow_triggers.list",
+   "method": "GET",
+   "path": "/api/workflow_triggers/",
+   "query": {
+    "page_size": 10000000
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflow_triggers.list.ordering-unknown",
+   "route": "workflow_triggers.list",
+   "method": "GET",
+   "path": "/api/workflow_triggers/",
+   "query": {
+    "ordering": "does_not_exist"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflow_triggers.list.auth",
+   "route": "workflow_triggers.list",
+   "method": "GET",
+   "path": "/api/workflow_triggers/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "anon",
+    "badtoken",
+    "inactive",
+    "admin@session",
+    "admin@basic"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflow_triggers.list.apiver",
+   "route": "workflow_triggers.list",
+   "method": "GET",
+   "path": "/api/workflow_triggers/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "none",
+    "99",
+    "abc"
+   ]
+  },
+  {
+   "id": "workflow_triggers.detail",
+   "route": "workflow_triggers.retrieve",
+   "method": "GET",
+   "path": "/api/workflow_triggers/${workflow_trigger_id}/",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "workflow_triggers.detail-unknown",
+   "route": "workflow_triggers.retrieve",
+   "method": "GET",
+   "path": "/api/workflow_triggers/999999999/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflow_triggers.detail-nonint",
+   "route": "workflow_triggers.retrieve",
+   "method": "GET",
+   "path": "/api/workflow_triggers/abc/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflow_triggers.detail-anon",
+   "route": "workflow_triggers.retrieve",
+   "method": "GET",
+   "path": "/api/workflow_triggers/${workflow_trigger_id}/",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflow_triggers.detail-noslash",
+   "route": "workflow_triggers.retrieve",
+   "method": "GET",
+   "path": "/api/workflow_triggers/${workflow_trigger_id}",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "follow": false
+  },
+  {
+   "id": "workflow_actions.list.default",
+   "route": "workflow_actions.list",
+   "method": "GET",
+   "path": "/api/workflow_actions/",
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "workflow_actions.list.page1",
+   "route": "workflow_actions.list",
+   "method": "GET",
+   "path": "/api/workflow_actions/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin",
+    "user1",
+    "noperm",
+    "anon"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "workflow_actions.list.listall",
+   "route": "workflow_actions.list",
+   "method": "GET",
+   "path": "/api/workflow_actions/",
+   "query": {
+    "page": 1,
+    "page_size": 100000
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "workflow_actions.list.page2",
+   "route": "workflow_actions.list",
+   "method": "GET",
+   "path": "/api/workflow_actions/",
+   "query": {
+    "page": 2,
+    "page_size": 1
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflow_actions.list.page-too-high",
+   "route": "workflow_actions.list",
+   "method": "GET",
+   "path": "/api/workflow_actions/",
+   "query": {
+    "page": 99999,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflow_actions.list.page-invalid",
+   "route": "workflow_actions.list",
+   "method": "GET",
+   "path": "/api/workflow_actions/",
+   "query": {
+    "page": "abc"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflow_actions.list.page-zero",
+   "route": "workflow_actions.list",
+   "method": "GET",
+   "path": "/api/workflow_actions/",
+   "query": {
+    "page": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflow_actions.list.page-size-invalid",
+   "route": "workflow_actions.list",
+   "method": "GET",
+   "path": "/api/workflow_actions/",
+   "query": {
+    "page_size": "x"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflow_actions.list.page-size-zero",
+   "route": "workflow_actions.list",
+   "method": "GET",
+   "path": "/api/workflow_actions/",
+   "query": {
+    "page_size": 0
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflow_actions.list.page-size-huge",
+   "route": "workflow_actions.list",
+   "method": "GET",
+   "path": "/api/workflow_actions/",
+   "query": {
+    "page_size": 10000000
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflow_actions.list.ordering-unknown",
+   "route": "workflow_actions.list",
+   "method": "GET",
+   "path": "/api/workflow_actions/",
+   "query": {
+    "ordering": "does_not_exist"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflow_actions.list.auth",
+   "route": "workflow_actions.list",
+   "method": "GET",
+   "path": "/api/workflow_actions/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "anon",
+    "badtoken",
+    "inactive",
+    "admin@session",
+    "admin@basic"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflow_actions.list.apiver",
+   "route": "workflow_actions.list",
+   "method": "GET",
+   "path": "/api/workflow_actions/",
+   "query": {
+    "page": 1,
+    "page_size": 25
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "none",
+    "99",
+    "abc"
+   ]
+  },
+  {
+   "id": "workflow_actions.detail",
+   "route": "workflow_actions.retrieve",
+   "method": "GET",
+   "path": "/api/workflow_actions/${workflow_action_id}/",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "workflow_actions.detail-unknown",
+   "route": "workflow_actions.retrieve",
+   "method": "GET",
+   "path": "/api/workflow_actions/999999999/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflow_actions.detail-nonint",
+   "route": "workflow_actions.retrieve",
+   "method": "GET",
+   "path": "/api/workflow_actions/abc/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflow_actions.detail-anon",
+   "route": "workflow_actions.retrieve",
+   "method": "GET",
+   "path": "/api/workflow_actions/${workflow_action_id}/",
+   "users": [
+    "anon"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "workflow_actions.detail-noslash",
+   "route": "workflow_actions.retrieve",
+   "method": "GET",
+   "path": "/api/workflow_actions/${workflow_action_id}",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ],
+   "follow": false
+  }
+ ]
+}

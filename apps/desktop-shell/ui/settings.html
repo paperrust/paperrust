@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PaperRust – Einstellungen</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="settings">
+  <main>
+    <h1>Einstellungen</h1>
+
+    <section class="card" aria-labelledby="h-mode">
+      <h2 id="h-mode">Betriebsart</h2>
+      <fieldset class="choices" id="mode-choice">
+        <legend class="sr-only">Betriebsart</legend>
+        <label class="choice"><input type="radio" name="mode" value="local">
+          <span><strong>Auf diesem Computer</strong><small>Datenbank, Dokumente und Texterkennung laufen lokal.</small></span></label>
+        <label class="choice"><input type="radio" name="mode" value="remote">
+          <span><strong>Mit einem Server verbinden</strong><small>Oberfläche vom Server; auf diesem Computer läuft keine Datenbank.</small></span></label>
+      </fieldset>
+      <p class="hint" id="local-data"></p>
+      <div class="buttons">
+        <button type="button" id="apply-mode" disabled>Übernehmen und neu starten</button>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="h-profiles">
+      <h2 id="h-profiles">Server-Profile</h2>
+      <p class="hint" id="no-profiles" hidden>Noch kein Server eingerichtet.</p>
+      <ul id="profiles" class="profiles"></ul>
+      <div class="buttons">
+        <button type="button" id="add-profile" class="secondary">Server hinzufügen …</button>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="h-ui">
+      <h2 id="h-ui">Oberfläche (Fern-Modus)</h2>
+      <fieldset class="choices">
+        <legend class="sr-only">Oberfläche</legend>
+        <label class="choice"><input type="radio" name="ui" value="server" checked>
+          <span><strong>Oberfläche vom Server</strong><small>Wie im Browser – alle Funktionen des Servers, Anmeldung auf dessen Anmeldeseite.</small></span></label>
+        <label class="choice disabled"><input type="radio" name="ui" value="app" disabled>
+          <span><strong>App-Oberfläche mit Offline-Bestand</strong><small>Folgt (Sync, Modus 3).</small></span></label>
+      </fieldset>
+    </section>
+
+    <!-- P5: offline data (mode 3), logic in sync.js via prapi://…/local/… -->
+    <section class="card" aria-labelledby="h-sync" id="sync-card" hidden>
+      <h2 id="h-sync">Offline-Bestand (Sync)</h2>
+      <label class="check"><input type="checkbox" id="sync-enabled"> Ausgewählte Dokumente auf diesem Computer bereithalten (auch ohne Verbindung lesen und suchen)</label>
+      <p class="hint" id="sync-unsupported" hidden>Server-Art noch unbekannt – bitte einmal verbinden. Mit paperless-ngx eingeschränkt (Abgleich alle 60 s, Massen-Änderungen spätestens nach 15 min).</p>
+      <div id="sync-body" hidden>
+        <p class="hint" id="sync-status" role="status"></p>
+        <form id="sync-login" hidden>
+          <p class="hint">Anmelden für den Offline-Bestand (Geräte-Token im Windows-Schlüsselbund; das Passwort wird nicht gespeichert).</p>
+          <label class="inline">Benutzer <input id="sync-user" autocomplete="username" required></label>
+          <label class="inline">Passwort <input id="sync-pass" type="password" autocomplete="current-password" required></label>
+          <label class="inline">Code (2FA) <input id="sync-code" inputmode="numeric" autocomplete="one-time-code"></label>
+          <div class="buttons"><button type="submit">Anmelden</button></div>
+        </form>
+        <div id="sync-selection" hidden>
+          <h3>Auswahl</h3>
+          <p class="hint">Tags und gespeicherte Ansichten; Vorschaubilder immer.</p>
+          <ul id="sync-items" class="profiles"></ul>
+          <label class="inline">Dateien
+            <select id="sync-files">
+              <option value="preferred">Archiv-PDF (sonst Original)</option>
+              <option value="original">Original</option>
+              <option value="both">Original und Archiv</option>
+              <option value="none">keine (nur Text)</option>
+            </select>
+          </label>
+          <label class="inline">Höchstens <input id="sync-max-docs" type="number" min="1" step="1"> Dokumente</label>
+          <label class="inline">und <input id="sync-max-gib" type="number" min="0.1" step="0.1"> GiB</label>
+          <p class="hint" id="sync-preview" role="status"></p>
+          <p class="hint">Empfehlung: Datenträgerverschlüsselung (BitLocker) – der Offline-Bestand wird nicht zusätzlich verschlüsselt.</p>
+          <div class="buttons">
+            <button type="button" id="sync-check" class="secondary">Prüfen</button>
+            <button type="button" id="sync-apply">Übernehmen</button>
+            <button type="button" id="sync-now" class="secondary">Jetzt abgleichen</button>
+            <button type="button" id="sync-logout" class="secondary">Abmelden</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="h-updates">
+      <h2 id="h-updates">Updates</h2>
+      <label class="check"><input type="checkbox" id="upd-enabled"> Automatisch nach Updates suchen und im Hintergrund laden</label>
+      <fieldset class="choices">
+        <legend class="sr-only">Kanal</legend>
+        <label class="choice"><input type="radio" name="channel" value="stable">
+          <span><strong>Stabil</strong><small>Nur freigegebene Versionen.</small></span></label>
+        <label class="choice"><input type="radio" name="channel" value="beta">
+          <span><strong>Beta</strong><small>Vorab-Versionen zum Ausprobieren – und jede neuere stabile Version.</small></span></label>
+      </fieldset>
+      <label class="inline">Suchen alle
+        <select id="upd-interval">
+          <option value="6">6 Stunden</option>
+          <option value="12">12 Stunden</option>
+          <option value="24">24 Stunden</option>
+          <option value="168">7 Tage</option>
+        </select>
+      </label>
+      <p class="hint" id="upd-status"></p>
+      <p class="hint">Installiert wird nur nach deiner Bestätigung. Updates sind signiert und werden vor
+        dem Einspielen geprüft; deine Daten bleiben unverändert.</p>
+      <div class="buttons">
+        <button type="button" id="upd-open" class="secondary">Update-Fenster …</button>
+        <button type="button" id="upd-save" disabled>Speichern</button>
+      </div>
+    </section>
+
+    <p class="error" id="settings-error" role="alert"></p>
+    <p class="hint">Datenordner: <code id="home"></code> · <a href="#" id="logs">Logs öffnen</a></p>
+    <div class="buttons">
+      <button type="button" id="back">Zurück</button>
+    </div>
+  </main>
+  <script src="settings.js"></script>
+  <script src="sync.js"></script>
+</body>
+</html>

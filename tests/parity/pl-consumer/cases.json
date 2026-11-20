@@ -1,0 +1,206 @@
+{
+ "_comment": "Gemeinsame Eingaben für upstream (run_upstream.py) und Rust (crates/pl-consumer/tests/parity.rs). Reihenfolge = Einlesereihenfolge (gleiche Dokument-IDs). mtime: Sekunden seit Epoche (ganzzahlig).",
+ "cases": [
+  {
+   "name": "plain_text",
+   "filename": "Kontoauszug.txt",
+   "content": "Ein einfacher Text ohne bekannte Begriffe qqzv 1.\n",
+   "mtime": 1705312800,
+   "source": 2,
+   "overrides": {}
+  },
+  {
+   "name": "overrides",
+   "filename": "override.txt",
+   "content": "Noch ein Text ohne Treffer qqzv 2.\n",
+   "mtime": 1705312800,
+   "source": 2,
+   "overrides": {
+    "title": "{{ correspondent }} - {{ original_filename }}",
+    "correspondent_id": 4,
+    "document_type_id": 5,
+    "tag_ids": [
+     4
+    ],
+    "owner_id": 2,
+    "view_users": [
+     3
+    ],
+    "created": "2020-05-06",
+    "asn": 987654,
+    "custom_fields": {
+     "1": "hello",
+     "5": 42
+    }
+   }
+  },
+  {
+   "name": "match_any_storage_path",
+   "filename": "bill.txt",
+   "content": "Your Swisscom mobile bill. Tax notice from the steueramt.\nDatum 15.03.2024\n",
+   "mtime": 1705312800,
+   "source": 1,
+   "overrides": {}
+  },
+  {
+   "name": "match_regex",
+   "filename": "amt.txt",
+   "content": "Schreiben vom Steueramt Zuerich qqzv 3\n",
+   "mtime": 1705312800,
+   "source": 1,
+   "overrides": {}
+  },
+  {
+   "name": "workflow_added",
+   "filename": "wf.txt",
+   "content": "Diese Rechnung bitte bezahlen qqzv 4\n",
+   "mtime": 1705312800,
+   "source": 2,
+   "overrides": {}
+  },
+  {
+   "name": "owner_permissions",
+   "filename": "owned.txt",
+   "content": "Krankenkasse Helvetia Beleg arzt doctor qqzv 5\n",
+   "mtime": 1705312800,
+   "source": 2,
+   "overrides": {
+    "owner_id": 4
+   }
+  },
+  {
+   "name": "duplicate_consumed",
+   "filename": "Kontoauszug-2.txt",
+   "content": "Ein einfacher Text ohne bekannte Begriffe qqzv 1.\n",
+   "mtime": 1705312800,
+   "source": 2,
+   "overrides": {}
+  },
+  {
+   "name": "duplicate_deleted",
+   "filename": "Kontoauszug-3.txt",
+   "content": "Ein einfacher Text ohne bekannte Begriffe qqzv 1.\n",
+   "mtime": 1705312800,
+   "source": 2,
+   "overrides": {},
+   "delete_duplicates": true
+  },
+  {
+   "name": "asn_exists",
+   "filename": "asn.txt",
+   "content": "ASN Test qqzv 6\n",
+   "mtime": 1705312800,
+   "source": 2,
+   "overrides": {
+    "asn": 987654
+   }
+  },
+  {
+   "name": "filename_format",
+   "filename": "Brief.txt",
+   "content": "Brief ohne Treffer qqzv 7\n",
+   "mtime": 1705312800,
+   "source": 2,
+   "overrides": {
+    "correspondent_id": 5
+   },
+   "filename_format": "{correspondent}/{title}"
+  },
+  {
+   "name": "filename_collision",
+   "filename": "Brief.txt",
+   "content": "Brief ohne Treffer qqzv 8\n",
+   "mtime": 1705312800,
+   "source": 2,
+   "overrides": {
+    "correspondent_id": 5
+   },
+   "filename_format": "{correspondent}/{title}"
+  },
+  {
+   "name": "pdf_ocr_off",
+   "filename": "Vertrag.pdf",
+   "sample": "pl-parsers/samples/pdf_text.pdf",
+   "mtime": 1705312800,
+   "source": 2,
+   "overrides": {},
+   "ocr_mode": "off",
+   "archive_file_generation": "never",
+   "known_diffs": {
+    "content": "upstream braucht pdftotext (poppler) – in der Referenzumgebung nicht installiert → leerer Text; Rust liest den Text mit lopdf",
+    "audit": "Folge von content (create-Eintrag enthält den Inhalt)"
+   }
+  },
+  {
+   "name": "barcode_split_patcht",
+   "mtime": 1705312800,
+   "source": 1,
+   "overrides": {},
+   "ocr_mode": "off",
+   "archive_file_generation": "never",
+   "filename": "patcht-scan.pdf",
+   "sample": "../../upstream/src/documents/tests/samples/barcodes/patch-code-t-middle.pdf",
+   "settings": {
+    "CONSUMER_ENABLE_BARCODES": true
+   },
+   "normalize": [
+    "checksum"
+   ],
+   "_comment": "Trennseite PATCHT auf Seite 2: Elternaufgabe stoppt, zwei Teil-PDFs werden eingelesen (lopdf statt pikepdf → Prüfsummen normalisiert)"
+  },
+  {
+   "name": "barcode_asn",
+   "mtime": 1705312800,
+   "source": 1,
+   "overrides": {},
+   "ocr_mode": "off",
+   "archive_file_generation": "never",
+   "filename": "asn-scan.pdf",
+   "sample": "../../upstream/src/documents/tests/samples/barcodes/barcode-39-asn-123.pdf",
+   "settings": {
+    "CONSUMER_ENABLE_ASN_BARCODE": true
+   },
+   "known_diffs": {
+    "content": "PDF-Textebene: upstream liefert in der Windows-Referenz \r\n-Zeilenenden ohne Seitentrenner-Leerzeilen, pl-parsers \n mit Leerzeilen zwischen Seiten bzw. Leerzeichen am Zeilenende (Textextraktion, nicht Barcode-Logik; pl-parsers/pl-ocr)",
+    "audit": "Folge von content (create-Eintrag enthält den Inhalt)"
+   }
+  },
+  {
+   "name": "barcode_tiff_split",
+   "mtime": 1705312800,
+   "source": 1,
+   "overrides": {},
+   "ocr_mode": "off",
+   "archive_file_generation": "never",
+   "filename": "patcht-scan.tiff",
+   "sample": "../../upstream/src/documents/tests/samples/barcodes/patch-code-t-middle.tiff",
+   "settings": {
+    "CONSUMER_ENABLE_BARCODES": true,
+    "CONSUMER_BARCODE_TIFF_SUPPORT": true
+   },
+   "normalize": [
+    "checksum"
+   ],
+   "_comment": "TIFF → PDF (img2pdf-Ersatz), Barcode-Trennung, zwei Teil-PDFs"
+  },
+  {
+   "name": "barcode_tags_app_config",
+   "mtime": 1705312800,
+   "source": 1,
+   "overrides": {},
+   "ocr_mode": "off",
+   "archive_file_generation": "never",
+   "filename": "tag-scan.pdf",
+   "sample": "../../upstream/src/documents/tests/samples/barcodes/split-by-tag-basic.pdf",
+   "app_config": {
+    "barcode_enable_tag": true,
+    "barcode_store_values": true
+   },
+   "_comment": "Einstellungen nur aus paperless_applicationconfiguration (Umgebung aus): Tags aus Barcodes + gespeicherte Barcode-Werte",
+   "known_diffs": {
+    "content": "PDF-Textebene: upstream liefert in der Windows-Referenz \r\n-Zeilenenden ohne Seitentrenner-Leerzeilen, pl-parsers \n mit Leerzeilen zwischen Seiten bzw. Leerzeichen am Zeilenende (Textextraktion, nicht Barcode-Logik; pl-parsers/pl-ocr)",
+    "audit": "Folge von content (create-Eintrag enthält den Inhalt)"
+   }
+  }
+ ]
+}

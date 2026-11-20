@@ -1,0 +1,25 @@
+[package]
+name = "pl-indexer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+# Schema, tokenizers, normalize_search_text/extract_cjk_text come from pl-search
+# (engine only, without the `routes` feature -> no pl-core/pl-authz).
+# Engine without the `routes` feature: via path, because the workspace dependency carries the default features.
+pl-search = { path = "../pl-search", default-features = false }
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+chrono.workspace = true
+tantivy.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tokio.workspace = true
+rand.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+chrono-tz.workspace = true

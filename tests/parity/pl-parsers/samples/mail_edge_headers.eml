@@ -1,0 +1,45 @@
+From: "Müller, Hans" (Chef) <hans@example.ch>
+To: a@example.com,
+ b@example.com, "C, D" <cd@example.com>
+To: zweite@example.com
+Cc: (nur Kommentar) x@example.com
+Bcc: undisclosed-recipients:;
+Subject: =?utf-8?Q?Teil_eins?=
+ =?utf-8?B?IHVuZCB6d2Vp?= normal
+Date: 31 Mar 2024 02:30:00 -0000
+Content-Type: multipart/mixed; boundary="=_outer"
+
+--=_outer
+Content-Type: multipart/alternative; boundary=inner
+
+--inner
+Content-Type: text/plain; charset=windows-1252
+Content-Transfer-Encoding: quoted-printable
+
+Preis: 10=80 =E4
+--inner
+Content-Type: text/html; charset="utf-8"
+
+<p>Preis: 10&euro;</p>
+--inner--
+
+--=_outer
+Content-Type: application/octet-stream
+Content-Disposition: attachment; filename*0*=utf-8''la%C3%A4ng; filename*1="er_name.dat"
+Content-Transfer-Encoding: base64
+
+AAECAwQFBgcICQ
+--=_outer
+Content-Type: text/plain; name="Grüße.txt"
+Content-Disposition: attachment; filename="Grüße.txt"
+
+Inhalt
+--=_outer
+Content-Type: message/rfc822
+
+From: inner@example.com
+Subject: innen
+
+Innen-Text
+--=_outer--
+Epilog

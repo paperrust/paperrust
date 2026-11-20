@@ -1,0 +1,39 @@
+[package]
+name = "pl-dbmigrate"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "paperrust-migrate-db"
+path = "src/main.rs"
+
+[dependencies]
+tokio.workspace = true
+# In addition to the workspace features (only in this tool): source drivers SQLite (bundled) and MySQL/MariaDB.
+sqlx = { workspace = true, features = ["sqlite", "mysql"] }
+serde_json.workspace = true
+anyhow.workspace = true
+futures.workspace = true
+sha2.workspace = true
+chrono.workspace = true
+url.workspace = true
+# Switchover with verification report (switch/verify): stream the manifest, ZIP exports, legacy MD5 data,
+# sample via API v1, temporary API token
+serde.workspace = true
+flate2.workspace = true
+md-5 = "0.10"
+reqwest.workspace = true
+rand.workspace = true
+percent-encoding.workspace = true
+
+# Free space before copying (wizard, assist.rs)
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -1,0 +1,2445 @@
+{
+ "crate": "pl-objects",
+ "generated_by": "tests/parity/pl-objects/gen_cases.py",
+ "vars": {
+  "correspondent_id": {
+   "get": "/api/correspondents/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1
+   }
+  },
+  "document_type_id": {
+   "get": "/api/document_types/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1
+   }
+  },
+  "storage_path_id": {
+   "get": "/api/storage_paths/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1
+   }
+  },
+  "tag_id": {
+   "get": "/api/tags/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1
+   }
+  },
+  "tag_id_last": {
+   "get": "/api/tags/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "-id",
+    "page_size": 1
+   }
+  }
+ },
+ "cases": [
+  {
+   "id": "correspondents.list.last-correspondence",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "last_correspondence": "true",
+    "page_size": 100
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.list.last-correspondence-false",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "last_correspondence": "false"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.list.order-last-corr-annotated",
+   "route": "correspondents.list",
+   "method": "GET",
+   "path": "/api/correspondents/",
+   "query": {
+    "last_correspondence": "1",
+    "ordering": "-last_correspondence"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.detail.full-perms",
+   "route": "correspondents.retrieve",
+   "method": "GET",
+   "path": "/api/correspondents/${correspondent_id}/",
+   "query": {
+    "full_perms": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.is-root",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "is_root": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "tags.list.is-root-false",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "is_root": "0"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.is-root-garbage",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "is_root": "maybe"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.children-page",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "page_size": 1,
+    "ordering": "-name"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  },
+  {
+   "id": "tags.list.full-perms-children",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "full_perms": "true",
+    "page_size": 100
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.id-decimal",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "id": "1.5"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.id-exp",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "id": "1e0"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.list.name-like-escape",
+   "route": "tags.list",
+   "method": "GET",
+   "path": "/api/tags/",
+   "query": {
+    "name__icontains": "%_"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.detail.ordering-children",
+   "route": "tags.retrieve",
+   "method": "GET",
+   "path": "/api/tags/${tag_id}/",
+   "query": {
+    "ordering": "-document_count"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.detail.full-perms",
+   "route": "tags.retrieve",
+   "method": "GET",
+   "path": "/api/tags/${tag_id}/",
+   "query": {
+    "full_perms": "1"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.detail.dot-pk",
+   "route": "tags.retrieve",
+   "method": "GET",
+   "path": "/api/tags/1.5/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.detail.huge-pk",
+   "route": "tags.retrieve",
+   "method": "GET",
+   "path": "/api/tags/99999999999/",
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.detail.full-perms",
+   "route": "storage_paths.retrieve",
+   "method": "GET",
+   "path": "/api/storage_paths/${storage_path_id}/",
+   "query": {
+    "full_perms": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.create.ok",
+   "route": "correspondents.create",
+   "method": "POST",
+   "path": "/api/correspondents/",
+   "json": {
+    "name": "Parity New",
+    "matching_algorithm": 1,
+    "match": "foo"
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.create.full-perms",
+   "route": "correspondents.create",
+   "method": "POST",
+   "path": "/api/correspondents/",
+   "query": {
+    "full_perms": "true"
+   },
+   "json": {
+    "name": "Parity Perms",
+    "set_permissions": {
+     "view": {
+      "users": [],
+      "groups": []
+     },
+     "change": {
+      "users": [],
+      "groups": []
+     }
+    }
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.create.owner-null",
+   "route": "correspondents.create",
+   "method": "POST",
+   "path": "/api/correspondents/",
+   "json": {
+    "name": "Parity Unowned",
+    "owner": null
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.create.missing-name",
+   "route": "correspondents.create",
+   "method": "POST",
+   "path": "/api/correspondents/",
+   "json": {
+    "match": "x"
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.create.blank-name",
+   "route": "correspondents.create",
+   "method": "POST",
+   "path": "/api/correspondents/",
+   "json": {
+    "name": "   "
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.create.long-name",
+   "route": "correspondents.create",
+   "method": "POST",
+   "path": "/api/correspondents/",
+   "json": {
+    "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.create.bad-types",
+   "route": "correspondents.create",
+   "method": "POST",
+   "path": "/api/correspondents/",
+   "json": {
+    "name": [
+     "a"
+    ],
+    "matching_algorithm": 9,
+    "is_insensitive": "perhaps",
+    "owner": "abc"
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.create.bad-owner",
+   "route": "correspondents.create",
+   "method": "POST",
+   "path": "/api/correspondents/",
+   "json": {
+    "name": "P",
+    "owner": 999999
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.create.bad-regex",
+   "route": "correspondents.create",
+   "method": "POST",
+   "path": "/api/correspondents/",
+   "json": {
+    "name": "P",
+    "matching_algorithm": 4,
+    "match": "(unclosed"
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.create.good-regex",
+   "route": "correspondents.create",
+   "method": "POST",
+   "path": "/api/correspondents/",
+   "json": {
+    "name": "P",
+    "matching_algorithm": 4,
+    "match": "^inv\\d+$"
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.create.regex-as-string-algo",
+   "route": "correspondents.create",
+   "method": "POST",
+   "path": "/api/correspondents/",
+   "json": {
+    "name": "P",
+    "matching_algorithm": "4",
+    "match": "(unclosed"
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.create.set-perms-unknown",
+   "route": "correspondents.create",
+   "method": "POST",
+   "path": "/api/correspondents/",
+   "json": {
+    "name": "P",
+    "set_permissions": {
+     "own": {}
+    }
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.create.set-perms-bad-user",
+   "route": "correspondents.create",
+   "method": "POST",
+   "path": "/api/correspondents/",
+   "json": {
+    "name": "P",
+    "set_permissions": {
+     "view": {
+      "users": [
+       999999
+      ]
+     }
+    }
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.create.not-a-dict",
+   "route": "correspondents.create",
+   "method": "POST",
+   "path": "/api/correspondents/",
+   "json": [
+    1,
+    2
+   ],
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.create.duplicate",
+   "route": "correspondents.create",
+   "method": "POST",
+   "path": "/api/correspondents/",
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/correspondents/",
+     "json": {
+      "name": "Dup"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/correspondents/",
+     "json": {
+      "name": "Dup"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/correspondents/",
+     "json": {
+      "name": "Dup",
+      "owner": null
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/correspondents/",
+     "json": {
+      "name": "Dup",
+      "owner": null
+     }
+    }
+   ],
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.patch.name",
+   "route": "correspondents.partial_update",
+   "method": "PATCH",
+   "path": "/api/correspondents/${correspondent_id}/",
+   "json": {
+    "name": "Renamed by parity"
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.patch.owner",
+   "route": "correspondents.partial_update",
+   "method": "PATCH",
+   "path": "/api/correspondents/${correspondent_id}/",
+   "json": {
+    "owner": null
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.patch.set-perms",
+   "route": "correspondents.partial_update",
+   "method": "PATCH",
+   "path": "/api/correspondents/${correspondent_id}/",
+   "query": {
+    "full_perms": "true"
+   },
+   "json": {
+    "set_permissions": {
+     "view": {
+      "users": [],
+      "groups": []
+     },
+     "change": {
+      "users": [],
+      "groups": []
+     }
+    }
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.put.no-name",
+   "route": "correspondents.update",
+   "method": "PUT",
+   "path": "/api/correspondents/${correspondent_id}/",
+   "json": {
+    "match": "x"
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.put.full",
+   "route": "correspondents.update",
+   "method": "PUT",
+   "path": "/api/correspondents/${correspondent_id}/",
+   "json": {
+    "name": "Put by parity",
+    "match": "a b",
+    "matching_algorithm": 2,
+    "is_insensitive": false
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.delete",
+   "route": "correspondents.destroy",
+   "method": "DELETE",
+   "path": "/api/correspondents/${correspondent_id}/",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "correspondents.delete-then-get",
+   "route": "correspondents.destroy",
+   "method": "DELETE",
+   "path": "/api/correspondents/${correspondent_id}/",
+   "steps": [
+    {
+     "method": "DELETE",
+     "path": "/api/correspondents/${correspondent_id}/"
+    },
+    {
+     "method": "GET",
+     "path": "/api/correspondents/${correspondent_id}/"
+    }
+   ],
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.create.ok",
+   "route": "document_types.create",
+   "method": "POST",
+   "path": "/api/document_types/",
+   "json": {
+    "name": "Parity New",
+    "matching_algorithm": 1,
+    "match": "foo"
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.create.full-perms",
+   "route": "document_types.create",
+   "method": "POST",
+   "path": "/api/document_types/",
+   "query": {
+    "full_perms": "true"
+   },
+   "json": {
+    "name": "Parity Perms",
+    "set_permissions": {
+     "view": {
+      "users": [],
+      "groups": []
+     },
+     "change": {
+      "users": [],
+      "groups": []
+     }
+    }
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.create.owner-null",
+   "route": "document_types.create",
+   "method": "POST",
+   "path": "/api/document_types/",
+   "json": {
+    "name": "Parity Unowned",
+    "owner": null
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.create.missing-name",
+   "route": "document_types.create",
+   "method": "POST",
+   "path": "/api/document_types/",
+   "json": {
+    "match": "x"
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.create.blank-name",
+   "route": "document_types.create",
+   "method": "POST",
+   "path": "/api/document_types/",
+   "json": {
+    "name": "   "
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.create.long-name",
+   "route": "document_types.create",
+   "method": "POST",
+   "path": "/api/document_types/",
+   "json": {
+    "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.create.bad-types",
+   "route": "document_types.create",
+   "method": "POST",
+   "path": "/api/document_types/",
+   "json": {
+    "name": [
+     "a"
+    ],
+    "matching_algorithm": 9,
+    "is_insensitive": "perhaps",
+    "owner": "abc"
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.create.bad-owner",
+   "route": "document_types.create",
+   "method": "POST",
+   "path": "/api/document_types/",
+   "json": {
+    "name": "P",
+    "owner": 999999
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.create.bad-regex",
+   "route": "document_types.create",
+   "method": "POST",
+   "path": "/api/document_types/",
+   "json": {
+    "name": "P",
+    "matching_algorithm": 4,
+    "match": "(unclosed"
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.create.good-regex",
+   "route": "document_types.create",
+   "method": "POST",
+   "path": "/api/document_types/",
+   "json": {
+    "name": "P",
+    "matching_algorithm": 4,
+    "match": "^inv\\d+$"
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.create.regex-as-string-algo",
+   "route": "document_types.create",
+   "method": "POST",
+   "path": "/api/document_types/",
+   "json": {
+    "name": "P",
+    "matching_algorithm": "4",
+    "match": "(unclosed"
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.create.set-perms-unknown",
+   "route": "document_types.create",
+   "method": "POST",
+   "path": "/api/document_types/",
+   "json": {
+    "name": "P",
+    "set_permissions": {
+     "own": {}
+    }
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.create.set-perms-bad-user",
+   "route": "document_types.create",
+   "method": "POST",
+   "path": "/api/document_types/",
+   "json": {
+    "name": "P",
+    "set_permissions": {
+     "view": {
+      "users": [
+       999999
+      ]
+     }
+    }
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.create.not-a-dict",
+   "route": "document_types.create",
+   "method": "POST",
+   "path": "/api/document_types/",
+   "json": [
+    1,
+    2
+   ],
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.create.duplicate",
+   "route": "document_types.create",
+   "method": "POST",
+   "path": "/api/document_types/",
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/document_types/",
+     "json": {
+      "name": "Dup"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/document_types/",
+     "json": {
+      "name": "Dup"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/document_types/",
+     "json": {
+      "name": "Dup",
+      "owner": null
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/document_types/",
+     "json": {
+      "name": "Dup",
+      "owner": null
+     }
+    }
+   ],
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.patch.name",
+   "route": "document_types.partial_update",
+   "method": "PATCH",
+   "path": "/api/document_types/${document_type_id}/",
+   "json": {
+    "name": "Renamed by parity"
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.patch.owner",
+   "route": "document_types.partial_update",
+   "method": "PATCH",
+   "path": "/api/document_types/${document_type_id}/",
+   "json": {
+    "owner": null
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.patch.set-perms",
+   "route": "document_types.partial_update",
+   "method": "PATCH",
+   "path": "/api/document_types/${document_type_id}/",
+   "query": {
+    "full_perms": "true"
+   },
+   "json": {
+    "set_permissions": {
+     "view": {
+      "users": [],
+      "groups": []
+     },
+     "change": {
+      "users": [],
+      "groups": []
+     }
+    }
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.put.no-name",
+   "route": "document_types.update",
+   "method": "PUT",
+   "path": "/api/document_types/${document_type_id}/",
+   "json": {
+    "match": "x"
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.put.full",
+   "route": "document_types.update",
+   "method": "PUT",
+   "path": "/api/document_types/${document_type_id}/",
+   "json": {
+    "name": "Put by parity",
+    "match": "a b",
+    "matching_algorithm": 2,
+    "is_insensitive": false
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.delete",
+   "route": "document_types.destroy",
+   "method": "DELETE",
+   "path": "/api/document_types/${document_type_id}/",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "document_types.delete-then-get",
+   "route": "document_types.destroy",
+   "method": "DELETE",
+   "path": "/api/document_types/${document_type_id}/",
+   "steps": [
+    {
+     "method": "DELETE",
+     "path": "/api/document_types/${document_type_id}/"
+    },
+    {
+     "method": "GET",
+     "path": "/api/document_types/${document_type_id}/"
+    }
+   ],
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.create.ok",
+   "route": "tags.create",
+   "method": "POST",
+   "path": "/api/tags/",
+   "json": {
+    "name": "Parity New",
+    "matching_algorithm": 1,
+    "match": "foo"
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.create.full-perms",
+   "route": "tags.create",
+   "method": "POST",
+   "path": "/api/tags/",
+   "query": {
+    "full_perms": "true"
+   },
+   "json": {
+    "name": "Parity Perms",
+    "set_permissions": {
+     "view": {
+      "users": [],
+      "groups": []
+     },
+     "change": {
+      "users": [],
+      "groups": []
+     }
+    }
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.create.owner-null",
+   "route": "tags.create",
+   "method": "POST",
+   "path": "/api/tags/",
+   "json": {
+    "name": "Parity Unowned",
+    "owner": null
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.create.missing-name",
+   "route": "tags.create",
+   "method": "POST",
+   "path": "/api/tags/",
+   "json": {
+    "match": "x"
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.create.blank-name",
+   "route": "tags.create",
+   "method": "POST",
+   "path": "/api/tags/",
+   "json": {
+    "name": "   "
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.create.long-name",
+   "route": "tags.create",
+   "method": "POST",
+   "path": "/api/tags/",
+   "json": {
+    "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.create.bad-types",
+   "route": "tags.create",
+   "method": "POST",
+   "path": "/api/tags/",
+   "json": {
+    "name": [
+     "a"
+    ],
+    "matching_algorithm": 9,
+    "is_insensitive": "perhaps",
+    "owner": "abc"
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.create.bad-owner",
+   "route": "tags.create",
+   "method": "POST",
+   "path": "/api/tags/",
+   "json": {
+    "name": "P",
+    "owner": 999999
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.create.bad-regex",
+   "route": "tags.create",
+   "method": "POST",
+   "path": "/api/tags/",
+   "json": {
+    "name": "P",
+    "matching_algorithm": 4,
+    "match": "(unclosed"
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.create.good-regex",
+   "route": "tags.create",
+   "method": "POST",
+   "path": "/api/tags/",
+   "json": {
+    "name": "P",
+    "matching_algorithm": 4,
+    "match": "^inv\\d+$"
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.create.regex-as-string-algo",
+   "route": "tags.create",
+   "method": "POST",
+   "path": "/api/tags/",
+   "json": {
+    "name": "P",
+    "matching_algorithm": "4",
+    "match": "(unclosed"
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.create.set-perms-unknown",
+   "route": "tags.create",
+   "method": "POST",
+   "path": "/api/tags/",
+   "json": {
+    "name": "P",
+    "set_permissions": {
+     "own": {}
+    }
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.create.set-perms-bad-user",
+   "route": "tags.create",
+   "method": "POST",
+   "path": "/api/tags/",
+   "json": {
+    "name": "P",
+    "set_permissions": {
+     "view": {
+      "users": [
+       999999
+      ]
+     }
+    }
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.create.not-a-dict",
+   "route": "tags.create",
+   "method": "POST",
+   "path": "/api/tags/",
+   "json": [
+    1,
+    2
+   ],
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.create.duplicate",
+   "route": "tags.create",
+   "method": "POST",
+   "path": "/api/tags/",
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tags/",
+     "json": {
+      "name": "Dup"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/tags/",
+     "json": {
+      "name": "Dup"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/tags/",
+     "json": {
+      "name": "Dup",
+      "owner": null
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/tags/",
+     "json": {
+      "name": "Dup",
+      "owner": null
+     }
+    }
+   ],
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.patch.name",
+   "route": "tags.partial_update",
+   "method": "PATCH",
+   "path": "/api/tags/${tag_id}/",
+   "json": {
+    "name": "Renamed by parity"
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.patch.owner",
+   "route": "tags.partial_update",
+   "method": "PATCH",
+   "path": "/api/tags/${tag_id}/",
+   "json": {
+    "owner": null
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.patch.set-perms",
+   "route": "tags.partial_update",
+   "method": "PATCH",
+   "path": "/api/tags/${tag_id}/",
+   "query": {
+    "full_perms": "true"
+   },
+   "json": {
+    "set_permissions": {
+     "view": {
+      "users": [],
+      "groups": []
+     },
+     "change": {
+      "users": [],
+      "groups": []
+     }
+    }
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.put.no-name",
+   "route": "tags.update",
+   "method": "PUT",
+   "path": "/api/tags/${tag_id}/",
+   "json": {
+    "match": "x"
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.put.full",
+   "route": "tags.update",
+   "method": "PUT",
+   "path": "/api/tags/${tag_id}/",
+   "json": {
+    "name": "Put by parity",
+    "match": "a b",
+    "matching_algorithm": 2,
+    "is_insensitive": false
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.delete",
+   "route": "tags.destroy",
+   "method": "DELETE",
+   "path": "/api/tags/${tag_id}/",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.delete-then-get",
+   "route": "tags.destroy",
+   "method": "DELETE",
+   "path": "/api/tags/${tag_id}/",
+   "steps": [
+    {
+     "method": "DELETE",
+     "path": "/api/tags/${tag_id}/"
+    },
+    {
+     "method": "GET",
+     "path": "/api/tags/${tag_id}/"
+    }
+   ],
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.create.color",
+   "route": "tags.create",
+   "method": "POST",
+   "path": "/api/tags/",
+   "json": {
+    "name": "Colored",
+    "color": "#ff0000",
+    "is_inbox_tag": true
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.create.bad-color",
+   "route": "tags.create",
+   "method": "POST",
+   "path": "/api/tags/",
+   "json": {
+    "name": "Colored",
+    "color": "red"
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.create.child",
+   "route": "tags.create",
+   "method": "POST",
+   "path": "/api/tags/",
+   "json": {
+    "name": "Child by parity",
+    "parent": "${tag_id}"
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.create.bad-parent",
+   "route": "tags.create",
+   "method": "POST",
+   "path": "/api/tags/",
+   "json": {
+    "name": "Orphan",
+    "parent": 999999
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.patch.parent-self",
+   "route": "tags.partial_update",
+   "method": "PATCH",
+   "path": "/api/tags/${tag_id}/",
+   "json": {
+    "parent": "${tag_id}"
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.patch.parent",
+   "route": "tags.partial_update",
+   "method": "PATCH",
+   "path": "/api/tags/${tag_id_last}/",
+   "json": {
+    "parent": "${tag_id}"
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.patch.unparent",
+   "route": "tags.partial_update",
+   "method": "PATCH",
+   "path": "/api/tags/${tag_id_last}/",
+   "json": {
+    "parent": null
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "tags.create.chain-depth",
+   "route": "tags.create",
+   "method": "POST",
+   "path": "/api/tags/",
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/tags/",
+     "json": {
+      "name": "D1"
+     },
+     "capture": {
+      "d1": "id"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/tags/",
+     "json": {
+      "name": "D2",
+      "parent": "${d1}"
+     },
+     "capture": {
+      "d2": "id"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/tags/",
+     "json": {
+      "name": "D3",
+      "parent": "${d2}"
+     },
+     "capture": {
+      "d3": "id"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/tags/",
+     "json": {
+      "name": "D4",
+      "parent": "${d3}"
+     },
+     "capture": {
+      "d4": "id"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/tags/",
+     "json": {
+      "name": "D5",
+      "parent": "${d4}"
+     },
+     "capture": {
+      "d5": "id"
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/api/tags/",
+     "json": {
+      "name": "D6",
+      "parent": "${d5}"
+     }
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/tags/${d1}/",
+     "json": {
+      "parent": "${d3}"
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/api/tags/${d1}/"
+    },
+    {
+     "method": "DELETE",
+     "path": "/api/tags/${d2}/"
+    },
+    {
+     "method": "GET",
+     "path": "/api/tags/",
+     "query": {
+      "name__istartswith": "D"
+     }
+    }
+   ],
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "storage_paths.delete",
+   "route": "storage_paths.destroy",
+   "method": "DELETE",
+   "path": "/api/storage_paths/${storage_path_id}/",
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "bulk.missing-fields",
+   "route": "bulk_edit_objects",
+   "method": "POST",
+   "path": "/api/bulk_edit_objects/",
+   "json": {},
+   "users": [
+    "admin",
+    "noperm",
+    "anon"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "bulk.bad-choices",
+   "route": "bulk_edit_objects",
+   "method": "POST",
+   "path": "/api/bulk_edit_objects/",
+   "json": {
+    "object_type": "x",
+    "operation": "y",
+    "objects": "1"
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "bulk.objects-required",
+   "route": "bulk_edit_objects",
+   "method": "POST",
+   "path": "/api/bulk_edit_objects/",
+   "json": {
+    "object_type": "tags",
+    "operation": "delete"
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "bulk.objects-empty",
+   "route": "bulk_edit_objects",
+   "method": "POST",
+   "path": "/api/bulk_edit_objects/",
+   "json": {
+    "object_type": "tags",
+    "operation": "delete",
+    "objects": []
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "bulk.objects-unknown",
+   "route": "bulk_edit_objects",
+   "method": "POST",
+   "path": "/api/bulk_edit_objects/",
+   "json": {
+    "object_type": "tags",
+    "operation": "delete",
+    "objects": [
+     999999
+    ]
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "bulk.perms-empty",
+   "route": "bulk_edit_objects",
+   "method": "POST",
+   "path": "/api/bulk_edit_objects/",
+   "json": {
+    "object_type": "tags",
+    "operation": "set_permissions",
+    "objects": [
+     "${tag_id}"
+    ],
+    "permissions": {}
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "bulk.tags.set-perms",
+   "route": "bulk_edit_objects",
+   "method": "POST",
+   "path": "/api/bulk_edit_objects/",
+   "json": {
+    "object_type": "tags",
+    "operation": "set_permissions",
+    "objects": [
+     "${tag_id}"
+    ],
+    "owner": null,
+    "permissions": {
+     "view": {
+      "users": [],
+      "groups": []
+     }
+    },
+    "merge": false
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "bulk.tags.set-perms-merge",
+   "route": "bulk_edit_objects",
+   "method": "POST",
+   "path": "/api/bulk_edit_objects/",
+   "json": {
+    "object_type": "tags",
+    "operation": "set_permissions",
+    "objects": [
+     "${tag_id}"
+    ],
+    "owner": null,
+    "merge": true
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "bulk.tags.delete",
+   "route": "bulk_edit_objects",
+   "method": "POST",
+   "path": "/api/bulk_edit_objects/",
+   "json": {
+    "object_type": "tags",
+    "operation": "delete",
+    "objects": [
+     "${tag_id}"
+    ]
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "bulk.tags.delete-all-filtered",
+   "route": "bulk_edit_objects",
+   "method": "POST",
+   "path": "/api/bulk_edit_objects/",
+   "json": {
+    "object_type": "tags",
+    "operation": "delete",
+    "all": true,
+    "filters": {
+     "name__istartswith": "zzz-none"
+    }
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "bulk.correspondents.set-perms",
+   "route": "bulk_edit_objects",
+   "method": "POST",
+   "path": "/api/bulk_edit_objects/",
+   "json": {
+    "object_type": "correspondents",
+    "operation": "set_permissions",
+    "objects": [
+     "${correspondent_id}"
+    ],
+    "owner": null,
+    "permissions": {
+     "view": {
+      "users": [],
+      "groups": []
+     }
+    },
+    "merge": false
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "bulk.correspondents.set-perms-merge",
+   "route": "bulk_edit_objects",
+   "method": "POST",
+   "path": "/api/bulk_edit_objects/",
+   "json": {
+    "object_type": "correspondents",
+    "operation": "set_permissions",
+    "objects": [
+     "${correspondent_id}"
+    ],
+    "owner": null,
+    "merge": true
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "bulk.correspondents.delete",
+   "route": "bulk_edit_objects",
+   "method": "POST",
+   "path": "/api/bulk_edit_objects/",
+   "json": {
+    "object_type": "correspondents",
+    "operation": "delete",
+    "objects": [
+     "${correspondent_id}"
+    ]
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "bulk.correspondents.delete-all-filtered",
+   "route": "bulk_edit_objects",
+   "method": "POST",
+   "path": "/api/bulk_edit_objects/",
+   "json": {
+    "object_type": "correspondents",
+    "operation": "delete",
+    "all": true,
+    "filters": {
+     "name__istartswith": "zzz-none"
+    }
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "bulk.document_types.set-perms",
+   "route": "bulk_edit_objects",
+   "method": "POST",
+   "path": "/api/bulk_edit_objects/",
+   "json": {
+    "object_type": "document_types",
+    "operation": "set_permissions",
+    "objects": [
+     "${document_type_id}"
+    ],
+    "owner": null,
+    "permissions": {
+     "view": {
+      "users": [],
+      "groups": []
+     }
+    },
+    "merge": false
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "bulk.document_types.set-perms-merge",
+   "route": "bulk_edit_objects",
+   "method": "POST",
+   "path": "/api/bulk_edit_objects/",
+   "json": {
+    "object_type": "document_types",
+    "operation": "set_permissions",
+    "objects": [
+     "${document_type_id}"
+    ],
+    "owner": null,
+    "merge": true
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "bulk.document_types.delete",
+   "route": "bulk_edit_objects",
+   "method": "POST",
+   "path": "/api/bulk_edit_objects/",
+   "json": {
+    "object_type": "document_types",
+    "operation": "delete",
+    "objects": [
+     "${document_type_id}"
+    ]
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "bulk.document_types.delete-all-filtered",
+   "route": "bulk_edit_objects",
+   "method": "POST",
+   "path": "/api/bulk_edit_objects/",
+   "json": {
+    "object_type": "document_types",
+    "operation": "delete",
+    "all": true,
+    "filters": {
+     "name__istartswith": "zzz-none"
+    }
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "bulk.storage_paths.set-perms",
+   "route": "bulk_edit_objects",
+   "method": "POST",
+   "path": "/api/bulk_edit_objects/",
+   "json": {
+    "object_type": "storage_paths",
+    "operation": "set_permissions",
+    "objects": [
+     "${storage_path_id}"
+    ],
+    "owner": null,
+    "permissions": {
+     "view": {
+      "users": [],
+      "groups": []
+     }
+    },
+    "merge": false
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "bulk.storage_paths.set-perms-merge",
+   "route": "bulk_edit_objects",
+   "method": "POST",
+   "path": "/api/bulk_edit_objects/",
+   "json": {
+    "object_type": "storage_paths",
+    "operation": "set_permissions",
+    "objects": [
+     "${storage_path_id}"
+    ],
+    "owner": null,
+    "merge": true
+   },
+   "write": true,
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "bulk.storage_paths.delete",
+   "route": "bulk_edit_objects",
+   "method": "POST",
+   "path": "/api/bulk_edit_objects/",
+   "json": {
+    "object_type": "storage_paths",
+    "operation": "delete",
+    "objects": [
+     "${storage_path_id}"
+    ]
+   },
+   "users": [
+    "admin",
+    "user1",
+    "user2",
+    "noperm"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "bulk.storage_paths.delete-all-filtered",
+   "route": "bulk_edit_objects",
+   "method": "POST",
+   "path": "/api/bulk_edit_objects/",
+   "json": {
+    "object_type": "storage_paths",
+    "operation": "delete",
+    "all": true,
+    "filters": {
+     "name__istartswith": "zzz-none"
+    }
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "bulk.tags.delete-all",
+   "route": "bulk_edit_objects",
+   "method": "POST",
+   "path": "/api/bulk_edit_objects/",
+   "steps": [
+    {
+     "method": "POST",
+     "path": "/api/bulk_edit_objects/",
+     "json": {
+      "object_type": "tags",
+      "operation": "delete",
+      "all": true
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/api/tags/"
+    }
+   ],
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "write": true,
+   "api_versions": [
+    "10"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,2132 @@
+{
+ "crate": "pl-docfilter",
+ "generated_by": "tests/parity/harness/gen_base_catalog.py (do not edit; add cases.json instead)",
+ "vars": {
+  "correspondent_id": {
+   "get": "/api/correspondents/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1
+   }
+  },
+  "correspondent_id_last": {
+   "get": "/api/correspondents/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "-id",
+    "page_size": 1
+   }
+  },
+  "custom_field_id": {
+   "get": "/api/custom_fields/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1
+   }
+  },
+  "doc_id": {
+   "get": "/api/documents/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1,
+    "fields": "id"
+   }
+  },
+  "doc_id_last": {
+   "get": "/api/documents/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "-id",
+    "page_size": 1,
+    "fields": "id"
+   }
+  },
+  "document_type_id": {
+   "get": "/api/document_types/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1
+   }
+  },
+  "storage_path_id": {
+   "get": "/api/storage_paths/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1
+   }
+  },
+  "tag_id": {
+   "get": "/api/tags/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "id",
+    "page_size": 1
+   }
+  },
+  "tag_id_last": {
+   "get": "/api/tags/",
+   "json": "results.0.id",
+   "user": "admin",
+   "query": {
+    "ordering": "-id",
+    "page_size": 1
+   }
+  },
+  "user1_id": {
+   "get": "/api/ui_settings/",
+   "json": "user.id",
+   "user": "user1"
+  }
+ },
+ "cases": [
+  {
+   "id": "docfilter.title_content",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "title_content": "a"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.title__icontains",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "title__icontains": "a"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.content__icontains",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "content__icontains": "the"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.archive_serial_number",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "archive_serial_number": 1
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.archive_serial_number__gt",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "archive_serial_number__gt": 1
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.archive_serial_number__lt",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "archive_serial_number__lt": 100
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.archive_serial_number__isnull",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "archive_serial_number__isnull": 1
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.archive_serial_number__isnull-0",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "archive_serial_number__isnull": 0
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.created__date__gt",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "created__date__gt": "2020-01-01"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.created__date__gte",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "created__date__gte": "2020-01-01"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.created__date__lt",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "created__date__lt": "2030-01-01"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.created__date__lte",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "created__date__lte": "2030-01-01"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.created__year",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "created__year": 2024
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.created__month",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "created__month": 1
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.created__day",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "created__day": 1
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.added__date__gt",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "added__date__gt": "2020-01-01"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.added__date__gte",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "added__date__gte": "2020-01-01"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.added__date__lt",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "added__date__lt": "2030-01-01"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.added__date__lte",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "added__date__lte": "2030-01-01"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.modified__date__gt",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "modified__date__gt": "2020-01-01"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.modified__date__lt",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "modified__date__lt": "2030-01-01"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.correspondent__id",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "correspondent__id": "${correspondent_id}"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.correspondent__id__in",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "correspondent__id__in": "${correspondent_id},${correspondent_id_last}"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.correspondent__id__none",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "correspondent__id__none": "${correspondent_id}"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.correspondent__isnull",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "correspondent__isnull": 1
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.correspondent__isnull-0",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "correspondent__isnull": 0
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.document_type__id",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "document_type__id": "${document_type_id}"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.document_type__id__in",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "document_type__id__in": "${document_type_id}"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.document_type__id__none",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "document_type__id__none": "${document_type_id}"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.document_type__isnull",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "document_type__isnull": 1
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.storage_path__id",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "storage_path__id": "${storage_path_id}"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.storage_path__id__in",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "storage_path__id__in": "${storage_path_id}"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.storage_path__id__none",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "storage_path__id__none": "${storage_path_id}"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.storage_path__isnull",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "storage_path__isnull": 1
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.tags__id__all",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "tags__id__all": "${tag_id},${tag_id_last}"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.tags__id__in",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "tags__id__in": "${tag_id},${tag_id_last}"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.tags__id__none",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "tags__id__none": "${tag_id}"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.tags__id__all-single",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "tags__id__all": "${tag_id}"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.is_tagged",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "is_tagged": 1
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.is_tagged-0",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "is_tagged": 0
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.is_in_inbox",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "is_in_inbox": 1
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.is_in_inbox-false",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "is_in_inbox": "false"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.owner__id",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "owner__id": "${user1_id}"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.owner__id__in",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "owner__id__in": "${user1_id}"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.owner__id__none",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "owner__id__none": "${user1_id}"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.owner__isnull",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "owner__isnull": 1
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.shared_by__id",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "shared_by__id": "${user1_id}"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.custom_fields__id__all",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "custom_fields__id__all": "${custom_field_id}"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.custom_fields__id__in",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "custom_fields__id__in": "${custom_field_id}"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.custom_fields__id__none",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "custom_fields__id__none": "${custom_field_id}"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.custom_fields__icontains",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "custom_fields__icontains": "a"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.has_custom_fields",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "has_custom_fields": 1
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.has_custom_fields-0",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "has_custom_fields": 0
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.mime_type",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "mime_type": "application/pdf"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.has_duplicates",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "has_duplicates": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.id",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "id": "${doc_id}"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.id__in",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "id__in": "${doc_id},${doc_id_last}"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.invalid.correspondent__id__in",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "correspondent__id__in": "a,b"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.invalid.tags__id__all",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "tags__id__all": "x"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.invalid.created__date__gt",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "created__date__gt": "not-a-date"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.invalid.archive_serial_number",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "archive_serial_number": "abc"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.invalid.is_tagged",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "is_tagged": "maybe"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.invalid.created__year",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "created__year": "abc"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.invalid.owner__id__none",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "owner__id__none": ",,"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.invalid.custom_field_query",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "custom_field_query": "not json"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.cfq.exists",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "custom_field_query": "[\"${custom_field_id}\",\"exists\",true]"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.cfq.isnull",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "custom_field_query": "[\"${custom_field_id}\",\"isnull\",true]"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.cfq.icontains",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "custom_field_query": "[\"${custom_field_id}\",\"icontains\",\"a\"]"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.cfq.and",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "custom_field_query": "[\"AND\",[[\"${custom_field_id}\",\"exists\",true],[\"${custom_field_id}\",\"isnull\",false]]]"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.cfq.or",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "custom_field_query": "[\"OR\",[[\"${custom_field_id}\",\"exists\",true],[\"${custom_field_id}\",\"exists\",false]]]"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.cfq.not",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "custom_field_query": "[\"NOT\",[\"${custom_field_id}\",\"exists\",true]]"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.cfq.unknown-field",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "custom_field_query": "[\"no_such_field\",\"exists\",true]"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.cfq.bad-op",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "custom_field_query": "[\"${custom_field_id}\",\"nope\",1]"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.cfq.too-deep",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "custom_field_query": "[\"AND\",[\"AND\",[\"AND\",[\"AND\",[\"AND\",[\"AND\",[\"AND\",[\"AND\",[\"AND\",[\"AND\",[\"AND\",[\"AND\",[\"x\",\"exists\",true]]]]]]]]]]]]]"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.cfq.empty",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "custom_field_query": "[]"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.ordering+archive_serial_number",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "archive_serial_number",
+    "truncate_content": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.ordering-archive_serial_number",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-archive_serial_number",
+    "truncate_content": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.ordering+correspondent__name",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "correspondent__name",
+    "truncate_content": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.ordering-correspondent__name",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-correspondent__name",
+    "truncate_content": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.ordering+title",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "title",
+    "truncate_content": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.ordering-title",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-title",
+    "truncate_content": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.ordering+document_type__name",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "document_type__name",
+    "truncate_content": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.ordering-document_type__name",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-document_type__name",
+    "truncate_content": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.ordering+created",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "created",
+    "truncate_content": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.ordering-created",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.ordering+added",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "added",
+    "truncate_content": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.ordering-added",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-added",
+    "truncate_content": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.ordering+modified",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "modified",
+    "truncate_content": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.ordering-modified",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-modified",
+    "truncate_content": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.ordering+num_notes",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "num_notes",
+    "truncate_content": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.ordering-num_notes",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-num_notes",
+    "truncate_content": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.ordering+owner",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "owner",
+    "truncate_content": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.ordering-owner",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-owner",
+    "truncate_content": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.ordering+page_count",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "page_count",
+    "truncate_content": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.ordering-page_count",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-page_count",
+    "truncate_content": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.ordering+storage_path__name",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "storage_path__name",
+    "truncate_content": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.ordering-storage_path__name",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-storage_path__name",
+    "truncate_content": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.ordering+id",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "id",
+    "truncate_content": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.ordering-id",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-id",
+    "truncate_content": "true"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.ordering-custom-field",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "custom_field_${custom_field_id}",
+    "truncate_content": "true"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.ordering-custom-field-desc",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-custom_field_${custom_field_id}",
+    "truncate_content": "true"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.ordering-custom-field-unknown",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "custom_field_999999999",
+    "truncate_content": "true"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.ordering-multi",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "title,-created",
+    "truncate_content": "true"
+   },
+   "users": [
+    "admin"
+   ],
+   "api_versions": [
+    "10"
+   ]
+  },
+  {
+   "id": "docfilter.combo-frontend",
+   "route": "documents.list",
+   "method": "GET",
+   "path": "/api/documents/",
+   "query": {
+    "page": 1,
+    "page_size": 50,
+    "ordering": "-created",
+    "truncate_content": "true",
+    "include_selection_data": "true",
+    "tags__id__all": "${tag_id}",
+    "is_in_inbox": 0,
+    "correspondent__id__in": "${correspondent_id}",
+    "created__date__gte": "2000-01-01",
+    "title_content": "e"
+   },
+   "users": [
+    "admin",
+    "user1"
+   ],
+   "api_versions": [
+    "10",
+    "9"
+   ]
+  }
+ ]
+}

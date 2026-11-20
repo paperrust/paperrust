@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PaperRust – Update</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="settings update">
+  <main>
+    <h1 id="title">Update</h1>
+    <p class="hint" id="current"></p>
+    <p class="advice" id="note" hidden></p>
+
+    <section class="card" id="ready" hidden aria-labelledby="ready-title">
+      <h2 id="ready-title">Version <span id="new-version"></span> ist bereit</h2>
+      <p class="hint" id="ready-meta"></p>
+      <h3>Was ist neu</h3>
+      <pre class="notes" id="notes"></pre>
+      <p class="hint">PaperRust wird beendet – auf diesem Computer werden Server und Datenbank vorher
+        geordnet gestoppt –, das Update eingespielt und PaperRust neu gestartet. Deine Dokumente und
+        Einstellungen bleiben unverändert; nötige Datenbank-Anpassungen erledigt PaperRust beim
+        nächsten Start.</p>
+      <p class="warn" id="not-installable" hidden>Diese Installation (portable oder Entwickler-Version)
+        kann sich nicht selbst aktualisieren. Bitte die neue Version von Hand installieren.</p>
+      <div class="buttons">
+        <button type="button" id="later" class="secondary">Beim nächsten Start</button>
+        <button type="button" id="install">Jetzt neu starten und installieren</button>
+      </div>
+    </section>
+
+    <section class="card" id="idle" hidden>
+      <p id="idle-text" role="status"></p>
+      <p class="error" id="search-error"></p>
+      <div class="buttons">
+        <button type="button" id="close" class="secondary">Schließen</button>
+        <button type="button" id="check">Jetzt suchen</button>
+      </div>
+    </section>
+
+    <p class="error" id="error" role="alert"></p>
+  </main>
+  <script src="update.js"></script>
+</body>
+</html>

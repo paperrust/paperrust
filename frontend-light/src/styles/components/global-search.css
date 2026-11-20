@@ -1,0 +1,113 @@
+/* Search field in the header bar and its result menu (GlobalSearch.svelte, GlobalSearchResults.svelte). */
+
+form {
+  position: relative;
+}
+
+/* Magnifier on the left in the field; disappears as soon as the field has focus */
+form > pngx-bs-icon[name=search] {
+  position: absolute;
+  left: 0.6rem;
+  top: 0.25rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+@media screen and (min-width: 768px) {
+  form > pngx-bs-icon[name=search] {
+    top: 0.15rem;
+  }
+}
+
+/* With focus: magnifier and shortcut hint gone, placeholder invisible */
+form:focus-within pngx-bs-icon[name=search],
+form:focus-within .badge {
+  display: none !important;
+}
+
+form:focus-within .form-control::placeholder {
+  color: rgba(255, 255, 255, 0);
+}
+
+form .badge {
+  font-size: 0.8rem;
+}
+
+/* Button next to the field (search target) in the same tinted style */
+form .input-group .btn {
+  border-color: rgba(255, 255, 255, 0.2);
+  color: var(--pr-primary-text-contrast);
+  padding-top: 0.15rem;
+  padding-bottom: 0.15rem;
+  min-height: calc(1.3em + 0.5rem + var(--bs-border-width) * 2) !important;
+}
+
+/* Field: dark tinted on the primary color, darker on focus and without room for the magnifier */
+form .form-control {
+  min-height: 2.25rem;
+  color: rgba(255, 255, 255, 0.55);
+  background-color: rgba(0, 0, 0, 0.16);
+  padding-left: 1.8rem;
+  border-color: rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease, padding-left 0s ease, background-color 0s ease;
+}
+
+form .form-control > input {
+  outline: none;
+  color: var(--pr-primary-text-contrast);
+}
+
+form .form-control > input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+form .form-control:focus-within {
+  background-color: rgba(0, 0, 0, 0.26);
+  color: var(--bs-light);
+  flex-grow: 1;
+  padding-left: 0.5rem;
+}
+
+/* no focus ring on the whole component */
+* {
+  --pr-focus-alpha: 0;
+}
+
+/* Result menu at most three quarters of the window height */
+.mh-75 {
+  max-height: 75vh;
+}
+
+/* Menu open: field as with focus */
+.dropdown.show pngx-bs-icon[name=search] {
+  display: none !important;
+}
+
+.dropdown.show .form-control {
+  padding-left: 0.5rem;
+}
+
+/* Result row: action button on the right shows its label only on hover/focus */
+.dropdown-item:has(button:focus) {
+  background-color: var(--pr-bg-darker);
+}
+
+.dropdown-item button {
+  transition: all 0.3s ease, color 0.15s ease;
+  max-width: 2rem;
+  overflow: hidden;
+}
+
+.dropdown-item button span {
+  opacity: 0;
+  transition: inherit;
+}
+
+.dropdown-item:hover button,
+.dropdown-item:has(button:focus) button {
+  max-width: 10rem;
+}
+
+.dropdown-item:hover button span,
+.dropdown-item:has(button:focus) span {
+  opacity: 1;
+}

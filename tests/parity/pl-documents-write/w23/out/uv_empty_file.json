@@ -1,0 +1,22 @@
+{
+  "django": {
+    "status": 400,
+    "body": {
+      "document": [
+        "The submitted file is empty."
+      ]
+    },
+    "plan": [],
+    "files": {}
+  },
+  "rust": {
+    "status": 400,
+    "body": {
+      "document": [
+        "The submitted file is empty."
+      ]
+    },
+    "plan": [],
+    "files": {}
+  }
+}

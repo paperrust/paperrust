@@ -1,0 +1,16 @@
+/* Drop area over the whole window when dragging in files (FileDrop.svelte). */
+
+.global-dropzone-overlay {
+  opacity: 0;
+  transition: opacity 0.25s ease-in-out;
+  background-color: hsla(var(--pr-primary), var(--pr-primary-lightness), 0.8);
+  z-index: 1200;
+}
+
+.global-dropzone-overlay.active {
+  opacity: 1;
+}
+
+.global-dropzone-overlay h2 {
+  color: var(--pr-primary-text-contrast);
+}

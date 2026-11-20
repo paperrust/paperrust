@@ -1,0 +1,22 @@
+{
+  "django": {
+    "status": 400,
+    "body": {
+      "documents": [
+        "Some documents in documents don't exist or were specified twice."
+      ]
+    },
+    "plan": [],
+    "files": {}
+  },
+  "rust": {
+    "status": 400,
+    "body": {
+      "documents": [
+        "Some documents in documents don't exist or were specified twice."
+      ]
+    },
+    "plan": [],
+    "files": {}
+  }
+}

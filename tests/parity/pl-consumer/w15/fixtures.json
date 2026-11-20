@@ -1,0 +1,31 @@
+{
+  "_comment": "Dateien der W15-Dokumente (Pfad relativ zu ORIGINALS_DIR) und die Schritte, die beide Läufer in derselben Reihenfolge ausführen. fake_archive: Dateiname, für den beide Seiten statt des echten Parsers einen Prüf-Parser einsetzen (Archiv = Kopie des Originals, Text fest, Vorschaubild feste Bytes), weil die Referenz ohne tesseract/ghostscript kein Archiv erzeugen kann.",
+  "fake_archive": {"filename": "w15_arch.pdf", "text": "fake archive text", "thumbnail": "W15THUMB"},
+  "files": [
+    {"id": 9001, "filename": "w15_text.txt", "text": "Hello W15\nSecond line of the text document\n"},
+    {"id": 9002, "filename": "w15_pdf.pdf", "sample": "pl-parsers/samples/pdf_text.pdf"},
+    {"id": 9003, "filename": "w15_arch.pdf", "sample": "pl-parsers/samples/pdf_text.pdf"},
+    {"id": 9011, "filename": "w15_9011.txt", "text": "w15 doc 9011\n"},
+    {"id": 9012, "filename": "w15_9012.txt", "text": "w15 doc 9012\n"},
+    {"id": 9013, "filename": "w15_9013.txt", "text": "w15 doc 9013\n"},
+    {"id": 9014, "filename": "w15_9014.txt", "text": "w15 doc 9014\n"},
+    {"id": 9015, "filename": "w15_9015.txt", "text": "w15 doc 9015\n"},
+    {"id": 9016, "filename": "w15_9016.txt", "text": "w15 doc 9016\n"},
+    {"id": 9017, "filename": "w15_9017.txt", "text": "w15 doc 9017\n"},
+    {"id": 9018, "filename": "w15_9018.txt", "text": "w15 doc 9018\n"},
+    {"id": 9019, "filename": "w15_9019.txt", "text": "w15 doc 9019\n"},
+    {"id": 9020, "filename": "w15_9020.txt", "text": "w15 doc 9020\n"},
+    {"id": 9021, "filename": "w15_9021.txt", "text": "w15 doc 9021\n"},
+    {"id": 9031, "filename": "w15_b1.txt", "text": "w15 bulk one\n"},
+    {"id": 9032, "filename": "w15_b2.txt", "text": "w15 bulk two\n"}
+  ],
+  "steps": [
+    {"name": "reprocess_text", "op": "reprocess", "id": 9001},
+    {"name": "reprocess_pdf", "op": "reprocess", "id": 9002},
+    {"name": "reprocess_archive", "op": "reprocess", "id": 9003},
+    {"name": "reprocess_missing", "op": "reprocess", "id": 9999},
+    {"name": "scheduled_1", "op": "scheduled"},
+    {"name": "scheduled_2", "op": "scheduled"},
+    {"name": "bulk_update", "op": "bulk_update", "ids": [9031, 9032]}
+  ]
+}

@@ -1,0 +1,28 @@
+{
+ "_doc": "pl-system: akzeptierte Abweichungen. Format: tests/parity/harness/plharness/rules.py.",
+ "rules": [
+  {
+   "name": "status-queue-cache-env",
+   "reason": "status: database.url ist der Name der jeweiligen DB-Kopie (A paperless, B eigene Kopie); tasks.redis_url/celery_* bedeuten in PaperRust Cache und eigene Warteschlange (kein Redis/Celery mehr).",
+   "ref": "docs/contract/pl-system.md#statusget--get-apistatus",
+   "case": "status@*",
+   "kind": [
+    "value",
+    "type"
+   ],
+   "path": "\\$\\.database\\.url|\\$\\.tasks\\.(redis_url|celery_url|celery_error)",
+   "target": "b"
+  },
+  {
+   "name": "logs-key-paperrust",
+   "reason": "PaperRust schreibt paperrust.log; die Liste nennt den Schlüssel paperrust statt paperless (paperless bleibt als Alias abrufbar).",
+   "ref": "docs/contract/pl-system.md#known-differences (6. logs)",
+   "case": "logs.list@*",
+   "kind": [
+    "value"
+   ],
+   "path": "\\$\\[0\\]",
+   "target": "b"
+  }
+ ]
+}

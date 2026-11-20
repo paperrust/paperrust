@@ -1,0 +1,14 @@
+{
+  "django": {
+    "status": 403,
+    "body": "Insufficient permissions",
+    "plan": [],
+    "files": {}
+  },
+  "rust": {
+    "status": 403,
+    "body": "Insufficient permissions",
+    "plan": [],
+    "files": {}
+  }
+}

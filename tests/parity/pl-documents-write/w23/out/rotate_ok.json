@@ -1,0 +1,152 @@
+{
+  "django": {
+    "status": 200,
+    "body": {
+      "result": "OK"
+    },
+    "plan": [
+      {
+        "kind": "task",
+        "task": {
+          "task": "documents.tasks.consume_file",
+          "args": [],
+          "kwargs": {
+            "input_doc": {
+              "source": 1,
+              "original_file": "<scratch>/8_rotated.pdf",
+              "root_document_id": 8,
+              "original_path": null,
+              "mailrule_id": null,
+              "mime_type": "application/pdf"
+            },
+            "overrides": {
+              "filename": null,
+              "title": "Invoice Doctor Weber 008",
+              "correspondent_id": 9,
+              "document_type_id": 1,
+              "tag_ids": [
+                18,
+                5
+              ],
+              "storage_path_id": 1,
+              "created": "2019-04-15",
+              "asn": null,
+              "owner_id": 2,
+              "view_users": [
+                3
+              ],
+              "view_groups": [],
+              "change_users": [
+                3
+              ],
+              "change_groups": [],
+              "custom_fields": {
+                "1": "text value 8",
+                "4": true,
+                "10": "pr3HighAAAAAAAAA"
+              },
+              "skip_asn_if_exists": false,
+              "version_label": null,
+              "actor_id": 2,
+              "remote_ocr": false,
+              "barcodes": null
+            }
+          },
+          "trigger_source": "api_upload",
+          "link": [],
+          "link_error": []
+        }
+      }
+    ],
+    "files": {
+      "8_rotated.pdf": {
+        "pages": 3,
+        "rotations": [
+          90,
+          90,
+          90
+        ],
+        "texts": [
+          "Invoice Doctor Weber 008 ORIGINAL - page 1/3 Invoice Doctor Weber 008 Reference REF-00008 From: Doctor Weber Water vehicle invoice tenant pharmacy prescription contract minutes agreement customs. Account credit amount tax prescription membership overdue.",
+          "Invoice Doctor Weber 008 ORIGINAL - page 2/3 Agreement insurance reminder due agreement vehicle tuition. Statement amount mortgage health tuition notice subscription balance passport phone health cancellation credit renewal. Property vehicle order shipment property cancellation repair donation. Rent quarterly contract quarterly school report meeting balance pharmacy policy prescription transfer. Policy payment pension invoice tuition pension passport report.",
+          "Invoice Doctor Weber 008 ORIGINAL - page 3/3 Electricity statement warranty agreement membership report due reminder refund pension. Registration rent employer water credit pension overdue pharmacy registration doctor tuition tax. Water shipment delivery passport repair credit invoice total phone renewal subscription report reminder water delivery. Landlord vehicle credit internet survey shipment budget report minutes insurance school due. Order customs employer gas property refund statement."
+        ]
+      }
+    }
+  },
+  "rust": {
+    "status": 200,
+    "body": {
+      "result": "OK"
+    },
+    "plan": [
+      {
+        "kind": "task",
+        "task": {
+          "task": "documents.tasks.consume_file",
+          "args": [],
+          "kwargs": {
+            "input_doc": {
+              "source": 1,
+              "mime_type": "application/pdf",
+              "mailrule_id": null,
+              "original_file": "<scratch>/8_rotated.pdf",
+              "original_path": null,
+              "root_document_id": 8
+            },
+            "overrides": {
+              "asn": null,
+              "title": "Invoice Doctor Weber 008",
+              "created": "2019-04-15",
+              "tag_ids": [
+                18,
+                5
+              ],
+              "actor_id": 2,
+              "barcodes": null,
+              "filename": null,
+              "owner_id": 2,
+              "remote_ocr": false,
+              "view_users": [
+                3
+              ],
+              "view_groups": [],
+              "change_users": [
+                3
+              ],
+              "change_groups": [],
+              "custom_fields": {
+                "1": "text value 8",
+                "4": true,
+                "10": "pr3HighAAAAAAAAA"
+              },
+              "version_label": null,
+              "storage_path_id": 1,
+              "correspondent_id": 9,
+              "document_type_id": 1,
+              "skip_asn_if_exists": false
+            }
+          },
+          "trigger_source": "api_upload",
+          "link": [],
+          "link_error": []
+        }
+      }
+    ],
+    "files": {
+      "8_rotated.pdf": {
+        "pages": 3,
+        "rotations": [
+          90,
+          90,
+          90
+        ],
+        "texts": [
+          "Invoice Doctor Weber 008 ORIGINAL - page 1/3 Invoice Doctor Weber 008 Reference REF-00008 From: Doctor Weber Water vehicle invoice tenant pharmacy prescription contract minutes agreement customs. Account credit amount tax prescription membership overdue.",
+          "Invoice Doctor Weber 008 ORIGINAL - page 2/3 Agreement insurance reminder due agreement vehicle tuition. Statement amount mortgage health tuition notice subscription balance passport phone health cancellation credit renewal. Property vehicle order shipment property cancellation repair donation. Rent quarterly contract quarterly school report meeting balance pharmacy policy prescription transfer. Policy payment pension invoice tuition pension passport report.",
+          "Invoice Doctor Weber 008 ORIGINAL - page 3/3 Electricity statement warranty agreement membership report due reminder refund pension. Registration rent employer water credit pension overdue pharmacy registration doctor tuition tax. Water shipment delivery passport repair credit invoice total phone renewal subscription report reminder water delivery. Landlord vehicle credit internet survey shipment budget report minutes insurance school due. Order customs employer gas property refund statement."
+        ]
+      }
+    }
+  }
+}

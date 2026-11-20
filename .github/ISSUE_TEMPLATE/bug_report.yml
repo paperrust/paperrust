@@ -1,0 +1,91 @@
+name: Bug report
+description: Something in PaperRust does not work as expected.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please check existing issues first.
+        **Security vulnerabilities must not be reported here** – see [SECURITY.md](https://github.com/paperrust/paperrust/blob/main/SECURITY.md).
+        Bugs in paperless-ngx itself belong to the paperless-ngx project.
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the problem and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to …
+        2. Click …
+        3. See error …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: PaperRust version or commit
+      description: Output of `paperrust --version`, the version shown in the web UI, or the git commit you built.
+      placeholder: e.g. 0.1.0 or 5f5de7c
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: How do you run PaperRust?
+      options:
+        - Docker / docker compose
+        - NAS template (Synology, UGREEN, Asustor, Unraid, CasaOS)
+        - Desktop app (Windows)
+        - Built from source (server)
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system and architecture
+      placeholder: e.g. Debian 12 amd64, Synology DSM 7.2 arm64, Windows 11 x64
+    validations:
+      required: true
+  - type: input
+    id: postgres
+    attributes:
+      label: PostgreSQL version
+      placeholder: e.g. 17
+  - type: input
+    id: browser
+    attributes:
+      label: Browser (for UI problems)
+      placeholder: e.g. Firefox 140
+  - type: dropdown
+    id: migrated
+    attributes:
+      label: Did you switch from paperless-ngx?
+      options:
+        - "No, new installation"
+        - "Yes (please name the paperless-ngx version below)"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: |
+        Relevant log lines (e.g. `docker compose logs paperrust`). **Remove passwords, tokens, secret keys,
+        e-mail addresses and document contents before posting.**
+      render: text
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context
+      description: Configuration (without secrets), screenshots, paperless-ngx version, anything else.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I removed secrets and personal data from everything I posted.
+          required: true

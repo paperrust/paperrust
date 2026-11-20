@@ -1,0 +1,44 @@
+{
+  "django": {
+    "status": 400,
+    "body": {
+      "documents": [
+        "Expected a list of items but got type \"str\"."
+      ],
+      "all": [
+        "Must be a valid boolean."
+      ],
+      "filters": [
+        "Expected a dictionary of items but got type \"list\"."
+      ],
+      "excluded_documents": {
+        "0": [
+          "This field may not be null."
+        ]
+      }
+    },
+    "plan": [],
+    "files": {}
+  },
+  "rust": {
+    "status": 400,
+    "body": {
+      "documents": [
+        "Expected a list of items but got type \"str\"."
+      ],
+      "all": [
+        "Must be a valid boolean."
+      ],
+      "filters": [
+        "Expected a dictionary of items but got type \"list\"."
+      ],
+      "excluded_documents": {
+        "0": [
+          "This field may not be null."
+        ]
+      }
+    },
+    "plan": [],
+    "files": {}
+  }
+}

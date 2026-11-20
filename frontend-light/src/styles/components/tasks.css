@@ -1,0 +1,75 @@
+/* Tasks (Tasks.svelte). */
+
+/* Popover with result text (applies globally as before) */
+::deep .popover {
+  max-width: 350px;
+}
+
+::deep .popover pre,
+pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.result {
+  cursor: pointer;
+}
+
+/* Table: fixed column widths from desktop on */
+.tasks-table {
+  width: 100%;
+}
+
+@media (min-width: 992px) {
+  .tasks-table {
+    table-layout: fixed;
+  }
+
+  .tasks-table .select-col {
+    width: 3rem;
+  }
+
+  .tasks-table .created-col {
+    width: 13rem;
+    white-space: nowrap;
+  }
+
+  .tasks-table .results-col {
+    width: 24%;
+  }
+
+  .tasks-table .actions-col {
+    width: 18rem;
+    white-space: nowrap;
+  }
+
+  .tasks-table .name-col,
+  .tasks-table .results-col {
+    overflow: hidden;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .name-col {
+    max-width: 150px;
+  }
+}
+
+/* Filter bar */
+.input-group .dropdown .btn {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.z-10 {
+  z-index: 10;
+}
+
+/* Second-to-last table row without line */
+tbody tr:nth-last-child(2) td {
+  border-bottom: none !important;
+}
+
+.section-header .show-all {
+  font-size: inherit;
+}

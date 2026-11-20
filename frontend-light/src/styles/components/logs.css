@@ -1,0 +1,41 @@
+/* Logs (Logs.svelte). */
+
+/* Color per level: 10 debug, 30 warning, 40 error, 50 critical */
+.log-entry-10 {
+  color: lightslategray !important;
+}
+
+.log-entry-30 {
+  color: yellow !important;
+}
+
+.log-entry-40 {
+  color: red !important;
+}
+
+.log-entry-50 {
+  color: lightcoral !important;
+  font-weight: bold;
+}
+
+/* Scroll area fills the page */
+.log-container {
+  height: calc(100vh - 190px);
+  overflow-y: auto;
+}
+
+.log-container p {
+  white-space: pre-wrap;
+}
+
+/* "Down" button fades in as soon as one has scrolled up */
+.jump-to-bottom {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease-in-out;
+}
+
+.jump-to-bottom.visible {
+  opacity: 1;
+  pointer-events: auto;
+}

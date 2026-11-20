@@ -1,0 +1,22 @@
+{
+  "django": {
+    "status": 400,
+    "body": {
+      "non_field_errors": [
+        "doc index is out of bounds"
+      ]
+    },
+    "plan": [],
+    "files": {}
+  },
+  "rust": {
+    "status": 400,
+    "body": {
+      "non_field_errors": [
+        "doc index is out of bounds"
+      ]
+    },
+    "plan": [],
+    "files": {}
+  }
+}

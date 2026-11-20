@@ -1,0 +1,65 @@
+# PaperRust + PostgreSQL 17 – schlanke Variante: nur Startwerte in der Umgebung.
+#
+# Wie docker-compose.postgres.yml, aber die Umgebung enthält nur, was vor dem Datenbankzugriff
+# gebraucht wird (Datenbank, SECRET_KEY, optional die öffentliche Adresse). Alles andere –
+# Zeitzone, OCR-Sprache, E-Mail-Versand, Anmeldung/SSO, Zeitpläne, KI … – stellt ein Administrator
+# in der Oberfläche ein: Einstellungen → System (gespeichert in der Datenbank).
+#
+#   cd docker
+#   cp docker-compose.slim.env .env.paperrust        # Kopie anpassen (SECRET_KEY!), env_file umstellen
+#   docker compose -f docker-compose.slim.yml build  # bis ein Image veröffentlicht ist
+#   docker compose -f docker-compose.slim.yml up -d
+#   docker compose -f docker-compose.slim.yml exec paperrust createsuperuser
+#
+# Oberfläche: http://localhost:8000 → Einstellungen → System.
+# Ausführlich: docs/user/configuration.md#settings-ui, docs/SETTINGS.md §5.
+#
+# Umsteiger mit einer langen docker-compose.env: Einstellungen → System → „Herkunft & Umzug“
+# übernimmt die Werte in die Datenbank und erzeugt eine schlanke docker-compose.env
+# (CLI: docker compose -f docker-compose.slim.yml exec -T paperrust
+#        paperrust manage settings slim-env < docker-compose.env > docker-compose.env.neu).
+
+services:
+  db:
+    image: docker.io/library/postgres:17
+    restart: unless-stopped
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: paperless
+      POSTGRES_USER: paperless
+      # muss zu PAPERRUST_DBPASS in docker-compose.slim.env passen
+      POSTGRES_PASSWORD: paperless
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paperless -d paperless"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  paperrust:
+    # Noch nicht veröffentlicht: `build` baut das Image lokal aus diesem Repository.
+    image: ${PAPERRUST_IMAGE:-paperrust/paperrust:local}
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - data:/usr/src/paperless/data
+      - media:/usr/src/paperless/media
+      - ./export:/usr/src/paperless/export
+      - ./consume:/usr/src/paperless/consume
+    # PAPERRUST_DBHOST, PAPERRUST_DBPASS, PAPERRUST_SECRET_KEY (+ optional PAPERRUST_URL).
+    # DBENGINE (postgresql, weil DBHOST gesetzt), DBNAME und DBUSER (paperless) sind Standard.
+    env_file: docker-compose.slim.env
+    # laufende Aufgaben bekommen PAPERRUST_QUEUE_SHUTDOWN_GRACE (30 s) zum Abschließen
+    stop_grace_period: 45s
+
+volumes:
+  data:
+  media:
+  pgdata:

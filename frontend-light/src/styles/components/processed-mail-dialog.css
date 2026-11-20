@@ -1,0 +1,13 @@
+/* Dialog "Processed emails" (ProcessedMailDialog.svelte). */
+
+/* Popover with error text: limited and wrapping (applies globally as before) */
+::deep .popover {
+  max-width: 350px;
+  max-height: 600px;
+  overflow: hidden;
+}
+
+::deep .popover pre {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}

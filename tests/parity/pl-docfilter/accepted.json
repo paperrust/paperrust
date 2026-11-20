@@ -1,0 +1,49 @@
+{
+ "_doc": "pl-docfilter: akzeptierte Abweichungen. Format: tests/parity/harness/plharness/rules.py.",
+ "rules": [
+  {
+   "name": "is-in-inbox-1-0-inbox",
+   "reason": "is_in_inbox=1|0 gilt wie true/false (die Oberflächen senden 1/0); upstream wertet nur true/false aus und liefert bei 1/0 alle Dokumente (195 statt 44).",
+   "ref": "docs/contract/pl-docfilter.md#known-differences (10. is_in_inbox=1|0)",
+   "case": "docfilter.is_in_inbox@*",
+   "kind": [
+    "value",
+    "type",
+    "length",
+    "missing",
+    "extra"
+   ],
+   "path": "\\$\\.(count|next|previous)|\\$\\.results(\\[\\d+\\].*)?",
+   "target": "b"
+  },
+  {
+   "name": "is-in-inbox-1-0-combo",
+   "reason": "Wie is-in-inbox-1-0-inbox: im Frontend-Kombifilter mit is_in_inbox=0 schließt PaperRust Inbox-Dokumente aus (0 Treffer), upstream ignoriert den Wert (2 Treffer); die Zähler in selection_data und all folgen daraus.",
+   "ref": "docs/contract/pl-docfilter.md#known-differences (10. is_in_inbox=1|0)",
+   "case": "docfilter.combo-frontend@*",
+   "kind": [
+    "value",
+    "type",
+    "length",
+    "missing",
+    "extra"
+   ],
+   "path": "\\$\\.(count|next|previous)|\\$\\.all(\\[\\d+\\])?|\\$\\.results(\\[\\d+\\].*)?|\\$\\.selection_data\\.selected_\\w+\\[\\d+\\]\\.document_count",
+   "target": "b"
+  },
+  {
+   "name": "tie-order-documents-ordering",
+   "reason": "Reihenfolge bei gleichem Sortierwert (viele leere ASN, gleicher Besitzer, gleiches modified): nach dem Datenmodell-Umbau ist der Plan ein anderer; upstream legt die Reihenfolge innerhalb gleicher Werte nicht fest. count gleich, nur die Positionen innerhalb der Seite unterscheiden sich.",
+   "ref": "docs/contract/pl-store.md#known-differences-stufe-1 (Reihenfolge bei Gleichstand)",
+   "case": "docfilter.ordering[-+]*",
+   "kind": [
+    "value",
+    "type",
+    "length",
+    "missing",
+    "extra"
+   ],
+   "path": "\\$\\.results\\[\\d+\\]\\..*"
+  }
+ ]
+}

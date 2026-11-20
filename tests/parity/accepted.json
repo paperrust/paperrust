@@ -1,0 +1,204 @@
+{
+  "_doc": "Global accepted deviations (harness owner). Crate-specific rules belong in tests/parity/<crate>/accepted.json. Format: see tests/parity/harness/plharness/rules.py. Every rule needs name, reason and ref (contract section).",
+  "rules": [
+    {
+      "name": "status-storage-available-volatile",
+      "reason": "Freier Speicher ändert sich zwischen der A- und der B-Anfrage (andere Prozesse schreiben auf C:); flüchtiger Wert, kein Verhaltensunterschied.",
+      "ref": "docs/contract/pl-system.md#known-differences",
+      "case": "status@*",
+      "kind": [
+        "value"
+      ],
+      "path": "\\$\\.storage\\.available"
+    },
+    {
+      "name": "token-login-throttle-shared-bucket",
+      "reason": "Django drosselt /api/token/ auf 5/min pro Client-IP. A und B laufen nacheinander gegen dieselbe Django-Instanz (B = Proxy) von 127.0.0.1, also teilen sie einen Zähler; B bekommt 429. Testartefakt; Drosselung selbst ist in tests/security geprüft.",
+      "ref": "docs/contract/testing.md",
+      "case": "token.*",
+      "kind": [
+        "status",
+        "missing",
+        "extra",
+        "value"
+      ]
+    },
+    {
+      "name": "statistics-asn-filtered",
+      "reason": "Nutzerentscheidung 2026-11-08: current_asn nur über sichtbare Dokumente (upstream-Fix #14710, nach v3.4.2). v3.4.2 zeigt das globale Maximum (Leck).",
+      "ref": "docs/contract/pl-system.md#entscheidungen",
+      "case": "statistics@*",
+      "kind": [
+        "value"
+      ],
+      "path": "\\$\\.current_asn",
+      "target": "b"
+    },
+    {
+      "name": "more-like-this-upstream-nondeterministic",
+      "reason": "more_like_id: tantivy wählt bei gleichem Gewicht MLT-Terme über eine HashMap zufällig – auch zwei Django-Anfragen hintereinander liefern unterschiedliche Reihenfolge/Treffer (pl-indexer-Kontrolllauf upstream gegen upstream). PaperRust delegiert more_like_id derzeit ohnehin an Django.",
+      "ref": "docs/contract/pl-indexer.md#known-differences",
+      "case": "search.documents.more_like*",
+      "kind": [
+        "value",
+        "length",
+        "missing",
+        "extra"
+      ]
+    },
+    {
+      "name": "bulk-download-windows-unlink",
+      "reason": "Windows-Referenz: BulkDownloadView.post loescht die offene Temp-ZIP (temp_path.unlink nach open) -> PermissionError WinError 32 -> 500. Unter Linux liefert upstream 200 + ZIP wie Rust. Referenzartefakt.",
+      "ref": "docs/contract/pl-files.md#known-differences",
+      "case": "files.bulk_download.archive@*",
+      "kind": [
+        "status",
+        "header",
+        "missing",
+        "extra",
+        "value",
+        "type",
+        "length"
+      ]
+    },
+    {
+      "name": "webhook-allowed-schemes-set-order",
+      "reason": "upstream WEBHOOKS_ALLOWED_SCHEMES ist ein Python-set; die Reihenfolge in 'Allowed schemes: ...' haengt vom Hash-Seed des Django-Prozesses ab. Rust fest 'http, https'.",
+      "ref": "upstream/src/documents/validators.py:36",
+      "case": "wf.actions.create.webhook-url@*",
+      "kind": [
+        "value"
+      ]
+    },
+    {
+      "name": "status-paperrust-extra",
+      "reason": "PaperRust liefert zusaetzlich das Unterobjekt `paperrust` (Komponenten-Status); alle upstream-Schluessel bleiben.",
+      "ref": "docs/contract/pl-system.md#known-differences",
+      "case": "status@*",
+      "kind": [
+        "extra"
+      ],
+      "path": "\\$\\.paperrust.*",
+      "target": "b"
+    },
+    {
+      "name": "remote-version-paperrust",
+      "reason": "Versionspruefung gegen PaperRust-Releases statt paperless-ngx (Nutzerentscheidung Rebranding 2026-11-09); Zusatzobjekt `paperrust`.",
+      "ref": "docs/contract/pl-system.md#known-differences",
+      "case": "remote_version@*",
+      "kind": [
+        "value",
+        "extra"
+      ],
+      "path": "\\$\\.(version|update_available|paperrust.*)",
+      "target": "b"
+    },
+    {
+      "name": "branding-ui-defaults",
+      "reason": "pl-server setzt app_title/app_logo auf PaperRust, wenn nicht konfiguriert (Branding, Nutzerentscheidung). Django liefert null.",
+      "ref": "docs/contract/pl-server.md",
+      "case": "ui_settings*",
+      "kind": [
+        "type",
+        "value"
+      ],
+      "path": "\\$\\.settings\\.app_(title|logo)",
+      "target": "b"
+    },
+    {
+      "name": "tag-tree-audit-django-process-artifact",
+      "reason": "Django-Prozessartefakt nach DB-Reset zwischen den Faellen: im Audit fehlen tn_level/tn_order/tn_ancestors nach dem Baum-Update (bei frisch gestartetem Django identisch, Analyse W11). Rust-Werte sind die korrekten.",
+      "ref": "docs/contract/pl-objects.md",
+      "case": "w2.obj.create.state@*",
+      "kind": [
+        "value"
+      ],
+      "path": "(step\\d+:)?\\$\\[0\\]\\.changes\\.tn_(level|order|ancestors_pks|ancestors_count)\\[1\\]",
+      "target": "b"
+    },
+    {
+      "name": "config-read-needs-view-perm-user1",
+      "reason": "upstream fix 53d9aa34a after v3.4.2: GET /api/config/ braucht paperless.view_applicationconfiguration (PaperlessModelPermissions). v3.4.2 liefert jedem angemeldeten Nutzer 200, PaperRust 403 fuer user1 (ohne diese Berechtigung).",
+      "ref": "docs/UPSTREAM-SYNC.md#uebernommene-einzel-fixes",
+      "case": "config.*@user1/*",
+      "kind": [
+        "status",
+        "type",
+        "value",
+        "missing",
+        "extra",
+        "length",
+        "key-order",
+        "body-kind",
+        "body"
+      ],
+      "target": "b"
+    },
+    {
+      "name": "config-read-needs-view-perm-noperm",
+      "reason": "upstream fix 53d9aa34a after v3.4.2: GET /api/config/ braucht paperless.view_applicationconfiguration (PaperlessModelPermissions). v3.4.2 liefert jedem angemeldeten Nutzer 200, PaperRust 403 fuer noperm (ohne diese Berechtigung).",
+      "ref": "docs/UPSTREAM-SYNC.md#uebernommene-einzel-fixes",
+      "case": "config.*@noperm/*",
+      "kind": [
+        "status",
+        "type",
+        "value",
+        "missing",
+        "extra",
+        "length",
+        "key-order",
+        "body-kind",
+        "body"
+      ],
+      "target": "b"
+    },
+    {
+      "name": "config-read-needs-view-perm-vary",
+      "reason": "Folge der Regeln config-read-needs-view-perm-*: A liefert 200 mit langem JSON (GZipMiddleware setzt Vary: Accept-Encoding), B die kurze 403-Antwort, fuer die auch Django kein Accept-Encoding in Vary setzt (unter 200 Byte).",
+      "ref": "docs/UPSTREAM-SYNC.md#uebernommene-einzel-fixes",
+      "case": "config.*",
+      "kind": [
+        "header"
+      ],
+      "path": "header:vary",
+      "a": "accept, accept-encoding, accept-language, cookie, origin",
+      "b": "accept, accept-language, cookie, origin",
+      "target": "b"
+    },
+    {
+      "name": "redacted-version-flag",
+      "reason": "PaperRust-Erweiterung (Schwärzen): jede Version in versions[] hat zusätzlich das Feld redacted (bool, Erkennung über die Prüfsumme in paperrust_redaction). Seed-Daten ohne Schwärzung, daher immer false; upstream hat das Feld nicht.",
+      "ref": "docs/contract/pl-pdftools.md#41-geschwärzte-versionen-beim-teilen-stand-2026-11-19",
+      "case": "*",
+      "kind": [
+        "extra"
+      ],
+      "path": "(step\\d+:)?\\$(\\.results\\[\\d+\\])?\\.versions\\[\\d+\\]\\.redacted",
+      "b": false,
+      "target": "b"
+    },
+    {
+      "name": "redacted-version-flag-vary",
+      "reason": "Folge von redacted-version-flag: mit dem Zusatzfeld überschreitet die Antwort auf ?fields=id,versions die 200-Byte-Grenze der GZip-Middleware, daher Vary: Accept-Encoding (die kürzere upstream-Antwort hat es nicht).",
+      "ref": "docs/contract/pl-pdftools.md#41-geschwärzte-versionen-beim-teilen-stand-2026-11-19; docs/contract/pl-server.md#known-differences (1. Kompression)",
+      "case": "documents.retrieve.versions@*",
+      "kind": [
+        "header"
+      ],
+      "path": "header:vary",
+      "a": "accept, accept-language, cookie, origin",
+      "b": "accept, accept-encoding, accept-language, cookie, origin",
+      "target": "b"
+    },
+    {
+      "name": "oauth-state-random-ui-settings",
+      "reason": "Testaufbau des Release-Laufs (tests/parity/release-run.sh): die OAuth-Testwerte (PAPERLESS_{GMAIL,OUTLOOK}_OAUTH_CLIENT_*) sind für alle Kataloge gesetzt, daher enthalten auch ui_settings-Antworten außerhalb von gaps.* die OAuth-URLs. state= ist je Anfrage zufällig (secrets.token_urlsafe(32)), wie Regel oauth-state-random.",
+      "ref": "docs/contract/pl-auth-api.md#known-differences (6. ui_settings.get mit Mail-OAuth)",
+      "case": "*",
+      "kind": [
+        "value"
+      ],
+      "path": "(step\\d+:)?\\$\\.settings\\.(gmail|outlook)_oauth_url"
+    }
+  ]
+}

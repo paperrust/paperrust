@@ -1,0 +1,43 @@
+{
+ "_doc": "pl-mail: akzeptierte Abweichungen. Format: tests/parity/harness/plharness/rules.py.",
+ "rules": [
+  {
+   "name": "mail-send-error-400-status",
+   "reason": "Fehler beim Lesen/Bauen/Senden der Mail: 400 statt upstreams 500 (unbehandelte Ausnahme).",
+   "ref": "docs/contract/pl-mail.md#known-differences (19.)",
+   "case": "w23.documents.email*",
+   "kind": [
+    "status"
+   ],
+   "path": "\\$status",
+   "a": 500,
+   "b": 400,
+   "target": "b"
+  },
+  {
+   "name": "mail-send-error-400-page",
+   "reason": "Folge von mail-send-error-400-status: 400-Antwort der Route (mit Allow/Vary der View) statt Djangos 500-Seite.",
+   "ref": "docs/contract/pl-mail.md#known-differences (19.)",
+   "case": "w23.documents.email*",
+   "kind": [
+    "header",
+    "body"
+   ],
+   "path": "\\$body|header:(allow|vary)",
+   "target": "b"
+  },
+  {
+   "name": "mail-account-test-error-400",
+   "reason": "Test eines Mail-Kontos mit nicht erreichbarem Server: 400 statt upstreams 500.",
+   "ref": "docs/contract/pl-mail.md#known-differences (19.)",
+   "case": "mail.accounts.test.refused@*",
+   "kind": [
+    "status"
+   ],
+   "path": "\\$status",
+   "a": 500,
+   "b": 400,
+   "target": "b"
+  }
+ ]
+}

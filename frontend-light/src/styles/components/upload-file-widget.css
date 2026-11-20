@@ -1,0 +1,25 @@
+/* Home page tile for uploading documents (UploadFileWidget.svelte). */
+
+/* Align plus icon to the text baseline */
+:host ::deep pngx-bs-icon svg {
+  margin-top: -3px;
+}
+
+/* Dashed drop area */
+.btn-outline-dark {
+  --bs-btn-border-color: var(--bs-border-color-translucent);
+  border-style: dashed;
+  border-width: 1px;
+  min-height: 5.25rem;
+  background: color-mix(in srgb, var(--bs-primary) 4%, var(--bs-light)) !important;
+}
+
+.btn-outline-dark:hover,
+.btn-outline-dark:focus {
+  border-color: var(--bs-primary);
+  background: color-mix(in srgb, var(--bs-primary) 9%, var(--bs-light)) !important;
+}
+
+.smaller {
+  font-size: 0.75rem;
+}

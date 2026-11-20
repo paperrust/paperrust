@@ -1,0 +1,16 @@
+From: Ivan <ivan@example.org>
+To: paperless@example.org
+Subject: Inline PDF only
+Date: Tue, 14 Jan 2025 16:00:00 +0100
+Content-Type: multipart/mixed; boundary="q"
+
+--q
+Content-Type: application/pdf; name="inline.pdf"
+Content-Disposition: inline; filename="inline.pdf"
+Content-Transfer-Encoding: base64
+
+JVBERi0xLjQKMSAwIG9iajw8L1R5cGUvQ2F0YWxvZy9QYWdlcyAyIDAgUj4+ZW5kb2JqCjIgMCBv
+Ymo8PC9UeXBlL1BhZ2VzL0tpZHNbMyAwIFJdL0NvdW50IDE+PmVuZG9iagozIDAgb2JqPDwvVHlw
+ZS9QYWdlL1BhcmVudCAyIDAgUi9NZWRpYUJveFswIDAgMjAwIDIwMF0+PmVuZG9iagp0cmFpbGVy
+PDwvUm9vdCAxIDAgUj4+CiUlRU9GCg==
+--q--

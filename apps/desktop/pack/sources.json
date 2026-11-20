@@ -1,0 +1,140 @@
+{
+  "_comment": "Gepinnte Fremd-Binaries für das PaperRust-Desktop-Paket (pack.ps1). Jede Datei wird nach dem Download per SHA-256 geprüft; ein Eintrag ohne sha256 bricht den Paketbau ab. Quelle der Prüfsummen: GitHub-Release-API (Feld digest) bzw. bei tessdata erster Download (TOFU, 2026-11-09). Aktualisieren: Version + URL + sha256 gemeinsam ändern, Paket neu bauen, Rauchtest.",
+  "postgresql": {
+    "version": "17.11.1",
+    "license": "PostgreSQL License; gebündelte Bibliotheken siehe dependency-notices/ im Archiv",
+    "note": "theseus-rs/postgresql-binaries, aus Quellcode gebaut (REL_17_11), ICU + OpenSSL + lz4 + zstd gebündelt (manifest.json des Releases geprüft). Veröffentlicht 2026-10-18.",
+    "targets": {
+      "x86_64-pc-windows-msvc": {
+        "url": "https://github.com/theseus-rs/postgresql-binaries/releases/download/17.11.1/postgresql-17.11.1-x86_64-pc-windows-msvc.zip",
+        "sha256": "4dee656719d4182055219765c29c9e692993d14ba0d1b4344dd24a8ff7296782",
+        "size": 48338921,
+        "strip_prefix": "postgresql-17.11.1-x86_64-pc-windows-msvc"
+      },
+      "x86_64-unknown-linux-gnu": {
+        "url": "https://github.com/theseus-rs/postgresql-binaries/releases/download/17.11.1/postgresql-17.11.1-x86_64-unknown-linux-gnu.tar.gz",
+        "sha256": "aa8e2e97574bd789119ac01f1dddcd7a038c84e5c308d7b753018618258f0fbd",
+        "size": 40073705,
+        "strip_prefix": "postgresql-17.11.1-x86_64-unknown-linux-gnu"
+      },
+      "aarch64-unknown-linux-gnu": {
+        "url": "https://github.com/theseus-rs/postgresql-binaries/releases/download/17.11.1/postgresql-17.11.1-aarch64-unknown-linux-gnu.tar.gz",
+        "sha256": "edaab3230a014680ebedd836824962628f66ceabd94c36ba3f953bf9e04dc166",
+        "size": 39478345,
+        "strip_prefix": "postgresql-17.11.1-aarch64-unknown-linux-gnu"
+      },
+      "aarch64-apple-darwin": {
+        "url": "https://github.com/theseus-rs/postgresql-binaries/releases/download/17.11.1/postgresql-17.11.1-aarch64-apple-darwin.tar.gz",
+        "sha256": "f4b2ff0587d80b6f22bf09ec2d133a3c2949b6423318d3fed0f4ddddddf2f004",
+        "size": 90030572,
+        "strip_prefix": "postgresql-17.11.1-aarch64-apple-darwin"
+      },
+      "x86_64-apple-darwin": {
+        "url": "https://github.com/theseus-rs/postgresql-binaries/releases/download/17.11.1/postgresql-17.11.1-x86_64-apple-darwin.tar.gz",
+        "sha256": "edb44b25cf8bffec60fa300fbe100fa4238bf2cab4f4bd98d4b7255c61780df3",
+        "size": 93265621,
+        "strip_prefix": "postgresql-17.11.1-x86_64-apple-darwin"
+      }
+    }
+  },
+  "pdfium": {
+    "version": "chromium/8111",
+    "license": "BSD-3-Clause + Drittlizenzen (LICENSE im Archiv)",
+    "note": "bblanchon/pdfium-binaries, veröffentlicht 2026-10-19.",
+    "targets": {
+      "x86_64-pc-windows-msvc": {
+        "url": "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F8111/pdfium-win-x64.tgz",
+        "sha256": "3452d11031050ec65e57f180215b57b9e6d465e3fbedafa8a77ad90885c7d23e",
+        "size": 3905343,
+        "file": "bin/pdfium.dll"
+      },
+      "x86_64-unknown-linux-gnu": {
+        "url": "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F8111/pdfium-linux-x64.tgz",
+        "sha256": "bdc60126399f39fe768566a18d4be055a7b3681bc9e248e8a6656b4f6cae0aa2",
+        "size": 3828739,
+        "file": "lib/libpdfium.so"
+      },
+      "aarch64-unknown-linux-gnu": {
+        "url": "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F8111/pdfium-linux-arm64.tgz",
+        "sha256": "042de247138f96341534cccf24ed21c2550a7245b936bb4a60d2340120000f05",
+        "size": 3728828,
+        "file": "lib/libpdfium.so"
+      },
+      "aarch64-apple-darwin": {
+        "url": "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F8111/pdfium-mac-arm64.tgz",
+        "sha256": "46c674298c60123f1195c2a03c65ee08c4783c84874ce4f5b3a054abb3ecaf30",
+        "size": 3541773,
+        "file": "lib/libpdfium.dylib"
+      },
+      "x86_64-apple-darwin": {
+        "url": "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F8111/pdfium-mac-x64.tgz",
+        "sha256": "e7fece4693f65a7e47f84fa38099068d573d4dcbd46b1a3c8d2c26581c308466",
+        "size": 3749773,
+        "file": "lib/libpdfium.dylib"
+      }
+    }
+  },
+  "tesseract": {
+    "version": "5.4.0.20240606",
+    "license": "Apache-2.0 (Tesseract), Leptonica BSD-2, weitere DLL-Lizenzen im Installer",
+    "note": "Windows: UB-Mannheim-Build (NSIS-Installer, wird mit 7-Zip entpackt, nie ausgeführt). sha256 gepinnt 2026-11-09 (D2): GitHub liefert für dieses Asset keinen digest; Größe 50175248 B stimmt mit dem Release überein, Authenticode-Signatur 'Universität Mannheim' (GEANT Code Signing CA 4, Zertifikat 2022-12-09..2023-12-10, Signatur intakt, nur abgelaufen). Der Spiegel digi.bib.uni-mannheim.de verweigert automatische Downloads (403), daher kein Zweitabgleich. macOS/Linux: eigener Build bzw. Paketabhängigkeit (docs/DESKTOP.md Abschnitt 9).",
+    "targets": {
+      "x86_64-pc-windows-msvc": {
+        "url": "https://github.com/UB-Mannheim/tesseract/releases/download/v5.4.0.20240606/tesseract-ocr-w64-setup-5.4.0.20240606.exe",
+        "sha256": "c885fff6998e0608ba4bb8ab51436e1c6775c2bafc2559a19b423e18678b60c9",
+        "size": 50175248,
+        "extract": "7z"
+      }
+    }
+  },
+  "tessdata": {
+    "version": "tessdata_fast 4.1.0",
+    "license": "Apache-2.0",
+    "files": {
+      "eng.traineddata": {
+        "url": "https://github.com/tesseract-ocr/tessdata_fast/raw/4.1.0/eng.traineddata",
+        "sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+        "size": 4113088
+      },
+      "deu.traineddata": {
+        "url": "https://github.com/tesseract-ocr/tessdata_fast/raw/4.1.0/deu.traineddata",
+        "sha256": "19d219bbb6672c869d20a9636c6816a81eb9a71796cb93ebe0cb1530e2cdb22d",
+        "size": 1525436
+      },
+      "osd.traineddata": {
+        "url": "https://github.com/tesseract-ocr/tessdata_fast/raw/4.1.0/osd.traineddata",
+        "sha256": "9cf5d576fcc47564f11265841e5ca839001e7e6f38ff7f7aacf46d15a96b00ff",
+        "size": 10562727
+      }
+    }
+  },
+  "fonts": {
+    "version": "liberation-fonts 2.1.5",
+    "license": "SIL Open Font License 1.1 (LICENSE im Archiv)",
+    "note": "Schrift für Text-Vorschaubilder (PAPERLESS_THUMBNAIL_FONT_NAME, upstream-Standard LiberationSerif-Regular.ttf). GitHub-Release 2.1.5 (2021-09-30, Anhang der Release-Notiz). sha256 gepinnt 2026-11-09, Zweitabgleich: Homebrew-Cask font-liberation (gleiche URL, gleiche Prüfsumme). Aus dem Archiv werden nur LiberationSerif-Regular.ttf und LICENSE übernommen.",
+    "url": "https://github.com/liberationfonts/liberation-fonts/files/7261482/liberation-fonts-ttf-2.1.5.tar.gz",
+    "sha256": "7191c669bf38899f73a2094ed00f7b800553364f90e2637010a69c0e268f25d0",
+    "size": 2385008,
+    "strip_prefix": "liberation-fonts-ttf-2.1.5",
+    "files": ["LiberationSerif-Regular.ttf"]
+  },
+  "tools": {
+    "_comment": "Werkzeuge nur für den Paketbau (nicht im Paket).",
+    "7zip": {
+      "version": "26.05",
+      "license": "LGPL-2.1+ / BSD-3 (unRAR-Einschränkung) – nur Bauwerkzeug, wird nicht mitgeliefert",
+      "note": "ip7z/7zip GitHub-Release 26.05 (2026-10-21), sha256 = GitHub digest. Wird nur benutzt, wenn kein 7z.exe vorhanden ist: per 'msiexec /a' (administrative Installation = nur Dateien auspacken, keine Admin-Rechte) in den Cache entpackt.",
+      "url": "https://github.com/ip7z/7zip/releases/download/26.05/7z2605-x64.msi",
+      "sha256": "3fe4ab99fa15629c652944309a2b2bc6e41fc933fc6b63f5df1ebcf3aea68263",
+      "size": 2008576
+    },
+    "tauri_cli": {
+      "version": "2.12.4",
+      "license": "MIT/Apache-2.0 – nur Bauwerkzeug, wird nicht mitgeliefert",
+      "note": "tauri-apps/tauri Release tauri-cli-v2.12.4 (2026-10-21), sha256 = GitHub digest. Vorgebautes cargo-tauri.exe (statt cargo install: ~600 Crates). Der Bundler lädt NSIS 3 + nsis_tauri_utils.dll selbst und prüft sie gegen fest eingebaute Prüfsummen.",
+      "url": "https://github.com/tauri-apps/tauri/releases/download/tauri-cli-v2.12.4/cargo-tauri-x86_64-pc-windows-msvc.zip",
+      "sha256": "3e8687fb184bd7f10ebd8642f7715f79f4a605c0694c142a21507e8a24dc0f8b",
+      "size": 7763590
+    }
+  }
+}

@@ -1,0 +1,189 @@
+[workspace]
+resolver = "2"
+members = ["crates/*", "apps/desktop"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-only"
+repository = "https://github.com/paperrust/paperrust"
+# Nichts wird auf crates.io veroeffentlicht (cargo-deny wildcard-Gate).
+publish = false
+
+# Versions are a starting point; the core agent may bump them to the newest
+# compatible releases. All crates take dependencies from here (`dep.workspace = true`).
+[workspace.dependencies]
+pl-core = { path = "crates/pl-core" }
+pl-authz = { path = "crates/pl-authz" }
+pl-documents = { path = "crates/pl-documents" }
+pl-docfilter = { path = "crates/pl-docfilter" }
+pl-auth-api = { path = "crates/pl-auth-api" }
+pl-objects = { path = "crates/pl-objects" }
+pl-files = { path = "crates/pl-files" }
+pl-documents-write = { path = "crates/pl-documents-write" }
+pl-fields-views = { path = "crates/pl-fields-views" }
+pl-workflows = { path = "crates/pl-workflows" }
+pl-search = { path = "crates/pl-search" }
+pl-system = { path = "crates/pl-system" }
+pl-mail = { path = "crates/pl-mail" }
+pl-ai = { path = "crates/pl-ai" }
+pl-templating = { path = "crates/pl-templating" }
+pl-matching = { path = "crates/pl-matching" }
+# Worker-Bausteine (Welle 3, W1)
+pl-parsers = { path = "crates/pl-parsers" }
+pl-ocr = { path = "crates/pl-ocr" }
+pl-classifier = { path = "crates/pl-classifier" }
+pl-indexer = { path = "crates/pl-indexer" }
+pl-queue = { path = "crates/pl-queue" }
+pl-consumer = { path = "crates/pl-consumer" }
+pl-pdfops = { path = "crates/pl-pdfops" }
+pl-accounts = { path = "crates/pl-accounts" }
+# ohne Standard-Features: `document_llmindex` (pl-ai) schaltet pl-server über sein Feature `ai` zu
+pl-cli = { path = "crates/pl-cli", default-features = false }
+# Sync-Änderungserfassung (P2)
+pl-sync = { path = "crates/pl-sync" }
+# API v2 Kern (P3)
+pl-domain = { path = "crates/pl-domain" }
+pl-store = { path = "crates/pl-store" }
+pl-api-v2 = { path = "crates/pl-api-v2" }
+# Systemeinstellungen aus der Oberfläche (docs/SETTINGS.md)
+pl-settings = { path = "crates/pl-settings" }
+pl-envlive = { path = "crates/pl-envlive" }
+# Bereich „Automatik“ (docs/contract/automation.md); Feature `ai` schaltet pl-server zu
+pl-automation = { path = "crates/pl-automation", default-features = false }
+
+axum = { version = "0.8", features = ["macros", "multipart", "ws"] }
+tokio = { version = "1", features = ["full"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["trace", "fs"] }
+hyper = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "chrono", "json", "uuid", "macros"] }
+sea-query = { version = "0.32", features = ["with-chrono", "with-json", "with-uuid", "backend-postgres", "backend-sqlite"] }
+sea-query-binder = { version = "0.7", features = ["sqlx-postgres", "with-chrono", "with-json", "with-uuid"] }
+chrono = { version = "0.4", features = ["serde"] }
+chrono-tz = "0.10"
+thiserror = "2"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# Benutzer-Doku als HTML unter /rs/docs/ (pl-server::docs)
+pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream", "json"] }
+futures = "0.3"
+uuid = { version = "1", features = ["v4", "serde"] }
+base64 = "0.22"
+hmac = "0.12"
+sha2 = "0.10"
+pbkdf2 = "0.12"
+flate2 = "1"
+rand = "0.8"
+redis = { version = "0.27", features = ["tokio-comp", "connection-manager"] }
+regex = "1"
+percent-encoding = "2"
+url = "2"
+
+# Aus den Crate-Berichten uebernommen (Versionen wie bisher in den Crates fest gepinnt).
+# =0.26.2: dieselbe Version, die tantivy-py 0.26.2 (upstream uv.lock) einbettet.
+tantivy = "=0.26.2"
+minijinja = { version = "=2.19.0", default-features = false, features = ["builtins", "macros", "multi_template", "adjacent_loop_items", "std_collections", "serde", "loop_controls", "fuel", "preserve_order", "json", "urlencode", "unstable_machinery"] }
+fancy-regex = "=0.14.0"
+unicode-normalization = "=0.1.26"
+sha1 = "=0.10.6"
+imap-proto = "0.16"
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12", "logging"] }
+rustls-native-certs = "0.8"
+hyper-util = { version = "0.1.21", features = ["client-legacy", "http1", "http2", "server", "server-auto", "server-graceful", "service", "tokio"] }
+http-body-util = "0.1.5"
+bytes = "1.12.1"
+toml = { version = "1.2.0", default-features = false, features = ["parse", "serde", "std"] }
+tokio-util = { version = "0.7.18", features = ["io"] }
+async-compression = { version = "0.4.42", features = ["tokio", "gzip", "brotli", "zstd"] }
+libc = "=0.2.191"
+windows-sys = { version = "=0.59.0", features = ["Win32_Storage_FileSystem", "Win32_Foundation"] }
+# Worker-Crates (aus pl-parsers/pl-ocr/pl-consumer/pl-classifier, Versionen wie dort gepinnt)
+quick-xml = { version = "=0.41.0", features = ["escape-html"] }
+encoding_rs = "=0.8.44"
+cfb = "=0.16.0"
+lopdf = { version = "=0.47.0", default-features = false }
+image = { version = "=0.25.10", default-features = false, features = ["png", "jpeg", "tiff", "bmp", "gif", "webp"] }
+libloading = "=0.8.9"
+tiff = "=0.11.3"
+rust-stemmers = "=1.2.0"
+# pl-pdfops: zxing-cpp-Ersatz (ohne Funktion `image`, die pinnt image =0.25.8) und Text-Vorschau
+rxing = { version = "=0.9.3", default-features = false, features = ["full_barcode_format_support", "multi_barcode_readers", "decoders", "encoding_rs"] }
+ab_glyph = "=0.2.32"
+# pl-cli: Passphrase-Verschluesselung des Exports (wie upstream cryptography AES)
+aes = "=0.9.4"
+# pl-server: optionaler Allokator (Feature `mimalloc`, O1-Messung)
+mimalloc = { version = "=0.1.52", default-features = false }
+# pl-authz: Django-Standard-Hasher Argon2/BCryptSHA256/Scrypt (Lücke S5)
+argon2 = { version = "=0.5.3", default-features = false, features = ["alloc"] }
+bcrypt = "=0.17.1"
+scrypt = { version = "=0.11.0", default-features = false }
+# pl-cli: ZIP-Kompression bzip2/lzma/zstd wie CPython zipfile (Lücke B6). bzip2 reine Rust-Fassung
+# (libbz2-rs-sys), xz2 mit liblzma statisch, zstd wie in async-compression.
+bzip2 = "=0.6.1"
+xz2 = { version = "=0.1.7", features = ["static"] }
+zstd = { version = "=0.13.4", default-features = false }
+# pl-guard, pl-consumer: Dateisystem-Ereignisse (inotify/ReadDirectoryChangesW/kqueue), CC0-1.0
+notify = { version = "=8.2.0", default-features = false }
+# pl-pdftools: WordCraft (MIT OR Apache-2.0) und craft-heif (MIT OR Apache-2.0, nutzt heic-rs =0.1.4),
+# feste Revisionen, siehe NOTICE. Nur im isolierten Kindprozess benutzt.
+wordcraft-doc = { git = "https://github.com/storytold/wordcraft", rev = "a4b898f820eb28626865292fd037a155e4a07aef" }
+wordcraft-docx = { git = "https://github.com/storytold/wordcraft", rev = "a4b898f820eb28626865292fd037a155e4a07aef" }
+wordcraft-docbin = { git = "https://github.com/storytold/wordcraft", rev = "a4b898f820eb28626865292fd037a155e4a07aef" }
+wordcraft-formats = { git = "https://github.com/storytold/wordcraft", rev = "a4b898f820eb28626865292fd037a155e4a07aef" }
+wordcraft-pdf = { git = "https://github.com/storytold/wordcraft", rev = "a4b898f820eb28626865292fd037a155e4a07aef" }
+craft-heif = { git = "https://github.com/storytold/craft-libs", rev = "6e03f65bf45181db77ba6229716e6624db9eb25b" }
+# nur dev-dependencies
+tempfile = "=3.27.0"
+tokio-tungstenite = "0.29.0"
+
+[profile.dev]
+# Keep debug builds small: 12 agents share one target dir on a 15 GB laptop.
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
+# PBKDF2 mit 1 000 000 Iterationen ist im Debug-Build sonst sekundenlang (Login).
+[profile.dev.package.sha2]
+opt-level = 3
+[profile.dev.package.pbkdf2]
+opt-level = 3
+[profile.dev.package.hmac]
+opt-level = 3
+# Generische PBKDF2-Instanz landet in pl-authz: unoptimiert ~10 s pro Hash.
+[profile.dev.package.pl-authz]
+opt-level = 3
+# Worker im Debug-Build: Training/Bilddekodierung sonst um Größenordnungen langsamer.
+[profile.dev.package.pl-classifier]
+opt-level = 2
+[profile.dev.package.image]
+opt-level = 3
+[profile.dev.package.png]
+opt-level = 3
+[profile.dev.package.tiff]
+opt-level = 3
+[profile.dev.package.flate2]
+opt-level = 3
+# Barcode-Erkennung: unoptimiert ~50 s pro Seite, so ~4 s.
+[profile.dev.package.rxing]
+opt-level = 3
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+strip = "symbols"
+panic = "unwind"
+
+# pl-pdftools (PdfCraft, MIT OR Apache-2.0): PdfCraft braucht seine gepatchten hayro-Kopien
+# (vendor/ im selben Repository, dieselbe Revision). Betrifft nur hayro-*, das sonst niemand nutzt.
+[patch.crates-io]
+hayro-jbig2 = { git = "https://github.com/storytold/pdfcraft", rev = "0f22627bff6cde9930817e891290f653d882bbda" }
+hayro-syntax = { git = "https://github.com/storytold/pdfcraft", rev = "0f22627bff6cde9930817e891290f653d882bbda" }
+# WordCraft (pl-pdftools, Funktion `office`): craft-pdf braucht die krilla-Fassung aus craft-libs
+# (wie im WordCraft-Workspace selbst gepatcht; Patches gelten nur im Wurzel-Workspace).
+krilla = { git = "https://github.com/storytold/craft-libs", rev = "6e03f65bf45181db77ba6229716e6624db9eb25b" }

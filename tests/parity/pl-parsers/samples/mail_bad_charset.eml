@@ -1,0 +1,8 @@
+From: a@example.com
+To: b@example.com
+Subject: =?x-unknown?Q?abc?= def
+Date: Mon, 32 Jan 2024 10:00:00 +0100
+Content-Type: text/plain; charset=x-unknown-charset
+Content-Transfer-Encoding: base64
+
+R3LDvMOfZQ

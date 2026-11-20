@@ -1,0 +1,17 @@
+{% extends "layout.html" %}
+{% set page_title = t("auth.page.external") %}
+{% block body %}
+    <form id="form-account" method="post">
+      {{ csrf_input }}
+      <p>{{ t("auth.external.connect", PROVIDER=provider.name) }}</p>
+      <button class="btn" type="submit">{{ t("auth.external.continue") }}</button>
+    </form>
+    {%- if REDIRECT_LOGIN_TO_SSO %}
+    <script>
+      (function () {
+        var form = document.getElementById("form-account");
+        if (form) { form.submit(); }
+      })();
+    </script>
+    {%- endif %}
+{% endblock %}

@@ -1,0 +1,20 @@
+{% extends "layout.html" %}
+{% set page_title = t("auth.page.external_signup") %}
+{% block body %}
+    <p>{{ t("auth.external.signup_intro", PROVIDER=account.get_provider.name) }} {{ t("auth.external.signup_complete") }}</p>
+    <form id="form-account" method="post">
+      {{ csrf_input }}
+      <div class="field">
+        <label for="inputUsername">{{ t("auth.field.username") }}</label>
+        <input type="text" name="{{ form.username.name }}" id="inputUsername" autocomplete="username" autocorrect="off" autocapitalize="none" required autofocus value="{{ form.username.value }}">
+      </div>
+      <div class="field">
+        <label for="inputEmail">{{ t("auth.field.email_optional") }}</label>
+        <input type="email" name="{{ form.email.name }}" id="inputEmail" autocomplete="email" value="{{ form.email.value }}">
+      </div>
+      {%- if redirect_field_value %}
+      <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">
+      {%- endif %}
+      <button class="btn" type="submit">{{ t("auth.external.signup_submit") }}</button>
+    </form>
+{% endblock %}

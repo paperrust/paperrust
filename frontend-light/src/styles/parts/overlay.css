@@ -1,0 +1,68 @@
+/* Floating layer for the dropdown list of the selection field (lib/cdk-overlay.ts, used by NgSelect.svelte):
+   container in body > wrapper (popover) > area with the panel. */
+
+/* Container over the whole page, lets clicks through */
+.cdk-overlay-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.cdk-overlay-container:empty {
+  display: none;
+}
+
+/* Wrapper to which the area is aligned */
+.cdk-overlay-connected-position-bounding-box {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  min-width: 1px;
+  min-height: 1px;
+}
+
+/* Wrapper as popover: cancel browser defaults for [popover].
+   Sits after the wrapper block so that position: fixed wins. */
+.cdk-overlay-popover {
+  position: fixed;
+  inset: auto;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  overflow: visible;
+  color: inherit;
+  white-space: normal;
+  text-decoration: none;
+  background: none;
+  border: none;
+  outline: 0;
+  pointer-events: none;
+}
+
+.cdk-overlay-popover::backdrop {
+  display: none;
+}
+
+/* Area with the panel (top/left/width are set by the script) */
+.cdk-overlay-pane {
+  position: absolute;
+  display: flex;
+  box-sizing: border-box;
+  max-width: 100%;
+  max-height: 100%;
+  pointer-events: auto;
+}
+
+/* Stacking height in its own layer: every other statement without a layer takes precedence */
+@layer pr-overlay {
+  .cdk-overlay-container,
+  .cdk-overlay-connected-position-bounding-box,
+  .cdk-overlay-pane {
+    z-index: 1000;
+  }
+}

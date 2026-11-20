@@ -1,0 +1,12 @@
+/* Preview bubble of a document (PreviewPopup.svelte, PreviewPopupContent.svelte). */
+
+/* fixed size for thumbnail or PDF in the bubble */
+.preview-popup-container > * {
+  width: 30rem !important;
+  height: 22rem !important;
+}
+
+/* Bubble sits outside the component in the popover, therefore unencapsulated */
+::deep .popover.popover-preview {
+  max-width: 32rem;
+}

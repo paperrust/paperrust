@@ -1,0 +1,14 @@
+{
+  "django": {
+    "status": 400,
+    "body": "Cannot delete the root/original version. Delete the document instead.",
+    "plan": [],
+    "files": {}
+  },
+  "rust": {
+    "status": 400,
+    "body": "Cannot delete the root/original version. Delete the document instead.",
+    "plan": [],
+    "files": {}
+  }
+}
