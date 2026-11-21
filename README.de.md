@@ -19,6 +19,26 @@ Website: <https://paperrust.org> · Dokumentation: [Deutsch](docs/user/README.md
 > [bekannten Grenzen](docs/RELEASE-NOTES-0.1.0.md#grenzen) und probieren Sie es zuerst mit einer
 > **Kopie** Ihrer Daten aus. Der Windows-Installer ist noch nicht signiert.
 
+## Auf einen Blick
+
+Gemessen gegen paperless-ngx 3.4.2 auf demselben kleinen arm64-Rechner (NVIDIA Jetson Orin Nano),
+gleiche Dokumente, gleiche Datenbank – Einzelheiten und Grenzen weiter unten:
+
+- **17-mal schneller beim Einlesen:** 230 Dokumente in 1 min 46 s statt 29 min 56 s.
+- **16-mal schnellerer erster Start** (3,3 s statt 53 s); nach einem Neustart antwortet es nach 0,6 s
+  statt 34 s.
+- **12- bis 19-mal schnellere Antworten mit mehreren Nutzern gleichzeitig** (Median, 1–10 Personen,
+  keine Fehler) – [Bericht](results/benchmark/2026-11-20-jetson/s2s3-rerun/bericht.md).
+- **Ein Container statt zwei, 0,65 GB statt 3,5 GB** – ohne Python, Redis, Celery, Tika und
+  Gotenberg. Startet mit 74 MiB Arbeitsspeicher (plus Datenbank).
+- **Ihre Daten bleiben, wie sie sind:** gleiche Datenbank, gleiche Dateien, gleiche REST-API. Apps für
+  paperless-ngx funktionieren weiter, und der [Umstieg](#umstieg-von-paperless-ngx) ist in wenigen
+  Befehlen erledigt – mit Weg zurück.
+
+```sh
+docker pull ghcr.io/paperrust/paperrust:0.1.0     # linux/amd64 + linux/arm64
+```
+
 ## Warum PaperRust?
 
 Gemessen am 20. November 2026 auf einem NVIDIA Jetson Orin Nano (arm64, 6 Kerne, 8 GB RAM) in Docker,
@@ -101,15 +121,20 @@ cd paperrust
 
 ### Docker compose
 
-Compose baut das Image aus diesem Repository und startet es mit PostgreSQL:
+Das veröffentlichte Image `ghcr.io/paperrust/paperrust` (Tags `0.1.0`, `0.1`, `latest`; amd64 und
+arm64) startet mit PostgreSQL so:
 
 ```sh
 cd docker
 mkdir -p consume export
 # zuerst PAPERRUST_SECRET_KEY (und optional PAPERRUST_ADMIN_USER/PASSWORD) in docker-compose.env setzen
-docker compose -f docker-compose.postgres.yml build
+export PAPERRUST_IMAGE=ghcr.io/paperrust/paperrust:0.1.0
+docker compose -f docker-compose.postgres.yml pull
 docker compose -f docker-compose.postgres.yml up -d      # PaperRust + PostgreSQL 17
 ```
+
+Ohne `PAPERRUST_IMAGE` baut Compose das Image stattdessen aus diesem Repository
+(`docker compose -f docker-compose.postgres.yml build`).
 
 Die Oberfläche ist dann unter <http://localhost:8000> erreichbar. Weitere Varianten in `docker/`:
 schlanke Konfiguration (`docker-compose.slim.yml`), getrennte Web-/Worker-Prozesse
@@ -148,6 +173,25 @@ MariaDB/MySQL-Datenbanken werden nach PostgreSQL kopiert.
 **Der Weg zurück:** Nach dem Umstieg kann paperless-ngx dieselbe Datenbank nicht mehr öffnen. Zurück
 geht es über die Sicherung oder einen Export im Format von paperless-ngx 3.4.2. Im Zweifel in eine
 **Kopie** umsteigen (`--target`); dann bleibt paperless-ngx unberührt.
+
+### Umstieg in wenigen Befehlen (Docker mit PostgreSQL)
+
+```sh
+# 1. sichern (paperless-ngx gestoppt: docker compose down, dann nur die Datenbank starten)
+docker compose up -d db
+docker compose exec db pg_dump -U paperless -Fc paperless > paperless-vorher.pgdump
+# 2. in docker-compose.yml das paperless-ngx-Image durch ghcr.io/paperrust/paperrust:0.1.0 ersetzen
+#    (Vorlage: docker/docker-compose.migrate-from-paperless.yml) – Volumes und PAPERLESS_SECRET_KEY bleiben
+# 3. Probelauf: prüft alles, ändert nichts
+docker compose run --rm webserver paperrust migrate --dry-run \
+    --from "postgres://paperless:PASSWORT@db:5432/paperless" --media /usr/src/paperless/media
+# 4. umsteigen (derselbe Befehl ohne --dry-run), dann starten und mit den bisherigen Benutzern anmelden
+docker compose up -d
+```
+
+Soll das Original unberührt bleiben? Mit `--target "postgres://paperless:PASSWORT@db:5432/paperrust"`
+(eine leere Datenbank) kopiert PaperRust alles dorthin. Zurück: `paperless-vorher.pgdump`
+zurückspielen und das paperless-ngx-Image wieder eintragen.
 
 - Schritt für Schritt: [Deutsch](docs/user/umstieg.md) · [English](docs/user/en/umstieg.md)
 - Ausführlich (gleiche Datenbank, SQLite/MariaDB, Export/Import, Rückweg):
