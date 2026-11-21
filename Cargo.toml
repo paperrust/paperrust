@@ -101,7 +101,7 @@ toml = { version = "1.2.0", default-features = false, features = ["parse", "serd
 tokio-util = { version = "0.7.18", features = ["io"] }
 async-compression = { version = "0.4.42", features = ["tokio", "gzip", "brotli", "zstd"] }
 libc = "=0.2.191"
-windows-sys = { version = "=0.59.0", features = ["Win32_Storage_FileSystem", "Win32_Foundation"] }
+windows-sys = { version = "=0.61.2", features = ["Win32_Storage_FileSystem", "Win32_Foundation"] }
 # Worker-Crates (aus pl-parsers/pl-ocr/pl-consumer/pl-classifier, Versionen wie dort gepinnt)
 quick-xml = { version = "=0.41.0", features = ["escape-html"] }
 encoding_rs = "=0.8.44"

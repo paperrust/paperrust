@@ -3737,7 +3737,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "url",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4379,7 +4379,7 @@ dependencies = [
  "tracing",
  "url",
  "uuid",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
  "zeroize",
 ]
 
@@ -4409,7 +4409,7 @@ dependencies = [
  "tracing",
  "url",
  "uuid",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
