@@ -154,8 +154,18 @@ mod tests {
                 let text = String::from_utf8_lossy(&out.stdout).to_string();
                 // Output: "<path> <ACE>\n<indentation><ACE>…\n\n<status line>" – ACE lines contain ":(".
                 let aces: Vec<&str> = text.lines().filter(|l| l.contains(":(")).collect();
-                assert_eq!(aces.len(), 1, "{p:?}: {text}");
-                assert!(aces[0].contains("(F)"), "{text}");
+                // An elevated process (e.g. the GitHub Windows runner) additionally gets SYSTEM and
+                // Administrators from its default DACL; both can reach every folder anyway (module doc).
+                // Every other entry – Users, Everyone, other accounts – must be gone.
+                let principal = |l: &str| {
+                    let ace = l.trim_start().strip_prefix(&*p.to_string_lossy()).unwrap_or(l).trim_start().to_string();
+                    ace.split(":(").next().unwrap_or("").to_string()
+                };
+                let admin_or_system =
+                    |n: &str| n.ends_with("\\SYSTEM") || n.ends_with("\\Administrators") || n.ends_with("\\Administratoren");
+                let own: Vec<&&str> = aces.iter().filter(|l| !admin_or_system(&principal(l))).collect();
+                assert_eq!(own.len(), 1, "{p:?}: {text}");
+                assert!(own[0].contains("(F)"), "{text}");
             }
         }
     }
