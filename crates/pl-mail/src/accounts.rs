@@ -43,9 +43,9 @@ pub struct AccountRow {
 const COLS: &str = "a.id, a.name, a.imap_server, a.imap_port, a.imap_security, a.username, a.password, \
     a.character_set, a.is_token, a.owner_id, a.account_type, a.refresh_token, a.expiration";
 
-/// `ObfuscatedPasswordField.to_representation`.
-pub fn obfuscate(pw: &str) -> String {
-    "*".repeat(pw.chars().count().max(10))
+/// `ObfuscatedPasswordField.to_representation` (upstream 64bf7f845 / #14784, after v3.4.2: constant mask; v3.4.2 sent `"*" * max(10, len(value))`, which leaked the length).
+pub fn obfuscate(_pw: &str) -> String {
+    "*".repeat(10)
 }
 
 fn represent(r: &AccountRow, pf: &PermFields, tz: chrono_tz::Tz) -> Value {
@@ -806,7 +806,7 @@ mod tests {
     fn password_masking() {
         assert_eq!(obfuscate("password1"), "**********");
         assert_eq!(obfuscate(""), "**********");
-        assert_eq!(obfuscate("abcdefghijkl"), "************");
+        assert_eq!(obfuscate("abcdefghijkl"), "**********", "constant mask, no length leak (#14784)");
         assert_eq!(obfuscate("äöü"), "**********");
     }
 

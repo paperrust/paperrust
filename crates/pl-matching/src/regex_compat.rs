@@ -210,11 +210,11 @@ fn compile_with(pattern: &str, ignore_case: bool, limit: usize) -> Result<fancy_
 }
 
 fn build(translated: &str, ignore_case: bool, limit: usize) -> Result<fancy_regex::Regex, RegexError> {
-    fancy_regex::RegexBuilder::new(translated)
-        .case_insensitive(ignore_case)
-        .backtrack_limit(limit)
-        .build()
-        .map_err(|e| RegexError::Invalid(e.to_string()))
+    // Inline (?i) instead of RegexBuilder::case_insensitive: fancy-regex 0.14 drops that flag as
+    // soon as the pattern needs its backtracking engine (lookaround, atomic groups), so
+    // `Invoice(?= )` did not match "invoice 1" although Python's re.IGNORECASE does.
+    let src = if ignore_case { format!("(?i){translated}") } else { translated.to_string() };
+    fancy_regex::RegexBuilder::new(&src).backtrack_limit(limit).build().map_err(|e| RegexError::Invalid(e.to_string()))
 }
 
 /// Compiled user patterns, keyed by (pattern, anchored, ignore_case, budget) (PERF-SCALE Q8, [`crate::cache`]).
@@ -424,6 +424,14 @@ pub fn safe_regex_sub(pattern: &str, repl: &str, text: &str, ignore_case: bool) 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ignore_case_also_with_lookaround_and_atomic_groups() {
+        for (pat, hay) in [("Invoice(?= )", "invoice 1"), ("(?<=x)ABC", "xabc"), ("ABC", "abc"), ("(?>AB)C", "abc")] {
+            assert_eq!(compile(pat, true).unwrap().is_match(hay).ok(), Some(true), "{pat} on {hay}");
+            assert_eq!(compile(pat, false).unwrap().is_match(hay).ok(), Some(false), "{pat} on {hay} (case-sensitive)");
+        }
+    }
 
     #[test]
     fn k1_wall_clock_timeout() {

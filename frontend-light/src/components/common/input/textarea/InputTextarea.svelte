@@ -54,7 +54,7 @@
           class:font-monospace={monospace}
           bind:value
           onchange={() => onchange?.(value)}
-          oninput={(e) => oninput?.(e.currentTarget.value)}
+          oninput={(e) => { oninput?.(e.currentTarget.value); onchange?.(e.currentTarget.value) }}
           {disabled}
           {placeholder}
           rows="4"></textarea>

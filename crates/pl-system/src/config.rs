@@ -34,7 +34,7 @@ enum Kind {
     Bool,
     /// `JSONField(binary=True)`: `json.dumps(value)` as a string.
     JsonBinary,
-    /// `ObfuscatedPasswordField`: `"*" * max(10, len(value))`.
+    /// `ObfuscatedPasswordField`: constant `"**********"` (#14784).
     Obfuscated,
     /// `FileField` → absolute URL.
     File,
@@ -214,9 +214,9 @@ fn dump_str(s: &str, out: &mut String) {
     out.push('"');
 }
 
-/// `"*" * max(10, len(value))` (len in code points).
-pub fn obfuscate(s: &str) -> String {
-    "*".repeat(s.chars().count().max(10))
+/// `ObfuscatedPasswordField.to_representation` (upstream 64bf7f845 / #14784, after v3.4.2: constant mask; v3.4.2 sent `"*" * max(10, len(value))`, which leaked the length).
+pub fn obfuscate(_s: &str) -> String {
+    "*".repeat(10)
 }
 
 /// Django `filepath_to_uri(name)`.
@@ -377,7 +377,7 @@ mod tests {
     fn obfuscation() {
         assert_eq!(obfuscate(""), "**********");
         assert_eq!(obfuscate("abc"), "**********");
-        assert_eq!(obfuscate("12345678901"), "***********");
+        assert_eq!(obfuscate("12345678901"), "**********", "constant mask (#14784)");
     }
 
     #[test]

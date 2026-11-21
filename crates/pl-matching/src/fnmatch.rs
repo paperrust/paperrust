@@ -161,12 +161,68 @@ pub fn fnmatch(name: &str, pat: &str) -> bool {
     }
 }
 
+/// `documents.matching._glob_to_portable_regex` (upstream c177c13ac / #14783, after v3.4.2):
+/// fnmatch-style glob → anchored regex accepted by Python, PostgreSQL (ARE) and MariaDB (PCRE).
+/// Supports `*`, `?`, `[seq]` and `[!seq]`; an unclosed `[` is a literal.
+pub fn glob_to_portable_regex(pattern: &str) -> String {
+    let p: Vec<char> = pattern.chars().collect();
+    let n = p.len();
+    let mut out = String::from("^");
+    let mut i = 0;
+    while i < n {
+        let c = p[i];
+        i += 1;
+        match c {
+            '*' => out.push_str(".*"),
+            '?' => out.push('.'),
+            '[' => {
+                let mut j = i;
+                if j < n && p[j] == '!' {
+                    j += 1;
+                }
+                if j < n && p[j] == ']' {
+                    j += 1;
+                }
+                while j < n && p[j] != ']' {
+                    j += 1;
+                }
+                if j >= n {
+                    out.push_str(r"\[");
+                } else {
+                    let mut body: &[char] = &p[i..j];
+                    i = j + 1;
+                    let negate = body.first() == Some(&'!');
+                    if negate {
+                        body = &body[1..];
+                    }
+                    out.push('[');
+                    if negate {
+                        out.push('^');
+                    }
+                    for &ch in body {
+                        if matches!(ch, '\\' | '[' | '^') {
+                            out.push('\\');
+                        }
+                        out.push(ch);
+                    }
+                    out.push(']');
+                }
+            }
+            _ => out.push_str(&python_re_escape(&c.to_string())),
+        }
+    }
+    out.push('$');
+    out
+}
+
 /// Python-`re` search with IGNORECASE of the prefilter regex
-/// (`fnmatch_translate(pat).lstrip("^").rstrip("$")` used as `original_filename__iregex`).
+/// (used as `original_filename__iregex`).
 /// Semantics of Django's SQLite/Python REGEXP: `re.search`, i.e. unanchored at the start.
 pub fn iregex_search(regex_text: &str, value: &str) -> bool {
-    let rust = translate_python_pattern(regex_text);
-    match fancy_regex::RegexBuilder::new(&rust).case_insensitive(true).build() {
+    // inline (?i): RegexBuilder::case_insensitive is not applied once the pattern needs the
+    // backtracking engine (lookahead, e.g. from a translated `$`)
+    let rust = format!("(?i){}", translate_python_pattern(regex_text));
+    match fancy_regex::RegexBuilder::new(&rust).build() {
         Ok(re) => re.is_match(value).unwrap_or(false),
         Err(_) => false,
     }
@@ -175,6 +231,37 @@ pub fn iregex_search(regex_text: &str, value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn glob_to_portable_regex_like_upstream_14783() {
+        // all cases of upstream src/documents/tests/test_glob_to_portable_regex.py::test_translation
+        for (pat, want) in [
+            (r#""#, r#"^$"#),
+            (r#"abc"#, r#"^abc$"#),
+            (r#"*"#, r#"^.*$"#),
+            (r#"?"#, r#"^.$"#),
+            (r#"*.pdf"#, r#"^.*\.pdf$"#),
+            (r#"[abc]"#, r#"^[abc]$"#),
+            (r#"[a-z]"#, r#"^[a-z]$"#),
+            (r#"[!abc]"#, r#"^[^abc]$"#),
+            (r#"[]a]"#, r#"^[]a]$"#),
+            (r#"[!]a]"#, r#"^[^]a]$"#),
+            (r#"[a^b]"#, r#"^[a\^b]$"#),
+            (r#"[a[b]"#, r#"^[a\[b]$"#),
+            (r#"[a\b]"#, r#"^[a\\b]$"#),
+            (r#"[abc"#, r#"^\[abc$"#),
+            (r#"["#, r#"^\[$"#),
+            (r#"[!"#, r#"^\[!$"#),
+            (r#"[]"#, r#"^\[\]$"#),
+            (r#"a[0-9]?*"#, r#"^a[0-9]..*$"#),
+        ] {
+            assert_eq!(glob_to_portable_regex(pat), want, "{pat}");
+        }
+        assert!(iregex_search(&glob_to_portable_regex("SAMPLE*"), "sample_1.pdf"));
+        assert!(!iregex_search(&glob_to_portable_regex("SAMPLE*"), "my_sample_1.pdf"));
+        assert!(iregex_search(&glob_to_portable_regex("*.PDF"), "x.pdf"));
+        assert!(!iregex_search(&glob_to_portable_regex("*.pdf"), "x.pdf.txt"));
+    }
 
     #[test]
     fn translate_like_cpython() {

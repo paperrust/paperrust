@@ -40,7 +40,7 @@
     </div>
     <div class:col-md-9={horizontal}>
       <div class="input-group" class:is-invalid={error}>
-        <input type="url" class="form-control" class:is-invalid={error} placeholder="https://" id={inputId} bind:value onchange={() => onchange?.(value)} {disabled}>
+        <input type="url" class="form-control" class:is-invalid={error} placeholder="https://" id={inputId} bind:value onchange={() => onchange?.(value)} oninput={(e) => onchange?.(e.currentTarget.value)} {disabled}>
         <a class="btn btn-outline-secondary rounded-end" title={t('input.open_link')} href={safeHref(value)} target="_blank" rel="noopener noreferrer">
           <pngx-bs-icon width="1.2em" height="1.2em" name="box-arrow-up-right">{@html icon('box-arrow-up-right', '1.2em', '1.2em')}</pngx-bs-icon>
         </a>

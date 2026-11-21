@@ -364,13 +364,15 @@ fn prefilter_null_semantics_and_filename_regex() {
     let mut d = sample_doc();
     d.correspondent = None;
     assert!(prefilter_matches(&d, &trig, None));
-    // filename prefilter is an unanchored case-insensitive search of fnmatch.translate
-    assert_eq!(filename_prefilter_regex("*.pdf"), r"(?s:.*\.pdf)\Z");
+    // filename prefilter: anchored portable regex (upstream #14783), case-insensitive
+    assert_eq!(filename_prefilter_regex("*.pdf"), r"^.*\.pdf$");
     let trig = WorkflowTrigger { filter_filename: Some("SAMPLE*".into()), ..Default::default() };
     let mut d = sample_doc();
     d.original_filename = Some("my_sample_1.pdf".into());
-    assert!(prefilter_matches(&d, &trig, None)); // suffix match like upstream's iregex
-    assert!(!existing_document_matches_workflow(&d, &trig, None).unwrap().0); // exact check afterwards
+    assert!(!prefilter_matches(&d, &trig, None)); // anchored since #14783 (v3.4.2: suffix search)
+    assert!(!existing_document_matches_workflow(&d, &trig, None).unwrap().0); // exact check agrees
+    d.original_filename = Some("Sample_1.pdf".into());
+    assert!(prefilter_matches(&d, &trig, None));
     d.original_filename = None;
     assert!(!prefilter_matches(&d, &trig, None));
 }

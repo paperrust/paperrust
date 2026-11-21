@@ -57,7 +57,7 @@
       </div>
       <div class="position-relative" class:col-md-9={horizontal}>
         <div class="input-group" class:is-invalid={error}>
-          <input type="number" class="form-control" {step} id={inputId} bind:value onchange={changed} class:is-invalid={error} {disabled}>
+          <input type="number" class="form-control" {step} id={inputId} bind:value onchange={changed} oninput={(e) => onchange?.(e.currentTarget.value === '' ? null : Number(e.currentTarget.value))} class:is-invalid={error} {disabled}>
           {#if showAdd}
             <button class="btn btn-outline-secondary" type="button" id="button-addon1" onclick={nextAsn} {disabled}>+1</button>
           {/if}

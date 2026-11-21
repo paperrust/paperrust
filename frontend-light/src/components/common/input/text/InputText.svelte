@@ -61,7 +61,7 @@
         {/if}
       </div>
       <div class="position-relative" class:col-md-9={horizontal}>
-        <input bind:this={inputField} type="text" class="form-control" class:is-invalid={error} id={inputId} bind:value onchange={() => onchange?.(value)} oninput={(e) => oninput?.(e.currentTarget.value)} {onkeyup} {disabled} autocomplete={autocomplete as AutoFill} {placeholder}>
+        <input bind:this={inputField} type="text" class="form-control" class:is-invalid={error} id={inputId} bind:value onchange={() => onchange?.(value)} oninput={(e) => { oninput?.(e.currentTarget.value); onchange?.(e.currentTarget.value) }} {onkeyup} {disabled} autocomplete={autocomplete as AutoFill} {placeholder}>
         {#if hint}
           <small class="form-text text-muted">{@html hint}</small>
         {/if}

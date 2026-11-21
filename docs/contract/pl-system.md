@@ -412,6 +412,7 @@ fehlt oder Embedding-Konfiguration geändert); Index-Prüfung über den Dienst
     `DATA_DIR/classification_model.pickle`). PaperRust liest das Pickle nicht (eigenes Modellformat,
     pl-classifier) und prüft deshalb die Datei des PaperRust-Modells; `PAPERLESS_MODEL_FILE` verschiebt
     sie nicht (das upstream-Pickle bleibt für einen Rückweg unangetastet).
+14. **Passwort-Maske konstant** (2026-11-21, upstream 64bf7f845 / #14784, nach v3.4.2): `password`-Felder werden immer als `"**********"` (10 Sterne) ausgegeben; v3.4.2 sendete `"*" * max(10, len(passwort))` und verriet damit die Länge. „Nur Sterne oder leer“ = unverändert, wie bisher. Betrifft die Passwort-/Schlüsselfelder von `/api/config/`.
 
 ## Paritätsstand (2026-11-08, Referenz v3.4.2 auf Windows)
 

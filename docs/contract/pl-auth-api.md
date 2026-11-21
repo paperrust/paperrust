@@ -448,6 +448,7 @@ Crates, z. B. allauth-Seiten in pl-accounts), antwortet 404. Stand der Liste unt
 22. **`OPTIONS /api/token/` – Labels** (2026-11-20): die `label`-Texte der Metadaten (`Username`,
     `Password`, `Token`, `MFA Code`) sind immer Englisch; upstream übersetzt DRFs `gettext_lazy`-Labels
     mit der aktiven Sprache.
+23. **Passwort-Maske konstant** (2026-11-21, upstream 64bf7f845 / #14784, nach v3.4.2): `password`-Felder werden immer als `"**********"` (10 Sterne) ausgegeben; v3.4.2 sendete `"*" * max(10, len(passwort))` und verriet damit die Länge. „Nur Sterne oder leer“ = unverändert, wie bisher. Betrifft `password` in `/api/profile/`.
 
 ## Umsetzungsstand (Rust, `crates/pl-auth-api`)
 

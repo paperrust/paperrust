@@ -363,6 +363,7 @@ src/documents/mail.py@v3.4.2 `send_email`, src/documents/models.py@v3.4.2 `get_p
     `effects::context::for_row` bildet `source_path` über `pl_consumer::files::join`. Unsicherer
     DB-Dateiname → Pfad, der nie existiert; der Versand scheitert wie bei einer fehlenden Datei
     (upstream öffnet den Pfad ungeprüft).
+22. **Passwort-Maske konstant** (2026-11-21, upstream 64bf7f845 / #14784, nach v3.4.2): `password`-Felder werden immer als `"**********"` (10 Sterne) ausgegeben; v3.4.2 sendete `"*" * max(10, len(passwort))` und verriet damit die Länge. „Nur Sterne oder leer“ = unverändert, wie bisher. Betrifft `/api/mail_accounts/`.
 
 ## Paritätsstand
 

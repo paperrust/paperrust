@@ -164,6 +164,7 @@ Neu erzeugen: `reference/venv/Scripts/python.exe -X utf8 tests/parity/pl-matchin
 12. **Performance-Hinweis** (kein Verhaltensunterschied): ohne Sprachkonfiguration (alle Sprachen) werden
     bei Wörtern, die keine frühe Locale kennt, alle Locale-Regexe kompiliert (Debug-Build ~90 s, Release
     deutlich schneller, RAM-Bedarf einige 100 MB möglich). Mit konfigurierten Sprachen nur diese.
+13. **Dateinamen-Vorfilter zeitgesteuerter Workflows verankert** (2026-11-21, upstream c177c13ac / #14783, nach v3.4.2): `filename_prefilter_regex` liefert `_glob_to_portable_regex(...)` (`^…$`) statt `fnmatch.translate(...)` ohne Anker. Ergebnis unverändert, weil danach die genaue `fnmatch`-Prüfung entscheidet; es kommen nur weniger Kandidaten durch. Dabei behoben: `iregex_search` und benutzerdefinierte reguläre Ausdrücke (`regex_compat`) ignorierten „Groß-/Kleinschreibung egal“, sobald das Muster Vorausblick/Rückblick/atomare Gruppen enthielt (fancy-regex 0.14 wendet `case_insensitive` dann nicht an); jetzt inline `(?i)` wie Pythons `re.IGNORECASE`. Die Datumserkennung bleibt beim Builder-Schalter (Text ist dort schon klein geschrieben; inline `(?i)` verdoppelte die Kompilierzeit aller Sprachdaten).
 
 ## Für Aufrufer
 

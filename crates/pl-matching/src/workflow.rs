@@ -10,7 +10,7 @@
 // of Django `filter`/`exclude`); `filename_prefilter_regex` returns the regex text that
 // upstream passes to `original_filename__iregex` for a DB-side implementation.
 
-use crate::fnmatch::{fnmatch, iregex_search, translate};
+use crate::fnmatch::{fnmatch, glob_to_portable_regex, iregex_search};
 use crate::matching::{MATCH_NONE, MatchDocument, Matchable, UnsupportedMatchingAlgorithm, matches};
 
 /// `documents.data_models.DocumentSource`.
@@ -369,11 +369,12 @@ pub fn existing_document_matches_workflow(
     Ok((true, None))
 }
 
-/// Regex text upstream uses for `original_filename__iregex`:
-/// `fnmatch_translate(filter_filename).lstrip("^").rstrip("$")` (Python regex syntax).
+/// Regex text upstream uses for `original_filename__iregex`. v3.4.2 used
+/// `fnmatch_translate(...)` (Python-only syntax, rejected by PostgreSQL, unanchored); since upstream
+/// c177c13ac (#14783) it is `_glob_to_portable_regex(...)`: anchored, portable. The exact
+/// `fnmatch` check afterwards (`existing_document_matches_workflow`) decides either way.
 pub fn filename_prefilter_regex(filter_filename: &str) -> String {
-    let t = translate(filter_filename);
-    t.trim_start_matches('^').trim_end_matches('$').to_string()
+    glob_to_portable_regex(filter_filename)
 }
 
 /// In-memory equivalent of `prefilter_documents_by_workflowtrigger` for one document.

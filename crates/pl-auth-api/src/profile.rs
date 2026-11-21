@@ -50,9 +50,9 @@ fn respond(r: HResult<Response>) -> Response {
     }
 }
 
-/// `"*" * max(10, len(value))` (`ObfuscatedPasswordField.to_representation`).
-pub fn obfuscate(password: &str) -> String {
-    "*".repeat(password.chars().count().max(10))
+/// `ObfuscatedPasswordField.to_representation` (upstream 64bf7f845 / #14784, after v3.4.2: constant mask; v3.4.2 sent `"*" * max(10, len(value))`, which leaked the length).
+pub fn obfuscate(_password: &str) -> String {
+    "*".repeat(10)
 }
 
 /// `ProfileSerializer.to_representation(user)`.
@@ -350,7 +350,7 @@ mod tests {
     #[test]
     fn obfuscation() {
         assert_eq!(obfuscate(""), "**********");
-        assert_eq!(obfuscate(&"x".repeat(88)).len(), 88);
+        assert_eq!(obfuscate(&"x".repeat(88)), "**********", "constant mask (#14784)");
     }
 
     #[test]
