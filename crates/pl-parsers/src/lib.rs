@@ -12,6 +12,7 @@
 //! - [`limits`]: limits for size, time, unpacking, XML depth (zip bombs, broken files).
 
 pub mod html;
+pub mod langdetect;
 pub mod limits;
 pub mod mail;
 pub mod mime;

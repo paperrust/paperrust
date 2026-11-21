@@ -488,6 +488,8 @@ Quelle fehlt, Ziel existiert), Rollback, leere Ordner löschen, Versionen der Wu
     (Warnung im Log). `working_file_name` nutzt jetzt `pl_core::safepath::sanitize_component` (gleiche
     Regeln wie vorher, Gerätenamen zusätzlich `COM0`/`LPT0`/`CONIN$`/`CONOUT$` und hochgestellte Ziffern).
 
+23. **OCR-Sprache automatisch** (2026-11-21, `PAPERRUST_OCR_LANGUAGE_AUTO`, Standard aus; PaperRust-Erweiterung): nach der Texterkennung `langdetect` (jetzt in pl-parsers) auf den Text; bei ≥ 200 Buchstaben, Wahrscheinlichkeit ≥ 0,90, Sprache nicht eingestellt und installiert → zweite Erkennung mit dieser Sprache, deren Ergebnis zählt (Fehler → erstes Ergebnis). `native::auto_ocr_language`, Test `tests/ocr_language_auto.rs`. Messung: `results/benchmark/2026-11-21-ocr-lang`.
+
 ## Tests
 
 - `cargo test -p pl-consumer -j 1` (lib, 23 Unit-Tests ohne DB): Overrides-`update`, JSON (B5),

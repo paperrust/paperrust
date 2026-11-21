@@ -490,6 +490,13 @@ ITU-R 601.
    (Wortquote 97,4 %, paperless-ngx 100 %), in Graustufen bei allen Winkeln 2,5–4,5° richtig. Archiv-/Anzeigebild
    bleibt farbig. Test: `tests/image_ocr_gray.rs`.
 
+22. **Standard-OCR-Sprache `deu+eng`** (2026-11-21; paperless-ngx `eng`): ohne `PAPERLESS_OCR_LANGUAGE` erkennt
+   PaperRust Deutsch und Englisch (`config::DEFAULT_OCR_LANGUAGE`). Messung `results/benchmark/2026-11-21-ocr-lang`:
+   deutsche Seiten mit `eng` 88,6 % der Wörter, mit `deu+eng` 100 %; Zeit +3–7 %. Fehlen beim Standard die
+   deutschen Daten, wird mit Warnung `eng` genommen (nur beim Standard; explizit gewählte, fehlende Sprachen
+   scheitern weiter mit `MissingDependencyError`). Test: `tests/language_default.rs`. Die Suchsprache
+   (`pl-core`, Stemming) folgt weiter `PAPERLESS_OCR_LANGUAGE` mit Standard `eng`.
+
 ## 12. Was läuft ohne externe Programme / was braucht Werkzeuge
 
 Ohne externe Programme (reines Rust): Einstellungen, Argumente, komplette `parse()`-Steuerlogik,

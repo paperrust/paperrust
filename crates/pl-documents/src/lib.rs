@@ -14,7 +14,8 @@ use pl_core::ApiRoute;
 use pl_core::route::{ALLOW_MODEL_DETAIL, ALLOW_POST_ONLY, ALLOW_READ_ONLY, drf_view};
 
 pub mod db;
-pub mod langdetect;
+/// Moved to pl-parsers (2026-11-21) so pl-consumer can use it too (OCR language automatic).
+pub use pl_parsers::langdetect;
 pub mod listing;
 pub mod metadata;
 pub mod selection_data;

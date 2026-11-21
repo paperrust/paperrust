@@ -102,11 +102,19 @@ pub struct OcrSettings {
     pub remote_ocr_allow_internal_endpoints: bool,
 }
 
+/// OCR languages when `PAPERLESS_OCR_LANGUAGE` is not set. paperless-ngx uses `eng`; PaperRust
+/// `deu+eng` (Jetson measurement 2026-11-21, results/benchmark/2026-11-21-ocr-lang: German pages
+/// with `eng` only 88.6 % of the words – umlauts/ß lost; `deu+eng` 100 % for German and English at
+/// +3–7 % time). All PaperRust packages ship `deu` and `eng`.
+pub const DEFAULT_OCR_LANGUAGE: &str = "deu+eng";
+/// Used instead of [`DEFAULT_OCR_LANGUAGE`] if the engine has no German data (own builds).
+pub const DEFAULT_OCR_LANGUAGE_FALLBACK: &str = "eng";
+
 impl Default for OcrSettings {
     fn default() -> Self {
         Self {
             ocr_pages: None,
-            ocr_language: "eng".into(),
+            ocr_language: DEFAULT_OCR_LANGUAGE.into(),
             ocr_output_type: "pdfa".into(),
             ocr_mode: Mode::Auto,
             archive_file_generation: ArchiveFileGeneration::Auto,
@@ -519,7 +527,7 @@ mod tests {
         let c = OcrConfig::new(&s, &app).unwrap();
         assert_eq!(c.rotate_threshold, 30.0);
         assert_eq!(c.pages, Some(3));
-        assert_eq!(c.language, "eng");
+        assert_eq!(c.language, DEFAULT_OCR_LANGUAGE, "empty app language → built-in default (PaperRust: deu+eng)");
         assert!(!c.deskew); // `is not None`
         assert_eq!(c.user_args, None);
     }

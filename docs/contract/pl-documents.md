@@ -430,6 +430,8 @@ Quelle: `DocumentViewSet.suggestions`, `matching.match_*` (mit `user=request.use
     und schlägt dann eine ASN vor, die ein Papierkorb-Dokument noch belegt; Speichern scheitert mit
     „Document with this Archive Serial Number already exists in the trash.“
 
+12. **langdetect verschoben** (2026-11-21): Modul und Profile liegen jetzt in `pl-parsers` (`pl_parsers::langdetect`, Daten `crates/pl-parsers/data/langdetect/`), `pl_documents::langdetect` verweist darauf – Verhalten unverändert; Grund: pl-consumer braucht es für die OCR-Sprachautomatik (sonst Abhängigkeitskreis).
+
 ## Parität
 
 In-process-Vergleich `crates/pl-documents/tests/parity.rs` (`#[ignore]`, Aufruf siehe Dateikopf):

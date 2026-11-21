@@ -38,6 +38,64 @@ pub struct NativeParsing {
     /// Database for `MailRule.pdf_layout` (mail → PDF, gap E12); without it
     /// `PAPERLESS_EMAIL_PARSE_DEFAULT_LAYOUT` applies.
     pub pool: Option<sqlx::PgPool>,
+    /// PaperRust `PAPERRUST_OCR_LANGUAGE_AUTO`: after OCR, detect the text language and recognize
+    /// once more with that language if it is not configured but installed ([`auto_ocr_language`]).
+    pub ocr_language_auto: bool,
+}
+
+/// Minimum letters in the OCR text before the language automatic decides (short/number-heavy
+/// pages detect unreliably; a wrong decision would cost a second recognition).
+pub const AUTO_LANGUAGE_MIN_LETTERS: usize = 200;
+/// Minimum langdetect probability of the winning language.
+pub const AUTO_LANGUAGE_MIN_PROBABILITY: f64 = 0.90;
+
+/// langdetect code → Tesseract code (languages that Tesseract ships as `<code>.traineddata`).
+pub fn langdetect_to_tesseract(code: &str) -> Option<&'static str> {
+    Some(match code {
+        "de" => "deu",
+        "en" => "eng",
+        "fr" => "fra",
+        "it" => "ita",
+        "es" => "spa",
+        "nl" => "nld",
+        "pt" => "por",
+        "pl" => "pol",
+        "sv" => "swe",
+        "da" => "dan",
+        "fi" => "fin",
+        "no" => "nor",
+        "cs" => "ces",
+        "sk" => "slk",
+        "sl" => "slv",
+        "hr" => "hrv",
+        "hu" => "hun",
+        "ro" => "ron",
+        "tr" => "tur",
+        "ru" => "rus",
+        "uk" => "ukr",
+        "el" => "ell",
+        _ => return None,
+    })
+}
+
+/// OCR language automatic (PaperRust, Jetson measurement 2026-11-21: a French page with
+/// `deu+eng` 93.4 % of the words and 35 % slower, with `fra` 100 %): Tesseract language to
+/// recognize the document with once more, or `None` (keep the first result).
+/// Acts only on enough text, a confident detection, a language that is not configured
+/// already and whose data is installed.
+pub fn auto_ocr_language(text: &str, configured: &str, installed: &[String]) -> Option<&'static str> {
+    if text.chars().filter(|c| c.is_alphabetic()).count() < AUTO_LANGUAGE_MIN_LETTERS {
+        return None;
+    }
+    let (code, p) = pl_parsers::langdetect::detect_with_probability(text)?;
+    if p < AUTO_LANGUAGE_MIN_PROBABILITY {
+        return None;
+    }
+    let tess = langdetect_to_tesseract(&code)?;
+    if configured.split('+').any(|l| l == tess) || !installed.iter().any(|l| l == tess) {
+        return None;
+    }
+    Some(tess)
 }
 
 impl NativeParsing {
@@ -66,6 +124,8 @@ impl NativeParsing {
             limits: pl_parsers::Limits::default(),
             thumbnail_font,
             pool: None,
+            ocr_language_auto: pl_core::config::var("PAPERRUST_OCR_LANGUAGE_AUTO")
+                .is_some_and(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "y" | "on")),
         }
     }
 
@@ -243,13 +303,33 @@ impl DocumentParsing for NativeParsing {
                 Some(png) => (png.as_path(), "image/png"),
                 None => (req.path, req.mime_type),
             };
+            let to_stage = |e: pl_ocr::OcrError| match e {
+                pl_ocr::OcrError::Parse(m) => StageError::Parse(m),
+                other => StageError::Parse(format!("{}: {}", other.class_name(), other.message())),
+            };
             let out =
-                pl_ocr::native::parse_document(&backend, &self.ocr, req.tempdir, path, mime_type, produce_archive).map_err(
-                    |e| match e {
-                        pl_ocr::OcrError::Parse(m) => StageError::Parse(m),
-                        other => StageError::Parse(format!("{}: {}", other.class_name(), other.message())),
-                    },
-                )?;
+                pl_ocr::native::parse_document(&backend, &self.ocr, req.tempdir, path, mime_type, produce_archive).map_err(to_stage)?;
+            if self.ocr_language_auto {
+                use pl_ocr::engine::OcrEngine as _;
+                let installed = self.tesseract.as_ref().and_then(|t| t.languages().ok()).unwrap_or_default();
+                if let Some(lang) = auto_ocr_language(&out.text, &self.ocr.language, &installed) {
+                    tracing::info!(target: "paperless.parsing", "OCR language automatic: text looks like '{lang}', recognizing again with it");
+                    let mut cfg = self.ocr.clone();
+                    cfg.language = lang.to_string();
+                    let dir = req.tempdir.join("auto-language");
+                    let again = std::fs::create_dir_all(&dir).map_err(|e| e.to_string()).and_then(|()| {
+                        let engine = pl_ocr::engine_select::engine_from_env(self.tesseract.clone(), &cfg.language);
+                        let backend = pl_ocr::native::NativeOcrmypdf::new(engine, self.renderer(), dir.join("pages"));
+                        pl_ocr::native::parse_document(&backend, &cfg, &dir, path, mime_type, produce_archive).map_err(|e| e.to_string())
+                    });
+                    match again {
+                        Ok(o) => return Ok(ParsedOutput { text: Some(o.text), date: None, archive_path: o.archive_path }),
+                        Err(e) => {
+                            tracing::warn!(target: "paperless.parsing", "OCR language automatic: second recognition failed ({e}); keeping the first result")
+                        }
+                    }
+                }
+            }
             return Ok(ParsedOutput { text: Some(out.text), date: None, archive_path: out.archive_path });
         }
         if parser.class_name == crate::remote::CLASS_NAME {

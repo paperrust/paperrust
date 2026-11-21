@@ -423,6 +423,12 @@ fn normalize_prob(prob: &mut [f64]) -> f64 {
 /// `langdetect.detect(text)`: language code with the highest probability, `None` on
 /// `LangDetectException` ("No features in text.").
 pub fn detect(text: &str) -> Option<String> {
+    detect_with_probability(text).map(|(l, _)| l)
+}
+
+/// Like [`detect`], plus the probability of the winner (0 for `"unknown"`). PaperRust: used by
+/// the OCR language automatic (pl-consumer), which only acts on confident results.
+pub fn detect_with_probability(text: &str) -> Option<(String, f64)> {
     let f = factory()?;
     let text = Factory::cleaning_text(f.append(text));
     let ngrams = f.extract_ngrams(&text);
@@ -466,8 +472,8 @@ pub fn detect(text: &str) -> Option<String> {
         }
     }
     Some(match best {
-        Some((i, _)) => f.langlist[i].clone(),
-        None => "unknown".to_string(),
+        Some((i, p)) => (f.langlist[i].clone(), p),
+        None => ("unknown".to_string(), 0.0),
     })
 }
 

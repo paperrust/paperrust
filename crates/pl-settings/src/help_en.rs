@@ -181,6 +181,7 @@ pub static HELP_EN: &[(&str, &str)] = &[
     ("PAPERLESS_OCR_USER_ARGS", "Additional OCR arguments"),
     ("PAPERLESS_OCR_SKIP_ARCHIVE_FILE", "Legacy, no effect"),
     ("PAPERLESS_OCR_LANGUAGES", "Install language packs in the upstream image"),
+    ("PAPERRUST_OCR_LANGUAGE_AUTO", "Detect the document language after OCR and recognize again with it if needed"),
     ("PAPERRUST_OCR_ENGINE", "OCR engine"),
     ("PAPERRUST_OCR_ENGINE_IDLE_SECS", "Unload idle Tesseract engines after this many seconds (0 = never)"),
     ("PAPERRUST_PDFA_FONT_DIR", "Folder with substitute fonts (Liberation) for missing fonts in the PDF/A archive"),

@@ -291,6 +291,7 @@ OCR-Felder mit AC-Feld: Vorrang AC (E3), wirksam L (nächstes Dokument).
 | `OCR_USER_ARGS` | weitere OCRmyPDF-Optionen (u. a. optimize 0–3, jpeg/png_quality, title…, tesseract_*; Rest mit Warnung je Schlüssel) | JSON | – | E, AC:user_args | L | nein | A |
 | `OCR_SKIP_ARCHIVE_FILE` | alt, ohne Wirkung (upstream-Prüfung warnt) | – | – | E | – | nein | X |
 | `OCR_LANGUAGES` | Sprachpakete im upstream-Image installieren | Liste | – | DI | – | nein | X |
+| `PAPERRUST_OCR_LANGUAGE_AUTO` | OCR-Sprache automatisch: Textsprache bestimmen, bei fremder installierter Sprache noch einmal erkennen (pl-consumer, 2026-11-21) | bool | false | E | L | nein | A |
 | `PAPERRUST_OCR_ENGINE` | OCR-Engine | tesseract/windows/macos/auto | tesseract | E | L | nein | A |
 | `PAPERRUST_OCR_ENGINE_IDLE_SECS` | geladene Tesseract-Engines (Sprachmodelle) nach so vielen Sekunden Leerlauf entladen und Speicher zurückgeben (pl-ocr `tesslib`); 0 = nie (schnellste erste Erkennung, mehr RAM) | int ≥ 0 | 180 | E | L | nein | A |
 | `PAPERRUST_PDFA_FONT_DIR` | Ordner mit Ersatzschriften (Liberation) für Schriften, die im Original nicht eingebettet sind (PDF/A-Archiv, pl-ocr `pdfa_fonts`); sonst `/usr/share/fonts/liberation` u. a. | Pfad | Suche | E | L | nein | C |
@@ -564,12 +565,12 @@ ohne pro-Nutzer-Werte, ohne DB-Objekte).
 
 | Klasse | Anzahl | davon ApplicationConfiguration |
 |---|---|---|
-| A – GUI live | 188 | 45 |
+| A – GUI live | 189 | 45 |
 | B – GUI mit Neustart | 43 | – |
 | C – Bootstrap / Installation | 94 | – (großteils Desktop-, Docker- und Installationsschlüssel) |
 | D – nur Umgebung | 27 | – |
 | X – wirkungslos in PaperRust / intern | 32 | – |
-| **Summe System** | **384** | |
+| **Summe System** | **385** | |
 | pro Nutzer (ui_settings, 1.17) | 44 | |
 | DB-Objekte bereits in der GUI (1.18) | 10 Arten | |
 

@@ -844,7 +844,21 @@ impl NativeOcrmypdf {
 
     /// `ocrmypdf.ocr(**args)`.
     pub fn run(&self, args: &OcrArgs) -> Result<()> {
-        let opts = parse_options(args)?;
+        let mut opts = parse_options(args)?;
+        // Built-in default `deu+eng` without German language data (own builds): use `eng` instead of
+        // failing – installations that never set OCR_LANGUAGE keep working as before.
+        if opts.language == crate::config::DEFAULT_OCR_LANGUAGE
+            && let Some(e) = self.engine.as_deref()
+            && e.check_languages(&opts.language).is_err()
+            && e.check_languages(crate::config::DEFAULT_OCR_LANGUAGE_FALLBACK).is_ok()
+        {
+            tracing::warn!(
+                "OCR language data for '{}' incomplete; using '{}' (install the German data or set PAPERLESS_OCR_LANGUAGE)",
+                crate::config::DEFAULT_OCR_LANGUAGE,
+                crate::config::DEFAULT_OCR_LANGUAGE_FALLBACK
+            );
+            opts.language = crate::config::DEFAULT_OCR_LANGUAGE_FALLBACK.to_string();
+        }
         let data = std::fs::read(&opts.input).map_err(|e| OcrError::InputFile(format!("{}: {e}", opts.input.display())))?;
         let meta = OutputMeta {
             output_type: opts.output_type,

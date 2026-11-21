@@ -563,7 +563,7 @@ pub static SCHEMA: &[SettingDef] = &[
     s(K::Barcodes, "PAPERLESS_CONSUMER_TAG_BARCODE_SPLIT", A, L, BOOL, Some("no"), "an Tag-Barcodes trennen").ac("barcode_tag_split"),
     s(K::Barcodes, "PAPERLESS_CONSUMER_STORE_BARCODE_VALUES", A, L, BOOL, Some("no"), "Barcodewerte speichern").ac("barcode_store_values"),
     // ---- 1.9 OCR ----
-    s(K::Ocr, "PAPERLESS_OCR_LANGUAGE", A, L, STR, Some("eng"), "Tesseract-Sprachen (deu+eng)").ac("language"),
+    s(K::Ocr, "PAPERLESS_OCR_LANGUAGE", A, L, STR, Some("deu+eng"), "Tesseract-Sprachen (deu+eng)").ac("language"),
     s(K::Ocr, "PAPERLESS_OCR_MODE", A, L, choice(&["auto", "force", "redo", "off"]), Some("auto"), "OCR-Modus").ac("mode"),
     s(K::Ocr, "PAPERLESS_ARCHIVE_FILE_GENERATION", A, L, choice(&["auto", "always", "never"]), Some("auto"), "Archiv-PDF erzeugen")
         .ac("archive_file_generation"),
@@ -582,6 +582,7 @@ pub static SCHEMA: &[SettingDef] = &[
     s(K::Ocr, "PAPERLESS_OCR_USER_ARGS", A, L, JSON_OBJ, None, "weitere OCR-Argumente").ac("user_args"),
     s(K::Ocr, "PAPERLESS_OCR_SKIP_ARCHIVE_FILE", X, N, STR, None, "alt, ohne Wirkung"),
     s(K::Ocr, "PAPERLESS_OCR_LANGUAGES", X, N, STR, None, "Sprachpakete im upstream-Image installieren").store(Store::Entrypoint),
+    s(K::Ocr, "PAPERRUST_OCR_LANGUAGE_AUTO", A, L, BOOL, Some("false"), "OCR-Sprache automatisch erkennen und ggf. neu erkennen"),
     s(K::Ocr, "PAPERRUST_OCR_ENGINE", A, L, choice(&["tesseract", "windows", "macos", "auto"]), Some("tesseract"), "OCR-Engine"),
     s(
         K::Ocr,
