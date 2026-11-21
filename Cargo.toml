@@ -108,7 +108,7 @@ encoding_rs = "=0.8.44"
 cfb = "=0.16.0"
 lopdf = { version = "=0.47.0", default-features = false }
 image = { version = "=0.25.10", default-features = false, features = ["png", "jpeg", "tiff", "bmp", "gif", "webp"] }
-libloading = "=0.8.9"
+libloading = "=0.9.1"
 tiff = "=0.11.3"
 rust-stemmers = "=1.2.0"
 # pl-pdfops: zxing-cpp-Ersatz (ohne Funktion `image`, die pinnt image =0.25.8) und Text-Vorschau
