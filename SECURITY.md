@@ -18,7 +18,7 @@ Report them privately:
 
 - by e-mail to **contact@paperrust.org** (until a dedicated security address exists), or
 - via GitHub private vulnerability reporting ("Report a vulnerability" on the Security tab of
-  `paperrust/paperrust`), once it is enabled for the repository.
+  `paperrust/paperrust`).
 
 Please include, as far as you can:
 

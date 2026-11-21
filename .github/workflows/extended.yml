@@ -175,6 +175,11 @@ jobs:
       - name: Release build Tauri shell
         working-directory: apps/desktop-shell
         run: cargo build --release --locked
+      - name: Fetch all crates (license list runs cargo metadata --offline)
+        run: |
+          cargo fetch --locked
+          cd apps/desktop-shell
+          cargo fetch --locked
       - name: pack.ps1 -Zip
         shell: powershell
         run: .\apps\desktop\pack\pack.ps1 -Zip
@@ -201,7 +206,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends \
-            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev \
+            tesseract-ocr libtesseract-dev
       - run: rustup toolchain install --profile minimal
       - uses: Swatinem/rust-cache@v2
         with:
@@ -220,6 +226,10 @@ jobs:
           cargo build --release --locked -p pl-dbmigrate --bin paperrust-migrate-db
           cargo build --release --locked -p pl-pdftools --features engine --bin paperrust-pdftool
           (cd apps/desktop-shell && cargo build --release --locked)
+      - name: Fetch all crates (license list runs cargo metadata --offline)
+        run: |
+          cargo fetch --locked
+          (cd apps/desktop-shell && cargo fetch --locked)
       - name: pack.sh --tar
         run: bash apps/desktop/pack/pack.sh --tar
       - uses: actions/upload-artifact@v4
