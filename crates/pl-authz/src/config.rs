@@ -66,11 +66,7 @@ fn env_bool(key: &str, default: &str) -> Result<bool, String> {
 /// `get_list_from_env(key)`: split on ",", strip, drop empty; unset/empty -> default.
 fn env_list(key: &str, default: Option<Vec<String>>) -> Vec<String> {
     match env(key) {
-        Some(v) if !v.is_empty() => v
-            .split(',')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect(),
+        Some(v) if !v.is_empty() => v.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect(),
         _ => default.unwrap_or_default(),
     }
 }
@@ -110,8 +106,7 @@ impl AuthConfig {
         }
         let remote_user_enabled = env_bool("PAPERLESS_ENABLE_HTTP_REMOTE_USER", "NO")?;
         let remote_user_api = env_bool("PAPERLESS_ENABLE_HTTP_REMOTE_USER_API", "NO")?;
-        let remote_user_header = env("PAPERLESS_HTTP_REMOTE_USER_HEADER_NAME")
-            .unwrap_or_else(|| "HTTP_REMOTE_USER".into());
+        let remote_user_header = env("PAPERLESS_HTTP_REMOTE_USER_HEADER_NAME").unwrap_or_else(|| "HTTP_REMOTE_USER".into());
 
         let mut csrf_trusted_origins = env_list("PAPERLESS_CSRF_TRUSTED_ORIGINS", None);
         if debug {
@@ -120,18 +115,12 @@ impl AuthConfig {
         // upstream fix 00096e025 (#14735): `["*"]` only without PAPERLESS_ALLOWED_HOSTS and without
         // PAPERLESS_URL; hostname normalised (trailing dot, `*`/`.…` invalid, IPv6 in `[]`).
         let paperless_url = env("PAPERLESS_URL").filter(|u| !u.is_empty());
-        let mut allowed_hosts = pl_core::config::initial_allowed_hosts(
-            env("PAPERLESS_ALLOWED_HOSTS").as_deref(),
-            paperless_url.is_some(),
-        );
+        let mut allowed_hosts = pl_core::config::initial_allowed_hosts(env("PAPERLESS_ALLOWED_HOSTS").as_deref(), paperless_url.is_some());
         if let Some(url) = paperless_url {
-            let host = crate::csrf::urlsplit(&url).and_then(|p| {
-                pl_core::config::allowed_host_from_url_hostname(&hostname_of_netloc(&p.netloc))
-            });
+            let host =
+                crate::csrf::urlsplit(&url).and_then(|p| pl_core::config::allowed_host_from_url_hostname(&hostname_of_netloc(&p.netloc)));
             let Some(host) = host else {
-                return Err(format!(
-                    "PAPERRUST_URL {url:?} has no valid hostname, expected a URL like https://example.com"
-                ));
+                return Err(format!("PAPERRUST_URL {url:?} has no valid hostname, expected a URL like https://example.com"));
             };
             csrf_trusted_origins.push(url);
             allowed_hosts.push(host);
@@ -139,8 +128,7 @@ impl AuthConfig {
         let secure_proxy_ssl_header = match env("PAPERLESS_PROXY_SSL_HEADER") {
             None => None,
             Some(v) => {
-                let parsed: Vec<String> = serde_json::from_str(&v)
-                    .map_err(|e| format!("PAPERRUST_PROXY_SSL_HEADER: {e}"))?;
+                let parsed: Vec<String> = serde_json::from_str(&v).map_err(|e| format!("PAPERRUST_PROXY_SSL_HEADER: {e}"))?;
                 match parsed.as_slice() {
                     [] => None,
                     [h, val] => Some((h.clone(), val.clone())),
@@ -212,8 +200,7 @@ mod tests {
     #[test]
     fn url_host_normalised_like_upstream_00096e025() {
         let host = |u: &str| {
-            crate::csrf::urlsplit(u)
-                .and_then(|p| pl_core::config::allowed_host_from_url_hostname(&hostname_of_netloc(&p.netloc)))
+            crate::csrf::urlsplit(u).and_then(|p| pl_core::config::allowed_host_from_url_hostname(&hostname_of_netloc(&p.netloc)))
         };
         assert_eq!(host("https://Example.com.:8443").as_deref(), Some("example.com"));
         assert_eq!(host("http://[::1]:8000").as_deref(), Some("[::1]"));

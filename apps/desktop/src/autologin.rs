@@ -90,25 +90,14 @@ pub fn login_url_for(run_dir: &Path, base: &str, next: &str) -> Option<String> {
 /// that Django user names allow (`[A-Za-z0-9@.+_-]`, ASCII), others are dropped, at most
 /// 150 characters; empty → [`FALLBACK_OWNER`].
 pub fn sanitize_owner(os_name: &str) -> String {
-    let s: String = os_name
-        .trim()
-        .chars()
-        .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '@' | '.' | '+' | '-' | '_'))
-        .take(150)
-        .collect();
-    if s.is_empty() || s.chars().all(|c| matches!(c, '.' | '-' | '_' | '+' | '@')) {
-        FALLBACK_OWNER.into()
-    } else {
-        s
-    }
+    let s: String =
+        os_name.trim().chars().filter(|c| c.is_ascii_alphanumeric() || matches!(c, '@' | '.' | '+' | '-' | '_')).take(150).collect();
+    if s.is_empty() || s.chars().all(|c| matches!(c, '.' | '-' | '_' | '+' | '@')) { FALLBACK_OWNER.into() } else { s }
 }
 
 /// Owner name from `USERNAME` (Windows) or `USER`/`LOGNAME` (Unix).
 pub fn owner_name_from_os(get: impl Fn(&str) -> Option<String>) -> String {
-    let raw = ["USERNAME", "USER", "LOGNAME"]
-        .iter()
-        .find_map(|k| get(k).filter(|v| !v.trim().is_empty()))
-        .unwrap_or_default();
+    let raw = ["USERNAME", "USER", "LOGNAME"].iter().find_map(|k| get(k).filter(|v| !v.trim().is_empty())).unwrap_or_default();
     sanitize_owner(&raw)
 }
 
@@ -275,9 +264,8 @@ mod tests {
         assert_eq!(sanitize_owner("Ä Ö"), FALLBACK_OWNER);
         assert_eq!(sanitize_owner("..."), FALLBACK_OWNER);
         assert_eq!(sanitize_owner(&"x".repeat(200)).len(), 150);
-        let env = |pairs: &'static [(&'static str, &'static str)]| {
-            move |k: &str| pairs.iter().find(|(n, _)| *n == k).map(|(_, v)| v.to_string())
-        };
+        let env =
+            |pairs: &'static [(&'static str, &'static str)]| move |k: &str| pairs.iter().find(|(n, _)| *n == k).map(|(_, v)| v.to_string());
         assert_eq!(owner_name_from_os(env(&[("USERNAME", "Jane"), ("USER", "x")])), "Jane");
         assert_eq!(owner_name_from_os(env(&[("USERNAME", " "), ("USER", "anna")])), "anna");
         assert_eq!(owner_name_from_os(env(&[])), FALLBACK_OWNER);

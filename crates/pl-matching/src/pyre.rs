@@ -49,10 +49,7 @@ pub struct BoundedSearch {
 
 impl BoundedSearch {
     pub fn new(inner_pattern: &str, ignore_case: bool) -> Result<Self, regex::Error> {
-        let inner = regex::RegexBuilder::new(inner_pattern)
-            .case_insensitive(ignore_case)
-            .size_limit(64 * 1024 * 1024)
-            .build()?;
+        let inner = regex::RegexBuilder::new(inner_pattern).case_insensitive(ignore_case).size_limit(64 * 1024 * 1024).build()?;
         Ok(Self { inner })
     }
 

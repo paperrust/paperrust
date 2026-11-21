@@ -41,7 +41,12 @@ struct RecordingQueue {
 }
 
 impl pl_queue::TaskQueue for RecordingQueue {
-    fn enqueue<'a>(&'a self, task_name: &'a str, kwargs: Map<String, Value>, opts: EnqueueOptions) -> BoxFuture<'a, Result<uuid::Uuid, QueueError>> {
+    fn enqueue<'a>(
+        &'a self,
+        task_name: &'a str,
+        kwargs: Map<String, Value>,
+        opts: EnqueueOptions,
+    ) -> BoxFuture<'a, Result<uuid::Uuid, QueueError>> {
         Box::pin(async move {
             self.calls.lock().unwrap().push((task_name.to_string(), kwargs, opts.trigger_source.clone()));
             Ok(uuid::Uuid::new_v4())
@@ -74,7 +79,12 @@ async fn user(pool: &sqlx::PgPool, name: &str, su: bool, perms: &[&str], token: 
         .await
         .unwrap();
     }
-    sqlx::query("INSERT INTO authtoken_token (key, created, user_id) VALUES ($1, now(), $2)").bind(token).bind(id).execute(pool).await.unwrap();
+    sqlx::query("INSERT INTO authtoken_token (key, created, user_id) VALUES ($1, now(), $2)")
+        .bind(token)
+        .bind(id)
+        .execute(pool)
+        .await
+        .unwrap();
     i64::from(id)
 }
 
@@ -204,7 +214,11 @@ async fn run(url: String) {
     assert_eq!(st, StatusCode::CREATED, "{s}");
     assert_eq!(s["name"], "HP OfficeJet Pro 9010 series");
     let sid = s["id"].as_i64().unwrap();
-    assert_eq!(call(&r, "POST", "/api/x-scan/scanners/", Some(SU), Some(json!({"url": base}))).await.0, StatusCode::BAD_REQUEST, "duplicate");
+    assert_eq!(
+        call(&r, "POST", "/api/x-scan/scanners/", Some(SU), Some(json!({"url": base}))).await.0,
+        StatusCode::BAD_REQUEST,
+        "duplicate"
+    );
     // users do not see addresses
     let (_, v) = call(&r, "GET", "/api/x-scan/scanners/", Some(ADDER), None).await;
     assert!(v["results"][0].get("base_url").is_none(), "{v}");
@@ -217,11 +231,20 @@ async fn run(url: String) {
     assert_eq!(caps["sources"].as_array().unwrap().len(), 3);
     let (st, v) = call(&r, "POST", "/api/x-scan/jobs/", Some(VIEWER), Some(json!({"scanner": sid}))).await;
     assert_eq!(st, StatusCode::FORBIDDEN, "{v}");
-    let (st, v) = call(&r, "POST", "/api/x-scan/jobs/", Some(ADDER), Some(json!({"scanner": sid, "source": "flatbed", "duplex": true}))).await;
+    let (st, v) =
+        call(&r, "POST", "/api/x-scan/jobs/", Some(ADDER), Some(json!({"scanner": sid, "source": "flatbed", "duplex": true}))).await;
     assert_eq!(st, StatusCode::BAD_REQUEST, "{v}");
-    let (st, v) = call(&r, "POST", "/api/x-scan/jobs/", Some(ADDER), Some(json!({"scanner": sid, "source": "adf", "resolution": 9999}))).await;
+    let (st, v) =
+        call(&r, "POST", "/api/x-scan/jobs/", Some(ADDER), Some(json!({"scanner": sid, "source": "adf", "resolution": 9999}))).await;
     assert_eq!(st, StatusCode::BAD_REQUEST, "{v}");
-    let (st, job) = call(&r, "POST", "/api/x-scan/jobs/", Some(ADDER), Some(json!({"scanner": sid, "source": "adf", "duplex": true, "resolution": 200, "color_mode": "grayscale", "title": "Brief"}))).await;
+    let (st, job) = call(
+        &r,
+        "POST",
+        "/api/x-scan/jobs/",
+        Some(ADDER),
+        Some(json!({"scanner": sid, "source": "adf", "duplex": true, "resolution": 200, "color_mode": "grayscale", "title": "Brief"})),
+    )
+    .await;
     assert_eq!(st, StatusCode::CREATED, "{job}");
     let jid = job["id"].as_str().unwrap().to_string();
     let mut view = job.clone();
@@ -253,31 +276,50 @@ async fn run(url: String) {
     }
 
     // --- Device tokens ---
-    assert_eq!(call(&r, "POST", "/api/x-scan/devices/", Some(ADDER), Some(json!({"name": "HP", "owner": adder}))).await.0, StatusCode::FORBIDDEN);
+    assert_eq!(
+        call(&r, "POST", "/api/x-scan/devices/", Some(ADDER), Some(json!({"name": "HP", "owner": adder}))).await.0,
+        StatusCode::FORBIDDEN
+    );
     let (st, v) = call(&r, "POST", "/api/x-scan/devices/", Some(SU), Some(json!({"name": "HP", "owner": viewer}))).await;
     assert_eq!(st, StatusCode::BAD_REQUEST, "owner without add_document: {v}");
-    let (st, v) = call(&r, "POST", "/api/x-scan/devices/", Some(SU), Some(json!({"name": "HP", "owner": adder, "allowed_ips": "nope"}))).await;
+    let (st, v) =
+        call(&r, "POST", "/api/x-scan/devices/", Some(SU), Some(json!({"name": "HP", "owner": adder, "allowed_ips": "nope"}))).await;
     assert_eq!(st, StatusCode::BAD_REQUEST, "{v}");
-    let (st, dev) = call(&r, "POST", "/api/x-scan/devices/", Some(SU), Some(json!({"name": "HP OfficeJet Pro 9010", "owner": adder, "allowed_ips": "127.0.0.1"}))).await;
+    let (st, dev) = call(
+        &r,
+        "POST",
+        "/api/x-scan/devices/",
+        Some(SU),
+        Some(json!({"name": "HP OfficeJet Pro 9010", "owner": adder, "allowed_ips": "127.0.0.1"})),
+    )
+    .await;
     assert_eq!(st, StatusCode::CREATED, "{dev}");
     let token = dev["token"].as_str().unwrap().to_string();
     assert!(pl_scan::token::is_well_formed(&token));
     let did = dev["id"].as_i64().unwrap();
     // stored only as a hash
-    let stored: String = sqlx::query_scalar("SELECT token_hash FROM paperrust_scan_device WHERE id = $1").bind(did).fetch_one(&pool).await.unwrap();
+    let stored: String =
+        sqlx::query_scalar("SELECT token_hash FROM paperrust_scan_device WHERE id = $1").bind(did).fetch_one(&pool).await.unwrap();
     assert_eq!(stored, pl_scan::token::hash(&token));
-    let raw_hits: i64 = sqlx::query_scalar("SELECT count(*) FROM paperrust_scan_device WHERE row_to_json(paperrust_scan_device)::text LIKE '%' || $1 || '%'")
-        .bind(&token)
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+    let raw_hits: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM paperrust_scan_device WHERE row_to_json(paperrust_scan_device)::text LIKE '%' || $1 || '%'",
+    )
+    .bind(&token)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     assert_eq!(raw_hits, 0, "plain token must not be stored");
     let (_, list) = call(&r, "GET", "/api/x-scan/devices/", Some(SU), None).await;
     assert!(list["results"][0].get("token").is_none() && list["results"][0].get("token_hash").is_none(), "{list}");
     assert_eq!(list["smtp"]["enabled"], false);
 
     // --- SMTP intake with real device storage ---
-    let smtp_cfg = pl_scan::smtp::SmtpConfig::from_lookup(|k| (k == pl_scan::smtp::SETTING_ENABLED).then(|| "on".into()), scratch.path().to_path_buf()).unwrap().unwrap();
+    let smtp_cfg = pl_scan::smtp::SmtpConfig::from_lookup(
+        |k| (k == pl_scan::smtp::SETTING_ENABLED).then(|| "on".into()),
+        scratch.path().to_path_buf(),
+    )
+    .unwrap()
+    .unwrap();
     let ctx = Arc::new(pl_scan::smtp::Context {
         cfg: smtp_cfg,
         devices: Arc::new(pl_scan::store::PgDevices(pool.clone())),
@@ -299,11 +341,19 @@ async fn run(url: String) {
         assert_eq!(kw["overrides"]["owner_id"], json!(adder));
         assert_eq!(kw["overrides"]["filename"], "scan0001.pdf");
     }
-    let (n, ip): (i64, Option<String>) = sqlx::query_as("SELECT documents_received, last_ip FROM paperrust_scan_device WHERE id = $1").bind(did).fetch_one(&pool).await.unwrap();
+    let (n, ip): (i64, Option<String>) = sqlx::query_as("SELECT documents_received, last_ip FROM paperrust_scan_device WHERE id = $1")
+        .bind(did)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
     assert_eq!((n, ip.as_deref()), (1, Some("127.0.0.1")));
 
     // --- Revocation takes effect immediately ---
-    assert_eq!(call(&r, "DELETE", &format!("/api/x-scan/devices/{did}/"), Some(SU), None).await.0, StatusCode::NOT_FOUND, "only revoked devices can be deleted");
+    assert_eq!(
+        call(&r, "DELETE", &format!("/api/x-scan/devices/{did}/"), Some(SU), None).await.0,
+        StatusCode::NOT_FOUND,
+        "only revoked devices can be deleted"
+    );
     assert_eq!(call(&r, "POST", &format!("/api/x-scan/devices/{did}/revoke/"), Some(SU), None).await.0, StatusCode::OK);
     let (auth, _) = send_scan_mail(addr, &token).await;
     assert!(auth.starts_with("535"), "revoked token: {auth}");

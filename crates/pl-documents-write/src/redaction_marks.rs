@@ -27,8 +27,7 @@ pub async fn ensure(pool: &PgPool) -> Result<(), sqlx::Error> {
         return Ok(());
     }
     let mut c = pool.acquire().await?;
-    let exists: bool =
-        sqlx::query_scalar("SELECT to_regclass('public.paperrust_redaction') IS NOT NULL").fetch_one(&mut *c).await?;
+    let exists: bool = sqlx::query_scalar("SELECT to_regclass('public.paperrust_redaction') IS NOT NULL").fetch_one(&mut *c).await?;
     if !exists {
         let script = format!(
             "DO $paperrust$ BEGIN PERFORM pg_advisory_xact_lock(hashtext('paperrust_redaction'));\n{}\nEND $paperrust$",
@@ -43,22 +42,19 @@ pub async fn ensure(pool: &PgPool) -> Result<(), sqlx::Error> {
 /// Remember a successful redaction.
 pub async fn record(pool: &PgPool, root_id: i64, source_id: i64, checksum: &str, actor_id: i64) -> Result<(), sqlx::Error> {
     ensure(pool).await?;
-    sqlx::query(
-        "INSERT INTO paperrust_redaction (root_document_id, source_document_id, checksum, actor_id) VALUES ($1, $2, $3, $4)",
-    )
-    .bind(i32::try_from(root_id).unwrap_or(i32::MAX))
-    .bind(i32::try_from(source_id).unwrap_or(i32::MAX))
-    .bind(checksum)
-    .bind(i32::try_from(actor_id).unwrap_or(i32::MAX))
-    .execute(pool)
-    .await?;
+    sqlx::query("INSERT INTO paperrust_redaction (root_document_id, source_document_id, checksum, actor_id) VALUES ($1, $2, $3, $4)")
+        .bind(i32::try_from(root_id).unwrap_or(i32::MAX))
+        .bind(i32::try_from(source_id).unwrap_or(i32::MAX))
+        .bind(checksum)
+        .bind(i32::try_from(actor_id).unwrap_or(i32::MAX))
+        .execute(pool)
+        .await?;
     Ok(())
 }
 
 /// Is `checksum` a redacted version? Error or missing table: `false`.
 pub async fn is_redacted(pool: &PgPool, checksum: &str) -> bool {
-    let exists: Result<bool, _> =
-        sqlx::query_scalar("SELECT to_regclass('public.paperrust_redaction') IS NOT NULL").fetch_one(pool).await;
+    let exists: Result<bool, _> = sqlx::query_scalar("SELECT to_regclass('public.paperrust_redaction') IS NOT NULL").fetch_one(pool).await;
     if !matches!(exists, Ok(true)) {
         return false;
     }

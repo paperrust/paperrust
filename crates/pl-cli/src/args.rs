@@ -116,7 +116,8 @@ pub fn parse(args: &[String], opts: &[Opt], max_positionals: usize) -> CliResult
                     i += 1;
                 }
                 _ => {
-                    let what = if opt.nargs == 1 { "expected one argument".to_string() } else { format!("expected {} arguments", opt.nargs) };
+                    let what =
+                        if opt.nargs == 1 { "expected one argument".to_string() } else { format!("expected {} arguments", opt.nargs) };
                     return Err(CliError::Usage(format!("argument {}: {what}", opt.names.join("/"))));
                 }
             }
@@ -140,7 +141,11 @@ mod tests {
 
     #[test]
     fn parses_flags_values_and_positionals() {
-        let opts = [flag(&["-z", "--zip"], "zip"), value(&["-zn", "--zip-name"], "zip_name"), Opt { names: &["--id-range"], dest: "id_range", nargs: 2 }];
+        let opts = [
+            flag(&["-z", "--zip"], "zip"),
+            value(&["-zn", "--zip-name"], "zip_name"),
+            Opt { names: &["--id-range"], dest: "id_range", nargs: 2 },
+        ];
         let p = parse(&s(&["/tmp/x", "-z", "--zip-name=foo", "--id-range", "1", "5", "-v", "2"]), &opts, 1).unwrap();
         assert!(p.flag("zip"));
         assert_eq!(p.value("zip_name"), Some("foo"));

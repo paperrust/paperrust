@@ -171,10 +171,7 @@ fn analyzer(lang: Language) -> &'static Analyzer {
                 } else {
                     l.stop_words().iter().map(|w| (*w).to_owned()).collect()
                 };
-                Analyzer {
-                    stop,
-                    stemmer: Stemmer::create(l.algorithm()),
-                }
+                Analyzer { stop, stemmer: Stemmer::create(l.algorithm()) }
             })
             .collect()
     });
@@ -189,11 +186,7 @@ fn rust_word_regex() -> &'static Regex {
 
 /// tantivy `LowerCaser`: ASCII fast path, otherwise `char::to_lowercase` per char.
 fn tantivy_lowercase(s: &str) -> String {
-    if s.is_ascii() {
-        s.to_ascii_lowercase()
-    } else {
-        s.chars().flat_map(char::to_lowercase).collect()
-    }
+    if s.is_ascii() { s.to_ascii_lowercase() } else { s.chars().flat_map(char::to_lowercase).collect() }
 }
 
 /// tantivy-py `TextAnalyzer.analyze(text)` for the classifier analyzer of `lang`.
@@ -231,14 +224,8 @@ pub fn suggestion_content(content: &str) -> std::borrow::Cow<'_, str> {
     if n <= 1_200_000 {
         return std::borrow::Cow::Borrowed(content);
     }
-    let head_end = content
-        .char_indices()
-        .nth(800_000)
-        .map_or(content.len(), |(i, _)| i);
-    let tail_start = content
-        .char_indices()
-        .nth(n - 200_000)
-        .map_or(content.len(), |(i, _)| i);
+    let head_end = content.char_indices().nth(800_000).map_or(content.len(), |(i, _)| i);
+    let tail_start = content.char_indices().nth(n - 200_000).map_or(content.len(), |(i, _)| i);
     let mut s = String::with_capacity(head_end + 1 + content.len() - tail_start);
     s.push_str(&content[..head_end]);
     s.push(' ');
@@ -253,10 +240,7 @@ mod tests {
     #[test]
     fn english_removes_snowball_stop_words() {
         // upstream test_classifier.py::TestTextAnalyzer::test_english_removes_snowball_stop_words
-        let t = analyze(
-            Language::English,
-            "They were about to pay the invoices, don't worry",
-        );
+        let t = analyze(Language::English, "They were about to pay the invoices, don't worry");
         assert_eq!(t, vec!["pay", "invoic", "worri"]);
     }
 
@@ -280,10 +264,7 @@ mod tests {
 
     #[test]
     fn ocr_language_mapping() {
-        assert_eq!(
-            Language::from_ocr_language("deu+eng"),
-            Some(Language::German)
-        );
+        assert_eq!(Language::from_ocr_language("deu+eng"), Some(Language::German));
         assert_eq!(Language::from_ocr_language("eng"), Some(Language::English));
         assert_eq!(Language::from_ocr_language("ara"), None);
         assert_eq!(Language::from_ocr_language(""), None);
@@ -292,10 +273,7 @@ mod tests {
     #[test]
     fn suggestion_content_crop() {
         let s = "a".repeat(1_200_000);
-        assert!(matches!(
-            suggestion_content(&s),
-            std::borrow::Cow::Borrowed(_)
-        ));
+        assert!(matches!(suggestion_content(&s), std::borrow::Cow::Borrowed(_)));
         let s = format!("{}{}", "x".repeat(900_000), "y".repeat(400_000));
         let c = suggestion_content(&s);
         assert_eq!(c.chars().count(), 1_000_001);

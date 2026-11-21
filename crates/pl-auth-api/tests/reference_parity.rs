@@ -77,9 +77,7 @@ async fn compare_with(app: &Router, method: &str, token: &str, path: &str, versi
     let accept = format!("application/json; version={version}");
     let client = reqwest::Client::new();
     let m = reqwest::Method::from_bytes(method.as_bytes()).map_err(|e| e.to_string())?;
-    let mut rb = client
-        .request(m, format!("{DJANGO}{path}"))
-        .header("Accept", &accept);
+    let mut rb = client.request(m, format!("{DJANGO}{path}")).header("Accept", &accept);
     if !token.is_empty() {
         rb = rb.header("Authorization", format!("Token {token}"));
     }
@@ -105,7 +103,9 @@ async fn compare_with(app: &Router, method: &str, token: &str, path: &str, versi
     let r_body = String::from_utf8_lossy(&bytes).to_string();
 
     if d_status != r_status {
-        return Err(format!("{path} v{version}: status django={d_status} rust={r_status}\n  django: {d_body:.300}\n  rust:   {r_body:.300}"));
+        return Err(format!(
+            "{path} v{version}: status django={d_status} rust={r_status}\n  django: {d_body:.300}\n  rust:   {r_body:.300}"
+        ));
     }
     match (serde_json::from_str::<Value>(&d_body), serde_json::from_str::<Value>(&r_body)) {
         (Ok(mut a), Ok(mut b)) => {
@@ -200,8 +200,22 @@ async fn non_writing_mutations_match_django() {
     let cases: &[(&str, &str, &str, Option<&str>)] = &[
         ("POST", ADMIN, "/api/users/", Some(r#"{}"#)),
         ("POST", ADMIN, "/api/users/", Some(r#"[1, 2]"#)),
-        ("POST", ADMIN, "/api/users/", Some(r#"{"username": "admin", "email": "nope", "password": "1234", "groups": [999], "user_permissions": ["no_such_perm"], "is_staff": "maybe"}"#)),
-        ("POST", ADMIN, "/api/users/", Some(r#"{"username": "bad name!", "groups": "x", "first_name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}"#)),
+        (
+            "POST",
+            ADMIN,
+            "/api/users/",
+            Some(
+                r#"{"username": "admin", "email": "nope", "password": "1234", "groups": [999], "user_permissions": ["no_such_perm"], "is_staff": "maybe"}"#,
+            ),
+        ),
+        (
+            "POST",
+            ADMIN,
+            "/api/users/",
+            Some(
+                r#"{"username": "bad name!", "groups": "x", "first_name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}"#,
+            ),
+        ),
         ("POST", ADMIN, "/api/users/", Some(r#"{"username": "x", "user_permissions": "view_user", "groups": [true]}"#)),
         ("POST", ADMIN, "/api/users/", Some(r#"{"username": "x", "password": "admin123", "date_joined": "garbage"}"#)),
         ("POST", ALICE, "/api/users/", Some(r#"{"username": "x", "is_superuser": true}"#)),
@@ -240,8 +254,10 @@ async fn non_writing_mutations_match_django() {
         }
     }
     for f in &failures {
-        eprintln!("DIFF {f}
-");
+        eprintln!(
+            "DIFF {f}
+"
+        );
     }
     eprintln!("compared {}, different {}", cases.len(), failures.len());
     assert!(failures.is_empty(), "{} of {} cases differ", failures.len(), cases.len());

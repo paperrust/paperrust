@@ -56,11 +56,7 @@ impl Lang {
 
     /// Docs language for a Django language code (`de`, `de-ch`, `en-us`, `fr` …).
     pub fn for_language(code: &str) -> Lang {
-        if code == "de" || code.starts_with("de-") || code.starts_with("de_") {
-            Lang::De
-        } else {
-            Lang::En
-        }
+        if code == "de" || code.starts_with("de-") || code.starts_with("de_") { Lang::De } else { Lang::En }
     }
 }
 
@@ -113,20 +109,8 @@ pub fn source(lang: Lang, page: &str) -> Option<&'static str> {
 
 pub fn routes() -> Vec<ApiRoute> {
     vec![
-        ApiRoute::new(
-            "rs.docs.index",
-            Method::GET,
-            "/rs/docs/",
-            "PaperRust extension (user documentation)",
-            get(index),
-        ),
-        ApiRoute::new(
-            "rs.docs.page",
-            Method::GET,
-            "/rs/docs/{*path}",
-            "PaperRust extension (user documentation)",
-            get(page),
-        ),
+        ApiRoute::new("rs.docs.index", Method::GET, "/rs/docs/", "PaperRust extension (user documentation)", get(index)),
+        ApiRoute::new("rs.docs.page", Method::GET, "/rs/docs/{*path}", "PaperRust extension (user documentation)", get(page)),
     ]
 }
 
@@ -141,10 +125,7 @@ pub enum Target {
 }
 
 fn page_name(file: &str) -> Option<&'static str> {
-    let stem = file
-        .strip_suffix(".md")
-        .or_else(|| file.strip_suffix(".html"))
-        .unwrap_or(file);
+    let stem = file.strip_suffix(".md").or_else(|| file.strip_suffix(".html")).unwrap_or(file);
     PAGES.iter().copied().find(|p| *p == stem)
 }
 
@@ -161,9 +142,7 @@ pub fn resolve(path: &str) -> Target {
             // `/rs/docs/de` → `de/README.md` (relative to `/rs/docs/`)
             Some(lang) => Target::Redirect(None, format!("{}/README.md", lang.code())),
             None if path.is_empty() => Target::Redirect(None, String::new()),
-            None => page_name(path).map_or(Target::NotFound, |p| {
-                Target::Redirect(None, format!("{p}.md"))
-            }),
+            None => page_name(path).map_or(Target::NotFound, |p| Target::Redirect(None, format!("{p}.md"))),
         },
     }
 }
@@ -192,10 +171,7 @@ fn online_base(st: &AppState) -> Option<String> {
 }
 
 fn negotiated(st: &AppState, headers: &HeaderMap) -> Lang {
-    Lang::for_language(pl_core::request::language_from_request(
-        headers,
-        &st.config().language_cookie_name,
-    ))
+    Lang::for_language(pl_core::request::language_from_request(headers, &st.config().language_cookie_name))
 }
 
 async fn index(State(st): State<AppState>, headers: HeaderMap) -> Response {
@@ -206,11 +182,7 @@ async fn index(State(st): State<AppState>, headers: HeaderMap) -> Response {
     }
 }
 
-async fn page(
-    State(st): State<AppState>,
-    headers: HeaderMap,
-    UrlPath(path): UrlPath<String>,
-) -> Response {
+async fn page(State(st): State<AppState>, headers: HeaderMap, UrlPath(path): UrlPath<String>) -> Response {
     let target = resolve(&path);
     let online = online_base(&st);
     match target {
@@ -229,35 +201,19 @@ async fn page(
                 (Some(base), None) => redirect(&online_url(&base, lang, "README")),
                 // `/rs/docs/de` → `de/README.md`: already language-qualified
                 (None, _) if rest.contains('/') => redirect(&rest),
-                (None, _) => redirect(&format!(
-                    "{}/{}",
-                    lang.code(),
-                    if rest.is_empty() { "README.md" } else { &rest }
-                )),
+                (None, _) => redirect(&format!("{}/{}", lang.code(), if rest.is_empty() { "README.md" } else { &rest })),
             }
         }
-        Target::NotFound => html_response(
-            StatusCode::NOT_FOUND,
-            not_found_page(negotiated(&st, &headers)),
-        ),
+        Target::NotFound => html_response(StatusCode::NOT_FOUND, not_found_page(negotiated(&st, &headers))),
     }
 }
 
 fn html_response(status: StatusCode, body: String) -> Response {
     let mut r = (status, body).into_response();
     let h = r.headers_mut();
-    h.insert(
-        header::CONTENT_TYPE,
-        HeaderValue::from_static("text/html; charset=utf-8"),
-    );
-    h.insert(
-        header::CACHE_CONTROL,
-        HeaderValue::from_static("max-age=60"),
-    );
-    h.insert(
-        "X-Content-Type-Options",
-        HeaderValue::from_static("nosniff"),
-    );
+    h.insert(header::CONTENT_TYPE, HeaderValue::from_static("text/html; charset=utf-8"));
+    h.insert(header::CACHE_CONTROL, HeaderValue::from_static("max-age=60"));
+    h.insert("X-Content-Type-Options", HeaderValue::from_static("nosniff"));
     r
 }
 
@@ -283,12 +239,7 @@ fn normalise(path: &str) -> Option<String> {
 /// (relative to `/rs/docs/<lang>/`); other relative links → the repository on GitHub;
 /// absolute URLs, `#anchors`, `mailto:` unchanged.
 pub fn rewrite_link(lang: Lang, dest: &str) -> String {
-    if dest.is_empty()
-        || dest.starts_with('#')
-        || dest.starts_with('/')
-        || dest.contains("://")
-        || dest.contains(':')
-    {
+    if dest.is_empty() || dest.starts_with('#') || dest.starts_with('/') || dest.contains("://") || dest.contains(':') {
         return dest.to_string();
     }
     let (path, frag) = match dest.split_once('#') {
@@ -304,11 +255,7 @@ pub fn rewrite_link(lang: Lang, dest: &str) -> String {
             && !file.contains('/')
             && let Some(p) = page_name(file).filter(|_| file.ends_with(".md"))
         {
-            return if l == lang {
-                format!("{p}.md{frag}")
-            } else {
-                format!("../{}/{p}.md{frag}", l.code())
-            };
+            return if l == lang { format!("{p}.md{frag}") } else { format!("../{}/{p}.md{frag}", l.code()) };
         }
     }
     format!("{}/blob/main/{resolved}{frag}", pl_core::brand::REPO_URL)
@@ -332,39 +279,16 @@ pub fn slug(text: &str) -> String {
 
 /// Markdown → HTML body (links rewritten, headings with ids); returns `(title, body)`.
 pub fn render_markdown(lang: Lang, md: &str) -> (String, String) {
-    let opts = Options::ENABLE_TABLES
-        | Options::ENABLE_STRIKETHROUGH
-        | Options::ENABLE_TASKLISTS
-        | Options::ENABLE_FOOTNOTES;
+    let opts = Options::ENABLE_TABLES | Options::ENABLE_STRIKETHROUGH | Options::ENABLE_TASKLISTS | Options::ENABLE_FOOTNOTES;
     let mut events: Vec<Event> = Parser::new_ext(md, opts)
         .map(|e| match e {
-            Event::Start(Tag::Link {
-                link_type,
-                dest_url,
-                title,
-                id,
-            }) => {
+            Event::Start(Tag::Link { link_type, dest_url, title, id }) => {
                 let dest = CowStr::from(rewrite_link(lang, &dest_url));
-                Event::Start(Tag::Link {
-                    link_type,
-                    dest_url: dest,
-                    title,
-                    id,
-                })
+                Event::Start(Tag::Link { link_type, dest_url: dest, title, id })
             }
-            Event::Start(Tag::Image {
-                link_type,
-                dest_url,
-                title,
-                id,
-            }) => {
+            Event::Start(Tag::Image { link_type, dest_url, title, id }) => {
                 let dest = CowStr::from(rewrite_link(lang, &dest_url));
-                Event::Start(Tag::Image {
-                    link_type,
-                    dest_url: dest,
-                    title,
-                    id,
-                })
+                Event::Start(Tag::Image { link_type, dest_url: dest, title, id })
             }
             e => e,
         })
@@ -374,10 +298,7 @@ pub fn render_markdown(lang: Lang, md: &str) -> (String, String) {
     let mut used = std::collections::HashSet::new();
     let mut i = 0;
     while i < events.len() {
-        if let Event::Start(Tag::Heading {
-            level, id: None, ..
-        }) = &events[i]
-        {
+        if let Event::Start(Tag::Heading { level, id: None, .. }) = &events[i] {
             let level = *level;
             let mut text = String::new();
             let mut j = i + 1;
@@ -409,10 +330,7 @@ pub fn render_markdown(lang: Lang, md: &str) -> (String, String) {
 }
 
 fn esc(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
+    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
 }
 
 const STYLE: &str = r#"
@@ -445,11 +363,7 @@ pub fn render_page(lang: Lang, page: &str) -> String {
         Lang::De => ("Übersicht", Lang::En, "English"),
         Lang::En => ("Contents", Lang::De, "Deutsch"),
     };
-    let title = if title.is_empty() {
-        page.to_string()
-    } else {
-        title
-    };
+    let title = if title.is_empty() { page.to_string() } else { title };
     format!(
         "<!doctype html>\n<html lang=\"{code}\">\n<head>\n<meta charset=\"utf-8\">\n\
 <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
@@ -482,10 +396,7 @@ mod tests {
     #[test]
     fn every_docs_page_is_embedded_in_both_languages() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/user");
-        for (dir, skip) in [
-            (root.clone(), &["LINKMAP.md"][..]),
-            (root.join("en"), &[][..]),
-        ] {
+        for (dir, skip) in [(root.clone(), &["LINKMAP.md"][..]), (root.join("en"), &[][..])] {
             let mut on_disk: Vec<String> = std::fs::read_dir(&dir)
                 .unwrap()
                 .filter_map(|e| e.ok()?.file_name().into_string().ok())
@@ -495,12 +406,7 @@ mod tests {
             on_disk.sort();
             let mut embedded: Vec<String> = PAGES.iter().map(|s| s.to_string()).collect();
             embedded.sort();
-            assert_eq!(
-                on_disk,
-                embedded,
-                "docs pages in {} – update pages!() in docs.rs",
-                dir.display()
-            );
+            assert_eq!(on_disk, embedded, "docs pages in {} – update pages!() in docs.rs", dir.display());
         }
     }
 
@@ -508,18 +414,9 @@ mod tests {
     fn resolve_paths() {
         assert_eq!(resolve("de/usage.md"), Target::Page(Lang::De, "usage"));
         assert_eq!(resolve("en/usage.html"), Target::Page(Lang::En, "usage"));
-        assert_eq!(
-            resolve("en/custom-fields"),
-            Target::Page(Lang::En, "custom-fields")
-        );
-        assert_eq!(
-            resolve("usage.md"),
-            Target::Redirect(None, "usage.md".into())
-        );
-        assert_eq!(
-            resolve("de/"),
-            Target::Redirect(Some(Lang::De), "README.md".into())
-        );
+        assert_eq!(resolve("en/custom-fields"), Target::Page(Lang::En, "custom-fields"));
+        assert_eq!(resolve("usage.md"), Target::Redirect(None, "usage.md".into()));
+        assert_eq!(resolve("de/"), Target::Redirect(Some(Lang::De), "README.md".into()));
         assert_eq!(resolve("en"), Target::Redirect(None, "en/README.md".into()));
         assert_eq!(resolve("de/LINKMAP.md"), Target::NotFound);
         assert_eq!(resolve("de/../../etc/passwd"), Target::NotFound);
@@ -529,41 +426,24 @@ mod tests {
 
     #[test]
     fn link_rewriting() {
-        assert_eq!(
-            rewrite_link(Lang::De, "usage.md#papierkorb"),
-            "usage.md#papierkorb"
-        );
+        assert_eq!(rewrite_link(Lang::De, "usage.md#papierkorb"), "usage.md#papierkorb");
         assert_eq!(rewrite_link(Lang::De, "en/usage.md"), "../en/usage.md");
         assert_eq!(rewrite_link(Lang::En, "../usage.md#x"), "../de/usage.md#x");
         assert_eq!(rewrite_link(Lang::En, "mail.md"), "mail.md");
-        assert_eq!(
-            rewrite_link(Lang::De, "../DESKTOP.md"),
-            format!("{}/blob/main/docs/DESKTOP.md", pl_core::brand::REPO_URL)
-        );
-        assert_eq!(
-            rewrite_link(Lang::En, "../../../README.md#x"),
-            format!("{}/blob/main/README.md#x", pl_core::brand::REPO_URL)
-        );
-        assert_eq!(
-            rewrite_link(Lang::De, "https://example.org/a.md"),
-            "https://example.org/a.md"
-        );
+        assert_eq!(rewrite_link(Lang::De, "../DESKTOP.md"), format!("{}/blob/main/docs/DESKTOP.md", pl_core::brand::REPO_URL));
+        assert_eq!(rewrite_link(Lang::En, "../../../README.md#x"), format!("{}/blob/main/README.md#x", pl_core::brand::REPO_URL));
+        assert_eq!(rewrite_link(Lang::De, "https://example.org/a.md"), "https://example.org/a.md");
         assert_eq!(rewrite_link(Lang::De, "#anker"), "#anker");
         assert_eq!(rewrite_link(Lang::De, "mailto:a@b"), "mailto:a@b");
     }
 
     #[test]
     fn renders_tables_anchors_and_title() {
-        let (title, body) = render_markdown(
-            Lang::De,
-            "# Titel\n\n<a id=\"x\"></a>\n## Zwei Wörter\n\n| a | b |\n|---|---|\n| 1 | [u](usage.md) |\n",
-        );
+        let (title, body) =
+            render_markdown(Lang::De, "# Titel\n\n<a id=\"x\"></a>\n## Zwei Wörter\n\n| a | b |\n|---|---|\n| 1 | [u](usage.md) |\n");
         assert_eq!(title, "Titel");
         assert!(body.contains("<h2 id=\"zwei-wörter\">"), "{body}");
-        assert!(
-            body.contains("<table>") && body.contains("<a href=\"usage.md\">u</a>"),
-            "{body}"
-        );
+        assert!(body.contains("<table>") && body.contains("<a href=\"usage.md\">u</a>"), "{body}");
         assert!(body.contains("<a id=\"x\"></a>"));
         let page = render_page(Lang::En, "usage");
         assert!(page.starts_with("<!doctype html>") && page.contains("<html lang=\"en\">"));
@@ -576,9 +456,6 @@ mod tests {
         assert_eq!(Lang::for_language("de-ch"), Lang::De);
         assert_eq!(Lang::for_language("en-us"), Lang::En);
         assert_eq!(Lang::for_language("fr"), Lang::En);
-        assert_eq!(
-            online_url("https://x.org/docs/user/", Lang::En, "usage"),
-            "https://x.org/docs/user/en/usage.md"
-        );
+        assert_eq!(online_url("https://x.org/docs/user/", Lang::En, "usage"), "https://x.org/docs/user/en/usage.md");
     }
 }

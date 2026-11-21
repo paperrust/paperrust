@@ -38,9 +38,7 @@ async fn as_of_seq(v2: &V2) -> V2Result<Value> {
 
 pub async fn changes(v2: V2, Caller(p): Caller, Query(q): Query<HashMap<String, String>>) -> V2Result<Response> {
     let Some(feed) = v2.feed.clone() else {
-        return Err(V2Error(DomainError::NotImplemented(
-            "change feed not available on this server (sync capture P2 not wired)".into(),
-        )));
+        return Err(V2Error(DomainError::NotImplemented("change feed not available on this server (sync capture P2 not wired)".into())));
     };
     let after = match q.get("cursor").filter(|s| !s.is_empty()) {
         None => None,
@@ -108,10 +106,8 @@ pub async fn changes(v2: V2, Caller(p): Caller, Query(q): Query<HashMap<String, 
 }
 
 pub async fn ids(v2: V2, Caller(p): Caller, Query(q): Query<HashMap<String, String>>) -> V2Result<Response> {
-    let kind = q
-        .get("kind")
-        .and_then(|k| Kind::parse(k))
-        .ok_or_else(|| V2Error(DomainError::field("kind", "Required: document, tag, …")))?;
+    let kind =
+        q.get("kind").and_then(|k| Kind::parse(k)).ok_or_else(|| V2Error(DomainError::field("kind", "Required: document, tag, …")))?;
     let as_of = as_of_seq(&v2).await?;
     let items: Vec<Value> = v2.repo.ids(&p, kind).await?.into_iter().map(|(u, r)| json!([u, r])).collect();
     Ok(json(&json!({ "items": items, "as_of_seq": as_of })))

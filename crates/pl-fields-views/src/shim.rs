@@ -63,20 +63,14 @@ impl ApiError {
         ApiError::Json(status, json!({ "detail": msg }))
     }
     pub fn forbidden() -> Self {
-        Self::detail(
-            StatusCode::FORBIDDEN,
-            "You do not have permission to perform this action.",
-        )
+        Self::detail(StatusCode::FORBIDDEN, "You do not have permission to perform this action.")
     }
     pub fn insufficient() -> Self {
         Self::detail(StatusCode::FORBIDDEN, "Insufficient permissions.")
     }
     /// `get_object_or_404` with a valid pk: `No <Model> matches the given query.`
     pub fn not_found(model: &str) -> Self {
-        Self::detail(
-            StatusCode::NOT_FOUND,
-            &format!("No {model} matches the given query."),
-        )
+        Self::detail(StatusCode::NOT_FOUND, &format!("No {model} matches the given query."))
     }
     /// `Http404` without text (invalid pk, object permission): `Not found.`
     pub fn not_found_plain() -> Self {
@@ -112,9 +106,7 @@ impl IntoResponse for ApiError {
             ApiError::Json(status, v) => json_response(status, &v),
             ApiError::Core(e) => e.into_response(),
             ApiError::Auth(e) => e.into_response(),
-            ApiError::ServerError => {
-                pl_core::ApiError::internal("pl-fields-views server error").into_response()
-            }
+            ApiError::ServerError => pl_core::ApiError::internal("pl-fields-views server error").into_response(),
         }
     }
 }
@@ -134,13 +126,9 @@ pub fn finish(allow: &'static str, res: ApiResult<Response>) -> Response {
     };
     // The Django 500 page itself (unhandled exception) arises outside DRF: no
     // Allow/Vary: Accept (W2 parity run 2026-11-08, w2.cf.create.validation / sl.create.validation)
-    if r.extensions().get::<DelegateToDjango>().is_none()
-        && r.extensions().get::<pl_core::DjangoHandlerResponse>().is_none()
-    {
-        r.headers_mut()
-            .insert(header::ALLOW, HeaderValue::from_static(allow));
-        r.headers_mut()
-            .insert(header::VARY, HeaderValue::from_static("Accept"));
+    if r.extensions().get::<DelegateToDjango>().is_none() && r.extensions().get::<pl_core::DjangoHandlerResponse>().is_none() {
+        r.headers_mut().insert(header::ALLOW, HeaderValue::from_static(allow));
+        r.headers_mut().insert(header::VARY, HeaderValue::from_static("Accept"));
     }
     r
 }
@@ -213,23 +201,13 @@ impl Ctx {
 impl FromRequestParts<AppState> for Ctx {
     type Rejection = Response;
 
-    async fn from_request_parts(
-        parts: &mut Parts,
-        state: &AppState,
-    ) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
         // DRF `initial()`: negotiation/version before authentication/permissions
-        let rc = RequestContext::from_request_parts(parts, state)
-            .await
-            .map_err(IntoResponse::into_response)?;
-        let auth = AuthUser::from_request_parts(parts, state)
-            .await
-            .map_err(IntoResponse::into_response)?;
+        let rc = RequestContext::from_request_parts(parts, state).await.map_err(IntoResponse::into_response)?;
+        let auth = AuthUser::from_request_parts(parts, state).await.map_err(IntoResponse::into_response)?;
         let _ = TZ.set(state.inner.tz);
         let user = User::from_authz(auth.user(), auth.context().method);
-        let remote_ip = parts
-            .extensions
-            .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
-            .map(|c| c.0.ip().to_string());
+        let remote_ip = parts.extensions.get::<axum::extract::ConnectInfo<std::net::SocketAddr>>().map(|c| c.0.ip().to_string());
         Ok(Ctx {
             user,
             version: u32::from(rc.version().as_u16()),
@@ -250,11 +228,7 @@ impl FromRequestParts<AppState> for Ctx {
 /// Returns the body as a JSON value. Form data becomes an object of strings
 /// (repeated keys additionally as a list under `__list__<key>` for ListFields).
 pub fn parse_body(headers: &HeaderMap, body: &[u8]) -> ApiResult<Value> {
-    let ct = headers
-        .get(header::CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .to_string();
+    let ct = headers.get(header::CONTENT_TYPE).and_then(|v| v.to_str().ok()).unwrap_or("").to_string();
     let media = ct.split(';').next().unwrap_or("").trim().to_lowercase();
     if body.is_empty() {
         return Ok(Value::Object(Map::new()));
@@ -271,10 +245,7 @@ pub fn parse_body(headers: &HeaderMap, body: &[u8]) -> ApiResult<Value> {
             let mut map = Map::new();
             let mut lists: std::collections::BTreeMap<String, Vec<Value>> = Default::default();
             for (k, v) in url::form_urlencoded::parse(body) {
-                lists
-                    .entry(k.to_string())
-                    .or_default()
-                    .push(Value::String(v.to_string()));
+                lists.entry(k.to_string()).or_default().push(Value::String(v.to_string()));
                 map.insert(k.into_owned(), Value::String(v.into_owned()));
             }
             for (k, v) in lists {
@@ -282,9 +253,7 @@ pub fn parse_body(headers: &HeaderMap, body: &[u8]) -> ApiResult<Value> {
             }
             Ok(Value::Object(map))
         }
-        _ => Err(ApiError::Core(pl_core::ApiError::unsupported_media_type(
-            &ct,
-        ))),
+        _ => Err(ApiError::Core(pl_core::ApiError::unsupported_media_type(&ct))),
     }
 }
 
@@ -343,40 +312,27 @@ pub fn resolve_page(req: &PageRequest, count: i64) -> ApiResult<PageInfo> {
     Ok(req.resolve(count)?)
 }
 
-pub fn paginated(
-    ctx: &Ctx,
-    info: &PageInfo,
-    all_ids: Option<Vec<i64>>,
-    results: Vec<Value>,
-) -> Response {
+pub fn paginated(ctx: &Ctx, info: &PageInfo, all_ids: Option<Vec<i64>>, results: Vec<Value>) -> Response {
     let all = all_ids.map(|ids| ids.into_iter().map(Value::from).collect());
-    json_response(
-        StatusCode::OK,
-        &paginated_body(&ctx.rc, info, results, all),
-    )
+    json_response(StatusCode::OK, &paginated_body(&ctx.rc, info, results, all))
 }
 
 // ---------------------------------------------------------------------------
 // django.utils.crypto.get_random_string
 // ---------------------------------------------------------------------------
 
-pub const RANDOM_STRING_CHARS: &[u8] =
-    b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+pub const RANDOM_STRING_CHARS: &[u8] = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
 pub fn get_random_string(len: usize) -> String {
     use rand::Rng;
     let mut rng = rand::rngs::OsRng;
-    (0..len)
-        .map(|_| RANDOM_STRING_CHARS[rng.gen_range(0..RANDOM_STRING_CHARS.len())] as char)
-        .collect()
+    (0..len).map(|_| RANDOM_STRING_CHARS[rng.gen_range(0..RANDOM_STRING_CHARS.len())] as char).collect()
 }
 
 /// `pk` from the path: non-numeric → DRF `get_object_or_404` catches the ValueError →
 /// `Http404` without text → `Not found.`
 pub fn parse_pk(raw: &str) -> ApiResult<i64> {
-    raw.trim()
-        .parse::<i64>()
-        .map_err(|_| ApiError::not_found_plain())
+    raw.trim().parse::<i64>().map_err(|_| ApiError::not_found_plain())
 }
 
 #[cfg(test)]
@@ -402,10 +358,7 @@ mod tests {
         h.insert(header::CONTENT_TYPE, HeaderValue::from_static("application/json"));
         assert_eq!(parse_body(&h, b"{\"a\":1}").ok(), Some(json!({"a": 1})));
         assert_eq!(parse_body(&h, b"").ok(), Some(json!({})));
-        h.insert(
-            header::CONTENT_TYPE,
-            HeaderValue::from_static("application/x-www-form-urlencoded"),
-        );
+        h.insert(header::CONTENT_TYPE, HeaderValue::from_static("application/x-www-form-urlencoded"));
         let v = parse_body(&h, b"document_ids=1&document_ids=2").unwrap_or_default();
         assert_eq!(v["__list__document_ids"], json!(["1", "2"]));
         assert!(require_object(json!([1])).is_err());
@@ -432,9 +385,6 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
         let bytes = axum::body::to_bytes(resp.into_body(), 1 << 16).await.unwrap_or_default();
         let v: Value = serde_json::from_slice(&bytes).unwrap_or_default();
-        assert_eq!(
-            v,
-            json!({"detail": "JSON parse error - Expecting property name enclosed in double quotes: line 1 column 2 (char 1)"})
-        );
+        assert_eq!(v, json!({"detail": "JSON parse error - Expecting property name enclosed in double quotes: line 1 column 2 (char 1)"}));
     }
 }

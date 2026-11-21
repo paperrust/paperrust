@@ -11,8 +11,8 @@ use pl_core::AppState;
 
 use super::{data, effective_config, index};
 use crate::embedding::Embedder;
-use crate::mcp::knowledge::{IndexState, KnowledgeIndex, Passage};
 use crate::mcp::Actor;
+use crate::mcp::knowledge::{IndexState, KnowledgeIndex, Passage};
 use crate::vector_store::{DocFilter, VecStore};
 
 /// Production implementation (needs `AppState`: DB + `DATA_DIR`).
@@ -36,7 +36,13 @@ impl KnowledgeIndex for LlmIndexKnowledge {
         })
     }
 
-    fn semantic<'a>(&'a self, actor: &'a Actor, query: &'a str, top_k: usize, restrict: Option<&'a [i64]>) -> BoxFuture<'a, Result<Vec<Passage>, String>> {
+    fn semantic<'a>(
+        &'a self,
+        actor: &'a Actor,
+        query: &'a str,
+        top_k: usize,
+        restrict: Option<&'a [i64]>,
+    ) -> BoxFuture<'a, Result<Vec<Passage>, String>> {
         Box::pin(async move {
             let state = &self.0;
             let db = state.db();
@@ -63,7 +69,10 @@ impl KnowledgeIndex for LlmIndexKnowledge {
             let qv = emb.embed_query(query).await.map_err(|e| e.to_string())?;
             let dir = index::index_dir(state);
             let d2 = dir.clone();
-            let _r = tokio::task::spawn_blocking(move || crate::locks::RwGuard::read(&d2)).await.map_err(|e| e.to_string())?.map_err(|e| e.to_string())?;
+            let _r = tokio::task::spawn_blocking(move || crate::locks::RwGuard::read(&d2))
+                .await
+                .map_err(|e| e.to_string())?
+                .map_err(|e| e.to_string())?;
             let hits = tokio::task::spawn_blocking(move || -> Result<Vec<crate::vector_store::Hit>, String> {
                 let st = VecStore::open(&dir, None).map_err(|e| e.to_string())?;
                 let mut filters = filters;
@@ -82,7 +91,12 @@ impl KnowledgeIndex for LlmIndexKnowledge {
             Ok(hits
                 .into_iter()
                 .filter_map(|h| {
-                    Some(Passage { document_id: h.node.document_id()?, text: h.node.text.clone(), llm_text: h.node.llm_content(), score: h.score })
+                    Some(Passage {
+                        document_id: h.node.document_id()?,
+                        text: h.node.text.clone(),
+                        llm_text: h.node.llm_content(),
+                        score: h.score,
+                    })
                 })
                 .collect())
         })

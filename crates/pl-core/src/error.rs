@@ -63,12 +63,18 @@ struct Inner {
     django_handler: bool,
 }
 
-
 impl ApiError {
     fn detail(status: StatusCode, detail: impl Into<String>) -> Self {
         let mut m = Map::new();
         m.insert("detail".into(), Value::String(detail.into()));
-        Self(Box::new(Inner { status, body: Body::Json(Value::Object(m)), headers: Vec::new(), internal: None, delegate: false, django_handler: false }))
+        Self(Box::new(Inner {
+            status,
+            body: Body::Json(Value::Object(m)),
+            headers: Vec::new(),
+            internal: None,
+            delegate: false,
+            django_handler: false,
+        }))
     }
 
     /// Any DRF `APIException` case: `{"detail": detail}` with status.
@@ -78,7 +84,14 @@ impl ApiError {
 
     /// Any JSON body with status (e.g. `{"error": "..."}` from paperless views).
     pub fn json(status: StatusCode, body: Value) -> Self {
-        Self(Box::new(Inner { status, body: Body::Json(body), headers: Vec::new(), internal: None, delegate: false, django_handler: false }))
+        Self(Box::new(Inner {
+            status,
+            body: Body::Json(body),
+            headers: Vec::new(),
+            internal: None,
+            delegate: false,
+            django_handler: false,
+        }))
     }
 
     /// Django `HttpResponse(text, status=...)` (Content-Type `text/html; charset=utf-8`),
@@ -158,18 +171,13 @@ impl ApiError {
     /// with `PAPERLESS_ENABLE_HTTP_REMOTE_USER_API` the first authenticator is RemoteUser →
     /// `None`). With header → 401, without → 403. Supplied by `pl-authz`.
     pub fn not_authenticated(www_authenticate: Option<&str>) -> Self {
-        Self::detail(StatusCode::UNAUTHORIZED, "Authentication credentials were not provided.")
-            .auth_status(www_authenticate)
+        Self::detail(StatusCode::UNAUTHORIZED, "Authentication credentials were not provided.").auth_status(www_authenticate)
     }
 
     /// DRF `AuthenticationFailed` (default `"Incorrect authentication credentials."`,
     /// paperless e.g. `"Invalid token."`, `"MFA required"`, `"Invalid username/password."`).
     pub fn authentication_failed(detail: Option<&str>, www_authenticate: Option<&str>) -> Self {
-        Self::detail(
-            StatusCode::UNAUTHORIZED,
-            detail.unwrap_or("Incorrect authentication credentials."),
-        )
-        .auth_status(www_authenticate)
+        Self::detail(StatusCode::UNAUTHORIZED, detail.unwrap_or("Incorrect authentication credentials.")).auth_status(www_authenticate)
     }
 
     fn auth_status(mut self, www_authenticate: Option<&str>) -> Self {
@@ -227,10 +235,7 @@ impl ApiError {
 
     /// DRF `UnsupportedMediaType`: `"Unsupported media type \"<ct>\" in request."` (415).
     pub fn unsupported_media_type(media_type: &str) -> Self {
-        Self::detail(
-            StatusCode::UNSUPPORTED_MEDIA_TYPE,
-            format!("Unsupported media type \"{media_type}\" in request."),
-        )
+        Self::detail(StatusCode::UNSUPPORTED_MEDIA_TYPE, format!("Unsupported media type \"{media_type}\" in request."))
     }
 
     /// DRF `Throttled(wait)`: `"Request was throttled. Expected available in N second(s)."`
@@ -241,10 +246,8 @@ impl ApiError {
             Some(w) => {
                 let w = w.ceil().max(0.0) as u64;
                 let unit = if w == 1 { "second" } else { "seconds" };
-                let mut e = Self::detail(
-                    StatusCode::TOO_MANY_REQUESTS,
-                    format!("Request was throttled. Expected available in {w} {unit}."),
-                );
+                let mut e =
+                    Self::detail(StatusCode::TOO_MANY_REQUESTS, format!("Request was throttled. Expected available in {w} {unit}."));
                 if let Ok(v) = HeaderValue::from_str(&w.to_string()) {
                     e.0.headers.push((RETRY_AFTER, v));
                 }
@@ -271,10 +274,8 @@ impl ApiError {
     /// PaperRust (tests/chaos C1): database unreachable → 503 with an understandable message and
     /// `Retry-After` (upstream: Django's 500 page after `OperationalError`).
     pub fn db_unavailable() -> Self {
-        Self::detail(StatusCode::SERVICE_UNAVAILABLE, crate::dbconn::DB_UNAVAILABLE_DETAIL).with_header(
-            axum::http::header::RETRY_AFTER,
-            HeaderValue::from_static(crate::dbconn::DB_UNAVAILABLE_RETRY_AFTER),
-        )
+        Self::detail(StatusCode::SERVICE_UNAVAILABLE, crate::dbconn::DB_UNAVAILABLE_DETAIL)
+            .with_header(axum::http::header::RETRY_AFTER, HeaderValue::from_static(crate::dbconn::DB_UNAVAILABLE_RETRY_AFTER))
     }
 
     // ---- Access / customization ---------------------------------------------------------------
@@ -484,33 +485,17 @@ mod tests {
     fn drf_texts() {
         assert_eq!(
             body(ApiError::not_authenticated(Some("Token"))),
-            (
-                StatusCode::UNAUTHORIZED,
-                r#"{"detail":"Authentication credentials were not provided."}"#.into(),
-                Some("Token".into())
-            )
+            (StatusCode::UNAUTHORIZED, r#"{"detail":"Authentication credentials were not provided."}"#.into(), Some("Token".into()))
         );
         let (s, _, w) = body(ApiError::not_authenticated(None));
         assert_eq!((s, w), (StatusCode::FORBIDDEN, None));
-        assert_eq!(
-            body(ApiError::permission_denied()).1,
-            r#"{"detail":"You do not have permission to perform this action."}"#
-        );
+        assert_eq!(body(ApiError::permission_denied()).1, r#"{"detail":"You do not have permission to perform this action."}"#);
         assert_eq!(body(ApiError::not_found()).1, r#"{"detail":"Not found."}"#);
-        assert_eq!(
-            body(ApiError::not_found_model("Document")).1,
-            r#"{"detail":"No Document matches the given query."}"#
-        );
+        assert_eq!(body(ApiError::not_found_model("Document")).1, r#"{"detail":"No Document matches the given query."}"#);
         assert_eq!(body(ApiError::method_not_allowed("DELETE")).1, r#"{"detail":"Method \"DELETE\" not allowed."}"#);
         assert_eq!(body(ApiError::invalid_version()).1, r#"{"detail":"Invalid version in \"Accept\" header."}"#);
-        assert_eq!(
-            body(ApiError::throttled(Some(0.2))).1,
-            r#"{"detail":"Request was throttled. Expected available in 1 second."}"#
-        );
-        assert_eq!(
-            body(ApiError::throttled(Some(30.0))).1,
-            r#"{"detail":"Request was throttled. Expected available in 30 seconds."}"#
-        );
+        assert_eq!(body(ApiError::throttled(Some(0.2))).1, r#"{"detail":"Request was throttled. Expected available in 1 second."}"#);
+        assert_eq!(body(ApiError::throttled(Some(30.0))).1, r#"{"detail":"Request was throttled. Expected available in 30 seconds."}"#);
         assert_eq!(
             body(ApiError::unsupported_media_type("text/plain")).1,
             r#"{"detail":"Unsupported media type \"text/plain\" in request."}"#
@@ -522,10 +507,7 @@ mod tests {
         let mut v = ValidationErrors::new();
         v.add("name", "This field is required.");
         v.add_non_field("bad");
-        assert_eq!(
-            body(v.into()).1,
-            r#"{"name":["This field is required."],"non_field_errors":["bad"]}"#
-        );
+        assert_eq!(body(v.into()).1, r#"{"name":["This field is required."],"non_field_errors":["bad"]}"#);
         assert_eq!(body(ApiError::validation_list(["x"])).1, r#"["x"]"#);
     }
 

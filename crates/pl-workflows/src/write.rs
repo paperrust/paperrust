@@ -9,8 +9,8 @@
 use crate::drf::VErr;
 use crate::schema::*;
 use crate::serializers::{self, Attrs, WorkflowInput};
-use sea_query::{Alias, Expr, PostgresQueryBuilder, Query, SimpleExpr};
 use pl_core::sqlbind::SqlxBinder;
+use sea_query::{Alias, Expr, PostgresQueryBuilder, Query, SimpleExpr};
 use serde_json::{Map, Value};
 use sqlx::{PgConnection, Row};
 
@@ -43,10 +43,11 @@ fn scalar_cols(fields: &'static [Field], attrs: &Attrs) -> Cols {
     let mut out = Vec::new();
     for f in fields {
         if let Col::Scalar(col, ty) = f.col
-            && let Some(v) = attrs.get(f.spec.name) {
-                let v = if col == "sources" { sources_db(v) } else { v.clone() };
-                out.push((col, ty, v));
-            }
+            && let Some(v) = attrs.get(f.spec.name)
+        {
+            let v = if col == "sources" { sources_db(v) } else { v.clone() };
+            out.push((col, ty, v));
+        }
     }
     out
 }
@@ -54,9 +55,7 @@ fn scalar_cols(fields: &'static [Field], attrs: &Attrs) -> Cols {
 /// `normalize_workflow_trigger_sources` + `MultiSelectField.get_prep_value`: `",".join(str(s))`.
 fn sources_db(v: &Value) -> Value {
     match v {
-        Value::Array(a) => Value::String(
-            a.iter().map(crate::pyfmt::py_str).collect::<Vec<_>>().join(","),
-        ),
+        Value::Array(a) => Value::String(a.iter().map(crate::pyfmt::py_str).collect::<Vec<_>>().join(",")),
         other => other.clone(),
     }
 }
@@ -269,9 +268,10 @@ fn ids_of(v: &Value) -> Vec<i64> {
 async fn set_m2m_from_attrs(db: &mut PgConnection, fields: &'static [Field], owner: i64, attrs: &Attrs) -> Result<(), VErr> {
     for (name, m) in m2m_fields(fields) {
         if let Some(v) = attrs.get(name)
-            && !v.is_null() {
-                m2m_set(db, &m, owner, &ids_of(v)).await?;
-            }
+            && !v.is_null()
+        {
+            m2m_set(db, &m, owner, &ids_of(v)).await?;
+        }
     }
     Ok(())
 }
@@ -341,9 +341,8 @@ async fn orphan_ids(db: &mut PgConnection, table: &'static str, ref_table: &'sta
 /// PaperRust: ids of the actions in `paperrust_workflow_else_action` ("else" branch, pl-consumer
 /// `workflow_ext`) – of one workflow or of all. Without the table: none.
 pub async fn paperrust_else_action_ids(db: &mut PgConnection, workflow: Option<i64>) -> Result<Vec<i64>, VErr> {
-    let exists: bool = sqlx::query_scalar("SELECT to_regclass('public.paperrust_workflow_else_action') IS NOT NULL")
-        .fetch_one(&mut *db)
-        .await?;
+    let exists: bool =
+        sqlx::query_scalar("SELECT to_regclass('public.paperrust_workflow_else_action') IS NOT NULL").fetch_one(&mut *db).await?;
     if !exists {
         return Ok(Vec::new());
     }
@@ -368,7 +367,8 @@ pub async fn prune(db: &mut PgConnection) -> Result<(), VErr> {
     let t = orphan_ids(db, T_TRIGGER, T_WF_TRIGGERS, "workflowtrigger_id").await?;
     delete_triggers(db, &t).await?;
     let keep = paperrust_else_action_ids(db, None).await?;
-    let a: Vec<i64> = orphan_ids(db, T_ACTION, T_WF_ACTIONS, "workflowaction_id").await?.into_iter().filter(|id| !keep.contains(id)).collect();
+    let a: Vec<i64> =
+        orphan_ids(db, T_ACTION, T_WF_ACTIONS, "workflowaction_id").await?.into_iter().filter(|id| !keep.contains(id)).collect();
     delete_actions(db, &a).await?;
     let e = orphan_ids(db, T_EMAIL, T_ACTION, "email_id").await?;
     exec_delete(db, T_EMAIL, "id", &e).await?;
@@ -391,11 +391,8 @@ pub async fn model_create(db: &mut PgConnection, is_trigger: bool, attrs: &Attrs
     if !is_trigger && has_nested_write(attrs) {
         return Err(VErr::Server("The `.create()` method does not support writable nested fields by default.".into()));
     }
-    let (table, fields, defaults) = if is_trigger {
-        (T_TRIGGER, TRIGGER_FIELDS, trigger_defaults())
-    } else {
-        (T_ACTION, ACTION_FIELDS, action_defaults())
-    };
+    let (table, fields, defaults) =
+        if is_trigger { (T_TRIGGER, TRIGGER_FIELDS, trigger_defaults()) } else { (T_ACTION, ACTION_FIELDS, action_defaults()) };
     let mut cols = scalar_cols(fields, attrs);
     if !is_trigger {
         nested_null_cols(attrs, &mut cols);
@@ -416,25 +413,14 @@ fn nested_null_cols(attrs: &Attrs, cols: &mut Cols) {
 
 /// `ModelSerializer.update` (setattr + `instance.save()` + m2m `set`). Returns the pk of the
 /// saved instance (can change through an `id` field, like upstream).
-pub async fn model_update(
-    db: &mut PgConnection,
-    is_trigger: bool,
-    row: &Map<String, Value>,
-    attrs: &Attrs,
-) -> Result<i64, VErr> {
+pub async fn model_update(db: &mut PgConnection, is_trigger: bool, row: &Map<String, Value>, attrs: &Attrs) -> Result<i64, VErr> {
     if !is_trigger && has_nested_write(attrs) {
         return Err(VErr::Server("The `.update()` method does not support writable nested fields by default.".into()));
     }
-    let (table, fields, defaults) = if is_trigger {
-        (T_TRIGGER, TRIGGER_FIELDS, trigger_defaults())
-    } else {
-        (T_ACTION, ACTION_FIELDS, action_defaults())
-    };
+    let (table, fields, defaults) =
+        if is_trigger { (T_TRIGGER, TRIGGER_FIELDS, trigger_defaults()) } else { (T_ACTION, ACTION_FIELDS, action_defaults()) };
     // current values of the instance
-    let current: Cols = defaults
-        .into_iter()
-        .map(|(c, ty, d)| (c, ty, row.get(c).cloned().unwrap_or(d)))
-        .collect();
+    let current: Cols = defaults.into_iter().map(|(c, ty, d)| (c, ty, row.get(c).cloned().unwrap_or(d))).collect();
     let mut cols = scalar_cols(fields, attrs);
     if !is_trigger {
         nested_null_cols(attrs, &mut cols);
@@ -474,8 +460,10 @@ async fn update_triggers_and_actions(
     if let Some(acts) = actions {
         set_actions = upsert_actions(db, acts, is_create).await?;
     }
-    let wf_trig = M2m { through: T_WF_TRIGGERS, own: "workflow_id", other: "workflowtrigger_id", target: T_TRIGGER, order: M2mOrder::Unordered };
-    let wf_act = M2m { through: T_WF_ACTIONS, own: "workflow_id", other: "workflowaction_id", target: T_ACTION, order: M2mOrder::Unordered };
+    let wf_trig =
+        M2m { through: T_WF_TRIGGERS, own: "workflow_id", other: "workflowtrigger_id", target: T_TRIGGER, order: M2mOrder::Unordered };
+    let wf_act =
+        M2m { through: T_WF_ACTIONS, own: "workflow_id", other: "workflowaction_id", target: T_ACTION, order: M2mOrder::Unordered };
     if triggers.is_some() {
         m2m_set(db, &wf_trig, wf, &set_triggers).await?;
     }
@@ -500,10 +488,9 @@ pub async fn upsert_actions(db: &mut PgConnection, acts: &[Attrs], is_create: bo
         cols.push(("order", ColTy::Int, Value::from(index as i64)));
         let id = a.get("id").and_then(Value::as_i64);
         let aid = update_or_create(db, T_ACTION, action_defaults(), id, &cols).await?;
-        for (name, table, defaults, fk) in [
-            ("email", T_EMAIL, email_defaults(), "email_id"),
-            ("webhook", T_WEBHOOK, webhook_defaults(), "webhook_id"),
-        ] {
+        for (name, table, defaults, fk) in
+            [("email", T_EMAIL, email_defaults(), "email_id"), ("webhook", T_WEBHOOK, webhook_defaults(), "webhook_id")]
+        {
             if let Some(Value::Object(data)) = a.get(name) {
                 serializers::revalidate_nested(name, data)?;
                 let fields = if name == "email" { EMAIL_FIELDS } else { WEBHOOK_FIELDS };
@@ -528,10 +515,7 @@ pub async fn workflow_create(db: &mut PgConnection, input: &WorkflowInput) -> Re
 
 pub async fn workflow_update(db: &mut PgConnection, row: &Map<String, Value>, input: &WorkflowInput) -> Result<i64, VErr> {
     let id = row.get("id").and_then(Value::as_i64).ok_or_else(|| VErr::Server("workflow without id".into()))?;
-    let current: Cols = workflow_defaults()
-        .into_iter()
-        .map(|(c, ty, d)| (c, ty, row.get(c).cloned().unwrap_or(d)))
-        .collect();
+    let current: Cols = workflow_defaults().into_iter().map(|(c, ty, d)| (c, ty, row.get(c).cloned().unwrap_or(d))).collect();
     let cols = scalar_cols(WORKFLOW_FIELDS, &input.attrs);
     save_full(db, T_WORKFLOW, Some(id), &overlay(current, &cols)).await?;
     update_triggers_and_actions(db, id, input.triggers.as_deref(), input.actions.as_deref(), false).await?;

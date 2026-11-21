@@ -125,7 +125,14 @@ pub fn draw_label(
                 let cap = pt_to_mm(size) * font::CAP_HEIGHT;
                 let gap = (cap * 0.35).max(0.4);
                 let bar_h = ih - cap - gap;
-                out.push(Prim::Text { x: x + w / 2.0, y: y + pad + bar_h + gap + cap, size, face: Face::Bold, anchor: Anchor::Middle, text: t.into() });
+                out.push(Prim::Text {
+                    x: x + w / 2.0,
+                    y: y + pad + bar_h + gap + cap,
+                    size,
+                    face: Face::Bold,
+                    anchor: Anchor::Middle,
+                    text: t.into(),
+                });
                 (bar_h, size)
             }
             None => (ih, 0.0),
@@ -161,7 +168,14 @@ pub fn draw_label(
                 }
                 None => {
                     // centred in the text field
-                    out.push(Prim::Text { x: cx, y: y + h / 2.0 + cap / 2.0, size, face: Face::Bold, anchor: Anchor::Middle, text: t.into() });
+                    out.push(Prim::Text {
+                        x: cx,
+                        y: y + h / 2.0 + cap / 2.0,
+                        size,
+                        face: Face::Bold,
+                        anchor: Anchor::Middle,
+                        text: t.into(),
+                    });
                 }
             }
             LabelMetrics { module, code_height: side - 2.0 * qz * module, text_size: size }
@@ -178,7 +192,14 @@ pub fn draw_label(
             let left = x + (w - side) / 2.0;
             out.push(Prim::Modules { x: left + qz * module, y: top + qz * module, mx: module, my: module, runs: sym.runs() });
             // Quiet zone belongs to the code→text gap
-            out.push(Prim::Text { x: x + w / 2.0, y: top + side + gap + cap - qz * module * 0.5, size, face: Face::Bold, anchor: Anchor::Middle, text: t.into() });
+            out.push(Prim::Text {
+                x: x + w / 2.0,
+                y: top + side + gap + cap - qz * module * 0.5,
+                size,
+                face: Face::Bold,
+                anchor: Anchor::Middle,
+                text: t.into(),
+            });
             LabelMetrics { module, code_height: side - 2.0 * qz * module, text_size: size }
         }
         None => {
@@ -263,7 +284,10 @@ mod tests {
                     let mut prims = Vec::new();
                     let m = draw_label(&mut prims, (100.0, 50.0, w, h), &sym, text, None);
                     let (x0, y0, x1, y1) = bbox(&prims);
-                    assert!(x0 >= 100.0 && y0 >= 50.0 && x1 <= 100.0 + w + 1e-9 && y1 <= 50.0 + h + 1e-9, "{kind:?} {w}x{h} {text:?}: {x0},{y0},{x1},{y1}");
+                    assert!(
+                        x0 >= 100.0 && y0 >= 50.0 && x1 <= 100.0 + w + 1e-9 && y1 <= 50.0 + h + 1e-9,
+                        "{kind:?} {w}x{h} {text:?}: {x0},{y0},{x1},{y1}"
+                    );
                     assert!(m.module > 0.0 && m.code_height > 0.0);
                     if text.is_some() {
                         assert!(m.text_size >= 3.0, "{kind:?} {w}x{h}: text {}", m.text_size);

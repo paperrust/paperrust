@@ -170,7 +170,12 @@ pub struct TaskInfo {
 pub trait TaskQueue: Send + Sync {
     /// `task.apply_async(kwargs=kwargs, **opts)` → task ID. Tracked tasks first get
     /// their `PaperlessTask` entry (`status=pending`).
-    fn enqueue<'a>(&'a self, task_name: &'a str, kwargs: Map<String, Value>, opts: EnqueueOptions) -> BoxFuture<'a, Result<Uuid, QueueError>>;
+    fn enqueue<'a>(
+        &'a self,
+        task_name: &'a str,
+        kwargs: Map<String, Value>,
+        opts: EnqueueOptions,
+    ) -> BoxFuture<'a, Result<Uuid, QueueError>>;
 
     /// State (None = unknown).
     fn status(&self, task_id: Uuid) -> BoxFuture<'_, Result<Option<TaskInfo>, QueueError>>;
@@ -188,7 +193,12 @@ pub trait TaskQueue: Send + Sync {
     }
 
     /// `chord(header, body).on_error(on_error).delay()` → group ID.
-    fn enqueue_chord(&self, header: Vec<Signature>, body: Signature, on_error: Option<Signature>) -> BoxFuture<'_, Result<Uuid, QueueError>> {
+    fn enqueue_chord(
+        &self,
+        header: Vec<Signature>,
+        body: Signature,
+        on_error: Option<Signature>,
+    ) -> BoxFuture<'_, Result<Uuid, QueueError>> {
         let _ = (header, body, on_error);
         Box::pin(async { Err(QueueError::Unsupported("chord".into())) })
     }

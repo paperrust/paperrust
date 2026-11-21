@@ -22,7 +22,9 @@ const OPTS: &[args::Opt] = &[flag(&["--oneshot"], "oneshot"), flag(&["--testing"
 pub fn resolve_directory(arg: Option<&str>, setting: Option<PathBuf>) -> CliResult<PathBuf> {
     let dir = match arg.filter(|s| !s.is_empty()) {
         Some(d) => PathBuf::from(d),
-        None => setting.filter(|p| !p.as_os_str().is_empty()).ok_or_else(|| CliError::Command("CONSUMPTION_DIR is not configured".into()))?,
+        None => {
+            setting.filter(|p| !p.as_os_str().is_empty()).ok_or_else(|| CliError::Command("CONSUMPTION_DIR is not configured".into()))?
+        }
     };
     pl_consumer::watcher::FolderWatcher::check_directory(&dir).map_err(CliError::Command)
 }
@@ -76,10 +78,14 @@ mod tests {
         assert!(resolve_directory(None, Some(t.path().to_path_buf())).is_ok());
         assert!(matches!(resolve_directory(None, None), Err(CliError::Command(m)) if m == "CONSUMPTION_DIR is not configured"));
         let missing = t.path().join("nope").to_string_lossy().to_string();
-        assert!(matches!(resolve_directory(Some(&missing), None), Err(CliError::Command(m)) if m.starts_with("Consumption directory does not exist: ")));
+        assert!(
+            matches!(resolve_directory(Some(&missing), None), Err(CliError::Command(m)) if m.starts_with("Consumption directory does not exist: "))
+        );
         let f = t.path().join("file.txt");
         std::fs::write(&f, b"x").unwrap();
         let f = f.to_string_lossy().to_string();
-        assert!(matches!(resolve_directory(Some(&f), None), Err(CliError::Command(m)) if m.starts_with("Consumption path is not a directory: ")));
+        assert!(
+            matches!(resolve_directory(Some(&f), None), Err(CliError::Command(m)) if m.starts_with("Consumption path is not a directory: "))
+        );
     }
 }

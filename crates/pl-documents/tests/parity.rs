@@ -59,10 +59,7 @@ fn normalize(body: &str) -> String {
 
 /// Only the order of `results` (and `all`) differs?
 fn tie_only(a: &str, b: &str) -> bool {
-    let (Ok(mut x), Ok(mut y)) = (
-        serde_json::from_str::<Value>(a),
-        serde_json::from_str::<Value>(b),
-    ) else {
+    let (Ok(mut x), Ok(mut y)) = (serde_json::from_str::<Value>(a), serde_json::from_str::<Value>(b)) else {
         return false;
     };
     let sorted = |v: &mut Value| -> bool {
@@ -78,63 +75,28 @@ fn tie_only(a: &str, b: &str) -> bool {
     sorted(&mut x) && sorted(&mut y) && x == y
 }
 
-async fn django(
-    client: &reqwest::Client,
-    method: &str,
-    path: &str,
-    auth: Option<&str>,
-    accept: &str,
-    body: Option<&str>,
-) -> Resp {
+async fn django(client: &reqwest::Client, method: &str, path: &str, auth: Option<&str>, accept: &str, body: Option<&str>) -> Resp {
     let m = reqwest::Method::from_bytes(method.as_bytes()).unwrap_or(reqwest::Method::GET);
-    let mut rb = client
-        .request(m, format!("{DJANGO}{path}"))
-        .header("Accept", accept);
+    let mut rb = client.request(m, format!("{DJANGO}{path}")).header("Accept", accept);
     if let Some(a) = auth {
         rb = rb.header("Authorization", a);
     }
     if let Some(b) = body {
-        rb = rb
-            .header("Content-Type", "application/json")
-            .body(b.to_string());
+        rb = rb.header("Content-Type", "application/json").body(b.to_string());
     }
     let r = match rb.send().await {
         Ok(r) => r,
         Err(e) => {
-            return Resp {
-                status: 0,
-                ctype: String::new(),
-                body: format!("django error: {e}"),
-            };
+            return Resp { status: 0, ctype: String::new(), body: format!("django error: {e}") };
         }
     };
     let status = r.status().as_u16();
-    let ctype = r
-        .headers()
-        .get("content-type")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .to_string();
-    Resp {
-        status,
-        ctype,
-        body: r.text().await.unwrap_or_default(),
-    }
+    let ctype = r.headers().get("content-type").and_then(|v| v.to_str().ok()).unwrap_or("").to_string();
+    Resp { status, ctype, body: r.text().await.unwrap_or_default() }
 }
 
-async fn rust(
-    app: &axum::Router,
-    method: &str,
-    path: &str,
-    auth: Option<&str>,
-    accept: &str,
-    body: Option<&str>,
-) -> Resp {
-    let mut rb = Request::builder()
-        .method(method)
-        .uri(path)
-        .header("host", HOST)
-        .header("accept", accept);
+async fn rust(app: &axum::Router, method: &str, path: &str, auth: Option<&str>, accept: &str, body: Option<&str>) -> Resp {
+    let mut rb = Request::builder().method(method).uri(path).header("host", HOST).header("accept", accept);
     if let Some(a) = auth {
         rb = rb.header("authorization", a);
     }
@@ -142,51 +104,22 @@ async fn rust(
         rb = rb.header("content-type", "application/json");
     }
     let Ok(req) = rb.body(Body::from(body.unwrap_or("").to_string())) else {
-        return Resp {
-            status: 0,
-            ctype: String::new(),
-            body: "bad request".into(),
-        };
+        return Resp { status: 0, ctype: String::new(), body: "bad request".into() };
     };
-    let r = match tokio::time::timeout(
-        std::time::Duration::from_secs(120),
-        app.clone().oneshot(req),
-    )
-    .await
-    {
+    let r = match tokio::time::timeout(std::time::Duration::from_secs(120), app.clone().oneshot(req)).await {
         Ok(Ok(r)) => r,
         _ => {
-            return Resp {
-                status: 0,
-                ctype: String::new(),
-                body: "rust timeout".into(),
-            };
+            return Resp { status: 0, ctype: String::new(), body: "rust timeout".into() };
         }
     };
     let status = r.status().as_u16();
-    let ctype = r
-        .headers()
-        .get("content-type")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .to_string();
-    let bytes = axum::body::to_bytes(r.into_body(), 256 * 1024 * 1024)
-        .await
-        .unwrap_or_default();
-    Resp {
-        status,
-        ctype,
-        body: String::from_utf8_lossy(&bytes).into_owned(),
-    }
+    let ctype = r.headers().get("content-type").and_then(|v| v.to_str().ok()).unwrap_or("").to_string();
+    let bytes = axum::body::to_bytes(r.into_body(), 256 * 1024 * 1024).await.unwrap_or_default();
+    Resp { status, ctype, body: String::from_utf8_lossy(&bytes).into_owned() }
 }
 
 async fn pick(db: &sqlx::PgPool, sql: &str) -> Option<i64> {
-    sqlx::query_scalar::<_, i32>(sql)
-        .fetch_optional(db)
-        .await
-        .ok()
-        .flatten()
-        .map(i64::from)
+    sqlx::query_scalar::<_, i32>(sql).fetch_optional(db).await.ok().flatten().map(i64::from)
 }
 
 /// A comparison case.
@@ -241,21 +174,9 @@ async fn resolve_vars(client: &reqwest::Client, cat: &Value) -> HashMap<String, 
         return out;
     };
     for (name, spec) in vars {
-        let path = build_path(
-            spec["get"].as_str().unwrap_or("/"),
-            spec.get("query"),
-            &HashMap::new(),
-        );
+        let path = build_path(spec["get"].as_str().unwrap_or("/"), spec.get("query"), &HashMap::new());
         let user = spec.get("user").and_then(Value::as_str).unwrap_or("admin");
-        let r = django(
-            client,
-            "GET",
-            &path,
-            user_auth(user).as_deref(),
-            "application/json",
-            None,
-        )
-        .await;
+        let r = django(client, "GET", &path, user_auth(user).as_deref(), "application/json", None).await;
         let Ok(v) = serde_json::from_str::<Value>(&r.body) else {
             continue;
         };
@@ -271,12 +192,7 @@ async fn resolve_vars(client: &reqwest::Client, cat: &Value) -> HashMap<String, 
     out
 }
 
-fn catalog_cases(
-    set: &'static str,
-    file: &str,
-    vars: &HashMap<String, String>,
-    cat: &Value,
-) -> Vec<Case> {
+fn catalog_cases(set: &'static str, file: &str, vars: &HashMap<String, String>, cat: &Value) -> Vec<Case> {
     let defaults = cat.get("defaults");
     let mut out = Vec::new();
     let Some(cases) = cat.get("cases").and_then(Value::as_array) else {
@@ -290,12 +206,7 @@ fn catalog_cases(
             c.get(key)
                 .or_else(|| defaults.and_then(|d| d.get(key)))
                 .and_then(Value::as_array)
-                .map(|a| {
-                    a.iter()
-                        .filter_map(Value::as_str)
-                        .map(str::to_string)
-                        .collect()
-                })
+                .map(|a| a.iter().filter_map(Value::as_str).map(str::to_string).collect())
                 .unwrap_or_else(|| dflt.iter().map(|s| s.to_string()).collect())
         };
         out.push(Case {
@@ -312,11 +223,7 @@ fn catalog_cases(
 }
 
 fn accept_for(version: &str) -> String {
-    if version == "10" {
-        "application/json".into()
-    } else {
-        format!("application/json; version={version}")
-    }
+    if version == "10" { "application/json".into() } else { format!("application/json; version={version}") }
 }
 
 #[tokio::test]
@@ -330,16 +237,10 @@ async fn parity_documents() {
         router = router.route(r.path, r.handler);
     }
     let app: axum::Router = router.with_state(state).layer(axum::Extension(authz));
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(120))
-        .build()
-        .expect("client");
+    let client = reqwest::Client::builder().timeout(std::time::Duration::from_secs(120)).build().expect("client");
     let only = std::env::var("PARITY_ONLY").ok();
-    let sets: Vec<String> = std::env::var("PARITY_SETS")
-        .unwrap_or_else(|_| "routes,docfilter,search".into())
-        .split(',')
-        .map(str::to_string)
-        .collect();
+    let sets: Vec<String> =
+        std::env::var("PARITY_SETS").unwrap_or_else(|_| "routes,docfilter,search".into()).split(',').map(str::to_string).collect();
     let repo = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 
     let mut cases: Vec<Case> = Vec::new();
@@ -435,12 +336,8 @@ async fn parity_documents() {
         }
         for (i, (path, body)) in paths.into_iter().enumerate() {
             // Basic auth is expensive (PBKDF2): only on some paths
-            let mut users: Vec<String> = [
-                "admin", "user1", "user2", "noperm", "inactive", "badtoken", "anon",
-            ]
-            .iter()
-            .map(|s| s.to_string())
-            .collect();
+            let mut users: Vec<String> =
+                ["admin", "user1", "user2", "noperm", "inactive", "badtoken", "anon"].iter().map(|s| s.to_string()).collect();
             if i < 3 {
                 users.push("basic-admin".into());
                 users.push("basic-wrong".into());
@@ -457,17 +354,8 @@ async fn parity_documents() {
         }
     }
     for (set, files) in [
-        (
-            "docfilter",
-            &["tests/parity/pl-docfilter/cases.base.json"][..],
-        ),
-        (
-            "search",
-            &[
-                "tests/parity/pl-search/cases.json",
-                "tests/parity/pl-search/cases.base.json",
-            ][..],
-        ),
+        ("docfilter", &["tests/parity/pl-docfilter/cases.base.json"][..]),
+        ("search", &["tests/parity/pl-search/cases.json", "tests/parity/pl-search/cases.base.json"][..]),
     ] {
         if !sets.iter().any(|s| s == set) {
             continue;
@@ -491,27 +379,10 @@ async fn parity_documents() {
             let auth = user_auth(who);
             for v in &case.versions {
                 let accept = accept_for(v);
-                let d = django(
-                    &client,
-                    case.method,
-                    &case.path,
-                    auth.as_deref(),
-                    &accept,
-                    case.body.as_deref(),
-                )
-                .await;
-                let r = rust(
-                    &app,
-                    case.method,
-                    &case.path,
-                    auth.as_deref(),
-                    &accept,
-                    case.body.as_deref(),
-                )
-                .await;
+                let d = django(&client, case.method, &case.path, auth.as_deref(), &accept, case.body.as_deref()).await;
+                let r = rust(&app, case.method, &case.path, auth.as_deref(), &accept, case.body.as_deref()).await;
                 let e = stats.entry(case.set).or_insert((0, 0, 0));
-                let same_meta =
-                    d.status == r.status && d.ctype.split(';').next() == r.ctype.split(';').next();
+                let same_meta = d.status == r.status && d.ctype.split(';').next() == r.ctype.split(';').next();
                 if same_meta && normalize(&d.body) == normalize(&r.body) {
                     e.0 += 1;
                 } else if same_meta && tie_only(&d.body, &r.body) {
@@ -529,18 +400,8 @@ async fn parity_documents() {
                         case.path.chars().take(300).collect::<String>(),
                         case.body.as_deref().unwrap_or("")
                     );
-                    println!(
-                        "  django {} {}: {}",
-                        d.status,
-                        d.ctype,
-                        d.body.chars().take(lim).collect::<String>()
-                    );
-                    println!(
-                        "  rust   {} {}: {}",
-                        r.status,
-                        r.ctype,
-                        r.body.chars().take(lim).collect::<String>()
-                    );
+                    println!("  django {} {}: {}", d.status, d.ctype, d.body.chars().take(lim).collect::<String>());
+                    println!("  rust   {} {}: {}", r.status, r.ctype, r.body.chars().take(lim).collect::<String>());
                 }
             }
         }

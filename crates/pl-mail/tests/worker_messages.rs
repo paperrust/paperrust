@@ -65,7 +65,13 @@ fn messages_match_upstream() {
             let want = std::fs::read(dir().join("expected").join(name)).unwrap_or_default();
             let pos = want.iter().zip(eml.iter()).position(|(a, b)| a != b).unwrap_or(want.len().min(eml.len()));
             let ctx = |b: &[u8]| String::from_utf8_lossy(&b[pos.saturating_sub(40)..(pos + 40).min(b.len())]).into_owned();
-            diffs.push(format!("{name}.eml: differs at byte {pos} (len upstream {} rust {}):\n  upstream {:?}\n  rust     {:?}", want.len(), eml.len(), ctx(&want), ctx(&eml)));
+            diffs.push(format!(
+                "{name}.eml: differs at byte {pos} (len upstream {} rust {}):\n  upstream {:?}\n  rust     {:?}",
+                want.len(),
+                eml.len(),
+                ctx(&want),
+                ctx(&eml)
+            ));
         }
         n += 1;
     }

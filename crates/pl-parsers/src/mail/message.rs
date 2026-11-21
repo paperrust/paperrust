@@ -134,27 +134,16 @@ impl<'a> Input<'a> {
 impl Message {
     pub fn parse(data: &[u8], max_depth: usize) -> Message {
         let lines = split_lines(data);
-        let mut input = Input {
-            lines,
-            pos: 0,
-            eof: Vec::new(),
-        };
+        let mut input = Input { lines, pos: 0, eof: Vec::new() };
         parsegen(&mut input, "text/plain", 0, max_depth)
     }
 
     pub fn get(&self, name: &str) -> Option<&HeaderValue> {
-        self.headers
-            .iter()
-            .find(|(n, _)| n.eq_ignore_ascii_case(name))
-            .map(|(_, v)| v)
+        self.headers.iter().find(|(n, _)| n.eq_ignore_ascii_case(name)).map(|(_, v)| v)
     }
 
     pub fn get_all(&self, name: &str) -> Vec<&HeaderValue> {
-        self.headers
-            .iter()
-            .filter(|(n, _)| n.eq_ignore_ascii_case(name))
-            .map(|(_, v)| v)
-            .collect()
+        self.headers.iter().filter(|(n, _)| n.eq_ignore_ascii_case(name)).map(|(_, v)| v).collect()
     }
 
     pub fn get_str(&self, name: &str) -> Option<String> {
@@ -166,21 +155,13 @@ impl Message {
             None => self.default_type.to_owned(),
             Some(v) => {
                 let ct = header::splitparam(&v).0.to_lowercase();
-                if ct.matches('/').count() != 1 {
-                    "text/plain".to_owned()
-                } else {
-                    ct
-                }
+                if ct.matches('/').count() != 1 { "text/plain".to_owned() } else { ct }
             }
         }
     }
 
     pub fn get_content_maintype(&self) -> String {
-        self.get_content_type()
-            .split('/')
-            .next()
-            .unwrap_or("")
-            .to_owned()
+        self.get_content_type().split('/').next().unwrap_or("").to_owned()
     }
 
     pub fn get_content_charset(&self) -> Option<String> {
@@ -188,8 +169,7 @@ impl Message {
     }
 
     pub fn get_content_disposition(&self) -> Option<String> {
-        self.get_str("content-disposition")
-            .map(|v| header::splitparam(&v).0.to_lowercase())
+        self.get_str("content-disposition").map(|v| header::splitparam(&v).0.to_lowercase())
     }
 
     /// `get_filename()` (`None` = missing; `Some("")` possible).
@@ -197,10 +177,7 @@ impl Message {
         let p = self
             .get_str("content-disposition")
             .and_then(|v| header::get_param(&v, "filename"))
-            .or_else(|| {
-                self.get_str("content-type")
-                    .and_then(|v| header::get_param(&v, "name"))
-            })?;
+            .or_else(|| self.get_str("content-type").and_then(|v| header::get_param(&v, "name")))?;
         Some(crate::pystr::py_strip(&header::collapse_rfc2231(&p)).to_owned())
     }
 
@@ -230,18 +207,11 @@ impl Message {
             Payload::Bytes(b) => b,
             Payload::Parts(_) => return None,
         };
-        let cte = self
-            .get_str("content-transfer-encoding")
-            .unwrap_or_default()
-            .to_lowercase();
+        let cte = self.get_str("content-transfer-encoding").unwrap_or_default().to_lowercase();
         Some(match cte.as_str() {
             "quoted-printable" => qp_decode(b),
             "base64" => {
-                let joined: Vec<u8> = b
-                    .iter()
-                    .copied()
-                    .filter(|&c| c != b'\r' && c != b'\n')
-                    .collect();
+                let joined: Vec<u8> = b.iter().copied().filter(|&c| c != b'\r' && c != b'\n').collect();
                 header::b64_decode_lenient(&joined)
             }
             "x-uuencode" | "uuencode" | "uue" | "x-uue" => uu_decode(b),
@@ -250,12 +220,7 @@ impl Message {
     }
 }
 
-fn parsegen<'a>(
-    input: &mut Input<'a>,
-    default_type: &'static str,
-    depth: usize,
-    max_depth: usize,
-) -> Message {
+fn parsegen<'a>(input: &mut Input<'a>, default_type: &'static str, depth: usize, max_depth: usize) -> Message {
     let start_pos = input.pos;
     // Collect header lines
     let mut hlines: Vec<&[u8]> = Vec::new();
@@ -278,10 +243,7 @@ fn parsegen<'a>(
         let colon = first.iter().position(|&c| c == b':').unwrap_or(first.len());
         let name = String::from_utf8_lossy(&first[..colon]).into_owned();
         let mut value: Vec<u8> = first.get(colon + 1..).unwrap_or(&[]).to_vec();
-        let lead = value
-            .iter()
-            .take_while(|&&c| c == b' ' || c == b'\t')
-            .count();
+        let lead = value.iter().take_while(|&&c| c == b' ' || c == b'\t').count();
         value.drain(..lead);
         for l in &last[1..] {
             value.extend_from_slice(l);
@@ -319,13 +281,7 @@ fn parsegen<'a>(
         last.push(line);
     }
     flush(&mut last, &mut headers);
-    let mut msg = Message {
-        headers,
-        payload: Payload::Bytes(Vec::new()),
-        default_type,
-        raw: Vec::new(),
-        epilogue: None,
-    };
+    let mut msg = Message { headers, payload: Payload::Bytes(Vec::new()), default_type, raw: Vec::new(), epilogue: None };
     let ct = msg.get_content_type();
     let maintype = msg.get_content_maintype();
     if maintype == "message" && ct != "message/delivery-status" && depth < max_depth {
@@ -338,11 +294,7 @@ fn parsegen<'a>(
             }
             Some(boundary) => {
                 let sep = format!("--{boundary}").into_bytes();
-                let child_default = if ct == "multipart/digest" {
-                    "message/rfc822"
-                } else {
-                    "text/plain"
-                };
+                let child_default = if ct == "multipart/digest" { "message/rfc822" } else { "text/plain" };
                 let mut capturing_preamble = true;
                 let mut preamble: Vec<&[u8]> = Vec::new();
                 let mut parts: Vec<Message> = Vec::new();
@@ -503,9 +455,7 @@ mod tests {
             b"Content-Type: multipart/mixed; boundary=B\n\npre\n--B\nContent-Type: text/plain\n\nhallo\n--B\n\nzwei\n--B--\nepi\n",
             32,
         );
-        let Payload::Parts(ps) = &m.payload else {
-            panic!()
-        };
+        let Payload::Parts(ps) = &m.payload else { panic!() };
         assert_eq!(ps.len(), 2);
         assert!(matches!(&ps[0].payload, Payload::Bytes(b) if b == b"hallo"));
         assert!(matches!(&ps[1].payload, Payload::Bytes(b) if b == b"zwei"));

@@ -24,11 +24,8 @@ fn a(s: &str) -> Alias {
 /// `Document.deleted_objects.exclude(root_document_id__in=Document.deleted_objects.values("id"))`
 /// + `_TrashPermittedObjectsFilter`, column `id`, without sorting.
 pub fn trash_select(user: &CurrentUser) -> SelectStatement {
-    let deleted_ids = Query::select()
-        .column(a("id"))
-        .from(a("documents_document"))
-        .and_where(Expr::col(a("deleted_at")).is_not_null())
-        .to_owned();
+    let deleted_ids =
+        Query::select().column(a("id")).from(a("documents_document")).and_where(Expr::col(a("deleted_at")).is_not_null()).to_owned();
     Query::select()
         .column((a("documents_document"), a("id")))
         .from(a("documents_document"))
@@ -37,10 +34,7 @@ pub fn trash_select(user: &CurrentUser) -> SelectStatement {
         .cond_where(
             sea_query::Cond::any()
                 .add(Expr::col((a("documents_document"), a("root_document_id"))).is_null())
-                .add(
-                    Expr::col((a("documents_document"), a("root_document_id")))
-                        .not_in_subquery(deleted_ids),
-                ),
+                .add(Expr::col((a("documents_document"), a("root_document_id"))).not_in_subquery(deleted_ids)),
         )
         .cond_where(pl_authz::objects::permitted_objects_filter(
             Some(user),
@@ -56,11 +50,7 @@ pub fn trash_select(user: &CurrentUser) -> SelectStatement {
 }
 
 /// GET /api/trash/ – `TrashView.get` (`ListModelMixin.list` with `DocumentSerializer`).
-pub async fn trash_list_handler(
-    State(state): State<AppState>,
-    ctx: RequestContext,
-    auth: AuthUser,
-) -> Result<Response, pl_core::ApiError> {
+pub async fn trash_list_handler(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser) -> Result<Response, pl_core::ApiError> {
     // (IsAuthenticated, TrashPermissions): GET → documents.view_document
     let user = auth.require_perms_by_method(TRASH_PERMISSIONS)?;
     let db = state.db();
@@ -69,10 +59,7 @@ pub async fn trash_list_handler(
     q.order_by((a("documents_document"), a("created")), Order::Desc);
     let req = PageRequest::from_query(&ctx.query);
     let (rows, info) = pagination::fetch_page(db, &q, &req).await?;
-    let ids: Vec<i64> = rows
-        .iter()
-        .map(|r| pl_documents::db::i64_col(r, "id"))
-        .collect::<Result<_, _>>()?;
+    let ids: Vec<i64> = rows.iter().map(|r| pl_documents::db::i64_col(r, "id")).collect::<Result<_, _>>()?;
     // PassUserMixin.get_serializer: only `full_perms` (no fields/truncate_content);
     // own queryset without prefetch → own content/page count; no action == "retrieve".
     let opts = SerializeOpts {
@@ -84,9 +71,7 @@ pub async fn trash_list_handler(
     };
     let results = pl_documents::serialize_documents(&state, user, &ids, &opts).await?;
     let all = if ctx.version().includes_all() {
-        let all =
-            pagination::fetch_all_ids(db, &q, Expr::col((a("documents_document"), a("id"))).into())
-                .await?;
+        let all = pagination::fetch_all_ids(db, &q, Expr::col((a("documents_document"), a("id"))).into()).await?;
         Some(all.into_iter().map(Value::from).collect())
     } else {
         None

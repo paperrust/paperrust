@@ -5,10 +5,10 @@
 
 use unicode_normalization::UnicodeNormalization;
 
-use crate::context::{dummy_document, filepath_context, Created, DocumentContext};
+use crate::Options;
+use crate::context::{Created, DocumentContext, dummy_document, filepath_context};
 use crate::error::TemplateError;
 use crate::pystr::{path_parts, py_isspace, py_strip};
-use crate::Options;
 
 /// `FilePathTemplate.render` -> `clean_filepath`.
 pub fn clean_filepath(value: &str) -> String {

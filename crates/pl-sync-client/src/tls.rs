@@ -196,19 +196,15 @@ pub struct TlsOptions {
 /// rustls configuration for reqwest (`use_preconfigured_tls`).
 pub fn client_config(opts: &TlsOptions) -> Result<rustls::ClientConfig, String> {
     let provider = Arc::new(rustls::crypto::ring::default_provider());
-    let builder = rustls::ClientConfig::builder_with_provider(provider.clone())
-        .with_safe_default_protocol_versions()
-        .map_err(|e| e.to_string())?;
+    let builder =
+        rustls::ClientConfig::builder_with_provider(provider.clone()).with_safe_default_protocol_versions().map_err(|e| e.to_string())?;
     let pin = opts.pin.as_deref().map(str::trim).filter(|p| !p.is_empty());
     let config = match pin {
         Some(pin) => {
             if !valid_pin(pin) {
                 return Err("invalid tls pin (expected 64 hex characters)".into());
             }
-            builder
-                .dangerous()
-                .with_custom_certificate_verifier(Arc::new(PinnedVerifier::new(pin, &provider)))
-                .with_no_client_auth()
+            builder.dangerous().with_custom_certificate_verifier(Arc::new(PinnedVerifier::new(pin, &provider))).with_no_client_auth()
         }
         None => {
             let mut roots = RootCertStore::empty();

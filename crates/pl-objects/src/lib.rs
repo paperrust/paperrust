@@ -68,27 +68,36 @@ macro_rules! viewset_routes {
             detail_view(delete(handlers::$m::destroy)),
         ));
         if $writes {
-            $out.push(ApiRoute::new(
-                concat!($prefix, ".create"),
-                Method::POST,
-                concat!("/api/", $prefix, "/"),
-                concat!("src/documents/views.py::", $view, ".create"),
-                list_view(post(handlers::$m::create)),
-            ).accepts_drf_parsers());
-            $out.push(ApiRoute::new(
-                concat!($prefix, ".update"),
-                Method::PUT,
-                concat!("/api/", $prefix, "/{id}/"),
-                concat!("src/documents/views.py::", $view, ".update"),
-                detail_view(put(handlers::$m::update)),
-            ).accepts_drf_parsers());
-            $out.push(ApiRoute::new(
-                concat!($prefix, ".partial_update"),
-                Method::PATCH,
-                concat!("/api/", $prefix, "/{id}/"),
-                concat!("src/documents/views.py::", $view, ".partial_update"),
-                detail_view(patch(handlers::$m::partial_update)),
-            ).accepts_drf_parsers());
+            $out.push(
+                ApiRoute::new(
+                    concat!($prefix, ".create"),
+                    Method::POST,
+                    concat!("/api/", $prefix, "/"),
+                    concat!("src/documents/views.py::", $view, ".create"),
+                    list_view(post(handlers::$m::create)),
+                )
+                .accepts_drf_parsers(),
+            );
+            $out.push(
+                ApiRoute::new(
+                    concat!($prefix, ".update"),
+                    Method::PUT,
+                    concat!("/api/", $prefix, "/{id}/"),
+                    concat!("src/documents/views.py::", $view, ".update"),
+                    detail_view(put(handlers::$m::update)),
+                )
+                .accepts_drf_parsers(),
+            );
+            $out.push(
+                ApiRoute::new(
+                    concat!($prefix, ".partial_update"),
+                    Method::PATCH,
+                    concat!("/api/", $prefix, "/{id}/"),
+                    concat!("src/documents/views.py::", $view, ".partial_update"),
+                    detail_view(patch(handlers::$m::partial_update)),
+                )
+                .accepts_drf_parsers(),
+            );
         }
     }};
 }

@@ -205,10 +205,9 @@ mod tests {
         let t = tempfile::tempdir().unwrap();
         let p = t.path().join("broken.pdf");
         std::fs::write(&p, b"%PDF-1.4 broken").unwrap();
-        for loc in [
-            ToolLocation::NotFound(vec![t.path().join("paperrust-pdftool")]),
-            ToolLocation::ConfiguredMissing(t.path().join("nope.exe")),
-        ] {
+        for loc in
+            [ToolLocation::NotFound(vec![t.path().join("paperrust-pdftool")]), ToolLocation::ConfiguredMissing(t.path().join("nope.exe"))]
+        {
             let o = prepare_with(&loc, &p, t.path()).await;
             assert_eq!(o, IngestOutcome { repaired: false, shrunk: None, skipped_no_tool: true });
             assert_eq!(std::fs::read(&p).unwrap(), b"%PDF-1.4 broken");
@@ -223,8 +222,13 @@ mod tests {
         let p = t.path().join("ok.pdf");
         let mut doc = lopdf::Document::with_version("1.5");
         let pages_id = doc.new_object_id();
-        let page_id = doc.add_object(lopdf::dictionary! { "Type" => "Page", "Parent" => pages_id, "MediaBox" => vec![0.into(), 0.into(), 100.into(), 100.into()] });
-        doc.objects.insert(pages_id, lopdf::Object::Dictionary(lopdf::dictionary! { "Type" => "Pages", "Kids" => vec![page_id.into()], "Count" => 1 }));
+        let page_id = doc.add_object(
+            lopdf::dictionary! { "Type" => "Page", "Parent" => pages_id, "MediaBox" => vec![0.into(), 0.into(), 100.into(), 100.into()] },
+        );
+        doc.objects.insert(
+            pages_id,
+            lopdf::Object::Dictionary(lopdf::dictionary! { "Type" => "Pages", "Kids" => vec![page_id.into()], "Count" => 1 }),
+        );
         let cat = doc.add_object(lopdf::dictionary! { "Type" => "Catalog", "Pages" => pages_id });
         doc.trailer.set("Root", cat);
         doc.save(&p).unwrap();

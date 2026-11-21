@@ -30,12 +30,12 @@ use axum::routing::{delete, get, patch, post, put};
 use pl_core::route::drf_view;
 use pl_core::{ApiError, ApiRoute, AppState};
 
-use crate::tokenizer::TiktokenTruncator;
 use crate::config::AiConfig;
 use crate::llm::LlmClient;
 use crate::mcp::api::ApiBackend;
-use crate::mcp::{http, McpService, McpSettings};
+use crate::mcp::{McpService, McpSettings, http};
 use crate::pg::PgSideStore;
+use crate::tokenizer::TiktokenTruncator;
 
 type Svc = McpService<ApiBackend>;
 
@@ -159,12 +159,48 @@ pub fn routes() -> Vec<ApiRoute> {
         )
         // DRF default parsers: JSON, form and multipart (parsed in `chat::request_data`)
         .accepts_drf_parsers(),
-        ApiRoute::new("ai.review.list", Method::GET, "/api/x-ai/review/", "pl-ai extension (AI review list)", drf_view(get(review::list), ALLOW_GET)),
-        ApiRoute::new("ai.review.retrieve", Method::GET, "/api/x-ai/review/{id}/", "pl-ai extension (AI review list)", drf_view(get(review::retrieve), ALLOW_GET)),
-        ApiRoute::new("ai.review.apply", Method::POST, "/api/x-ai/review/{id}/apply/", "pl-ai extension (AI review list)", drf_view(post(review::apply), ALLOW_POST)),
-        ApiRoute::new("ai.review.reject", Method::POST, "/api/x-ai/review/{id}/reject/", "pl-ai extension (AI review list)", drf_view(post(review::reject), ALLOW_POST)),
-        ApiRoute::new("ai.review.undo", Method::POST, "/api/x-ai/review/{id}/undo/", "pl-ai extension (AI review list)", drf_view(post(review::undo), ALLOW_POST)),
-        ApiRoute::new("ai.run", Method::POST, "/api/x-ai/run/", "pl-ai extension (automatic processing, manual run)", drf_view(post(review::run_view), ALLOW_POST)),
+        ApiRoute::new(
+            "ai.review.list",
+            Method::GET,
+            "/api/x-ai/review/",
+            "pl-ai extension (AI review list)",
+            drf_view(get(review::list), ALLOW_GET),
+        ),
+        ApiRoute::new(
+            "ai.review.retrieve",
+            Method::GET,
+            "/api/x-ai/review/{id}/",
+            "pl-ai extension (AI review list)",
+            drf_view(get(review::retrieve), ALLOW_GET),
+        ),
+        ApiRoute::new(
+            "ai.review.apply",
+            Method::POST,
+            "/api/x-ai/review/{id}/apply/",
+            "pl-ai extension (AI review list)",
+            drf_view(post(review::apply), ALLOW_POST),
+        ),
+        ApiRoute::new(
+            "ai.review.reject",
+            Method::POST,
+            "/api/x-ai/review/{id}/reject/",
+            "pl-ai extension (AI review list)",
+            drf_view(post(review::reject), ALLOW_POST),
+        ),
+        ApiRoute::new(
+            "ai.review.undo",
+            Method::POST,
+            "/api/x-ai/review/{id}/undo/",
+            "pl-ai extension (AI review list)",
+            drf_view(post(review::undo), ALLOW_POST),
+        ),
+        ApiRoute::new(
+            "ai.run",
+            Method::POST,
+            "/api/x-ai/run/",
+            "pl-ai extension (automatic processing, manual run)",
+            drf_view(post(review::run_view), ALLOW_POST),
+        ),
         ApiRoute::new(
             "ai.mcp.post",
             Method::POST,
@@ -176,23 +212,125 @@ pub fn routes() -> Vec<ApiRoute> {
         ),
         ApiRoute::new("ai.mcp.get", Method::GET, "/mcp", "pl-ai extension (MCP Streamable HTTP)", get(get_h)),
         ApiRoute::new("ai.mcp.delete", Method::DELETE, "/mcp", "pl-ai extension (MCP Streamable HTTP)", delete(delete_h)),
-        ApiRoute::new("ai.mcp_scopes.list", Method::GET, "/api/x-ai/mcp-scopes/", "pl-ai extension (MCP token scopes)", drf_view(get(crate::server::mcp_admin::list), ALLOW_GET)),
-        ApiRoute::new("ai.mcp_scopes.create", Method::POST, "/api/x-ai/mcp-scopes/", "pl-ai extension (MCP token scopes)", drf_view(post(crate::server::mcp_admin::create), ALLOW_POST)),
-        ApiRoute::new("ai.status", Method::GET, "/api/x-ai/status/", "pl-ai extension (AI status)", drf_view(get(store::status), ALLOW_GET)),
-        ApiRoute::new("ai.prompts.list", Method::GET, "/api/x-ai/prompts/", "pl-ai extension (custom prompts)", drf_view(get(store::prompts_list), ALLOW_GET)),
-        ApiRoute::new("ai.prompts.update", Method::PUT, "/api/x-ai/prompts/{kind}/", "pl-ai extension (custom prompts)", drf_view(put(store::prompts_put), "PUT, DELETE, OPTIONS")),
-        ApiRoute::new("ai.prompts.reset", Method::DELETE, "/api/x-ai/prompts/{kind}/", "pl-ai extension (custom prompts)", drf_view(delete(store::prompts_reset), "PUT, DELETE, OPTIONS")),
-        ApiRoute::new("ai.prompts.preview", Method::POST, "/api/x-ai/prompts/{kind}/preview/", "pl-ai extension (custom prompts)", drf_view(post(store::prompts_preview), ALLOW_POST)),
-        ApiRoute::new("ai.options.get", Method::GET, "/api/x-ai/options/", "pl-ai extension (AI options)", drf_view(get(store::options_get), "GET, PATCH, HEAD, OPTIONS")),
-        ApiRoute::new("ai.options.patch", Method::PATCH, "/api/x-ai/options/", "pl-ai extension (AI options)", drf_view(patch(store::options_patch), "GET, PATCH, HEAD, OPTIONS")),
-        ApiRoute::new("ai.provider.check", Method::POST, "/api/x-ai/provider/check/", "pl-ai extension (provider connection test)", drf_view(post(store::provider_check), ALLOW_POST)),
-        ApiRoute::new("ai.jobs.list", Method::GET, "/api/x-ai/jobs/", "pl-ai extension (archive backfill)", drf_view(get(jobs::list), "GET, POST, HEAD, OPTIONS")),
-        ApiRoute::new("ai.jobs.create", Method::POST, "/api/x-ai/jobs/", "pl-ai extension (archive backfill)", drf_view(post(jobs::create), "GET, POST, HEAD, OPTIONS")),
-        ApiRoute::new("ai.jobs.preview", Method::POST, "/api/x-ai/jobs/preview/", "pl-ai extension (archive backfill)", drf_view(post(jobs::preview), ALLOW_POST)),
-        ApiRoute::new("ai.jobs.retrieve", Method::GET, "/api/x-ai/jobs/{id}/", "pl-ai extension (archive backfill)", drf_view(get(jobs::retrieve), ALLOW_GET)),
-        ApiRoute::new("ai.jobs.cancel", Method::POST, "/api/x-ai/jobs/{id}/cancel/", "pl-ai extension (archive backfill)", drf_view(post(jobs::cancel), ALLOW_POST)),
-        ApiRoute::new("ai.jobs.resume", Method::POST, "/api/x-ai/jobs/{id}/resume/", "pl-ai extension (archive backfill)", drf_view(post(jobs::resume), ALLOW_POST)),
-        ApiRoute::new("ai.assist.verdict", Method::POST, "/api/x-ai/assist/verdict/", "pl-ai extension (AI condition)", drf_view(post(assist::verdict_view), ALLOW_POST)),
+        ApiRoute::new(
+            "ai.mcp_scopes.list",
+            Method::GET,
+            "/api/x-ai/mcp-scopes/",
+            "pl-ai extension (MCP token scopes)",
+            drf_view(get(crate::server::mcp_admin::list), ALLOW_GET),
+        ),
+        ApiRoute::new(
+            "ai.mcp_scopes.create",
+            Method::POST,
+            "/api/x-ai/mcp-scopes/",
+            "pl-ai extension (MCP token scopes)",
+            drf_view(post(crate::server::mcp_admin::create), ALLOW_POST),
+        ),
+        ApiRoute::new(
+            "ai.status",
+            Method::GET,
+            "/api/x-ai/status/",
+            "pl-ai extension (AI status)",
+            drf_view(get(store::status), ALLOW_GET),
+        ),
+        ApiRoute::new(
+            "ai.prompts.list",
+            Method::GET,
+            "/api/x-ai/prompts/",
+            "pl-ai extension (custom prompts)",
+            drf_view(get(store::prompts_list), ALLOW_GET),
+        ),
+        ApiRoute::new(
+            "ai.prompts.update",
+            Method::PUT,
+            "/api/x-ai/prompts/{kind}/",
+            "pl-ai extension (custom prompts)",
+            drf_view(put(store::prompts_put), "PUT, DELETE, OPTIONS"),
+        ),
+        ApiRoute::new(
+            "ai.prompts.reset",
+            Method::DELETE,
+            "/api/x-ai/prompts/{kind}/",
+            "pl-ai extension (custom prompts)",
+            drf_view(delete(store::prompts_reset), "PUT, DELETE, OPTIONS"),
+        ),
+        ApiRoute::new(
+            "ai.prompts.preview",
+            Method::POST,
+            "/api/x-ai/prompts/{kind}/preview/",
+            "pl-ai extension (custom prompts)",
+            drf_view(post(store::prompts_preview), ALLOW_POST),
+        ),
+        ApiRoute::new(
+            "ai.options.get",
+            Method::GET,
+            "/api/x-ai/options/",
+            "pl-ai extension (AI options)",
+            drf_view(get(store::options_get), "GET, PATCH, HEAD, OPTIONS"),
+        ),
+        ApiRoute::new(
+            "ai.options.patch",
+            Method::PATCH,
+            "/api/x-ai/options/",
+            "pl-ai extension (AI options)",
+            drf_view(patch(store::options_patch), "GET, PATCH, HEAD, OPTIONS"),
+        ),
+        ApiRoute::new(
+            "ai.provider.check",
+            Method::POST,
+            "/api/x-ai/provider/check/",
+            "pl-ai extension (provider connection test)",
+            drf_view(post(store::provider_check), ALLOW_POST),
+        ),
+        ApiRoute::new(
+            "ai.jobs.list",
+            Method::GET,
+            "/api/x-ai/jobs/",
+            "pl-ai extension (archive backfill)",
+            drf_view(get(jobs::list), "GET, POST, HEAD, OPTIONS"),
+        ),
+        ApiRoute::new(
+            "ai.jobs.create",
+            Method::POST,
+            "/api/x-ai/jobs/",
+            "pl-ai extension (archive backfill)",
+            drf_view(post(jobs::create), "GET, POST, HEAD, OPTIONS"),
+        ),
+        ApiRoute::new(
+            "ai.jobs.preview",
+            Method::POST,
+            "/api/x-ai/jobs/preview/",
+            "pl-ai extension (archive backfill)",
+            drf_view(post(jobs::preview), ALLOW_POST),
+        ),
+        ApiRoute::new(
+            "ai.jobs.retrieve",
+            Method::GET,
+            "/api/x-ai/jobs/{id}/",
+            "pl-ai extension (archive backfill)",
+            drf_view(get(jobs::retrieve), ALLOW_GET),
+        ),
+        ApiRoute::new(
+            "ai.jobs.cancel",
+            Method::POST,
+            "/api/x-ai/jobs/{id}/cancel/",
+            "pl-ai extension (archive backfill)",
+            drf_view(post(jobs::cancel), ALLOW_POST),
+        ),
+        ApiRoute::new(
+            "ai.jobs.resume",
+            Method::POST,
+            "/api/x-ai/jobs/{id}/resume/",
+            "pl-ai extension (archive backfill)",
+            drf_view(post(jobs::resume), ALLOW_POST),
+        ),
+        ApiRoute::new(
+            "ai.assist.verdict",
+            Method::POST,
+            "/api/x-ai/assist/verdict/",
+            "pl-ai extension (AI condition)",
+            drf_view(post(assist::verdict_view), ALLOW_POST),
+        ),
         ApiRoute::new(
             "ai.assist.workflow_draft",
             Method::POST,

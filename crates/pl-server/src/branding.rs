@@ -57,12 +57,9 @@ const LIGHT_UI_MARKER: &[u8] = b"\"/rs/app/";
 const MAX_HTML: u64 = 4 * 1024 * 1024;
 
 pub const LOGO_SVG: &[u8] = include_bytes!("../../../docs/design/assets/paperrust-logo.svg");
-pub const LOGO_INVERSE_SVG: &[u8] =
-    include_bytes!("../../../docs/design/assets/paperrust-logo-inverse.svg");
-pub const LOGO_MONO_SVG: &[u8] =
-    include_bytes!("../../../docs/design/assets/paperrust-logo-mono.svg");
-pub const APP_ICON_SVG: &[u8] =
-    include_bytes!("../../../docs/design/assets/paperrust-app-icon.svg");
+pub const LOGO_INVERSE_SVG: &[u8] = include_bytes!("../../../docs/design/assets/paperrust-logo-inverse.svg");
+pub const LOGO_MONO_SVG: &[u8] = include_bytes!("../../../docs/design/assets/paperrust-logo-mono.svg");
+pub const APP_ICON_SVG: &[u8] = include_bytes!("../../../docs/design/assets/paperrust-app-icon.svg");
 pub const FAVICON_SVG: &[u8] = include_bytes!("../../../docs/design/assets/favicon.svg");
 
 /// favicon.ico (16/32/48, 32-bit BMP entries), rasterised once from the favicon.svg geometry.
@@ -92,11 +89,7 @@ pub fn parse_hex(s: &str) -> Option<[u8; 3]> {
     let digit = |i: usize| u8::from_str_radix(&s[i..i + 1], 16).ok();
     match s.len() {
         3 => Some([digit(0)? * 17, digit(1)? * 17, digit(2)? * 17]),
-        6 => Some([
-            u8::from_str_radix(&s[0..2], 16).ok()?,
-            u8::from_str_radix(&s[2..4], 16).ok()?,
-            u8::from_str_radix(&s[4..6], 16).ok()?,
-        ]),
+        6 => Some([u8::from_str_radix(&s[0..2], 16).ok()?, u8::from_str_radix(&s[2..4], 16).ok()?, u8::from_str_radix(&s[4..6], 16).ok()?]),
         _ => None,
     }
 }
@@ -143,11 +136,7 @@ pub fn hsl_to_rgb(h: f64, s: f64, l: f64) -> [u8; 3] {
 pub fn relative_luminance(rgb: [u8; 3]) -> f64 {
     let lin = |c: u8| {
         let c = f64::from(c) / 255.0;
-        if c <= 0.04045 {
-            c / 12.92
-        } else {
-            ((c + 0.055) / 1.055).powf(2.4)
-        }
+        if c <= 0.04045 { c / 12.92 } else { ((c + 0.055) / 1.055).powf(2.4) }
     };
     let [r, g, b] = rgb;
     0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
@@ -178,11 +167,7 @@ impl Accent {
     /// Rendered colour at lightness `l + delta` percent (clamped like CSS).
     pub fn rgb_at(&self, delta: i16) -> [u8; 3] {
         let l = (i16::from(self.l) + delta).clamp(0, 100);
-        hsl_to_rgb(
-            f64::from(self.h),
-            f64::from(self.s) / 100.0,
-            f64::from(l) / 100.0,
-        )
+        hsl_to_rgb(f64::from(self.h), f64::from(self.s) / 100.0, f64::from(l) / 100.0)
     }
 
     pub fn rgb(&self) -> [u8; 3] {
@@ -211,11 +196,7 @@ pub struct Branding {
 }
 
 fn invalid(var: &'static str, value: &str, reason: &str) -> ConfigError {
-    ConfigError::Invalid {
-        var,
-        value: value.to_owned(),
-        reason: reason.to_owned(),
-    }
+    ConfigError::Invalid { var, value: value.to_owned(), reason: reason.to_owned() }
 }
 
 impl Branding {
@@ -223,17 +204,8 @@ impl Branding {
         let accent = Accent::from_rgb(accent_rgb);
         let css_angular = css_angular(&accent);
         let css_accounts = css_accounts(&accent);
-        let etag_suffix = format!(
-            "-prb{:08x}",
-            fnv1a(format!("{css_angular}{css_accounts}").as_bytes())
-        );
-        Self {
-            enabled,
-            accent,
-            css_angular,
-            css_accounts,
-            etag_suffix,
-        }
+        let etag_suffix = format!("-prb{:08x}", fnv1a(format!("{css_angular}{css_accounts}").as_bytes()));
+        Self { enabled, accent, css_angular, css_accounts, etag_suffix }
     }
 
     pub fn off() -> Self {
@@ -253,9 +225,7 @@ impl Branding {
         let accent = match get("PAPERRUST_ACCENT") {
             None => DEFAULT_ACCENT,
             Some(v) if v.trim().is_empty() => DEFAULT_ACCENT,
-            Some(v) => parse_hex(&v).ok_or_else(|| {
-                invalid("PAPERRUST_ACCENT", &v, "expected a hex colour like #B7410E")
-            })?,
+            Some(v) => parse_hex(&v).ok_or_else(|| invalid("PAPERRUST_ACCENT", &v, "expected a hex colour like #B7410E"))?,
         };
         Ok(Self::new(enabled, accent))
     }
@@ -279,20 +249,13 @@ impl Branding {
 
     /// The `<style>` element for a page (Angular index or Django account page).
     pub fn style_element(&self, angular: bool) -> String {
-        let css = if angular {
-            &self.css_angular
-        } else {
-            &self.css_accounts
-        };
+        let css = if angular { &self.css_angular } else { &self.css_accounts };
         format!("<style id=\"paperrust-brand\">{css}</style>")
     }
 
     /// The `<link>` element for pages under a CSP without `'unsafe-inline'` (Light UI).
     pub fn link_element(&self, angular: bool) -> String {
-        format!(
-            "<link rel=\"stylesheet\" id=\"paperrust-brand\" href=\"{}\">",
-            stylesheet_path(&self.accent, angular)
-        )
+        format!("<link rel=\"stylesheet\" id=\"paperrust-brand\" href=\"{}\">", stylesheet_path(&self.accent, angular))
     }
 
     /// GET navigation to an HTML page of the frontend or the account pages?
@@ -304,15 +267,7 @@ impl Branding {
         if headers.contains_key(header::RANGE) || headers.contains_key(header::UPGRADE) {
             return false;
         }
-        let get = |n: &str| {
-            headers
-                .get_all(n)
-                .iter()
-                .filter_map(|v| v.to_str().ok())
-                .collect::<Vec<_>>()
-                .join(",")
-                .to_ascii_lowercase()
-        };
+        let get = |n: &str| headers.get_all(n).iter().filter_map(|v| v.to_str().ok()).collect::<Vec<_>>().join(",").to_ascii_lowercase();
         let dest = get("sec-fetch-dest");
         if !dest.is_empty() {
             return dest.trim() == "document";
@@ -339,15 +294,9 @@ impl Branding {
             out.extend_from_slice(self.style_element(angular).as_bytes());
         }
         if icon_links == 0 {
-            out.extend_from_slice(
-                format!("<link rel=\"icon\" type=\"image/x-icon\" href=\"{FAVICON_ICO_PATH}\">")
-                    .as_bytes(),
-            );
+            out.extend_from_slice(format!("<link rel=\"icon\" type=\"image/x-icon\" href=\"{FAVICON_ICO_PATH}\">").as_bytes());
         }
-        out.extend_from_slice(
-            format!("<link rel=\"icon\" type=\"image/svg+xml\" href=\"{FAVICON_SVG_PATH}\">")
-                .as_bytes(),
-        );
+        out.extend_from_slice(format!("<link rel=\"icon\" type=\"image/svg+xml\" href=\"{FAVICON_SVG_PATH}\">").as_bytes());
         out.extend_from_slice(&html[head_end..]);
         Some(out)
     }
@@ -365,27 +314,21 @@ impl Branding {
                 tracing::warn!(error = %e, "html body failed before branding");
                 let mut r = Response::new(Body::from("Bad Gateway"));
                 *r.status_mut() = StatusCode::BAD_GATEWAY;
-                r.headers_mut().insert(
-                    header::CONTENT_TYPE,
-                    HeaderValue::from_static("text/plain; charset=utf-8"),
-                );
+                r.headers_mut().insert(header::CONTENT_TYPE, HeaderValue::from_static("text/plain; charset=utf-8"));
                 return r;
             }
         };
         let Some(new) = self.inject(&content) else {
             return Response::from_parts(parts, Body::from(content));
         };
-        parts
-            .headers
-            .insert(header::CONTENT_LENGTH, HeaderValue::from(new.len()));
+        parts.headers.insert(header::CONTENT_LENGTH, HeaderValue::from(new.len()));
         let etag = parts
             .headers
             .get(header::ETAG)
             .and_then(|v| v.to_str().ok())
             .and_then(|e| {
                 let e = e.trim();
-                e.strip_suffix('"')
-                    .map(|stem| format!("{stem}{}\"", self.etag_suffix))
+                e.strip_suffix('"').map(|stem| format!("{stem}{}\"", self.etag_suffix))
             })
             .and_then(|e| HeaderValue::from_str(&e).ok());
         if let Some(e) = etag {
@@ -397,36 +340,18 @@ impl Branding {
 }
 
 fn is_excluded_path(path: &str) -> bool {
-    const EXACT_OR_DIR: &[&str] = &[
-        "/api", "/ws", "/share", "/static", "/assets", "/logo", "/fetch", "/admin", "/media",
-        "/__rs",
-    ];
-    path == "/favicon.ico"
-        || EXACT_OR_DIR.iter().any(|p| {
-            path.strip_prefix(p)
-                .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
-        })
+    const EXACT_OR_DIR: &[&str] = &["/api", "/ws", "/share", "/static", "/assets", "/logo", "/fetch", "/admin", "/media", "/__rs"];
+    path == "/favicon.ico" || EXACT_OR_DIR.iter().any(|p| path.strip_prefix(p).is_some_and(|rest| rest.is_empty() || rest.starts_with('/')))
 }
 
 fn html_eligible(resp: &Response) -> bool {
     let h = resp.headers();
-    let ct_html = h
-        .get(header::CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .is_some_and(|ct| ct.trim().to_ascii_lowercase().starts_with("text/html"));
-    let encoded = h
-        .get_all(header::CONTENT_ENCODING)
-        .iter()
-        .any(|v| !v.as_bytes().eq_ignore_ascii_case(b"identity"));
-    let attachment = h
-        .get(header::CONTENT_DISPOSITION)
-        .and_then(|v| v.to_str().ok())
-        .is_some_and(|v| v.to_ascii_lowercase().contains("attachment"));
-    let size_ok = resp
-        .body()
-        .size_hint()
-        .exact()
-        .is_some_and(|n| n <= MAX_HTML);
+    let ct_html =
+        h.get(header::CONTENT_TYPE).and_then(|v| v.to_str().ok()).is_some_and(|ct| ct.trim().to_ascii_lowercase().starts_with("text/html"));
+    let encoded = h.get_all(header::CONTENT_ENCODING).iter().any(|v| !v.as_bytes().eq_ignore_ascii_case(b"identity"));
+    let attachment =
+        h.get(header::CONTENT_DISPOSITION).and_then(|v| v.to_str().ok()).is_some_and(|v| v.to_ascii_lowercase().contains("attachment"));
+    let size_ok = resp.body().size_hint().exact().is_some_and(|n| n <= MAX_HTML);
     resp.status() == StatusCode::OK && ct_html && !encoded && !attachment && size_ok
 }
 
@@ -436,10 +361,7 @@ fn html_eligible(resp: &Response) -> bool {
 /// the same selectors (same specificity, later in the document) set the accent there, with the
 /// same lightness as in light mode (better contrast to the dark-mode button text than +10%).
 fn css_angular(a: &Accent) -> String {
-    let vars = format!(
-        "--pngx-primary:{},{}%;--pngx-primary-lightness:{}%",
-        a.h, a.s, a.l
-    );
+    let vars = format!("--pngx-primary:{},{}%;--pngx-primary-lightness:{}%", a.h, a.s, a.l);
     let b = "body:not(.primary-light):not(.primary-dark)";
     format!(
         ":root{{{vars}}}\
@@ -534,10 +456,7 @@ fn rewrite_icon_links(head: &[u8]) -> (Vec<u8>, usize) {
         out.extend_from_slice(&head[pos..start]);
         let attrs = attributes(tag);
         let is_icon = attrs.iter().any(|(n, r)| {
-            n == "rel"
-                && String::from_utf8_lossy(&tag[r.clone()])
-                    .split_ascii_whitespace()
-                    .any(|t| t.eq_ignore_ascii_case("icon"))
+            n == "rel" && String::from_utf8_lossy(&tag[r.clone()]).split_ascii_whitespace().any(|t| t.eq_ignore_ascii_case("icon"))
         });
         match attrs.iter().find(|(n, _)| n == "href").filter(|_| is_icon) {
             Some((_, r)) => {
@@ -555,9 +474,7 @@ fn rewrite_icon_links(head: &[u8]) -> (Vec<u8>, usize) {
 }
 
 fn fnv1a(data: &[u8]) -> u32 {
-    data.iter().fold(0x811c_9dc5u32, |h, &b| {
-        (h ^ u32::from(b)).wrapping_mul(0x0100_0193)
-    })
+    data.iter().fold(0x811c_9dc5u32, |h, &b| (h ^ u32::from(b)).wrapping_mul(0x0100_0193))
 }
 
 // ------------------------------------------------------------------ assets
@@ -587,31 +504,17 @@ pub fn asset_response(method: &Method, path: &str) -> Option<Response> {
         return Some(stylesheet_response(method, css));
     }
     let (bytes, ct) = asset(path)?;
-    let body = if method == Method::HEAD {
-        Body::empty()
-    } else {
-        Body::from(bytes)
-    };
+    let body = if method == Method::HEAD { Body::empty() } else { Body::from(bytes) };
     let mut r = Response::new(body);
     let h = r.headers_mut();
     h.insert(header::CONTENT_TYPE, HeaderValue::from_static(ct));
     h.insert(header::CONTENT_LENGTH, HeaderValue::from(bytes.len()));
-    h.insert(
-        header::CACHE_CONTROL,
-        HeaderValue::from_static("public, max-age=86400"),
-    );
-    h.insert(
-        header::X_CONTENT_TYPE_OPTIONS,
-        HeaderValue::from_static("nosniff"),
-    );
-    h.insert(
-        header::CONTENT_SECURITY_POLICY,
-        HeaderValue::from_static("default-src 'none'; style-src 'unsafe-inline'"),
-    );
+    h.insert(header::CACHE_CONTROL, HeaderValue::from_static("public, max-age=86400"));
+    h.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+    h.insert(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static("default-src 'none'; style-src 'unsafe-inline'"));
     h.insert(
         header::ETAG,
-        HeaderValue::from_str(&format!("\"{:08x}\"", fnv1a(bytes)))
-            .unwrap_or_else(|_| HeaderValue::from_static("\"0\"")),
+        HeaderValue::from_str(&format!("\"{:08x}\"", fnv1a(bytes))).unwrap_or_else(|_| HeaderValue::from_static("\"0\"")),
     );
     Some(r)
 }
@@ -639,12 +542,7 @@ pub fn accent_stylesheet(path: &str) -> Option<String> {
     if it.next().is_some() || h >= 360 || sat > 100 || l > 100 {
         return None;
     }
-    let a = Accent {
-        h,
-        s: u8::try_from(sat).ok()?,
-        l: u8::try_from(l).ok()?,
-        l_input: u8::try_from(l).ok()?,
-    };
+    let a = Accent { h, s: u8::try_from(sat).ok()?, l: u8::try_from(l).ok()?, l_input: u8::try_from(l).ok()? };
     match file {
         "app.css" => Some(css_angular(&a)),
         "accounts.css" => Some(css_accounts(&a)),
@@ -655,30 +553,14 @@ pub fn accent_stylesheet(path: &str) -> Option<String> {
 fn stylesheet_response(method: &Method, css: String) -> Response {
     let len = css.len();
     let etag = format!("\"{:08x}\"", fnv1a(css.as_bytes()));
-    let body = if method == Method::HEAD {
-        Body::empty()
-    } else {
-        Body::from(css)
-    };
+    let body = if method == Method::HEAD { Body::empty() } else { Body::from(css) };
     let mut r = Response::new(body);
     let h = r.headers_mut();
-    h.insert(
-        header::CONTENT_TYPE,
-        HeaderValue::from_static("text/css; charset=utf-8"),
-    );
+    h.insert(header::CONTENT_TYPE, HeaderValue::from_static("text/css; charset=utf-8"));
     h.insert(header::CONTENT_LENGTH, HeaderValue::from(len));
-    h.insert(
-        header::CACHE_CONTROL,
-        HeaderValue::from_static("public, max-age=31536000, immutable"),
-    );
-    h.insert(
-        header::X_CONTENT_TYPE_OPTIONS,
-        HeaderValue::from_static("nosniff"),
-    );
-    h.insert(
-        header::ETAG,
-        HeaderValue::from_str(&etag).unwrap_or_else(|_| HeaderValue::from_static("\"0\"")),
-    );
+    h.insert(header::CACHE_CONTROL, HeaderValue::from_static("public, max-age=31536000, immutable"));
+    h.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+    h.insert(header::ETAG, HeaderValue::from_str(&etag).unwrap_or_else(|_| HeaderValue::from_static("\"0\"")));
     r
 }
 
@@ -697,10 +579,7 @@ pub mod ico {
         for i in 1..=8 {
             let t = f64::from(i) / 8.0;
             let u = 1.0 - t;
-            out.push((
-                u * u * p0.0 + 2.0 * u * t * c.0 + t * t * p1.0,
-                u * u * p0.1 + 2.0 * u * t * c.1 + t * t * p1.1,
-            ));
+            out.push((u * u * p0.0 + 2.0 * u * t * c.0 + t * t * p1.0, u * u * p0.1 + 2.0 * u * t * c.1 + t * t * p1.1));
         }
     }
 
@@ -772,12 +651,7 @@ pub mod ico {
                 if a == 0.0 {
                     px.push([0, 0, 0, 0]);
                 } else {
-                    px.push([
-                        (r / a).round() as u8,
-                        (g / a).round() as u8,
-                        (b / a).round() as u8,
-                        (a / 16.0 * 255.0).round() as u8,
-                    ]);
+                    px.push([(r / a).round() as u8, (g / a).round() as u8, (b / a).round() as u8, (a / 16.0 * 255.0).round() as u8]);
                 }
             }
         }
@@ -880,23 +754,17 @@ mod tests {
         let b = Branding::from_lookup(&|_| None).unwrap();
         assert!(b.enabled);
         assert_eq!(b.accent, Accent::from_rgb(DEFAULT_ACCENT));
-        let off = Branding::from_lookup(&|k| (k == "PAPERRUST_BRANDING").then(|| "OFF".into()))
-            .unwrap();
+        let off = Branding::from_lookup(&|k| (k == "PAPERRUST_BRANDING").then(|| "OFF".into())).unwrap();
         assert!(!off.enabled);
         assert!(Branding::from_lookup(&|k| (k == "PAPERRUST_BRANDING").then(|| "vielleicht".into())).is_err());
         assert!(Branding::from_lookup(&|k| (k == "PAPERRUST_ACCENT").then(|| "#zz0000".into())).is_err());
-        let blue = Branding::from_lookup(&|k| (k == "PAPERRUST_ACCENT").then(|| "#0d6efd".into()))
-            .unwrap();
+        let blue = Branding::from_lookup(&|k| (k == "PAPERRUST_ACCENT").then(|| "#0d6efd".into())).unwrap();
         assert_eq!(blue.accent.h, 216);
     }
 
     #[test]
     fn ui_defaults_only_when_unset() {
-        let mut core = pl_core::Config::from_env_map(pl_core::config::Env::from_pairs([(
-            "PAPERLESS_SECRET_KEY",
-            "x",
-        )]))
-        .unwrap();
+        let mut core = pl_core::Config::from_env_map(pl_core::config::Env::from_pairs([("PAPERLESS_SECRET_KEY", "x")])).unwrap();
         Branding::off().apply_ui_defaults(&mut core);
         assert_eq!(core.app_title, None);
         Branding::new(true, DEFAULT_ACCENT).apply_ui_defaults(&mut core);
@@ -932,8 +800,19 @@ mod tests {
         assert!(!b.is_candidate(&Method::POST, "/accounts/login/", &nav));
         assert!(!b.is_candidate(&Method::HEAD, "/", &nav));
         for p in [
-            "/api/", "/api", "/api/documents/", "/share/abc", "/static/x.css", "/logo/", "/logo",
-            "/ws/status/", "/admin/", "/favicon.ico", "/__rs/health", "/fetch/doc/1", "/assets/x",
+            "/api/",
+            "/api",
+            "/api/documents/",
+            "/share/abc",
+            "/static/x.css",
+            "/logo/",
+            "/logo",
+            "/ws/status/",
+            "/admin/",
+            "/favicon.ico",
+            "/__rs/health",
+            "/fetch/doc/1",
+            "/assets/x",
         ] {
             assert!(!b.is_candidate(&Method::GET, p, &nav), "{p}");
         }
@@ -1021,7 +900,9 @@ mod tests {
 
     #[test]
     fn icon_link_variants() {
-        let (h, n) = rewrite_icon_links(b"<link href='a.ico' rel='shortcut icon'><LINK REL=icon HREF=b.ico /><link rel=\"apple-touch-icon\" href=\"c.png\">");
+        let (h, n) = rewrite_icon_links(
+            b"<link href='a.ico' rel='shortcut icon'><LINK REL=icon HREF=b.ico /><link rel=\"apple-touch-icon\" href=\"c.png\">",
+        );
         assert_eq!(n, 2);
         let h = String::from_utf8(h).unwrap();
         assert_eq!(

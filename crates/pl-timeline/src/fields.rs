@@ -37,20 +37,13 @@ pub struct FieldKinds {
 }
 
 fn fold(s: &str) -> String {
-    s.to_lowercase()
-        .replace('ä', "ae")
-        .replace('ö', "oe")
-        .replace('ü', "ue")
-        .replace('ß', "ss")
+    s.to_lowercase().replace('ä', "ae").replace('ö', "oe").replace('ü', "ue").replace('ß', "ss")
 }
 
 /// Detection by field name (first matching rule wins).
 pub fn kind_for_name(name: &str) -> Option<DateKind> {
     let n = fold(name);
-    let words: Vec<&str> = n
-        .split(|c: char| !c.is_alphanumeric())
-        .filter(|w| !w.is_empty())
-        .collect();
+    let words: Vec<&str> = n.split(|c: char| !c.is_alphanumeric()).filter(|w| !w.is_empty()).collect();
     let has = |f: &dyn Fn(&str) -> bool| words.iter().any(|w| f(w));
     let phrase = |p: &str| n.contains(p);
     if has(&|w| w.contains("kuendig") || w.starts_with("cancel") || w == "notice") {
@@ -96,9 +89,7 @@ pub fn kind_for_name(name: &str) -> Option<DateKind> {
 
 fn matches(v: &Value, f: &FieldInfo) -> bool {
     match v {
-        Value::String(s) => {
-            fold(s.trim()) == fold(f.name.trim()) || s.trim().parse::<i64>().ok() == Some(f.id)
-        }
+        Value::String(s) => fold(s.trim()) == fold(f.name.trim()) || s.trim().parse::<i64>().ok() == Some(f.id),
         Value::Number(n) => n.as_i64() == Some(f.id),
         _ => false,
     }
@@ -120,10 +111,7 @@ pub fn resolve(fields: &[FieldInfo], setting: Option<&str>) -> (FieldKinds, Vec<
         match serde_json::from_str::<Value>(raw) {
             Ok(Value::Object(o)) => {
                 for (k, v) in o {
-                    if k == "amount"
-                        || k == "ignore"
-                        || DateKind::parse(&k).is_some_and(|k| k != DateKind::Created)
-                    {
+                    if k == "amount" || k == "ignore" || DateKind::parse(&k).is_some_and(|k| k != DateKind::Created) {
                         map.insert(k, list(&v));
                     } else {
                         warnings.push(format!("unknown kind {k:?}"));
@@ -146,10 +134,7 @@ pub fn resolve(fields: &[FieldInfo], setting: Option<&str>) -> (FieldKinds, Vec<
                 let set = DateKind::ALL
                     .into_iter()
                     .filter(|k| *k != DateKind::Created)
-                    .find(|k| {
-                        map.get(k.as_str())
-                            .is_some_and(|l| l.iter().any(|v| matches(v, f)))
-                    });
+                    .find(|k| map.get(k.as_str()).is_some_and(|l| l.iter().any(|v| matches(v, f))));
                 if let Some(k) = set {
                     out.dates.insert(f.id, (k, MapSource::Setting));
                 } else if let Some(k) = kind_for_name(&f.name) {
@@ -163,9 +148,7 @@ pub fn resolve(fields: &[FieldInfo], setting: Option<&str>) -> (FieldKinds, Vec<
     // Amount: assigned ones first (in the order of the setting), then all other monetary
     if let Some(l) = map.get("amount") {
         for v in l {
-            if let Some(f) = sorted
-                .iter()
-                .find(|f| f.data_type == "monetary" && matches(v, f))
+            if let Some(f) = sorted.iter().find(|f| f.data_type == "monetary" && matches(v, f))
                 && !out.amount.contains(&f.id)
             {
                 out.amount.push(f.id);
@@ -173,10 +156,7 @@ pub fn resolve(fields: &[FieldInfo], setting: Option<&str>) -> (FieldKinds, Vec<
         }
     }
     for f in &sorted {
-        if f.data_type == "monetary"
-            && !out.amount.contains(&f.id)
-            && !ignore.iter().any(|v| matches(v, f))
-        {
+        if f.data_type == "monetary" && !out.amount.contains(&f.id) && !ignore.iter().any(|v| matches(v, f)) {
             out.amount.push(f.id);
         }
     }
@@ -203,11 +183,7 @@ mod tests {
     use super::*;
 
     fn f(id: i64, name: &str, t: &str) -> FieldInfo {
-        FieldInfo {
-            id,
-            name: name.into(),
-            data_type: t.into(),
-        }
+        FieldInfo { id, name: name.into(), data_type: t.into() }
     }
 
     #[test]
@@ -248,24 +224,13 @@ mod tests {
         ];
         let (k, w) = resolve(&fields, None);
         assert!(w.is_empty());
-        assert_eq!(
-            k.dates.get(&1),
-            Some(&(DateKind::Due, MapSource::Heuristic))
-        );
+        assert_eq!(k.dates.get(&1), Some(&(DateKind::Due, MapSource::Heuristic)));
         assert!(!k.dates.contains_key(&2), "unbekannter Name");
         assert!(!k.dates.contains_key(&5), "kein Datumsfeld");
         assert_eq!(k.amount, vec![3, 4]);
-        let (k, w) = resolve(
-            &fields,
-            Some(
-                r#"{"cancel_by":["termin"],"due":[6],"amount":["Gebühr"],"ignore":["Fällig am"],"nope":[]}"#,
-            ),
-        );
+        let (k, w) = resolve(&fields, Some(r#"{"cancel_by":["termin"],"due":[6],"amount":["Gebühr"],"ignore":["Fällig am"],"nope":[]}"#));
         assert_eq!(w.len(), 1, "{w:?}");
-        assert_eq!(
-            k.dates.get(&2),
-            Some(&(DateKind::CancelBy, MapSource::Setting))
-        );
+        assert_eq!(k.dates.get(&2), Some(&(DateKind::CancelBy, MapSource::Setting)));
         assert_eq!(k.dates.get(&6), Some(&(DateKind::Due, MapSource::Setting)));
         assert!(!k.dates.contains_key(&1), "ignoriert");
         assert_eq!(k.amount, vec![4, 3]);
@@ -275,14 +240,8 @@ mod tests {
 
     #[test]
     fn monetary() {
-        assert_eq!(
-            parse_monetary("CHF89.9"),
-            Some(("89.90".into(), Some("CHF".into())))
-        );
-        assert_eq!(
-            parse_monetary("eur1234.50"),
-            Some(("1234.50".into(), Some("EUR".into())))
-        );
+        assert_eq!(parse_monetary("CHF89.9"), Some(("89.90".into(), Some("CHF".into()))));
+        assert_eq!(parse_monetary("eur1234.50"), Some(("1234.50".into(), Some("EUR".into()))));
         assert_eq!(parse_monetary("12"), Some(("12.00".into(), None)));
         assert_eq!(parse_monetary(""), None);
         assert_eq!(parse_monetary("abc"), None);

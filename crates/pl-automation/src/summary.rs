@@ -271,12 +271,20 @@ pub async fn ai_status() -> (bool, bool) {
 }
 
 /// Summary of a workflow (names already resolved).
-pub fn build(names: &Names, workflow: &Value, else_actions: &[Value], ai: Option<&pl_consumer::workflow_ext::AiConditionDef>, ai_state: (bool, bool)) -> Value {
-    let triggers: Vec<Value> = workflow.get("triggers").and_then(Value::as_array).map(|ts| ts.iter().map(|t| trigger(names, t)).collect()).unwrap_or_default();
+pub fn build(
+    names: &Names,
+    workflow: &Value,
+    else_actions: &[Value],
+    ai: Option<&pl_consumer::workflow_ext::AiConditionDef>,
+    ai_state: (bool, bool),
+) -> Value {
+    let triggers: Vec<Value> =
+        workflow.get("triggers").and_then(Value::as_array).map(|ts| ts.iter().map(|t| trigger(names, t)).collect()).unwrap_or_default();
     let mut types: Vec<i64> = triggers.iter().filter_map(|t| t.get("type").and_then(Value::as_i64)).collect();
     types.sort_unstable();
     types.dedup();
-    let actions: Vec<Value> = workflow.get("actions").and_then(Value::as_array).map(|xs| xs.iter().map(|a| action(names, a)).collect()).unwrap_or_default();
+    let actions: Vec<Value> =
+        workflow.get("actions").and_then(Value::as_array).map(|xs| xs.iter().map(|a| action(names, a)).collect()).unwrap_or_default();
     let else_v: Vec<Value> = else_actions.iter().map(|a| action(names, a)).collect();
     let ai_v = ai.map(|c| {
         let kind = match c.field.as_str() {
@@ -326,7 +334,13 @@ pub fn collect_ai(names: &mut Names, ai: Option<&pl_consumer::workflow_ext::AiCo
 }
 
 /// Summary with name resolution (one query per object kind).
-pub async fn summarize(conn: &mut PgConnection, user: &User, workflow: &Value, else_actions: &[Value], ai: Option<&pl_consumer::workflow_ext::AiConditionDef>) -> AResult<Value> {
+pub async fn summarize(
+    conn: &mut PgConnection,
+    user: &User,
+    workflow: &Value,
+    else_actions: &[Value],
+    ai: Option<&pl_consumer::workflow_ext::AiConditionDef>,
+) -> AResult<Value> {
     let mut names = Names::default();
     collect(&mut names, workflow, else_actions);
     collect_ai(&mut names, ai);
@@ -354,15 +368,21 @@ mod tests {
         assert_eq!(c["conditions"][0]["kind"], "sources");
         assert_eq!(c["conditions"].as_array().unwrap().len(), 1);
 
-        let a = action(&names, &json!({"id": 9, "type": 1, "assign_title": "T {{ title }}", "assign_tags": [1],
-            "assign_custom_fields": [3], "assign_custom_fields_values": {"3": "x"}, "remove_tags": [2]}));
+        let a = action(
+            &names,
+            &json!({"id": 9, "type": 1, "assign_title": "T {{ title }}", "assign_tags": [1],
+            "assign_custom_fields": [3], "assign_custom_fields_values": {"3": "x"}, "remove_tags": [2]}),
+        );
         let kinds: Vec<&str> = a["items"].as_array().unwrap().iter().map(|c| c["kind"].as_str().unwrap()).collect();
         assert_eq!(kinds, vec!["assign_title", "assign_tags", "assign_custom_fields"]);
         assert_eq!(a["items"][2]["values"]["3"], "x");
         // Passwords never appear
         let p = action(&names, &json!({"type": 5, "passwords": ["secret"]}));
         assert!(!p.to_string().contains("secret"));
-        let e = action(&names, &json!({"type": 3, "email": {"to": "a@b.invalid", "subject": "S", "body": "secret body", "include_document": true}}));
+        let e = action(
+            &names,
+            &json!({"type": 3, "email": {"to": "a@b.invalid", "subject": "S", "body": "secret body", "include_document": true}}),
+        );
         assert_eq!(e["items"][0]["to"], "a@b.invalid");
         assert!(!e.to_string().contains("secret body"));
     }

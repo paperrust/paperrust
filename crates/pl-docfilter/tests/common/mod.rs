@@ -20,63 +20,26 @@ impl FilterDb for MockDb {
     async fn custom_field_by_name(&self, name: &str) -> Result<Option<CustomFieldDef>, FilterError> {
         Ok(self.fields.iter().find(|f| f.name == name).cloned())
     }
-    async fn custom_fields_lookup(
-        &self,
-        ids: &[i64],
-        names: &[String],
-    ) -> Result<Vec<CustomFieldDef>, FilterError> {
-        Ok(self
-            .fields
-            .iter()
-            .filter(|f| ids.contains(&f.id) || names.contains(&f.name))
-            .cloned()
-            .collect())
+    async fn custom_fields_lookup(&self, ids: &[i64], names: &[String]) -> Result<Vec<CustomFieldDef>, FilterError> {
+        Ok(self.fields.iter().filter(|f| ids.contains(&f.id) || names.contains(&f.name)).cloned().collect())
     }
-    async fn custom_fields_extra_data_icontains(
-        &self,
-        needle: &str,
-    ) -> Result<Vec<CustomFieldDef>, FilterError> {
+    async fn custom_fields_extra_data_icontains(&self, needle: &str) -> Result<Vec<CustomFieldDef>, FilterError> {
         let n = needle.to_uppercase();
         Ok(self
             .fields
             .iter()
-            .filter(|f| {
-                f.extra_data
-                    .as_ref()
-                    .map(|e| e.to_string().to_uppercase().contains(&n))
-                    .unwrap_or(false)
-            })
+            .filter(|f| f.extra_data.as_ref().map(|e| e.to_string().to_uppercase().contains(&n)).unwrap_or(false))
             .cloned()
             .collect())
     }
-    async fn doc_link_instances(
-        &self,
-        field_id: i64,
-        document_ids: &[i64],
-    ) -> Result<Vec<(i64, Value)>, FilterError> {
-        Ok(self
-            .links
-            .iter()
-            .filter(|(d, f, _)| *f == field_id && document_ids.contains(d))
-            .map(|(d, _, v)| (*d, v.clone()))
-            .collect())
+    async fn doc_link_instances(&self, field_id: i64, document_ids: &[i64]) -> Result<Vec<(i64, Value)>, FilterError> {
+        Ok(self.links.iter().filter(|(d, f, _)| *f == field_id && document_ids.contains(d)).map(|(d, _, v)| (*d, v.clone())).collect())
     }
 }
 
 /// One field per data type, named `<type>_field`, IDs 1.. (like the upstream test setup).
 pub fn upstream_fields() -> MockDb {
-    let types = [
-        "string",
-        "url",
-        "date",
-        "boolean",
-        "integer",
-        "float",
-        "monetary",
-        "documentlink",
-        "select",
-        "longtext",
-    ];
+    let types = ["string", "url", "date", "boolean", "integer", "float", "monetary", "documentlink", "select", "longtext"];
     let mut fields = Vec::new();
     for (i, t) in types.iter().enumerate() {
         fields.push(CustomFieldDef {
@@ -94,10 +57,7 @@ pub fn upstream_fields() -> MockDb {
             },
         });
     }
-    MockDb {
-        fields,
-        links: Vec::new(),
-    }
+    MockDb { fields, links: Vec::new() }
 }
 
 pub fn mk_user(id: i64, is_active: bool, is_superuser: bool) -> User {
@@ -135,10 +95,7 @@ pub fn ctx() -> FilterContext {
 }
 
 pub fn base() -> SelectStatement {
-    Query::select()
-        .column((Alias::new("documents_document"), Alias::new("id")))
-        .from(Alias::new("documents_document"))
-        .to_owned()
+    Query::select().column((Alias::new("documents_document"), Alias::new("id"))).from(Alias::new("documents_document")).to_owned()
 }
 
 pub const BASE_SQL: &str = r#"SELECT "documents_document"."id" FROM "documents_document""#;

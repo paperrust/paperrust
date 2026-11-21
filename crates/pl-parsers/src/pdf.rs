@@ -15,10 +15,7 @@ use std::path::Path;
 use lopdf::{Document, LoadOptions, Object};
 
 use crate::xmlutil::{Elem, parse_dom};
-use crate::{
-    DocumentParser, Limits, MetadataEntry, ParseContext, ParseError, ParsedDocument, Result,
-    read_limited,
-};
+use crate::{DocumentParser, Limits, MetadataEntry, ParseContext, ParseError, ParsedDocument, Result, read_limited};
 
 /// Minimum length for "born-digital" (upstream `PDF_TEXT_MIN_LENGTH`).
 pub const PDF_TEXT_MIN_LENGTH: usize = 50;
@@ -53,19 +50,10 @@ const NS_RDF: &str = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
 /// Loads a PDF (lenient, with repair; junk before `%PDF-` is skipped).
 /// Panics of the library are caught. `None` if unreadable or password-protected.
 pub fn load_document(data: &[u8], limits: &Limits) -> Option<Document> {
-    let start = data
-        .windows(5)
-        .take(1024)
-        .position(|w| w == b"%PDF-")
-        .unwrap_or(0);
+    let start = data.windows(5).take(1024).position(|w| w == b"%PDF-").unwrap_or(0);
     let body = &data[start..];
-    let opts = LoadOptions {
-        max_decompressed_size: Some(limits.max_entry_size.min(usize::MAX as u64) as usize),
-        ..LoadOptions::default()
-    };
-    let res = catch_unwind(AssertUnwindSafe(|| {
-        Document::load_mem_with_options(body, opts)
-    }));
+    let opts = LoadOptions { max_decompressed_size: Some(limits.max_entry_size.min(usize::MAX as u64) as usize), ..LoadOptions::default() };
+    let res = catch_unwind(AssertUnwindSafe(|| Document::load_mem_with_options(body, opts)));
     match res {
         Ok(Ok(doc)) => {
             if doc.is_encrypted() && doc.encryption_state.is_none() {
@@ -126,11 +114,7 @@ pub fn is_tagged_pdf(path: &Path, ctx: &ParseContext) -> bool {
 /// Reading order via text positions ([`crate::pdftext`], gap E14); if a page is not
 /// readable that way, lopdf's simple text is used.
 pub fn extract_text_from(doc: &Document, limits: &Limits) -> Option<String> {
-    let pages: Vec<(u32, lopdf::ObjectId)> = doc
-        .get_pages()
-        .into_iter()
-        .take(limits.max_pdf_pages as usize)
-        .collect();
+    let pages: Vec<(u32, lopdf::ObjectId)> = doc.get_pages().into_iter().take(limits.max_pdf_pages as usize).collect();
     let deadline = crate::Deadline::from_limits(limits);
     let limit = limits.max_entry_size.min(usize::MAX as u64) as usize;
     let mut out = String::new();
@@ -209,11 +193,7 @@ pub fn post_process_text(text: Option<&str>) -> Option<String> {
         }
     }
     let result = crate::pystr::py_strip(&c).replace('\0', " ");
-    if result.is_empty() {
-        None
-    } else {
-        Some(result)
-    }
+    if result.is_empty() { None } else { Some(result) }
 }
 
 /// `is_born_digital_text`.
@@ -245,9 +225,7 @@ fn xmp_bytes(doc: &Document, limits: &Limits) -> Option<Vec<u8>> {
         Object::Stream(s) => {
             let lim = limits.max_entry_size.min(usize::MAX as u64) as usize;
             if s.dict.get(b"Filter").is_ok() {
-                s.decompressed_content_with_limit(lim)
-                    .ok()
-                    .or_else(|| Some(s.content.clone()))
+                s.decompressed_content_with_limit(lim).ok().or_else(|| Some(s.content.clone()))
             } else {
                 Some(s.content.clone())
             }
@@ -258,11 +236,7 @@ fn xmp_bytes(doc: &Document, limits: &Limits) -> Option<Vec<u8>> {
 
 /// Python `repr(str)`.
 fn py_repr(s: &str) -> String {
-    let quote = if s.contains('\'') && !s.contains('"') {
-        '"'
-    } else {
-        '\''
-    };
+    let quote = if s.contains('\'') && !s.contains('"') { '"' } else { '\'' };
     let mut out = String::new();
     out.push(quote);
     for c in s.chars() {
@@ -275,9 +249,7 @@ fn py_repr(s: &str) -> String {
                 out.push('\\');
                 out.push(c);
             }
-            c if (c as u32) < 0x20 || c as u32 == 0x7f => {
-                out.push_str(&format!("\\x{:02x}", c as u32))
-            }
+            c if (c as u32) < 0x20 || c as u32 == 0x7f => out.push_str(&format!("\\x{:02x}", c as u32)),
             c => out.push(c),
         }
     }
@@ -296,19 +268,12 @@ impl XmpVal {
     fn to_py_string(&self) -> String {
         match self {
             XmpVal::Text(s) => s.clone(),
-            XmpVal::List(v) => v
-                .iter()
-                .map(|e| e.clone().unwrap_or_else(|| "None".into()))
-                .collect::<Vec<_>>()
-                .join(" "),
+            XmpVal::List(v) => v.iter().map(|e| e.clone().unwrap_or_else(|| "None".into())).collect::<Vec<_>>().join(" "),
             XmpVal::Set(v) => {
                 if v.is_empty() {
                     "set()".into()
                 } else {
-                    let items: Vec<String> = v
-                        .iter()
-                        .map(|e| e.as_deref().map(py_repr).unwrap_or_else(|| "None".into()))
-                        .collect();
+                    let items: Vec<String> = v.iter().map(|e| e.as_deref().map(py_repr).unwrap_or_else(|| "None".into())).collect();
                     format!("{{{}}}", items.join(", "))
                 }
             }
@@ -322,13 +287,7 @@ fn subelements(node: &Elem) -> XmpVal {
             alt.children
                 .first()
                 .and_then(|c| c.text.clone())
-                .unwrap_or_else(|| {
-                    if alt.children.is_empty() {
-                        String::new()
-                    } else {
-                        "None".into()
-                    }
-                }),
+                .unwrap_or_else(|| if alt.children.is_empty() { String::new() } else { "None".into() }),
         );
     }
     if let Some(bag) = node.find(NS_RDF, "Bag") {
@@ -364,11 +323,7 @@ pub fn xmp_entries(xmp: &[u8], limits: &Limits) -> Vec<MetadataEntry> {
         Ok(r) => r,
         Err(_) => {
             // pikepdf: second attempt without illegal bytes, otherwise empty XMP
-            let cleaned: Vec<u8> = xmp
-                .iter()
-                .copied()
-                .filter(|&b| matches!(b, 0x09 | 0x0a | 0x0d | 0x20..=0xff))
-                .collect();
+            let cleaned: Vec<u8> = xmp.iter().copied().filter(|&b| matches!(b, 0x09 | 0x0a | 0x0d | 0x20..=0xff)).collect();
             match parse_dom(&cleaned, limits.max_depth, 200_000) {
                 Ok(r) => r,
                 Err(_) => return Vec::new(),
@@ -383,9 +338,7 @@ pub fn xmp_entries(xmp: &[u8], limits: &Limits) -> Vec<MetadataEntry> {
         .iter()
         .filter(|d| {
             d.is(NS_RDF, "Description")
-                && d.attrs.iter().any(|a| {
-                    a.ns.as_deref() == Some(NS_RDF) && a.local == "about" && a.value.is_empty()
-                })
+                && d.attrs.iter().any(|a| a.ns.as_deref() == Some(NS_RDF) && a.local == "about" && a.value.is_empty())
         })
         .collect();
     // Keys in iteration order (attributes, then child elements per Description)
@@ -422,12 +375,7 @@ pub fn xmp_entries(xmp: &[u8], limits: &Limits) -> Vec<MetadataEntry> {
             tracing::warn!(target: "paperless.parsers.utils", "Error reading metadata key {{{ns_uri}}}{local}: unknown namespace");
             continue;
         };
-        out.push(MetadataEntry::new(
-            ns_uri.clone(),
-            *prefix,
-            local,
-            val.to_py_string(),
-        ));
+        out.push(MetadataEntry::new(ns_uri.clone(), *prefix, local, val.to_py_string()));
     }
     out
 }
@@ -471,10 +419,7 @@ impl DocumentParser for RasterisedDocumentParser {
         RASTER_MIME_TYPES
     }
     fn score(&self, mime_type: &str, _f: &str, _p: Option<&Path>) -> Option<i32> {
-        RASTER_MIME_TYPES
-            .iter()
-            .any(|(m, _)| *m == mime_type)
-            .then_some(10)
+        RASTER_MIME_TYPES.iter().any(|(m, _)| *m == mime_type).then_some(10)
     }
     fn can_produce_archive(&self) -> bool {
         true
@@ -490,25 +435,12 @@ impl DocumentParser for RasterisedDocumentParser {
         if !born_digital {
             return Err(ParseError::OcrRequired);
         }
-        Ok(ParsedDocument {
-            text: text.unwrap_or_default(),
-            date: None,
-            archive_path: None,
-        })
+        Ok(ParsedDocument { text: text.unwrap_or_default(), date: None, archive_path: None })
     }
     fn page_count(&self, path: &Path, mime_type: &str, ctx: &ParseContext) -> Option<u32> {
-        if mime_type == "application/pdf" {
-            get_page_count(path, ctx)
-        } else {
-            None
-        }
+        if mime_type == "application/pdf" { get_page_count(path, ctx) } else { None }
     }
-    fn extract_metadata(
-        &self,
-        path: &Path,
-        mime_type: &str,
-        ctx: &ParseContext,
-    ) -> Vec<MetadataEntry> {
+    fn extract_metadata(&self, path: &Path, mime_type: &str, ctx: &ParseContext) -> Vec<MetadataEntry> {
         if mime_type != "application/pdf" {
             return Vec::new();
         }
@@ -523,25 +455,13 @@ mod tests {
     #[test]
     fn post_process() {
         // Python: `$` without MULTILINE matches only the end or before the last "\n"
-        assert_eq!(
-            post_process_text(Some("  a   b \n   c  \n")).as_deref(),
-            Some("a b \nc")
-        );
+        assert_eq!(post_process_text(Some("  a   b \n   c  \n")).as_deref(), Some("a b \nc"));
         assert_eq!(post_process_text(Some(" \x0c \n ")), None);
         // Values from upstream post_process_text (reference/venv)
         assert_eq!(post_process_text(Some("a \n")).as_deref(), Some("a"));
-        assert_eq!(
-            post_process_text(Some("x\r\n  y \r\n")).as_deref(),
-            Some("x\r\ny")
-        );
-        assert_eq!(
-            post_process_text(Some("\x0c a\x0cb ")).as_deref(),
-            Some("a b")
-        );
-        assert_eq!(
-            post_process_text(Some("a\u{a0}\u{a0}b\n\u{2028} c")).as_deref(),
-            Some("a b\nc")
-        );
+        assert_eq!(post_process_text(Some("x\r\n  y \r\n")).as_deref(), Some("x\r\ny"));
+        assert_eq!(post_process_text(Some("\x0c a\x0cb ")).as_deref(), Some("a b"));
+        assert_eq!(post_process_text(Some("a\u{a0}\u{a0}b\n\u{2028} c")).as_deref(), Some("a b\nc"));
         assert_eq!(post_process_text(None), None);
         assert_eq!(post_process_text(Some("a\0b")).as_deref(), Some("a b"));
     }
@@ -565,10 +485,7 @@ mod tests {
 <dc:format>application/pdf</dc:format>
 </rdf:Description><rdf:Description rdf:about="uuid:x" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:rights>R</dc:rights></rdf:Description></rdf:RDF></x:xmpmeta>"#;
         let e = xmp_entries(x, &Limits::default());
-        let kv: Vec<(String, String)> = e
-            .iter()
-            .map(|m| (format!("{}:{}", m.prefix, m.key), m.value.clone()))
-            .collect();
+        let kv: Vec<(String, String)> = e.iter().map(|m| (format!("{}:{}", m.prefix, m.key), m.value.clone())).collect();
         assert_eq!(
             kv,
             vec![

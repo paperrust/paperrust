@@ -82,11 +82,7 @@ pub fn active() -> Engine {
         2 => return Engine::Grants,
         _ => {}
     }
-    if configured() == Engine::Grants && is_ready() {
-        Engine::Grants
-    } else {
-        Engine::Legacy
-    }
+    if configured() == Engine::Grants && is_ready() { Engine::Grants } else { Engine::Legacy }
 }
 
 /// Data model stage 4 detected (set by the background refresher): grants are stored natively in
@@ -172,18 +168,16 @@ impl Status {
 
 /// Read the state from the DB.
 pub async fn status(db: &PgPool) -> Result<Status, sqlx::Error> {
-    let (t, m): (bool, bool) = sqlx::query_as(
-        "SELECT to_regclass('paperrust_grant') IS NOT NULL, to_regclass('paperrust_grant_meta') IS NOT NULL",
-    )
-    .fetch_one(db)
-    .await?;
+    let (t, m): (bool, bool) =
+        sqlx::query_as("SELECT to_regclass('paperrust_grant') IS NOT NULL, to_regclass('paperrust_grant_meta') IS NOT NULL")
+            .fetch_one(db)
+            .await?;
     let native: bool = sqlx::query_scalar("SELECT to_regclass('paperrust_object_grant') IS NOT NULL").fetch_one(db).await?;
     if native {
-        let rows: i64 = sqlx::query_scalar(
-            "SELECT COALESCE(reltuples, 0)::int8 FROM pg_class WHERE oid = 'paperrust_object_grant'::regclass",
-        )
-        .fetch_one(db)
-        .await?;
+        let rows: i64 =
+            sqlx::query_scalar("SELECT COALESCE(reltuples, 0)::int8 FROM pg_class WHERE oid = 'paperrust_object_grant'::regclass")
+                .fetch_one(db)
+                .await?;
         return Ok(Status { native: true, installed: true, enabled: true, built: true, triggers: EXPECTED_TRIGGERS, rows });
     }
     if !(t && m) {
@@ -199,14 +193,7 @@ pub async fn status(db: &PgPool) -> Result<Status, sqlx::Error> {
     )
     .fetch_one(db)
     .await?;
-    Ok(Status {
-        native: false,
-        installed: true,
-        enabled,
-        built,
-        triggers,
-        rows,
-    })
+    Ok(Status { native: false, installed: true, enabled, built, triggers, rows })
 }
 
 /// Re-determine readiness. A connection error does not change the state (without a DB every
@@ -253,9 +240,7 @@ pub fn perm_cond(alias: &str, model: &ObjectModel, perm: &str) -> String {
         .column(Alias::new("id"))
         .from(Alias::new("auth_permission"))
         .and_where(Expr::col(Alias::new("codename")).eq(bare_codename(perm)))
-        .and_where(
-            Expr::col(Alias::new("content_type_id")).in_subquery(content_type_id_subquery(model)),
-        )
+        .and_where(Expr::col(Alias::new("content_type_id")).in_subquery(content_type_id_subquery(model)))
         .to_string(PostgresQueryBuilder);
     format!("{alias}.perm_id = ANY(ARRAY({ids}))")
 }
@@ -263,9 +248,7 @@ pub fn perm_cond(alias: &str, model: &ObjectModel, perm: &str) -> String {
 /// Subjects of a user as an SQL expression (`uid` = SQL expression of the user ID, e.g. `7` or `$1`):
 /// the user themselves and `-group_id` of their groups (`auth_user_groups`, as upstream per query).
 pub fn subjects_sql(uid: &str) -> String {
-    format!(
-        "(ARRAY(SELECT -ug.group_id::int8 FROM auth_user_groups ug WHERE ug.user_id = {uid}) || ({uid})::int8)"
-    )
+    format!("(ARRAY(SELECT -ug.group_id::int8 FROM auth_user_groups ug WHERE ug.user_id = {uid}) || ({uid})::int8)")
 }
 
 /// `SELECT object_id FROM paperrust_grant WHERE <perm> AND subject = ANY(<subjects>)`:
@@ -293,10 +276,7 @@ pub fn granted_ids_subquery(user_id: i64, model: &ObjectModel, perm: &str) -> Se
         .column((Alias::new("pg_g"), Alias::new("object_id")))
         .from_as(Alias::new(TABLE), Alias::new("pg_g"))
         .and_where(Expr::cust(perm_cond("pg_g", model, perm)))
-        .and_where(Expr::cust(format!(
-            "pg_g.subject = ANY{}",
-            subjects_sql(&user_id.to_string())
-        )))
+        .and_where(Expr::cust(format!("pg_g.subject = ANY{}", subjects_sql(&user_id.to_string()))))
         .to_owned()
 }
 
@@ -312,11 +292,7 @@ pub fn granted_ids_sql(uid: &str, model: &ObjectModel, perm: &str) -> String {
             perm_cond("pg_r", model, perm).replacen("pg_r.perm_id", "pg_r.permission_id", 1)
         );
     }
-    format!(
-        "SELECT pg_g.object_id FROM {TABLE} pg_g WHERE {} AND pg_g.subject = ANY{}",
-        perm_cond("pg_g", model, perm),
-        subjects_sql(uid)
-    )
+    format!("SELECT pg_g.object_id FROM {TABLE} pg_g WHERE {} AND pg_g.subject = ANY{}", perm_cond("pg_g", model, perm), subjects_sql(uid))
 }
 
 /// guardian `ObjectPermissionChecker.has_perm(perm, obj)` without the superuser/active rule:
@@ -354,12 +330,7 @@ pub fn any_grant_exists(model: &ObjectModel, id_expr: SimpleExpr) -> SimpleExpr 
             [id_expr.clone(), id_expr],
         );
     }
-    Expr::cust_with_exprs(
-        format!(
-            "EXISTS (SELECT 1 FROM {TABLE} pg_s WHERE pg_s.object_id = $1 AND pg_s.ct IN ({ct}))"
-        ),
-        [id_expr],
-    )
+    Expr::cust_with_exprs(format!("EXISTS (SELECT 1 FROM {TABLE} pg_s WHERE pg_s.object_id = $1 AND pg_s.ct IN ({ct}))"), [id_expr])
 }
 
 // ------------------------------------------------------------------------------ Administration
@@ -394,10 +365,7 @@ impl Check {
 
 /// Check the index against a full recomputation from guardian.
 pub async fn check(db: &PgPool) -> Result<Check, sqlx::Error> {
-    let (missing, extra): (i64, i64) =
-        sqlx::query_as("SELECT missing, extra FROM paperrust_grant_check()")
-            .fetch_one(db)
-            .await?;
+    let (missing, extra): (i64, i64) = sqlx::query_as("SELECT missing, extra FROM paperrust_grant_check()").fetch_one(db).await?;
     Ok(Check { missing, extra })
 }
 
@@ -408,9 +376,7 @@ pub async fn rebuild(db: &PgPool) -> Result<i64, sqlx::Error> {
         return sqlx::query_scalar("SELECT count(*) FROM paperrust_grant").fetch_one(db).await;
     }
     let mut tx = db.begin().await?;
-    let (n,): (i64,) = sqlx::query_as("SELECT paperrust_grant_rebuild()")
-        .fetch_one(&mut *tx)
-        .await?;
+    let (n,): (i64,) = sqlx::query_as("SELECT paperrust_grant_rebuild()").fetch_one(&mut *tx).await?;
     tx.commit().await?;
     vacuum(db).await;
     Ok(n)
@@ -422,10 +388,7 @@ pub async fn rebuild(db: &PgPool) -> Result<i64, sqlx::Error> {
 pub async fn vacuum(db: &PgPool) {
     let native = status(db).await.map(|s| s.native).unwrap_or(false);
     let sql = if native { "VACUUM (ANALYZE) paperrust_object_grant" } else { "VACUUM (ANALYZE) paperrust_grant" };
-    if let Err(e) = sqlx::raw_sql(sql)
-        .execute(db)
-        .await
-    {
+    if let Err(e) = sqlx::raw_sql(sql).execute(db).await {
         tracing::warn!("VACUUM paperrust_grant: {e}");
     }
 }
@@ -473,10 +436,7 @@ pub async fn command(db: &PgPool, argv: &[String]) -> Result<String, ManageError
             only(&["--json"])?;
             let s = status(db).await?;
             if rest.iter().any(|a| a == "--json") {
-                return Ok(format!(
-                    "{}\n",
-                    serde_json::to_string_pretty(&s).unwrap_or_default()
-                ));
+                return Ok(format!("{}\n", serde_json::to_string_pretty(&s).unwrap_or_default()));
             }
             if s.native {
                 return Ok(format!(
@@ -500,11 +460,7 @@ pub async fn command(db: &PgPool, argv: &[String]) -> Result<String, ManageError
                 s.triggers,
                 EXPECTED_TRIGGERS,
                 s.rows,
-                if s.ready() && configured() == Engine::Grants {
-                    "grants"
-                } else {
-                    "legacy"
-                },
+                if s.ready() && configured() == Engine::Grants { "grants" } else { "legacy" },
                 match configured() {
                     Engine::Grants => "grants",
                     Engine::Legacy => "legacy",
@@ -514,15 +470,8 @@ pub async fn command(db: &PgPool, argv: &[String]) -> Result<String, ManageError
         "check" => {
             only(&[])?;
             let c = check(db).await?;
-            let line = format!(
-                "paperrust_grant vs guardian: {} missing, {} extra\n",
-                c.missing, c.extra
-            );
-            if c.ok() {
-                Ok(line)
-            } else {
-                Err(ManageError::Mismatch(line))
-            }
+            let line = format!("paperrust_grant vs guardian: {} missing, {} extra\n", c.missing, c.extra);
+            if c.ok() { Ok(line) } else { Err(ManageError::Mismatch(line)) }
         }
         "rebuild" => {
             only(&[])?;
@@ -536,22 +485,12 @@ pub async fn command(db: &PgPool, argv: &[String]) -> Result<String, ManageError
             }
             migrations::apply(db).await?;
             let mut tx = db.begin().await?;
-            sqlx::query(
-                "UPDATE paperrust_grant_meta SET value = 'true'::jsonb WHERE key = 'enabled'",
-            )
-            .execute(&mut *tx)
-            .await?;
-            let (t,): (i32,) = sqlx::query_as("SELECT paperrust_grant_install()")
-                .fetch_one(&mut *tx)
-                .await?;
-            let (n,): (i64,) = sqlx::query_as("SELECT paperrust_grant_rebuild()")
-                .fetch_one(&mut *tx)
-                .await?;
+            sqlx::query("UPDATE paperrust_grant_meta SET value = 'true'::jsonb WHERE key = 'enabled'").execute(&mut *tx).await?;
+            let (t,): (i32,) = sqlx::query_as("SELECT paperrust_grant_install()").fetch_one(&mut *tx).await?;
+            let (n,): (i64,) = sqlx::query_as("SELECT paperrust_grant_rebuild()").fetch_one(&mut *tx).await?;
             tx.commit().await?;
             vacuum(db).await;
-            Ok(format!(
-                "permission index enabled: {t} triggers, {n} rows\n"
-            ))
+            Ok(format!("permission index enabled: {t} triggers, {n} rows\n"))
         }
         "disable" => {
             only(&["--purge"])?;
@@ -559,11 +498,7 @@ pub async fn command(db: &PgPool, argv: &[String]) -> Result<String, ManageError
             if !status(db).await?.installed {
                 return Ok("permission index: not installed\n".into());
             }
-            sqlx::query(
-                "UPDATE paperrust_grant_meta SET value = 'false'::jsonb WHERE key = 'enabled'",
-            )
-            .execute(db)
-            .await?;
+            sqlx::query("UPDATE paperrust_grant_meta SET value = 'false'::jsonb WHERE key = 'enabled'").execute(db).await?;
             if !purge {
                 return Ok("permission index disabled (reads use guardian; triggers keep the index current)\n".into());
             }
@@ -583,10 +518,7 @@ pub async fn command(db: &PgPool, argv: &[String]) -> Result<String, ManageError
             .await?;
             Ok("permission index purged\n".into())
         }
-        other => Err(ManageError::Usage(format!(
-            "unknown subcommand: {other}\n{}",
-            HELP.trim_end()
-        ))),
+        other => Err(ManageError::Usage(format!("unknown subcommand: {other}\n{}", HELP.trim_end()))),
     }
 }
 
@@ -595,22 +527,15 @@ mod tests {
     use super::*;
     use crate::models::{DOCUMENT, TAG};
 
-
     #[test]
     fn sql_shapes() {
         let s = granted_ids_subquery(7, &TAG, "documents.view_tag").to_string(PostgresQueryBuilder);
         assert!(s.contains(r#"FROM "paperrust_grant" AS "pg_g""#), "{s}");
-        assert!(
-            s.contains("pg_g.perm_id = ANY(ARRAY(SELECT \"id\" FROM \"auth_permission\""),
-            "{s}"
-        );
+        assert!(s.contains("pg_g.perm_id = ANY(ARRAY(SELECT \"id\" FROM \"auth_permission\""), "{s}");
         assert!(s.contains("\"codename\" = 'view_tag'"), "{s}");
         assert!(s.contains("WHERE ug.user_id = 7) || (7)::int8)"), "{s}");
         let c = checker_exists_sql("$3", &DOCUMENT, "change_document", "$4");
-        assert!(
-            c.contains("pg_c.object_id = $4 AND pg_c.ct IN (SELECT"),
-            "{c}"
-        );
+        assert!(c.contains("pg_c.object_id = $4 AND pg_c.ct IN (SELECT"), "{c}");
         assert!(c.contains("ug.user_id = $3"), "{c}");
     }
 }

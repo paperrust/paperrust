@@ -52,9 +52,7 @@ impl Ids {
 
     /// v1-IDs → UUIDs; unbekannte → Nil-UUID (trifft nichts).
     fn uuids(&self, kind: &str, ids: &[i64]) -> Vec<Uuid> {
-        ids.iter()
-            .map(|i| self.key(kind, *i).and_then(|k| Uuid::parse_str(k).ok()).unwrap_or(Uuid::nil()))
-            .collect()
+        ids.iter().map(|i| self.key(kind, *i).and_then(|k| Uuid::parse_str(k).ok()).unwrap_or(Uuid::nil())).collect()
     }
 }
 
@@ -197,9 +195,9 @@ fn notes_v1(notes: &Value, ids: &Ids) -> Value {
             .map(|a| {
                 a.iter()
                     .map(|n| {
-                        let user = n.get("user").filter(|u| !u.is_null()).map(|u| {
-                            json!({"id": ids.id(u["uuid"].as_str()), "username": u["username"], "first_name": "", "last_name": ""})
-                        });
+                        let user = n.get("user").filter(|u| !u.is_null()).map(
+                            |u| json!({"id": ids.id(u["uuid"].as_str()), "username": u["username"], "first_name": "", "last_name": ""}),
+                        );
                         json!({"id": n["legacy_id"], "note": n["note"], "created": n["created"], "user": user})
                     })
                     .collect()
@@ -211,7 +209,8 @@ fn notes_v1(notes: &Value, ids: &Ids) -> Value {
 /// v2-Dokument (Replikat) → v1-Dokument.
 pub fn doc_v1(d: &Value, ids: &Ids, content: Option<&str>, notes: Option<&Value>, truncate: bool) -> Value {
     let s = |k: &str| d.get(k).and_then(Value::as_str);
-    let tags: Vec<Value> = d["tags"].as_array().map(|a| a.iter().map(|t| ids.id(t.as_str())).filter(|v| !v.is_null()).collect()).unwrap_or_default();
+    let tags: Vec<Value> =
+        d["tags"].as_array().map(|a| a.iter().map(|t| ids.id(t.as_str())).filter(|v| !v.is_null()).collect()).unwrap_or_default();
     let cfs: Vec<Value> = d["custom_fields"]
         .as_array()
         .map(|a| {
@@ -322,7 +321,9 @@ pub fn obj_v1(kind: &str, o: &Value, ids: &Ids, counts: &HashMap<String, i64>) -
             }
             v
         }
-        "custom_field" => json!({"id": id, "name": name, "data_type": o["data_type"], "extra_data": o["extra_data"], "document_count": count}),
+        "custom_field" => {
+            json!({"id": id, "name": name, "data_type": o["data_type"], "extra_data": o["extra_data"], "document_count": count})
+        }
         "saved_view" => json!({"id": id, "name": name, "sort_field": o["sort_field"], "sort_reverse": o["sort_reverse"],
                                "filter_rules": o["filter_rules"], "page_size": o["page_size"], "display_mode": o["display_mode"],
                                "display_fields": o["display_fields"], "owner": owner, "user_can_change": can_change}),
@@ -466,13 +467,27 @@ pub async fn list_documents(r: &Replica, path: &str, params: &[(String, String)]
 async fn selection_data(r: &Replica, where_sql: &str, args: &[Arg], ids: &Ids) -> Result<Value> {
     let mut sd = Map::new();
     for (name, sql) in [
-        ("selected_correspondents", format!("SELECT d.correspondent, count(*) FROM document d WHERE {where_sql} AND d.correspondent IS NOT NULL GROUP BY 1")),
-        ("selected_document_types", format!("SELECT d.document_type, count(*) FROM document d WHERE {where_sql} AND d.document_type IS NOT NULL GROUP BY 1")),
-        ("selected_storage_paths", format!("SELECT d.storage_path, count(*) FROM document d WHERE {where_sql} AND d.storage_path IS NOT NULL GROUP BY 1")),
-        ("selected_tags", format!("SELECT t.tag, count(*) FROM document_tag t JOIN document d ON d.key = t.doc WHERE {where_sql} GROUP BY 1")),
+        (
+            "selected_correspondents",
+            format!("SELECT d.correspondent, count(*) FROM document d WHERE {where_sql} AND d.correspondent IS NOT NULL GROUP BY 1"),
+        ),
+        (
+            "selected_document_types",
+            format!("SELECT d.document_type, count(*) FROM document d WHERE {where_sql} AND d.document_type IS NOT NULL GROUP BY 1"),
+        ),
+        (
+            "selected_storage_paths",
+            format!("SELECT d.storage_path, count(*) FROM document d WHERE {where_sql} AND d.storage_path IS NOT NULL GROUP BY 1"),
+        ),
+        (
+            "selected_tags",
+            format!("SELECT t.tag, count(*) FROM document_tag t JOIN document d ON d.key = t.doc WHERE {where_sql} GROUP BY 1"),
+        ),
         (
             "selected_custom_fields",
-            format!("SELECT json_extract(cf.value, '$.field'), count(*) FROM document d, json_each(d.json, '$.custom_fields') cf WHERE {where_sql} GROUP BY 1"),
+            format!(
+                "SELECT json_extract(cf.value, '$.field'), count(*) FROM document d, json_each(d.json, '$.custom_fields') cf WHERE {where_sql} GROUP BY 1"
+            ),
         ),
     ] {
         let rows = bind_all(sqlx::query(&sql), args).fetch_all(r.pool()).await?;
@@ -573,7 +588,13 @@ mod tests {
         ids.to_key.insert(("tag".into(), 7), t.clone());
         let p = |k: &str, v: &str| (k.to_string(), v.to_string());
         let c = conditions(
-            &[p("tags__id__all", "7,8"), p("title_content", "rech"), p("created__date__gte", "2024-01-01"), p("page", "2"), p("is_tagged", "0")],
+            &[
+                p("tags__id__all", "7,8"),
+                p("title_content", "rech"),
+                p("created__date__gte", "2024-01-01"),
+                p("page", "2"),
+                p("is_tagged", "0"),
+            ],
             &ids,
             &[],
         )

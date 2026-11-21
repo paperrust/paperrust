@@ -28,8 +28,7 @@ pub fn drf_not_found() -> Response {
 pub fn plain(status: StatusCode, text: &'static str) -> Response {
     let mut r = Response::new(Body::from(text));
     *r.status_mut() = status;
-    r.headers_mut()
-        .insert(header::CONTENT_TYPE, HeaderValue::from_static(HTML));
+    r.headers_mut().insert(header::CONTENT_TYPE, HeaderValue::from_static(HTML));
     r
 }
 
@@ -55,13 +54,9 @@ fn error_page(title: &str, details: &str) -> String {
 
 /// Django `page_not_found` without a 404.html template (DEBUG=False).
 pub fn django_404() -> Response {
-    let mut r = Response::new(Body::from(error_page(
-        "Not Found",
-        "The requested resource was not found on this server.",
-    )));
+    let mut r = Response::new(Body::from(error_page("Not Found", "The requested resource was not found on this server.")));
     *r.status_mut() = StatusCode::NOT_FOUND;
-    r.headers_mut()
-        .insert(header::CONTENT_TYPE, HeaderValue::from_static(HTML));
+    r.headers_mut().insert(header::CONTENT_TYPE, HeaderValue::from_static(HTML));
     r
 }
 

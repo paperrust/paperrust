@@ -131,7 +131,11 @@ fn docx_line_breaks_and_metadata_through_parser() {
     let app = br#"<?xml version="1.0"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Pages>2</Pages><Words>3</Words><DocSecurity>4</DocSecurity></Properties>"#;
     let t = tempfile::tempdir().unwrap();
     let p = t.path().join("a.docx");
-    std::fs::write(&p, stored_zip(&[("[Content_Types].xml", CT), ("_rels/.rels", rels), ("word/document.xml", doc), ("docProps/app.xml", app)])).unwrap();
+    std::fs::write(
+        &p,
+        stored_zip(&[("[Content_Types].xml", CT), ("_rels/.rels", rels), ("word/document.xml", doc), ("docProps/app.xml", app)]),
+    )
+    .unwrap();
     let parser = OfficeDocumentParser::default();
     let ctx = ParseContext::default();
     let d = parser.parse(&p, DOCX, &ctx).unwrap();

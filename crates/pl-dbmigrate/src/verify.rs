@@ -45,91 +45,25 @@ pub struct ObjectType {
     pub cond: Option<&'static str>,
 }
 
-const fn o(
-    key: &'static str,
-    label: &'static str,
-    table: &'static str,
-    model: &'static str,
-) -> ObjectType {
-    ObjectType {
-        key,
-        label,
-        table,
-        model,
-        cond: None,
-    }
+const fn o(key: &'static str, label: &'static str, table: &'static str, model: &'static str) -> ObjectType {
+    ObjectType { key, label, table, model, cond: None }
 }
 
 /// Counted object kinds. Users like the upstream exporter without `consumer`/`AnonymousUser`.
 pub const OBJECTS: &[ObjectType] = &[
-    o(
-        "documents",
-        "Dokumente",
-        "documents_document",
-        "documents.document",
-    ),
-    o(
-        "document_tag_links",
-        "Tag-Zuordnungen",
-        "documents_document_tags",
-        "documents.document_tags",
-    ),
+    o("documents", "Dokumente", "documents_document", "documents.document"),
+    o("document_tag_links", "Tag-Zuordnungen", "documents_document_tags", "documents.document_tags"),
     o("tags", "Tags", "documents_tag", "documents.tag"),
-    o(
-        "correspondents",
-        "Korrespondenten",
-        "documents_correspondent",
-        "documents.correspondent",
-    ),
-    o(
-        "document_types",
-        "Dokumenttypen",
-        "documents_documenttype",
-        "documents.documenttype",
-    ),
-    o(
-        "storage_paths",
-        "Speicherpfade",
-        "documents_storagepath",
-        "documents.storagepath",
-    ),
-    o(
-        "custom_fields",
-        "Benutzerdefinierte Felder",
-        "documents_customfield",
-        "documents.customfield",
-    ),
-    o(
-        "custom_field_instances",
-        "Feldwerte",
-        "documents_customfieldinstance",
-        "documents.customfieldinstance",
-    ),
+    o("correspondents", "Korrespondenten", "documents_correspondent", "documents.correspondent"),
+    o("document_types", "Dokumenttypen", "documents_documenttype", "documents.documenttype"),
+    o("storage_paths", "Speicherpfade", "documents_storagepath", "documents.storagepath"),
+    o("custom_fields", "Benutzerdefinierte Felder", "documents_customfield", "documents.customfield"),
+    o("custom_field_instances", "Feldwerte", "documents_customfieldinstance", "documents.customfieldinstance"),
     o("notes", "Notizen", "documents_note", "documents.note"),
-    o(
-        "saved_views",
-        "Gespeicherte Ansichten",
-        "documents_savedview",
-        "documents.savedview",
-    ),
-    o(
-        "workflows",
-        "Workflows",
-        "documents_workflow",
-        "documents.workflow",
-    ),
-    o(
-        "workflow_triggers",
-        "Workflow-Auslöser",
-        "documents_workflowtrigger",
-        "documents.workflowtrigger",
-    ),
-    o(
-        "workflow_actions",
-        "Workflow-Aktionen",
-        "documents_workflowaction",
-        "documents.workflowaction",
-    ),
+    o("saved_views", "Gespeicherte Ansichten", "documents_savedview", "documents.savedview"),
+    o("workflows", "Workflows", "documents_workflow", "documents.workflow"),
+    o("workflow_triggers", "Workflow-Auslöser", "documents_workflowtrigger", "documents.workflowtrigger"),
+    o("workflow_actions", "Workflow-Aktionen", "documents_workflowaction", "documents.workflowaction"),
     ObjectType {
         key: "users",
         label: "Benutzer",
@@ -138,30 +72,10 @@ pub const OBJECTS: &[ObjectType] = &[
         cond: Some("username NOT IN ('consumer', 'AnonymousUser')"),
     },
     o("groups", "Gruppen", "auth_group", "auth.group"),
-    o(
-        "mail_accounts",
-        "E-Mail-Konten",
-        "paperless_mail_mailaccount",
-        "paperless_mail.mailaccount",
-    ),
-    o(
-        "mail_rules",
-        "E-Mail-Regeln",
-        "paperless_mail_mailrule",
-        "paperless_mail.mailrule",
-    ),
-    o(
-        "share_links",
-        "Freigabelinks",
-        "documents_sharelink",
-        "documents.sharelink",
-    ),
-    o(
-        "share_link_bundles",
-        "Freigabe-Bündel",
-        "documents_sharelinkbundle",
-        "documents.sharelinkbundle",
-    ),
+    o("mail_accounts", "E-Mail-Konten", "paperless_mail_mailaccount", "paperless_mail.mailaccount"),
+    o("mail_rules", "E-Mail-Regeln", "paperless_mail_mailrule", "paperless_mail.mailrule"),
+    o("share_links", "Freigabelinks", "documents_sharelink", "documents.sharelink"),
+    o("share_link_bundles", "Freigabe-Bündel", "documents_sharelinkbundle", "documents.sharelinkbundle"),
 ];
 
 pub type Counts = BTreeMap<&'static str, i64>;
@@ -186,10 +100,7 @@ pub async fn db_counts(src: &mut Source) -> Result<Counts> {
 }
 
 pub fn export_counts(sum: &ManifestSummary) -> Counts {
-    OBJECTS
-        .iter()
-        .map(|o| (o.key, sum.counts.get(o.model).copied().unwrap_or(0)))
-        .collect()
+    OBJECTS.iter().map(|o| (o.key, sum.counts.get(o.model).copied().unwrap_or(0))).collect()
 }
 
 fn truthy(s: Option<&str>) -> bool {
@@ -230,11 +141,7 @@ pub async fn db_docs(src: &mut Source) -> Result<Vec<DocRow>> {
     })
     .await?;
     let mut tags: HashMap<i64, Vec<i64>> = HashMap::new();
-    let sql = format!(
-        "SELECT {}, {} FROM documents_document_tags",
-        t(src, "document_id"),
-        t(src, "tag_id")
-    );
+    let sql = format!("SELECT {}, {} FROM documents_document_tags", t(src, "document_id"), t(src, "tag_id"));
     src.for_each_text_row(&sql, |r| {
         if let [Some(d), Some(tg)] = r.as_slice()
             && let (Ok(d), Ok(tg)) = (d.parse(), tg.parse())
@@ -313,10 +220,7 @@ impl FileProblem {
         match &self.issue {
             FileIssue::Missing => format!("{what} fehlt ({})", self.path),
             FileIssue::Mismatch { expected, actual } => {
-                format!(
-                    "{what} hat falsche Prüfsumme ({}: erwartet {expected}, Datei {actual})",
-                    self.path
-                )
+                format!("{what} hat falsche Prüfsumme ({}: erwartet {expected}, Datei {actual})", self.path)
             }
             FileIssue::NoFilename => format!("{what}: kein Dateiname in Datenbank/Manifest"),
             FileIssue::Unreadable(e) => format!("{what} nicht lesbar ({}): {e}", self.path),
@@ -384,11 +288,7 @@ enum Hasher {
 fn hash_reader(mut r: impl Read, expected: &str) -> std::io::Result<(String, u64, bool)> {
     use sha2::Digest;
     let md5 = expected.len() == 32;
-    let mut h = if md5 {
-        Hasher::Md5(md5::Md5::new())
-    } else {
-        Hasher::Sha256(sha2::Sha256::new())
-    };
+    let mut h = if md5 { Hasher::Md5(md5::Md5::new()) } else { Hasher::Sha256(sha2::Sha256::new()) };
     let mut buf = vec![0u8; 1 << 16];
     let mut n = 0u64;
     loop {
@@ -439,25 +339,13 @@ pub fn check_files(files: &Files, docs: &[DocRow], threads: usize) -> FileSummar
     for d in docs {
         let (orig, arch, thumb) = match files {
             Files::Media(_) => (d.filename.clone(), d.archive_filename.clone(), Some(None)),
-            Files::Export(_) => (
-                d.filename.clone(),
-                d.archive_filename.clone(),
-                d.thumbnail.clone().map(Some),
-            ),
+            Files::Export(_) => (d.filename.clone(), d.archive_filename.clone(), d.thumbnail.clone().map(Some)),
         };
         match orig {
-            Some(rel) => tasks.push(Task {
-                doc: d.id,
-                kind: FileKind::Original,
-                rel,
-                expected: Some(d.checksum.clone()),
-            }),
-            None => sum.problems.push(FileProblem {
-                doc: d.id,
-                kind: FileKind::Original,
-                path: String::new(),
-                issue: FileIssue::NoFilename,
-            }),
+            Some(rel) => tasks.push(Task { doc: d.id, kind: FileKind::Original, rel, expected: Some(d.checksum.clone()) }),
+            None => {
+                sum.problems.push(FileProblem { doc: d.id, kind: FileKind::Original, path: String::new(), issue: FileIssue::NoFilename })
+            }
         }
         if d.archive_checksum.is_some() || arch.is_some() {
             match arch {
@@ -467,28 +355,15 @@ pub fn check_files(files: &Files, docs: &[DocRow], threads: usize) -> FileSummar
                     rel,
                     expected: Some(d.archive_checksum.clone().unwrap_or_default()),
                 }),
-                None => sum.problems.push(FileProblem {
-                    doc: d.id,
-                    kind: FileKind::Archive,
-                    path: String::new(),
-                    issue: FileIssue::NoFilename,
-                }),
+                None => {
+                    sum.problems.push(FileProblem { doc: d.id, kind: FileKind::Archive, path: String::new(), issue: FileIssue::NoFilename })
+                }
             }
         }
         // Thumbnail: media folder always ({pk:07}.webp, older .png); export only if exported
         match thumb {
-            Some(Some(rel)) => tasks.push(Task {
-                doc: d.id,
-                kind: FileKind::Thumbnail,
-                rel,
-                expected: None,
-            }),
-            Some(None) => tasks.push(Task {
-                doc: d.id,
-                kind: FileKind::Thumbnail,
-                rel: format!("{:07}.webp", d.id),
-                expected: None,
-            }),
+            Some(Some(rel)) => tasks.push(Task { doc: d.id, kind: FileKind::Thumbnail, rel, expected: None }),
+            Some(None) => tasks.push(Task { doc: d.id, kind: FileKind::Thumbnail, rel: format!("{:07}.webp", d.id), expected: None }),
             None => {}
         }
     }
@@ -539,25 +414,14 @@ pub fn check_files(files: &Files, docs: &[DocRow], threads: usize) -> FileSummar
                 if actual.eq_ignore_ascii_case(&expected) {
                     sum.ok += 1;
                 } else {
-                    sum.problems.push(FileProblem {
-                        doc: t.doc,
-                        kind: t.kind,
-                        path,
-                        issue: FileIssue::Mismatch { expected, actual },
-                    });
+                    sum.problems.push(FileProblem { doc: t.doc, kind: t.kind, path, issue: FileIssue::Mismatch { expected, actual } });
                 }
             }
             Ok(None) => sum.ok += 1,
-            Err(issue) => sum.problems.push(FileProblem {
-                doc: t.doc,
-                kind: t.kind,
-                path,
-                issue,
-            }),
+            Err(issue) => sum.problems.push(FileProblem { doc: t.doc, kind: t.kind, path, issue }),
         }
     }
-    sum.problems
-        .sort_by(|a, b| (a.doc, a.kind.as_str()).cmp(&(b.doc, b.kind.as_str())));
+    sum.problems.sort_by(|a, b| (a.doc, a.kind.as_str()).cmp(&(b.doc, b.kind.as_str())));
     sum
 }
 
@@ -575,9 +439,7 @@ fn check_one(files: &Files, t: &Task) -> Result<Option<(String, u64, bool)>, Fil
                 return Ok(None);
             };
             let f = std::fs::File::open(&p).map_err(|e| FileIssue::Unreadable(e.to_string()))?;
-            hash_reader(f, exp)
-                .map(Some)
-                .map_err(|e| FileIssue::Unreadable(e.to_string()))
+            hash_reader(f, exp).map(Some).map_err(|e| FileIssue::Unreadable(e.to_string()))
         }
         Files::Export(e) => {
             if !e.exists(&t.rel) {
@@ -586,12 +448,8 @@ fn check_one(files: &Files, t: &Task) -> Result<Option<(String, u64, bool)>, Fil
             let Some(exp) = &t.expected else {
                 return Ok(None);
             };
-            let r = e
-                .open_file(&t.rel)
-                .map_err(|e| FileIssue::Unreadable(format!("{e:#}")))?;
-            hash_reader(r, exp)
-                .map(Some)
-                .map_err(|e| FileIssue::Unreadable(e.to_string()))
+            let r = e.open_file(&t.rel).map_err(|e| FileIssue::Unreadable(format!("{e:#}")))?;
+            hash_reader(r, exp).map(Some).map_err(|e| FileIssue::Unreadable(e.to_string()))
         }
     }
 }
@@ -720,21 +578,13 @@ pub struct Report {
 
 impl Report {
     pub fn step(&mut self, level: Level, name: &str, message: impl Into<String>) {
-        self.steps.push(Step {
-            level,
-            name: name.into(),
-            message: message.into(),
-        });
+        self.steps.push(Step { level, name: name.into(), message: message.into() });
     }
 
     pub fn finding(&mut self, level: Level, area: &'static str, message: impl Into<String>) {
         *self.findings_total.entry(level.as_str()).or_default() += 1;
         if self.findings.len() < MAX_LIST * 4 {
-            self.findings.push(Finding {
-                level,
-                area,
-                message: message.into(),
-            });
+            self.findings.push(Finding { level, area, message: message.into() });
         }
     }
 
@@ -753,14 +603,7 @@ impl Report {
                 .counts
                 .iter()
                 .filter(|c| c.level() == Level::Fail)
-                .map(|c| {
-                    format!(
-                        "{}: Quelle {}, Ziel {}",
-                        c.label,
-                        fmt_opt(c.source),
-                        fmt_opt(c.target)
-                    )
-                })
+                .map(|c| format!("{}: Quelle {}, Ziel {}", c.label, fmt_opt(c.source), fmt_opt(c.target)))
                 .collect();
             for b in bad {
                 self.finding(Level::Fail, "Anzahl", b);
@@ -775,11 +618,7 @@ impl Report {
         self.docs_compared = source.len();
         for s in source {
             let Some(d) = t.get(&s.id) else {
-                self.finding(
-                    Level::Fail,
-                    "Dokument",
-                    format!("Dokument {} ({}) fehlt im Ziel", s.id, s.title),
-                );
+                self.finding(Level::Fail, "Dokument", format!("Dokument {} ({}) fehlt im Ziel", s.id, s.title));
                 continue;
             };
             let mut diff = vec![];
@@ -807,59 +646,34 @@ impl Report {
                 diff.push("Papierkorb-Status");
             }
             if !diff.is_empty() {
-                self.finding(
-                    Level::Fail,
-                    "Dokument",
-                    format!("Dokument {}: abweichend im Ziel: {}", s.id, diff.join(", ")),
-                );
+                self.finding(Level::Fail, "Dokument", format!("Dokument {}: abweichend im Ziel: {}", s.id, diff.join(", ")));
             }
         }
         for d in target.iter().filter(|d| !s_ids.contains(&d.id)) {
-            self.finding(
-                Level::Warn,
-                "Dokument",
-                format!(
-                    "Dokument {} ({}) ist im Ziel, aber nicht in der Quelle",
-                    d.id, d.title
-                ),
-            );
+            self.finding(Level::Warn, "Dokument", format!("Dokument {} ({}) ist im Ziel, aber nicht in der Quelle", d.id, d.title));
         }
     }
 
     /// Findings from the file check. `dry_run`: only source checked → everything at most WARN.
     pub fn file_findings(&mut self) {
-        let src_keys: HashMap<(i64, FileKind), &FileIssue> = self
-            .source_files
-            .iter()
-            .flat_map(|s| s.problems.iter())
-            .map(|p| ((p.doc, p.kind), &p.issue))
-            .collect();
+        let src_keys: HashMap<(i64, FileKind), &FileIssue> =
+            self.source_files.iter().flat_map(|s| s.problems.iter()).map(|p| ((p.doc, p.kind), &p.issue)).collect();
         let mut add = vec![];
         if let Some(t) = &self.target_files {
             for p in &t.problems {
                 let pre = src_keys.contains_key(&(p.doc, p.kind));
-                let level = if p.kind == FileKind::Thumbnail || pre {
-                    Level::Warn
-                } else {
-                    Level::Fail
-                };
+                let level = if p.kind == FileKind::Thumbnail || pre { Level::Warn } else { Level::Fail };
                 let mut m = format!("Ziel: {}", p.describe());
                 if pre {
-                    m.push_str(
-                        " – bereits in der Quelle so, der Umstieg hat nichts verschlechtert",
-                    );
+                    m.push_str(" – bereits in der Quelle so, der Umstieg hat nichts verschlechtert");
                 }
                 add.push((level, m));
             }
             // Source defective, target intact (e.g. thumbnail regenerated): note only
-            let t_keys: HashSet<(i64, FileKind)> =
-                t.problems.iter().map(|p| (p.doc, p.kind)).collect();
+            let t_keys: HashSet<(i64, FileKind)> = t.problems.iter().map(|p| (p.doc, p.kind)).collect();
             for p in self.source_files.iter().flat_map(|s| s.problems.iter()) {
                 if !t_keys.contains(&(p.doc, p.kind)) {
-                    add.push((
-                        Level::Info,
-                        format!("Quelle: {} – im Ziel in Ordnung", p.describe()),
-                    ));
+                    add.push((Level::Info, format!("Quelle: {} – im Ziel in Ordnung", p.describe())));
                 }
             }
         } else if let Some(s) = &self.source_files {
@@ -872,19 +686,11 @@ impl Report {
         }
         if !self.extra_files.is_empty() {
             let n = self.extra_files.len();
-            let first: Vec<&str> = self
-                .extra_files
-                .iter()
-                .take(5)
-                .map(String::as_str)
-                .collect();
+            let first: Vec<&str> = self.extra_files.iter().take(5).map(String::as_str).collect();
             self.finding(
                 Level::Warn,
                 "Datei",
-                format!(
-                    "{n} Datei(en) im Ziel-Medienordner ohne Dokument (verwaist), z. B. {}",
-                    first.join(", ")
-                ),
+                format!("{n} Datei(en) im Ziel-Medienordner ohne Dokument (verwaist), z. B. {}", first.join(", ")),
             );
         }
     }
@@ -904,10 +710,7 @@ impl Report {
                 }
             }
             "error" => {
-                let m = format!(
-                    "Stichprobe über API v1 nicht möglich: {}",
-                    self.spot.message.clone().unwrap_or_default()
-                );
+                let m = format!("Stichprobe über API v1 nicht möglich: {}", self.spot.message.clone().unwrap_or_default());
                 self.finding(Level::Warn, "API", m);
             }
             _ => {}
@@ -920,19 +723,10 @@ impl Report {
             .iter()
             .map(|s| s.level)
             .chain(self.findings.iter().map(|f| f.level))
-            .chain(
-                self.counts
-                    .iter()
-                    .map(CountRow::level)
-                    .filter(|_| self.target.is_some()),
-            )
+            .chain(self.counts.iter().map(CountRow::level).filter(|_| self.target.is_some()))
             .max()
             .unwrap_or(Level::Ok);
-        let v = if worst == Level::Info {
-            Level::Ok
-        } else {
-            worst
-        };
+        let v = if worst == Level::Info { Level::Ok } else { worst };
         self.verdict = Some(v);
         v
     }
@@ -1003,18 +797,12 @@ impl Report {
     pub fn to_text(&self) -> String {
         let mut s = String::new();
         s.push_str("PaperRust – Umstieg von paperless-ngx: Prüfbericht\n");
-        s.push_str(&format!(
-            "Modus: {}   Werkzeug: paperrust-migrate-db {}\n",
-            self.mode, self.tool_version
-        ));
+        s.push_str(&format!("Modus: {}   Werkzeug: paperrust-migrate-db {}\n", self.mode, self.tool_version));
         s.push_str(&format!(
             "Quelle: {} – {}{}\n",
             self.source_label,
             self.source,
-            self.source_version
-                .as_ref()
-                .map(|v| format!(" (paperless-ngx {v})"))
-                .unwrap_or_default()
+            self.source_version.as_ref().map(|v| format!(" (paperless-ngx {v})")).unwrap_or_default()
         ));
         if let Some(m) = &self.source_media {
             s.push_str(&format!("        Medien: {m}\n"));
@@ -1025,103 +813,57 @@ impl Report {
         if let Some(m) = &self.target_media {
             s.push_str(&format!("        Medien: {m}\n"));
         }
-        s.push_str(&format!(
-            "Zeit:   {} ({:.1} s)\n\nSchritte:\n",
-            self.started, self.duration_s
-        ));
+        s.push_str(&format!("Zeit:   {} ({:.1} s)\n\nSchritte:\n", self.started, self.duration_s));
         for st in &self.steps {
-            s.push_str(&format!(
-                "  [{:<4}] {}: {}\n",
-                st.level.as_str(),
-                st.name,
-                st.message
-            ));
+            s.push_str(&format!("  [{:<4}] {}: {}\n", st.level.as_str(), st.name, st.message));
         }
         if !self.counts.is_empty() {
-            s.push_str(&format!(
-                "\n{:<28} {:>10} {:>10}  Prüfung\n",
-                "Objektart", "Quelle", "Ziel"
-            ));
+            s.push_str(&format!("\n{:<28} {:>10} {:>10}  Prüfung\n", "Objektart", "Quelle", "Ziel"));
             for c in &self.counts {
                 s.push_str(&format!(
                     "{:<28} {:>10} {:>10}  {}\n",
                     c.label,
                     fmt_opt(c.source),
                     fmt_opt(c.target),
-                    if self.target.is_some() {
-                        c.level().as_str()
-                    } else {
-                        "-"
-                    }
+                    if self.target.is_some() { c.level().as_str() } else { "-" }
                 ));
             }
         }
         s.push('\n');
         if self.docs_compared > 0 && self.target.is_some() {
-            s.push_str(&format!(
-                "Dokumentzeilen verglichen (Titel, Inhalt, Tags, Prüfsummen): {}\n",
-                self.docs_compared
-            ));
+            s.push_str(&format!("Dokumentzeilen verglichen (Titel, Inhalt, Tags, Prüfsummen): {}\n", self.docs_compared));
         }
         if let Some(f) = &self.source_files {
             s.push_str(&Self::files_line("Dateien Quelle", f));
         }
         if let Some(f) = &self.target_files {
             s.push_str(&Self::files_line("Dateien Ziel", f));
-            s.push_str(&format!(
-                "Verwaiste Dateien im Ziel: {}\n",
-                self.extra_files.len()
-            ));
+            s.push_str(&format!("Verwaiste Dateien im Ziel: {}\n", self.extra_files.len()));
         }
         match self.spot.status.as_str() {
             "done" => {
-                let ok = self
-                    .spot
-                    .rows
-                    .iter()
-                    .filter(|r| r.problems.is_empty())
-                    .count();
+                let ok = self.spot.rows.iter().filter(|r| r.problems.is_empty()).count();
                 s.push_str(&format!(
                     "Stichprobe API v1 ({}): {} Dokumente, {ok} in Ordnung\n",
                     self.spot.api_url.as_deref().unwrap_or("-"),
                     self.spot.rows.len()
                 ));
             }
-            "error" => s.push_str(&format!(
-                "Stichprobe API v1: FEHLER {}\n",
-                self.spot.message.as_deref().unwrap_or("")
-            )),
+            "error" => s.push_str(&format!("Stichprobe API v1: FEHLER {}\n", self.spot.message.as_deref().unwrap_or(""))),
             _ => s.push_str(&format!(
                 "Stichprobe API v1: nicht durchgeführt{}\n",
-                self.spot
-                    .message
-                    .as_ref()
-                    .map(|m| format!(" ({m})"))
-                    .unwrap_or_default()
+                self.spot.message.as_ref().map(|m| format!(" ({m})")).unwrap_or_default()
             )),
         }
         if !self.findings.is_empty() {
             s.push_str("\nBefunde:\n");
-            for f in self
-                .findings
-                .iter()
-                .filter(|f| f.level >= Level::Warn)
-                .chain(self.findings.iter().filter(|f| f.level < Level::Warn))
-            {
-                s.push_str(&format!(
-                    "  {:<4} {:<9} {}\n",
-                    f.level.as_str(),
-                    f.area,
-                    f.message
-                ));
+            for f in self.findings.iter().filter(|f| f.level >= Level::Warn).chain(self.findings.iter().filter(|f| f.level < Level::Warn)) {
+                s.push_str(&format!("  {:<4} {:<9} {}\n", f.level.as_str(), f.area, f.message));
             }
             let shown = self.findings.len();
             let total: usize = self.findings_total.values().sum();
             if total > shown {
-                s.push_str(&format!(
-                    "  … {} weitere Befunde (nur gezählt)\n",
-                    total - shown
-                ));
+                s.push_str(&format!("  … {} weitere Befunde (nur gezählt)\n", total - shown));
             }
         }
         s.push_str(&format!(
@@ -1129,8 +871,7 @@ impl Report {
             self.verdict().as_str(),
             match (self.verdict(), self.mode.as_str()) {
                 (Level::Fail, "dry-run") => "Umstieg so NICHT möglich, siehe Befunde.",
-                (Level::Fail, _) =>
-                    "Umstieg NICHT in Ordnung – Befunde prüfen, Quelle ist unverändert.",
+                (Level::Fail, _) => "Umstieg NICHT in Ordnung – Befunde prüfen, Quelle ist unverändert.",
                 (Level::Warn, _) => "Umstieg möglich/erfolgt, aber Hinweise beachten.",
                 (_, "dry-run") => "Probelauf ohne Befund – der Umstieg kann starten.",
                 _ => "Alles übernommen und geprüft.",
@@ -1160,23 +901,14 @@ impl Report {
             let missing = n(|i| matches!(i, FileIssue::Missing | FileIssue::NoFilename));
             let broken = n(|i| matches!(i, FileIssue::Mismatch { .. } | FileIssue::Unreadable(_)));
             let place = if self.target_files.is_some() { "im Ziel" } else { "in der Quelle" };
-            s.push_str(&format!(
-                "  Dateien {place}: {} gefunden und in Ordnung, {missing} fehlen, {broken} beschädigt\n",
-                f.ok
-            ));
+            s.push_str(&format!("  Dateien {place}: {} gefunden und in Ordnung, {missing} fehlen, {broken} beschädigt\n", f.ok));
         }
         s
     }
 
     pub fn to_html(&self) -> String {
         let e = html_escape;
-        let badge = |l: Level| {
-            format!(
-                "<span class=\"b {}\">{}</span>",
-                l.as_str().to_lowercase(),
-                l.as_str()
-            )
-        };
+        let badge = |l: Level| format!("<span class=\"b {}\">{}</span>", l.as_str().to_lowercase(), l.as_str());
         let mut h = String::from(
             "<!doctype html><html lang=\"de\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\
              <title>Umstieg – Prüfbericht</title><style>\
@@ -1189,10 +921,7 @@ impl Report {
              .verdict{font-size:1.3em;margin:12px 0}.mut{color:var(--mut)}code{word-break:break-all}</style></head><body>",
         );
         h.push_str("<h1>Umstieg von paperless-ngx – Prüfbericht</h1>");
-        h.push_str(&format!(
-            "<p class=\"verdict\">Ergebnis: {}</p>",
-            badge(self.verdict())
-        ));
+        h.push_str(&format!("<p class=\"verdict\">Ergebnis: {}</p>", badge(self.verdict())));
         h.push_str(&format!(
             "<p class=\"mut\">Modus {} · {} · {:.1} s · paperrust-migrate-db {}</p>",
             e(&self.mode),
@@ -1205,33 +934,19 @@ impl Report {
             "<tr><th>Quelle</th><td>{} – <code>{}</code>{}{}</td></tr>",
             e(&self.source_label),
             e(&self.source),
-            self.source_version
-                .as_ref()
-                .map(|v| format!(" (paperless-ngx {})", e(v)))
-                .unwrap_or_default(),
-            self.source_media
-                .as_ref()
-                .map(|m| format!("<br>Medien: <code>{}</code>", e(m)))
-                .unwrap_or_default()
+            self.source_version.as_ref().map(|v| format!(" (paperless-ngx {})", e(v))).unwrap_or_default(),
+            self.source_media.as_ref().map(|m| format!("<br>Medien: <code>{}</code>", e(m))).unwrap_or_default()
         ));
         if let Some(t) = &self.target {
             h.push_str(&format!(
                 "<tr><th>Ziel</th><td><code>{}</code>{}</td></tr>",
                 e(t),
-                self.target_media
-                    .as_ref()
-                    .map(|m| format!("<br>Medien: <code>{}</code>", e(m)))
-                    .unwrap_or_default()
+                self.target_media.as_ref().map(|m| format!("<br>Medien: <code>{}</code>", e(m))).unwrap_or_default()
             ));
         }
         h.push_str("</table><h2>Schritte</h2><table>");
         for st in &self.steps {
-            h.push_str(&format!(
-                "<tr><td>{}</td><td>{}</td><td>{}</td></tr>",
-                badge(st.level),
-                e(&st.name),
-                e(&st.message)
-            ));
+            h.push_str(&format!("<tr><td>{}</td><td>{}</td><td>{}</td></tr>", badge(st.level), e(&st.name), e(&st.message)));
         }
         h.push_str("</table>");
         if !self.counts.is_empty() {
@@ -1242,37 +957,21 @@ impl Report {
                     e(c.label),
                     fmt_opt(c.source),
                     fmt_opt(c.target),
-                    if self.target.is_some() {
-                        badge(c.level())
-                    } else {
-                        String::new()
-                    }
+                    if self.target.is_some() { badge(c.level()) } else { String::new() }
                 ));
             }
             h.push_str("</table>");
         }
         h.push_str("<h2>Dateien und Stichprobe</h2><ul>");
         if let Some(f) = &self.source_files {
-            h.push_str(&format!(
-                "<li>{}</li>",
-                e(Self::files_line("Quelle", f).trim())
-            ));
+            h.push_str(&format!("<li>{}</li>", e(Self::files_line("Quelle", f).trim())));
         }
         if let Some(f) = &self.target_files {
-            h.push_str(&format!(
-                "<li>{}</li>",
-                e(Self::files_line("Ziel", f).trim())
-            ));
-            h.push_str(&format!(
-                "<li>Verwaiste Dateien im Ziel: {}</li>",
-                self.extra_files.len()
-            ));
+            h.push_str(&format!("<li>{}</li>", e(Self::files_line("Ziel", f).trim())));
+            h.push_str(&format!("<li>Verwaiste Dateien im Ziel: {}</li>", self.extra_files.len()));
         }
         if self.docs_compared > 0 && self.target.is_some() {
-            h.push_str(&format!(
-                "<li>Dokumentzeilen verglichen: {}</li>",
-                self.docs_compared
-            ));
+            h.push_str(&format!("<li>Dokumentzeilen verglichen: {}</li>", self.docs_compared));
         }
         h.push_str(&format!(
             "<li>Stichprobe API v1: {}</li></ul>",
@@ -1280,33 +979,16 @@ impl Report {
                 "done" => format!(
                     "{} Dokumente, {} in Ordnung",
                     self.spot.rows.len(),
-                    self.spot
-                        .rows
-                        .iter()
-                        .filter(|r| r.problems.is_empty())
-                        .count()
+                    self.spot.rows.iter().filter(|r| r.problems.is_empty()).count()
                 ),
                 "error" => format!("Fehler: {}", e(self.spot.message.as_deref().unwrap_or(""))),
-                _ => format!(
-                    "nicht durchgeführt {}",
-                    e(self.spot.message.as_deref().unwrap_or(""))
-                ),
+                _ => format!("nicht durchgeführt {}", e(self.spot.message.as_deref().unwrap_or(""))),
             }
         ));
         if !self.findings.is_empty() {
             h.push_str("<h2>Befunde</h2><table>");
-            for f in self
-                .findings
-                .iter()
-                .filter(|f| f.level >= Level::Warn)
-                .chain(self.findings.iter().filter(|f| f.level < Level::Warn))
-            {
-                h.push_str(&format!(
-                    "<tr><td>{}</td><td>{}</td><td>{}</td></tr>",
-                    badge(f.level),
-                    f.area,
-                    e(&f.message)
-                ));
+            for f in self.findings.iter().filter(|f| f.level >= Level::Warn).chain(self.findings.iter().filter(|f| f.level < Level::Warn)) {
+                h.push_str(&format!("<tr><td>{}</td><td>{}</td><td>{}</td></tr>", badge(f.level), f.area, e(&f.message)));
             }
             h.push_str("</table>");
         }
@@ -1318,10 +1000,7 @@ impl Report {
     pub fn write(&self, dir: &Path) -> std::io::Result<Vec<std::path::PathBuf>> {
         std::fs::create_dir_all(dir)?;
         let files = [
-            (
-                dir.join("umstieg-bericht.json"),
-                serde_json::to_string_pretty(&self.to_json()).unwrap_or_default(),
-            ),
+            (dir.join("umstieg-bericht.json"), serde_json::to_string_pretty(&self.to_json()).unwrap_or_default()),
             (dir.join("umstieg-bericht.txt"), self.to_text()),
             (dir.join("umstieg-bericht.html"), self.to_html()),
         ];
@@ -1405,11 +1084,7 @@ mod tests {
         let s = check_files(&Files::Media(m.path()), &docs, 3);
         assert_eq!((s.originals, s.archives, s.thumbnails), (3, 1, 4));
         assert_eq!((s.md5, s.sha256), (1, 2));
-        let kinds: Vec<(i64, FileKind, &str)> = s
-            .problems
-            .iter()
-            .map(|p| (p.doc, p.kind, p.issue.code()))
-            .collect();
+        let kinds: Vec<(i64, FileKind, &str)> = s.problems.iter().map(|p| (p.doc, p.kind, p.issue.code())).collect();
         assert_eq!(
             kinds,
             vec![
@@ -1427,14 +1102,7 @@ mod tests {
     fn export_files_checked_from_zip() {
         let d = tempfile::tempdir().unwrap();
         let p = d.path().join("e.zip");
-        std::fs::write(
-            &p,
-            crate::zipread::testzip::build(&[
-                ("manifest.json", b"[]", false),
-                ("o/1.pdf", b"one", true),
-            ]),
-        )
-        .unwrap();
+        std::fs::write(&p, crate::zipread::testzip::build(&[("manifest.json", b"[]", false), ("o/1.pdf", b"one", true)])).unwrap();
         let e = ExportSource::open(&p).unwrap();
         let mut ok = doc(1, "o/1.pdf", b"one");
         ok.thumbnail = Some("t/1.webp".into());
@@ -1445,10 +1113,7 @@ mod tests {
     }
 
     fn base_report() -> Report {
-        Report {
-            target: Some("postgres://x".into()),
-            ..Default::default()
-        }
+        Report { target: Some("postgres://x".into()), ..Default::default() }
     }
 
     #[test]
@@ -1496,36 +1161,21 @@ mod tests {
             doc,
             kind,
             path: "p".into(),
-            issue: FileIssue::Mismatch {
-                expected: "e".into(),
-                actual: "a".into(),
-            },
+            issue: FileIssue::Mismatch { expected: "e".into(), actual: "a".into() },
         };
         let mut r = base_report();
-        r.source_files = Some(FileSummary {
-            problems: vec![prob(1, FileKind::Original)],
-            ..Default::default()
-        });
-        r.target_files = Some(FileSummary {
-            problems: vec![prob(1, FileKind::Original)],
-            ..Default::default()
-        });
+        r.source_files = Some(FileSummary { problems: vec![prob(1, FileKind::Original)], ..Default::default() });
+        r.target_files = Some(FileSummary { problems: vec![prob(1, FileKind::Original)], ..Default::default() });
         r.file_findings();
         assert_eq!(r.finish(), Level::Warn);
         assert!(r.to_text().contains("bereits in der Quelle"));
         let mut r = base_report();
         r.source_files = Some(FileSummary::default());
-        r.target_files = Some(FileSummary {
-            problems: vec![prob(1, FileKind::Original)],
-            ..Default::default()
-        });
+        r.target_files = Some(FileSummary { problems: vec![prob(1, FileKind::Original)], ..Default::default() });
         r.file_findings();
         assert_eq!(r.finish(), Level::Fail);
         let mut r = base_report();
-        r.target_files = Some(FileSummary {
-            problems: vec![prob(1, FileKind::Thumbnail)],
-            ..Default::default()
-        });
+        r.target_files = Some(FileSummary { problems: vec![prob(1, FileKind::Thumbnail)], ..Default::default() });
         r.file_findings();
         assert_eq!(r.finish(), Level::Warn);
     }
@@ -1540,16 +1190,8 @@ mod tests {
             api_url: Some("http://127.0.0.1:1".into()),
             message: None,
             rows: vec![
-                SpotRow {
-                    id: 1,
-                    title: "a".into(),
-                    problems: vec![],
-                },
-                SpotRow {
-                    id: 2,
-                    title: "b".into(),
-                    problems: vec!["Titel".into()],
-                },
+                SpotRow { id: 1, title: "a".into(), problems: vec![] },
+                SpotRow { id: 2, title: "b".into(), problems: vec!["Titel".into()] },
             ],
         };
         r.spot_findings();
@@ -1560,11 +1202,7 @@ mod tests {
         let h = r.to_html();
         assert!(h.contains("C:/export &lt;x&gt;") && h.contains("class=\"b fail\""));
         let mut r = base_report();
-        r.spot = Spot {
-            status: "error".into(),
-            message: Some("Verbindung".into()),
-            ..Default::default()
-        };
+        r.spot = Spot { status: "error".into(), message: Some("Verbindung".into()), ..Default::default() };
         r.spot_findings();
         assert_eq!(r.finish(), Level::Warn);
         let d = tempfile::tempdir().unwrap();

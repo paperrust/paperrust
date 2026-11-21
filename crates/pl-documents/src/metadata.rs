@@ -170,10 +170,8 @@ async fn build(state: &AppState, cx: Ctx<'_>, doc: &DocRow) -> ApiResult<Value> 
     let db = state.db();
     let source = docfile::source_path(cx, doc).await?;
     let archive: Option<PathBuf> = if doc.has_archive_version() { docfile::archive_path(cx, doc) } else { None };
-    let row = sqlx::query("SELECT original_filename, content FROM documents_document WHERE id = $1")
-        .bind(doc.id as i32)
-        .fetch_one(db)
-        .await?;
+    let row =
+        sqlx::query("SELECT original_filename, content FROM documents_document WHERE id = $1").bind(doc.id as i32).fetch_one(db).await?;
     let original_filename: Option<String> = row.try_get("original_filename")?;
     let content: String = row.try_get("content")?;
     let barcodes = sqlx::query("SELECT page, value, format FROM documents_documentbarcode WHERE document_id = $1 ORDER BY page, id")

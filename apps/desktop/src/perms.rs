@@ -29,32 +29,17 @@ pub fn create_private_dir(dir: &Path) -> std::io::Result<()> {
 }
 
 /// Warning if `home` lies outside the user's own profile (`None` = fine).
-pub fn location_warning(
-    os: Os,
-    home: &Path,
-    get: impl Fn(&str) -> Option<String>,
-) -> Option<String> {
+pub fn location_warning(os: Os, home: &Path, get: impl Fn(&str) -> Option<String>) -> Option<String> {
     let roots: Vec<PathBuf> = match os {
-        Os::Windows => ["LOCALAPPDATA", "USERPROFILE"]
-            .iter()
-            .filter_map(|k| get(k))
-            .filter(|v| !v.trim().is_empty())
-            .map(PathBuf::from)
-            .collect(),
-        Os::MacOs | Os::Unix => get("HOME")
-            .filter(|v| !v.trim().is_empty())
-            .map(PathBuf::from)
-            .into_iter()
-            .collect(),
+        Os::Windows => {
+            ["LOCALAPPDATA", "USERPROFILE"].iter().filter_map(|k| get(k)).filter(|v| !v.trim().is_empty()).map(PathBuf::from).collect()
+        }
+        Os::MacOs | Os::Unix => get("HOME").filter(|v| !v.trim().is_empty()).map(PathBuf::from).into_iter().collect(),
     };
     let norm = |p: &Path| {
         let s = p.to_string_lossy().replace('\\', "/");
         let s = s.trim_end_matches('/').to_string();
-        if os == Os::Windows {
-            s.to_lowercase()
-        } else {
-            s
-        }
+        if os == Os::Windows { s.to_lowercase() } else { s }
     };
     let h = norm(home);
     let inside = roots.iter().any(|r| {
@@ -74,24 +59,13 @@ pub fn parse_whoami_sid(out: &str) -> Option<String> {
     out.lines()
         .flat_map(|l| l.split(','))
         .map(|f| f.trim().trim_matches('"'))
-        .find(|f| {
-            f.starts_with("S-1-")
-                && f.len() > 4
-                && f.chars()
-                    .all(|c| c.is_ascii_digit() || c == '-' || c == 'S')
-        })
+        .find(|f| f.starts_with("S-1-") && f.len() > 4 && f.chars().all(|c| c.is_ascii_digit() || c == '-' || c == 'S'))
         .map(str::to_string)
 }
 
 /// `icacls` arguments for "current user only, inherited, inheritance from above cut".
 pub fn icacls_args(dir: &Path, sid: &str) -> Vec<std::ffi::OsString> {
-    vec![
-        dir.as_os_str().to_owned(),
-        "/inheritance:r".into(),
-        "/grant:r".into(),
-        format!("*{sid}:(OI)(CI)F").into(),
-        "/Q".into(),
-    ]
+    vec![dir.as_os_str().to_owned(), "/inheritance:r".into(), "/grant:r".into(), format!("*{sid}:(OI)(CI)F").into(), "/Q".into()]
 }
 
 #[cfg(windows)]
@@ -108,26 +82,16 @@ pub fn protect_home(home: &Path) -> std::io::Result<()> {
         use std::io::Error;
         use std::process::{Command, Stdio};
         let mut who = Command::new("whoami");
-        who.args(["/user", "/fo", "csv", "/nh"])
-            .stdin(Stdio::null())
-            .stderr(Stdio::null());
+        who.args(["/user", "/fo", "csv", "/nh"]).stdin(Stdio::null()).stderr(Stdio::null());
         hidden(&mut who);
         let out = who.output()?;
-        let sid = parse_whoami_sid(&String::from_utf8_lossy(&out.stdout))
-            .ok_or_else(|| Error::other("SID des Benutzers nicht lesbar"))?;
+        let sid = parse_whoami_sid(&String::from_utf8_lossy(&out.stdout)).ok_or_else(|| Error::other("SID des Benutzers nicht lesbar"))?;
         let mut ic = Command::new("icacls");
-        ic.args(icacls_args(home, &sid))
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::piped());
+        ic.args(icacls_args(home, &sid)).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::piped());
         hidden(&mut ic);
         let out = ic.output()?;
         if !out.status.success() {
-            return Err(Error::other(format!(
-                "icacls ({}): {}",
-                out.status,
-                String::from_utf8_lossy(&out.stderr).trim()
-            )));
+            return Err(Error::other(format!("icacls ({}): {}", out.status, String::from_utf8_lossy(&out.stderr).trim())));
         }
         Ok(())
     }
@@ -142,61 +106,29 @@ mod tests {
     use super::*;
 
     fn env<'a>(pairs: &'a [(&'a str, &'a str)]) -> impl Fn(&str) -> Option<String> + 'a {
-        move |k| {
-            pairs
-                .iter()
-                .find(|(n, _)| *n == k)
-                .map(|(_, v)| v.to_string())
-        }
+        move |k| pairs.iter().find(|(n, _)| *n == k).map(|(_, v)| v.to_string())
     }
 
     #[test]
     fn warns_outside_profile() {
-        let w = env(&[
-            ("LOCALAPPDATA", r"C:\Users\a\AppData\Local"),
-            ("USERPROFILE", r"C:\Users\a"),
-        ]);
-        assert_eq!(
-            location_warning(
-                Os::Windows,
-                Path::new(r"C:\Users\a\AppData\Local\PaperRust"),
-                &w
-            ),
-            None
-        );
-        assert_eq!(
-            location_warning(Os::Windows, Path::new(r"c:\users\A\Dokumente\pr"), &w),
-            None
-        );
+        let w = env(&[("LOCALAPPDATA", r"C:\Users\a\AppData\Local"), ("USERPROFILE", r"C:\Users\a")]);
+        assert_eq!(location_warning(Os::Windows, Path::new(r"C:\Users\a\AppData\Local\PaperRust"), &w), None);
+        assert_eq!(location_warning(Os::Windows, Path::new(r"c:\users\A\Dokumente\pr"), &w), None);
         assert!(location_warning(Os::Windows, Path::new(r"D:\PaperRust"), &w).is_some());
         assert!(location_warning(Os::Windows, Path::new(r"C:\Users\ab\x"), &w).is_some());
-        assert!(
-            location_warning(Os::Windows, Path::new(r"C:\Users\Public\PaperRust"), &w).is_some()
-        );
+        assert!(location_warning(Os::Windows, Path::new(r"C:\Users\Public\PaperRust"), &w).is_some());
         let u = env(&[("HOME", "/home/a")]);
-        assert_eq!(
-            location_warning(Os::Unix, Path::new("/home/a/.local/share/paperrust"), &u),
-            None
-        );
+        assert_eq!(location_warning(Os::Unix, Path::new("/home/a/.local/share/paperrust"), &u), None);
         assert!(location_warning(Os::Unix, Path::new("/srv/paperrust"), &u).is_some());
         assert!(location_warning(Os::MacOs, Path::new("/tmp/x"), env(&[])).is_some());
     }
 
     #[test]
     fn whoami_and_icacls() {
-        assert_eq!(
-            parse_whoami_sid("\"pc\\jane\",\"S-1-5-21-1-2-3-1001\"\r\n").as_deref(),
-            Some("S-1-5-21-1-2-3-1001")
-        );
+        assert_eq!(parse_whoami_sid("\"pc\\jane\",\"S-1-5-21-1-2-3-1001\"\r\n").as_deref(), Some("S-1-5-21-1-2-3-1001"));
         assert_eq!(parse_whoami_sid("Zugriff verweigert"), None);
-        let a: Vec<String> = icacls_args(Path::new(r"C:\d"), "S-1-5-21-9")
-            .iter()
-            .map(|s| s.to_string_lossy().into_owned())
-            .collect();
-        assert_eq!(
-            a[1..],
-            ["/inheritance:r", "/grant:r", "*S-1-5-21-9:(OI)(CI)F", "/Q"]
-        );
+        let a: Vec<String> = icacls_args(Path::new(r"C:\d"), "S-1-5-21-9").iter().map(|s| s.to_string_lossy().into_owned()).collect();
+        assert_eq!(a[1..], ["/inheritance:r", "/grant:r", "*S-1-5-21-9:(OI)(CI)F", "/Q"]);
     }
 
     /// Real permissions: Unix 0700/0600; Windows exactly one (inheritable) entry for the user.
@@ -218,10 +150,7 @@ mod tests {
         #[cfg(windows)]
         {
             for p in [home.clone(), home.join("media"), home.join("secret.toml")] {
-                let out = std::process::Command::new("icacls")
-                    .arg(&p)
-                    .output()
-                    .unwrap();
+                let out = std::process::Command::new("icacls").arg(&p).output().unwrap();
                 let text = String::from_utf8_lossy(&out.stdout).to_string();
                 // Output: "<path> <ACE>\n<indentation><ACE>…\n\n<status line>" – ACE lines contain ":(".
                 let aces: Vec<&str> = text.lines().filter(|l| l.contains(":(")).collect();

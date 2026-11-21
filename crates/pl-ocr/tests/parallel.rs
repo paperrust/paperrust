@@ -48,7 +48,15 @@ struct FakeEngine {
 
 impl FakeEngine {
     fn new(base_ms: u64, jitter_ms: u64) -> Self {
-        Self { base_ms, jitter_ms, fail: vec![], live: AtomicUsize::new(0), peak: AtomicUsize::new(0), order: Mutex::new(vec![]), osd_rotate: None }
+        Self {
+            base_ms,
+            jitter_ms,
+            fail: vec![],
+            live: AtomicUsize::new(0),
+            peak: AtomicUsize::new(0),
+            order: Mutex::new(vec![]),
+            osd_rotate: None,
+        }
     }
 }
 
@@ -250,15 +258,27 @@ fn run(engine: FakeEngine, input_bytes: &[u8], ext: &str, jobs: i64, extra: &[(&
     let rend = std::sync::Arc::new(renderer());
     struct E(std::sync::Arc<FakeEngine>);
     impl OcrEngine for E {
-        fn name(&self) -> String { self.0.name() }
-        fn recognize(&self, i: &Path, r: &OcrRequest) -> Result<PageOcr> { self.0.recognize(i, r) }
-        fn orientation(&self, i: &Path, t: Option<Duration>) -> Result<Option<Orientation>> { self.0.orientation(i, t) }
-        fn languages(&self) -> Result<Vec<String>> { self.0.languages() }
+        fn name(&self) -> String {
+            self.0.name()
+        }
+        fn recognize(&self, i: &Path, r: &OcrRequest) -> Result<PageOcr> {
+            self.0.recognize(i, r)
+        }
+        fn orientation(&self, i: &Path, t: Option<Duration>) -> Result<Option<Orientation>> {
+            self.0.orientation(i, t)
+        }
+        fn languages(&self) -> Result<Vec<String>> {
+            self.0.languages()
+        }
     }
     struct R(std::sync::Arc<FakeRenderer>);
     impl PdfRenderer for R {
-        fn name(&self) -> String { self.0.name() }
-        fn open<'a>(&'a self, pdf: &'a [u8]) -> Result<Box<dyn RenderDoc + 'a>> { self.0.open(pdf) }
+        fn name(&self) -> String {
+            self.0.name()
+        }
+        fn open<'a>(&'a self, pdf: &'a [u8]) -> Result<Box<dyn RenderDoc + 'a>> {
+            self.0.open(pdf)
+        }
     }
     let backend = NativeOcrmypdf::new(Some(Box::new(E(engine.clone()))), Box::new(R(rend.clone())), dir.path().join("pages"));
     let a = args(dir.path(), &input, jobs, extra);
@@ -299,9 +319,7 @@ fn assert_same(a: &Out, b: &Out, what: &str) {
 }
 
 fn sidecar_pages(s: &str) -> Vec<usize> {
-    s.split('\x0c')
-        .filter_map(|p| p.strip_prefix("Page ").and_then(|r| r.split(' ').next()).and_then(|n| n.parse().ok()))
-        .collect()
+    s.split('\x0c').filter_map(|p| p.strip_prefix("Page ").and_then(|r| r.split(' ').next()).and_then(|n| n.parse().ok())).collect()
 }
 
 // --------------------------------------------------------------------------------------------
@@ -339,7 +357,8 @@ fn pdf_parallel_equals_serial() {
 fn pdf_parallel_equals_serial_with_pages_force_and_rotation() {
     let input = image_pdf(9);
     // --pages: subset (skipped pages stay Keep) – sidecar is dropped with pages, so without
-    let extra = [("pages", json!("2-4,7")), ("force_ocr", json!(true)), ("rotate_pages", json!(true)), ("rotate_pages_threshold", json!(10.0))];
+    let extra =
+        [("pages", json!("2-4,7")), ("force_ocr", json!(true)), ("rotate_pages", json!(true)), ("rotate_pages_threshold", json!(10.0))];
     let mk = || {
         let mut e = FakeEngine::new(2, 15);
         e.osd_rotate = Some(90);
@@ -438,7 +457,9 @@ fn real_tesseract_pdfium_parallel_equals_serial() {
         return;
     };
     let tess = match std::env::var_os("PAPERRUST_TESSERACT_PATH") {
-        Some(p) => TesseractCli { program: p.into(), tessdata_dir: std::env::var_os("PAPERRUST_TESSDATA_DIR").map(PathBuf::from), psm: None },
+        Some(p) => {
+            TesseractCli { program: p.into(), tessdata_dir: std::env::var_os("PAPERRUST_TESSDATA_DIR").map(PathBuf::from), psm: None }
+        }
         None => {
             let base = repo().join("tests/parity/pl-ocr/.tools/tesseract");
             let exe = if cfg!(windows) { "tesseract.exe" } else { "tesseract" };
@@ -454,10 +475,17 @@ fn real_tesseract_pdfium_parallel_equals_serial() {
     let specs: Vec<ImagePageSpec> = {
         let doc = pdfium.open(&src).unwrap();
         (0..doc.page_count())
-            .map(|i| ImagePageSpec { image: PageImage::Raw(doc.render(i, 150.0, true).unwrap()), dpi_x: 150.0, dpi_y: 150.0, rotate: 0, ocr: None })
+            .map(|i| ImagePageSpec {
+                image: PageImage::Raw(doc.render(i, 150.0, true).unwrap()),
+                dpi_x: 150.0,
+                dpi_y: 150.0,
+                rotate: 0,
+                ocr: None,
+            })
             .collect()
     };
-    let input = pdfwrite::build_from_images(&specs, &OutputMeta { output_type: pl_ocr::config::OutputType::Pdf, ..Default::default() }).unwrap();
+    let input =
+        pdfwrite::build_from_images(&specs, &OutputMeta { output_type: pl_ocr::config::OutputType::Pdf, ..Default::default() }).unwrap();
     let go = |jobs: i64| {
         let dir = tempfile::tempdir().unwrap();
         let inp = dir.path().join("in.pdf");

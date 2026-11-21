@@ -17,11 +17,7 @@ use tower::ServiceExt;
 
 /// Serve `app` on `listener` until `shutdown` resolves; then stop accepting and give
 /// open connections up to 10 s to finish.
-pub async fn serve(
-    listener: TcpListener,
-    app: Router,
-    shutdown: impl Future<Output = ()> + Send + 'static,
-) -> std::io::Result<()> {
+pub async fn serve(listener: TcpListener, app: Router, shutdown: impl Future<Output = ()> + Send + 'static) -> std::io::Result<()> {
     let mut builder = Builder::new(TokioExecutor::new());
     builder
         .http1()

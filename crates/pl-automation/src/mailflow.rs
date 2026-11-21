@@ -186,7 +186,13 @@ pub async fn put(State(st): State<AppState>, who: Who, Path(id): Path<String>, h
     update(st, who, id, headers, body, false).await
 }
 
-pub async fn patch(State(st): State<AppState>, who: Who, Path(id): Path<String>, headers: HeaderMap, body: Bytes) -> Result<Response, AErr> {
+pub async fn patch(
+    State(st): State<AppState>,
+    who: Who,
+    Path(id): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Response, AErr> {
     update(st, who, id, headers, body, true).await
 }
 
@@ -201,10 +207,9 @@ fn rule_of(b: &Map<String, Value>) -> AResult<Map<String, Value>> {
 fn workflows_of(b: &Map<String, Value>) -> AResult<Vec<Map<String, Value>>> {
     match b.get("workflows") {
         None | Some(Value::Null) => Ok(Vec::new()),
-        Some(Value::Array(a)) => a
-            .iter()
-            .map(|w| w.as_object().cloned().ok_or_else(|| AErr::field("workflows", "Expected a list of objects.")))
-            .collect(),
+        Some(Value::Array(a)) => {
+            a.iter().map(|w| w.as_object().cloned().ok_or_else(|| AErr::field("workflows", "Expected a list of objects."))).collect()
+        }
         Some(_) => Err(AErr::field("workflows", "Expected a list of objects.")),
     }
 }
@@ -272,7 +277,8 @@ mod tests {
         assert_eq!(ts[1]["type"], 1);
         assert_eq!(ts[1]["filter_mailrule"], 7);
         assert_eq!(ts[1]["sources"], json!([3]));
-        let mut w: Map<String, Value> = serde_json::from_value(json!({"triggers": [{"type": 1, "sources": [1], "filter_mailrule": 2}]})).unwrap();
+        let mut w: Map<String, Value> =
+            serde_json::from_value(json!({"triggers": [{"type": 1, "sources": [1], "filter_mailrule": 2}]})).unwrap();
         bind_to_rule(&mut w, 7);
         assert_eq!(w["triggers"][0]["filter_mailrule"], 7);
         assert_eq!(w["triggers"][0]["sources"], json!([1, 3]));

@@ -18,9 +18,9 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
+use crate::sqlbind::SqlxBinder;
 use chrono::{DateTime, Utc};
 use sea_query::{Alias, OnConflict, PostgresQueryBuilder, Query};
-use crate::sqlbind::SqlxBinder;
 use serde_json::{Map, Value};
 use uuid::Uuid;
 

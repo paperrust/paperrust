@@ -16,7 +16,15 @@ const ALICE: &str = "alicetoken0000000000000000000000000000000";
 fn svc(settings: McpSettings) -> McpService<MemoryBackend> {
     let b = MemoryBackend::default();
     let perms: BTreeSet<String> = ["documents.view_document".to_string()].into_iter().collect();
-    b.add_user(MemUser { id: 1, username: "alice".into(), token: ALICE.into(), is_superuser: false, is_active: true, groups: vec![], perms });
+    b.add_user(MemUser {
+        id: 1,
+        username: "alice".into(),
+        token: ALICE.into(),
+        is_superuser: false,
+        is_active: true,
+        groups: vec![],
+        perms,
+    });
     McpService::new(Arc::new(b), settings, None, Arc::new(IdentityTruncator))
 }
 
@@ -61,7 +69,12 @@ async fn failures_counted_per_ip() {
 /// The global emergency brake only takes effect at the (high) global threshold.
 #[tokio::test]
 async fn global_brake() {
-    let s = svc(McpSettings { max_auth_failures_per_minute: 100, max_auth_failures_global_per_minute: 5, auth_cache_secs: 0, ..Default::default() });
+    let s = svc(McpSettings {
+        max_auth_failures_per_minute: 100,
+        max_auth_failures_global_per_minute: 5,
+        auth_cache_secs: 0,
+        ..Default::default()
+    });
     for i in 0..5 {
         let a = format!("192.0.2.{}", i + 1);
         assert_eq!(handle_post_from(&s, ip(&a), &headers("bad"), INIT).await.status(), 401);

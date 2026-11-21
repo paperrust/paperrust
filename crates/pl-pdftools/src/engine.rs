@@ -15,7 +15,7 @@ use pdfcraft_annot::{Meta, NewAnnotation, Shape, Style, add_annotation, rect_qua
 use pdfcraft_cos::{Document, SaveOptions, write_full};
 use pdfcraft_redact::sanitize::{Hidden, remove_hidden};
 
-use crate::job::{Area, Hit, Op, RedactReport, Reply, RepairReport, ShrinkPreset, ShrinkReport};
+use crate::job::{Area, Hit, Op, RedactReport, RepairReport, Reply, ShrinkPreset, ShrinkReport};
 use crate::matching;
 
 /// Domain error with user text.
@@ -57,15 +57,22 @@ fn save(doc: &Document, object_streams: bool) -> R<Vec<u8>> {
 /// Run a job.
 pub fn run(op: Op) -> Reply {
     let r = match op {
-        Op::Redact { input, output, areas, terms, remove_metadata } => redact(&input, &output, &areas, &terms, remove_metadata).map(Reply::Redacted),
-        Op::Search { input, terms, max_hits } => {
-            read_input(&input).and_then(open).and_then(|doc| search(&doc, &terms, max_hits)).map(|(hits, truncated)| Reply::Hits { hits, truncated })
+        Op::Redact { input, output, areas, terms, remove_metadata } => {
+            redact(&input, &output, &areas, &terms, remove_metadata).map(Reply::Redacted)
         }
+        Op::Search { input, terms, max_hits } => read_input(&input)
+            .and_then(open)
+            .and_then(|doc| search(&doc, &terms, max_hits))
+            .map(|(hits, truncated)| Reply::Hits { hits, truncated }),
         Op::Shrink { input, output, preset } => shrink(&input, &output, preset).map(Reply::Shrunk),
         Op::Repair { input, output } => repair(&input, &output).map(Reply::Repaired),
-        Op::Office { input, output, format } => crate::office::convert(&input, &output, &format).map(Reply::Converted).map_err(|e| EngineError(e.0)),
+        Op::Office { input, output, format } => {
+            crate::office::convert(&input, &output, &format).map(Reply::Converted).map_err(|e| EngineError(e.0))
+        }
         Op::Slides { input, output } => crate::office::slides(&input, &output).map(Reply::Converted).map_err(|e| EngineError(e.0)),
-        Op::Heic { input, output, max_pixels } => crate::heif::convert(&input, &output, max_pixels).map(Reply::Converted).map_err(|e| EngineError(e.0)),
+        Op::Heic { input, output, max_pixels } => {
+            crate::heif::convert(&input, &output, max_pixels).map(Reply::Converted).map_err(|e| EngineError(e.0))
+        }
         Op::SelfTest { .. } => Err(EngineError("self test is handled by the tool".into())),
     };
     match r {
@@ -93,7 +100,10 @@ pub fn search(doc: &Document, terms: &[String], max_hits: usize) -> R<(Vec<Hit>,
                     if hits.len() >= max_hits {
                         return Ok((hits, true));
                     }
-                    let rects = matching::rects_for(&line.text, line.rect, &line.ink, range).into_iter().map(|r| matching::padded(r, 0.5)).collect();
+                    let rects = matching::rects_for(&line.text, line.rect, &line.ink, range)
+                        .into_iter()
+                        .map(|r| matching::padded(r, 0.5))
+                        .collect();
                     hits.push(Hit { page, term: (*term).to_string(), context: line.text.chars().take(200).collect(), rects });
                 }
             }

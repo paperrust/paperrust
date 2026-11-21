@@ -22,8 +22,8 @@ pub mod text;
 pub mod vectorizer;
 
 pub use model::{
-    DEFAULT_MATCH_THRESHOLD, DocumentClassifier, FORMAT_VERSION, ModelKind, Prediction, Predictor,
-    TrainOptions, TrainingDoc, load_classifier, training_hash,
+    DEFAULT_MATCH_THRESHOLD, DocumentClassifier, FORMAT_VERSION, ModelKind, Prediction, Predictor, TrainOptions, TrainingDoc,
+    load_classifier, training_hash,
 };
 pub use text::{Language, preprocess_content, suggestion_content};
 

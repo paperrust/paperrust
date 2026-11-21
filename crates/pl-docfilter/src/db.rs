@@ -5,8 +5,8 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::sync::{Arc, Mutex, OnceLock};
 
-use sea_query::{Alias, Expr, ExprTrait, Order, PostgresQueryBuilder, Query};
 use pl_core::sqlbind::SqlxBinder;
+use sea_query::{Alias, Expr, ExprTrait, Order, PostgresQueryBuilder, Query};
 use sqlx::Row;
 
 use crate::error::FilterError;
@@ -26,29 +26,16 @@ pub struct CustomFieldDef {
 /// Read queries that the filters need.
 pub trait FilterDb: Sync {
     /// `CustomField.objects.get(pk=id)`
-    fn custom_field_by_id(
-        &self,
-        id: i64,
-    ) -> impl Future<Output = Result<Option<CustomFieldDef>, FilterError>> + Send;
+    fn custom_field_by_id(&self, id: i64) -> impl Future<Output = Result<Option<CustomFieldDef>, FilterError>> + Send;
 
     /// `CustomField.objects.get(name=name)`
-    fn custom_field_by_name(
-        &self,
-        name: &str,
-    ) -> impl Future<Output = Result<Option<CustomFieldDef>, FilterError>> + Send;
+    fn custom_field_by_name(&self, name: &str) -> impl Future<Output = Result<Option<CustomFieldDef>, FilterError>> + Send;
 
     /// Several fields at once: `id IN ids OR name IN names` (preloading for the DSL).
-    fn custom_fields_lookup(
-        &self,
-        ids: &[i64],
-        names: &[String],
-    ) -> impl Future<Output = Result<Vec<CustomFieldDef>, FilterError>> + Send;
+    fn custom_fields_lookup(&self, ids: &[i64], names: &[String]) -> impl Future<Output = Result<Vec<CustomFieldDef>, FilterError>> + Send;
 
     /// `CustomField.objects.filter(extra_data__icontains=needle)` (order `created`)
-    fn custom_fields_extra_data_icontains(
-        &self,
-        needle: &str,
-    ) -> impl Future<Output = Result<Vec<CustomFieldDef>, FilterError>> + Send;
+    fn custom_fields_extra_data_icontains(&self, needle: &str) -> impl Future<Output = Result<Vec<CustomFieldDef>, FilterError>> + Send;
 
     /// `CustomFieldInstance.objects.filter(document_id__in=ids, field=field_id,
     /// value_document_ids__isnull=False)` → (document_id, value_document_ids)
@@ -235,10 +222,7 @@ async fn link_instances<'e, E: sqlx::PgExecutor<'e>>(
         return Ok(Vec::new());
     }
     let (sql, values) = Query::select()
-        .columns([
-            (Alias::new("dl"), Alias::new("document_id")),
-            (Alias::new("dl"), Alias::new("value_document_ids")),
-        ])
+        .columns([(Alias::new("dl"), Alias::new("document_id")), (Alias::new("dl"), Alias::new("value_document_ids"))])
         .from_as(Alias::new(CFI), Alias::new("dl"))
         .and_where(col("dl", "document_id").is_in(ids))
         .and_where(col("dl", "field_id").eq(field32))

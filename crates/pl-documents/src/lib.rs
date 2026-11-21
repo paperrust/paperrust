@@ -16,9 +16,9 @@ use pl_core::route::{ALLOW_MODEL_DETAIL, ALLOW_POST_ONLY, ALLOW_READ_ONLY, drf_v
 pub mod db;
 pub mod langdetect;
 pub mod listing;
+pub mod metadata;
 pub mod selection_data;
 pub mod selection_filter;
-pub mod metadata;
 pub mod serializer;
 pub mod suggestions;
 pub mod views;
@@ -27,9 +27,7 @@ pub mod views;
 pub type Viewer = pl_authz::User;
 
 pub use pl_core::ApiError;
-pub use serializer::{
-    DOCUMENT_FIELDS, SerializeAction, SerializeOpts, serialize_documents, serialize_documents_db,
-};
+pub use serializer::{DOCUMENT_FIELDS, SerializeAction, SerializeOpts, serialize_documents, serialize_documents_db};
 pub use views::is_search_request;
 
 /// `Allow` of the `notes` action (GET, POST, DELETE).

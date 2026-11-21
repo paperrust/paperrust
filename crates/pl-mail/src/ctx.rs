@@ -112,11 +112,10 @@ impl FromRequestParts<AppState> for MailUser {
             return Ok(u.clone());
         }
         if let Some(AuthUserId(id)) = parts.extensions.get::<AuthUserId>().copied() {
-            let row: Option<(bool, bool)> =
-                sqlx::query_as("SELECT is_active, is_superuser FROM auth_user WHERE id = $1")
-                    .bind(id)
-                    .fetch_optional(&state.inner.db)
-                    .await?;
+            let row: Option<(bool, bool)> = sqlx::query_as("SELECT is_active, is_superuser FROM auth_user WHERE id = $1")
+                .bind(id)
+                .fetch_optional(&state.inner.db)
+                .await?;
             return match row {
                 Some((is_active, is_superuser)) => Ok(MailUser { id, is_active, is_superuser, perms: None }),
                 None => Err(ApiError::NotAuthenticated),

@@ -36,19 +36,62 @@ pub const DEFAULT_MAX_IMAGE_MPIXELS: f64 = 250.0;
 /// Known OCRmyPDF arguments that are evaluated here (paperless sets the first ones itself,
 /// the rest comes from `OCR_USER_ARGS`).
 const HANDLED: &[&str] = &[
-    "input_file_or_options", "output_file", "use_threads", "jobs", "language", "output_type",
-    "progress_bar", "color_conversion_strategy", "force_ocr", "redo_ocr", "skip_text", "mode", "clean",
-    "clean_final", "deskew", "rotate_pages", "rotate_pages_threshold", "pages", "sidecar",
-    "image_dpi", "max_image_mpixels", "invalidate_digital_signatures", "oversample",
-    "tesseract_timeout", "skip_big", "continue_on_soft_render_error", "tagged_pdf_mode",
+    "input_file_or_options",
+    "output_file",
+    "use_threads",
+    "jobs",
+    "language",
+    "output_type",
+    "progress_bar",
+    "color_conversion_strategy",
+    "force_ocr",
+    "redo_ocr",
+    "skip_text",
+    "mode",
+    "clean",
+    "clean_final",
+    "deskew",
+    "rotate_pages",
+    "rotate_pages_threshold",
+    "pages",
+    "sidecar",
+    "image_dpi",
+    "max_image_mpixels",
+    "invalidate_digital_signatures",
+    "oversample",
+    "tesseract_timeout",
+    "skip_big",
+    "continue_on_soft_render_error",
+    "tagged_pdf_mode",
     // E5/E6: optimization, metadata, Tesseract fine settings
-    "optimize", "jpeg_quality", "jpg_quality", "png_quality", "title", "author", "subject", "keywords",
-    "tesseract_pagesegmode", "tesseract_oem", "tesseract_thresholding", "tesseract_config", "user_words",
-    "user_patterns", "tesseract_non_ocr_timeout", "tesseract_downsample_large_images",
-    "tesseract_downsample_above", "max_ocr_image_mpixels", "remove_vectors", "pdfa_image_compression",
+    "optimize",
+    "jpeg_quality",
+    "jpg_quality",
+    "png_quality",
+    "title",
+    "author",
+    "subject",
+    "keywords",
+    "tesseract_pagesegmode",
+    "tesseract_oem",
+    "tesseract_thresholding",
+    "tesseract_config",
+    "user_words",
+    "user_patterns",
+    "tesseract_non_ocr_timeout",
+    "tesseract_downsample_large_images",
+    "tesseract_downsample_above",
+    "max_ocr_image_mpixels",
+    "remove_vectors",
+    "pdfa_image_compression",
     "ocr_engine",
     // E6 (2026-11-18): evaluated or assessed depending on the value, see `value_note`
-    "unpaper_args", "remove_background", "fast_web_view", "sidecar_format", "pdf_renderer", "rasterizer",
+    "unpaper_args",
+    "remove_background",
+    "fast_web_view",
+    "sidecar_format",
+    "pdf_renderer",
+    "rasterizer",
 ];
 
 /// No effect, but known (debug log only): output/flow control of OCRmyPDF.
@@ -71,8 +114,9 @@ pub fn value_note(key: &str, v: &Value) -> Option<String> {
     let s = v.as_str().map(str::trim).unwrap_or("");
     match key {
         // OCRmyPDF ≥ 13 aborts with NotImplementedError; here only a warning.
-        "remove_background" => truthy(Some(v))
-            .then(|| "remove_background is not implemented (OCRmyPDF raises NotImplementedError for it); ignored".to_owned()),
+        "remove_background" => {
+            truthy(Some(v)).then(|| "remove_background is not implemented (OCRmyPDF raises NotImplementedError for it); ignored".to_owned())
+        }
         "unpaper_args" => {
             let (_, ignored) = crate::preprocess::CleanFilters::from_unpaper_args(s);
             (!ignored.is_empty()).then(|| {
@@ -82,9 +126,12 @@ pub fn value_note(key: &str, v: &Value) -> Option<String> {
         // Threshold in MB; very large values practically disable linearization (= here).
         "fast_web_view" => {
             let mb = v.as_f64().or_else(|| s.parse().ok()).unwrap_or(1.0);
-            (mb < 10_000.0).then(|| "fast_web_view (linearization) is not supported by the native PDF writer; the archive is not linearized".to_owned())
+            (mb < 10_000.0).then(|| {
+                "fast_web_view (linearization) is not supported by the native PDF writer; the archive is not linearized".to_owned()
+            })
         }
-        "sidecar_format" => (!matches!(s, "" | "txt" | "text")).then(|| format!("sidecar_format '{s}' is not supported (sidecar is always plain text); ignored")),
+        "sidecar_format" => (!matches!(s, "" | "txt" | "text"))
+            .then(|| format!("sidecar_format '{s}' is not supported (sidecar is always plain text); ignored")),
         // Text layer: invisible GlyphLessFont layer like hocr/sandwich/fpdf2.
         "pdf_renderer" => (!matches!(s, "" | "auto" | "hocr" | "sandwich" | "fpdf2"))
             .then(|| format!("pdf_renderer '{s}' is not supported; the native invisible text layer is used")),
@@ -346,7 +393,10 @@ fn int_arg(args: &OcrArgs, k: &str, lo: i64, hi: i64) -> Result<Option<i64>> {
     };
     match v {
         Some(v) if (lo..=hi).contains(&v) => Ok(Some(v)),
-        _ => Err(OcrError::Other(format!("BadArgsError: invalid value for {k}: {}", args.get(k).map(ToString::to_string).unwrap_or_default()))),
+        _ => Err(OcrError::Other(format!(
+            "BadArgsError: invalid value for {k}: {}",
+            args.get(k).map(ToString::to_string).unwrap_or_default()
+        ))),
     }
 }
 
@@ -466,9 +516,9 @@ fn pixel_limit(mp: f64) -> Option<u64> {
 pub fn decode_frames(data: &[u8], info: &ImageInfo) -> Result<Vec<image::DynamicImage>> {
     let err = |e: &dyn std::fmt::Display| OcrError::Other(format!("UnidentifiedImageError: {e}"));
     match info.format {
-        ImageFormat::Heic => Err(OcrError::Other(
-            "UnidentifiedImageError: HEIC decoding is not supported (no HEVC decoder available)".into(),
-        )),
+        ImageFormat::Heic => {
+            Err(OcrError::Other("UnidentifiedImageError: HEIC decoding is not supported (no HEVC decoder available)".into()))
+        }
         ImageFormat::Tiff => decode_tiff_frames(data).map_err(|e| err(&e)),
         _ => {
             let img = image::load_from_memory(data).map_err(|e| err(&e))?;
@@ -500,9 +550,7 @@ fn decode_tiff_frames(data: &[u8]) -> std::result::Result<Vec<image::DynamicImag
                 }
                 image::GrayImage::from_raw(w, h, px).map(image::DynamicImage::ImageLuma8)
             }
-            (C::Gray(16), DecodingResult::U16(v)) => {
-                image::ImageBuffer::from_raw(w, h, v).map(image::DynamicImage::ImageLuma16)
-            }
+            (C::Gray(16), DecodingResult::U16(v)) => image::ImageBuffer::from_raw(w, h, v).map(image::DynamicImage::ImageLuma16),
             (C::GrayA(8), DecodingResult::U8(v)) => image::GrayAlphaImage::from_raw(w, h, v).map(image::DynamicImage::ImageLumaA8),
             (C::RGB(8), DecodingResult::U8(v)) => image::RgbImage::from_raw(w, h, v).map(image::DynamicImage::ImageRgb8),
             (C::RGBA(8), DecodingResult::U8(v)) => image::RgbaImage::from_raw(w, h, v).map(image::DynamicImage::ImageRgba8),
@@ -510,7 +558,9 @@ fn decode_tiff_frames(data: &[u8]) -> std::result::Result<Vec<image::DynamicImag
             (C::RGBA(16), DecodingResult::U16(v)) => image::ImageBuffer::from_raw(w, h, v).map(image::DynamicImage::ImageRgba16),
             (C::CMYK(8), DecodingResult::U8(v)) => {
                 let rgb: Vec<u8> = v
-                    .as_chunks::<4>().0.iter()
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
                     .flat_map(|p| {
                         let k = 255 - u16::from(p[3]);
                         [p[0], p[1], p[2]].map(|c| ((255 - u16::from(c)) * k / 255) as u8)
@@ -653,9 +703,10 @@ pub enum PagePlan {
 /// OCRmyPDF `is_ocr_required` (1-based page number).
 pub fn plan_page(opts: &Options, pageno: usize, a: &pdfwrite::PageAnalysis) -> Result<PagePlan> {
     if let Some(p) = &opts.pages
-        && !p.contains(&pageno) {
-            return Ok(PagePlan::Skip);
-        }
+        && !p.contains(&pageno)
+    {
+        return Ok(PagePlan::Skip);
+    }
     if a.has_text {
         return match opts.mode {
             ProcessingMode::Default => Err(OcrError::PriorOcrFound(
@@ -689,10 +740,7 @@ impl NativeOcrmypdf {
     }
 
     fn engine(&self, languages: &str, checked: &mut bool) -> Result<&dyn OcrEngine> {
-        let e = self
-            .engine
-            .as_deref()
-            .ok_or_else(|| OcrError::Unavailable("no OCR engine configured (tesseract not found)".into()))?;
+        let e = self.engine.as_deref().ok_or_else(|| OcrError::Unavailable("no OCR engine configured (tesseract not found)".into()))?;
         if !*checked {
             check_languages(e, languages)?;
             *checked = true;
@@ -752,7 +800,10 @@ impl NativeOcrmypdf {
             } else if let Some(c) = &prep.clean {
                 tracing::debug!(
                     "{name}: cleaned (border {} px, holes {}, gray tiles {}, specks {})",
-                    c.border_pixels, c.holes, c.gray_tiles, c.specks
+                    c.border_pixels,
+                    c.holes,
+                    c.gray_tiles,
+                    c.specks
                 );
             }
             if steps.any() {
@@ -933,14 +984,15 @@ impl NativeOcrmypdf {
             let a = pdfwrite::analyze_page(&doc, *pid);
             let mut plan = if opts.no_ocr { PagePlan::Skip } else { plan_page(opts, i + 1, &a)? };
             if plan != PagePlan::Skip
-                && let Some(mp) = opts.skip_big {
-                    let (w, h) = pdfwrite::display_size(pdfwrite::display_box(&doc, *pid), pdfwrite::page_rotation(&doc, *pid));
-                    let d = page_dpi(opts, &a);
-                    if a.has_images && (w * d / 72.0) * (h * d / 72.0) > mp * 1e6 {
-                        tracing::warn!("page too big, skipping OCR");
-                        plan = PagePlan::Skip;
-                    }
+                && let Some(mp) = opts.skip_big
+            {
+                let (w, h) = pdfwrite::display_size(pdfwrite::display_box(&doc, *pid), pdfwrite::page_rotation(&doc, *pid));
+                let d = page_dpi(opts, &a);
+                if a.has_images && (w * d / 72.0) * (h * d / 72.0) > mp * 1e6 {
+                    tracing::warn!("page too big, skipping OCR");
+                    plan = PagePlan::Skip;
                 }
+            }
             plans.push((plan, a));
         }
         // 2. For redo: rasterize a copy without any text (OCRmyPDF hides existing text).
@@ -1100,10 +1152,7 @@ impl OcrBackend for NativeOcrmypdf {
     }
 
     fn is_tagged_pdf(&self, pdf: &Path) -> bool {
-        std::fs::read(pdf)
-            .ok()
-            .and_then(|d| pdfwrite::load_pdf(&d).ok())
-            .is_some_and(|d| pdfwrite::doc_info(&d).is_tagged)
+        std::fs::read(pdf).ok().and_then(|d| pdfwrite::load_pdf(&d).ok()).is_some_and(|d| pdfwrite::doc_info(&d).is_tagged)
     }
 
     fn ocr(&self, args: &OcrArgs) -> Result<()> {
@@ -1254,13 +1303,27 @@ mod tests {
     #[test]
     fn options_from_args() {
         let cfg = OcrConfig::defaults();
-        let r = crate::args::ArgsRequest { input_file: "in.pdf", mime_type: "application/pdf", output_file: "out.pdf", sidecar_file: "s.txt", ..Default::default() };
+        let r = crate::args::ArgsRequest {
+            input_file: "in.pdf",
+            mime_type: "application/pdf",
+            output_file: "out.pdf",
+            sidecar_file: "s.txt",
+            ..Default::default()
+        };
         struct N;
         impl ImageOps for N {
-            fn get_dpi(&self, _: &str) -> Option<i64> { None }
-            fn calculate_a4_dpi(&self, _: &str) -> Option<i64> { None }
-            fn has_alpha(&self, _: &str) -> Result<bool> { Ok(false) }
-            fn remove_alpha(&self, p: &str) -> Result<String> { Ok(p.into()) }
+            fn get_dpi(&self, _: &str) -> Option<i64> {
+                None
+            }
+            fn calculate_a4_dpi(&self, _: &str) -> Option<i64> {
+                None
+            }
+            fn has_alpha(&self, _: &str) -> Result<bool> {
+                Ok(false)
+            }
+            fn remove_alpha(&self, p: &str) -> Result<String> {
+                Ok(p.into())
+            }
         }
         let a = crate::args::construct_ocrmypdf_parameters(&cfg, &r, &N).unwrap();
         let o = parse_options(&a).unwrap();

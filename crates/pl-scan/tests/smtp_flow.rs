@@ -30,7 +30,10 @@ struct Devices {
 impl Devices {
     fn add(&self, id: i64, owner: i64, allowed_ips: &str) -> String {
         let t = token::generate();
-        self.by_hash.lock().unwrap().insert(token::hash(&t), (ActiveDevice { id, name: format!("dev{id}"), owner_id: owner, allowed_ips: allowed_ips.into() }, false));
+        self.by_hash.lock().unwrap().insert(
+            token::hash(&t),
+            (ActiveDevice { id, name: format!("dev{id}"), owner_id: owner, allowed_ips: allowed_ips.into() }, false),
+        );
         t
     }
     fn revoke(&self, t: &str) {
@@ -80,7 +83,10 @@ fn data_path(name: &str) -> String {
 
 async fn server_with(tune: impl FnOnce(&mut SmtpConfig)) -> Server {
     let scratch = tempfile::tempdir().unwrap();
-    let mut cfg = SmtpConfig::from_lookup(|k| (k == pl_scan::smtp::SETTING_ENABLED).then(|| "on".to_string()), scratch.path().to_path_buf()).unwrap().unwrap();
+    let mut cfg =
+        SmtpConfig::from_lookup(|k| (k == pl_scan::smtp::SETTING_ENABLED).then(|| "on".to_string()), scratch.path().to_path_buf())
+            .unwrap()
+            .unwrap();
     cfg.max_bytes = 64 * 1024;
     tune(&mut cfg);
     let devices = Arc::new(Devices::default());
@@ -171,7 +177,9 @@ impl C {
 /// MIME message with attachments (name, type, content).
 fn message(parts: &[(&str, &str, &[u8])]) -> String {
     let b64 = base64::engine::general_purpose::STANDARD;
-    let mut m = String::from("From: scanner@printer.local\r\nTo: paperrust@nas.local\r\nSubject: Scan\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"XYZ\"\r\n\r\n--XYZ\r\nContent-Type: text/plain\r\n\r\n.Scan from printer\r\n");
+    let mut m = String::from(
+        "From: scanner@printer.local\r\nTo: paperrust@nas.local\r\nSubject: Scan\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"XYZ\"\r\n\r\n--XYZ\r\nContent-Type: text/plain\r\n\r\n.Scan from printer\r\n",
+    );
     for (name, ct, data) in parts {
         m.push_str(&format!("--XYZ\r\nContent-Type: {ct}; name=\"{name}\"\r\nContent-Disposition: attachment; filename=\"{name}\"\r\nContent-Transfer-Encoding: base64\r\n\r\n"));
         let enc = b64.encode(data);
@@ -290,7 +298,8 @@ async fn non_pdf_attachment_is_rejected() {
     c.ehlo().await;
     c.auth_plain(&t).await;
     // Announced as PDF, content is a ZIP → recognised by content and rejected
-    let r = c.send_mail("x@y", &message(&[("fake.pdf", "application/pdf", b"PK\x03\x04zipzip"), ("notes.txt", "text/plain", b"hello")])).await;
+    let r =
+        c.send_mail("x@y", &message(&[("fake.pdf", "application/pdf", b"PK\x03\x04zipzip"), ("notes.txt", "text/plain", b"hello")])).await;
     assert!(r.starts_with("554"), "{r}");
     let r = c.send_mail("x@y", "Subject: nur Text\r\n\r\nkein Anhang").await;
     assert!(r.starts_with("554"), "{r}");
@@ -417,10 +426,20 @@ impl rustls::client::danger::ServerCertVerifier for TrustCert {
             Err(rustls::Error::General("unexpected certificate".into()))
         }
     }
-    fn verify_tls12_signature(&self, m: &[u8], c: &rustls::pki_types::CertificateDer<'_>, d: &rustls::DigitallySignedStruct) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+    fn verify_tls12_signature(
+        &self,
+        m: &[u8],
+        c: &rustls::pki_types::CertificateDer<'_>,
+        d: &rustls::DigitallySignedStruct,
+    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
         rustls::crypto::verify_tls12_signature(m, c, d, &rustls::crypto::ring::default_provider().signature_verification_algorithms)
     }
-    fn verify_tls13_signature(&self, m: &[u8], c: &rustls::pki_types::CertificateDer<'_>, d: &rustls::DigitallySignedStruct) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+    fn verify_tls13_signature(
+        &self,
+        m: &[u8],
+        c: &rustls::pki_types::CertificateDer<'_>,
+        d: &rustls::DigitallySignedStruct,
+    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
         rustls::crypto::verify_tls13_signature(m, c, d, &rustls::crypto::ring::default_provider().signature_verification_algorithms)
     }
     fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {

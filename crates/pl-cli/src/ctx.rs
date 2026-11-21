@@ -50,8 +50,7 @@ pub fn load_config() -> CliResult<pl_core::config::Config> {
     let cfg = pl_core::config::Config::from_env().map_err(|e| CliError::Command(format!("configuration error: {e}")))?;
     if cfg.db.engine != pl_core::config::DbEngine::Postgresql {
         return Err(CliError::Command(
-            "PaperRust supports PostgreSQL only. Migrate SQLite/MariaDB first with paperrust-migrate-db (docs/MIGRATION.md)."
-                .into(),
+            "PaperRust supports PostgreSQL only. Migrate SQLite/MariaDB first with paperrust-migrate-db (docs/MIGRATION.md).".into(),
         ));
     }
     Ok(cfg)

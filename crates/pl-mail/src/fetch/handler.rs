@@ -278,9 +278,15 @@ impl<'a> AccountRun<'a> {
                                 tracing::info!(target: "paperless_mail", "Located folder: {f}");
                             }
                         }
-                        Err(e) => tracing::error!(target: "paperless_mail", "Exception during folder listing, unable to provide list folders: {e}"),
+                        Err(e) => {
+                            tracing::error!(target: "paperless_mail", "Exception during folder listing, unable to provide list folders: {e}")
+                        }
                     }
-                    return Err(HandleError::Mail(format!("Rule {}: Folder {folder} does not exist in account {}", rule.display(), account.name)));
+                    return Err(HandleError::Mail(format!(
+                        "Rule {}: Folder {folder} does not exist in account {}",
+                        rule.display(),
+                        account.name
+                    )));
                 }
                 Err(e) => return Err(e.into()),
             }
@@ -343,7 +349,8 @@ impl<'a> AccountRun<'a> {
                     tracing::debug!(target: "paperless_mail", "Skipping mail '{uid}' subject '{}' from '{}', already queued by a previous rule in this run.", message.subject(), message.from_());
                     continue;
                 }
-                let already = db::processed_uids(&w.pool, rule.id, &rule.folder, std::slice::from_ref(&uid), self.uid_validity.as_deref()).await?;
+                let already =
+                    db::processed_uids(&w.pool, rule.id, &rule.folder, std::slice::from_ref(&uid), self.uid_validity.as_deref()).await?;
                 if !already.is_empty() {
                     tracing::debug!(target: "paperless_mail", "Skipping mail '{uid}' subject '{}' from '{}', already processed.", message.subject(), message.from_());
                     continue;
@@ -524,7 +531,12 @@ impl<'a> AccountRun<'a> {
     }
 
     /// `queue_consumption_tasks`: `chord(consume_tasks, apply_mail_action.s(...)).on_error(error_callback.s(...))`.
-    async fn queue_consumption_tasks(&self, consume_tasks: Vec<pl_queue::Signature>, rule: &Rule, message: &FetchedMessage) -> Result<(), HandleError> {
+    async fn queue_consumption_tasks(
+        &self,
+        consume_tasks: Vec<pl_queue::Signature>,
+        rule: &Rule,
+        message: &FetchedMessage,
+    ) -> Result<(), HandleError> {
         let mut kw = Map::new();
         kw.insert("rule_id".into(), json!(rule.id));
         kw.insert("message_uid".into(), json!(message.uid));
@@ -574,7 +586,10 @@ fn consumable(path: &Path, rule_id: i32, mime: &str) -> pl_consumer::ConsumableD
     }
 }
 
-fn consume_signature(input: &pl_consumer::ConsumableDocument, overrides: &pl_consumer::DocumentMetadataOverrides) -> Result<pl_queue::Signature, HandleError> {
+fn consume_signature(
+    input: &pl_consumer::ConsumableDocument,
+    overrides: &pl_consumer::DocumentMetadataOverrides,
+) -> Result<pl_queue::Signature, HandleError> {
     let kwargs = pl_consumer::task::consume_kwargs(input, overrides).map_err(HandleError::Other)?;
     Ok(pl_queue::Signature::new(pl_consumer::task::TASK_NAME, kwargs).with_trigger("email_consume"))
 }

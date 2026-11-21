@@ -14,19 +14,14 @@ use axum::response::{IntoResponse, Response};
 use pl_authz::ObjectModel;
 use pl_core::filters::{CHAR_KWARGS, FieldKind, FilterContext, FilterSet, apply_order_terms, parse_ordering};
 use pl_core::pagination::{PageRequest, fetch_all_ids, fetch_page, paginated_body};
+use pl_core::sqlbind::SqlxBinder as _;
 use pl_core::{ApiError, AppState, Drf, RequestContext, ValidationErrors};
 use sea_query::{Expr, Func, Order, PostgresQueryBuilder, Query, SelectStatement};
-use pl_core::sqlbind::SqlxBinder as _;
 use serde_json::{Map, Value};
 use sqlx::{PgPool, Row};
 
-pub const GROUP_MODEL: ObjectModel = ObjectModel {
-    app_label: "auth",
-    model_name: "group",
-    object_name: "Group",
-    table: "auth_group",
-    soft_delete: false,
-};
+pub const GROUP_MODEL: ObjectModel =
+    ObjectModel { app_label: "auth", model_name: "group", object_name: "Group", table: "auth_group", soft_delete: false };
 
 /// Tables with a FK to `auth_group(id)` (reference schema); all CASCADE (m2m through tables
 /// and guardian's `GroupObjectPermission`).
@@ -79,32 +74,36 @@ pub async fn groups_repr(db: &PgPool, ids: &[i64]) -> Result<Vec<Value>, sqlx::E
 }
 
 pub async fn list(State(state): State<AppState>, req: Request) -> Response {
-    respond(async {
-        let (r, auth) = begin(&state, req).await?;
-        auth.require_model_perms(&GROUP_MODEL)?;
-        let ctx = RequestContext::from_parts(&r.parts, state.config())?;
-        let mut q = base_select();
-        FilterSet::new()
-            .field("name", Expr::col((a("auth_group"), a("name"))), FieldKind::Char, CHAR_KWARGS)
-            .apply(&mut q, &ctx.query, &FilterContext::new(&ctx, state.tz()))?;
-        match parse_ordering(&ctx.query, &["name"]) {
-            Some(terms) => apply_order_terms(&mut q, &terms, |_| Some(Expr::col((a("auth_group"), a("name"))).into())),
-            None => {
-                q.order_by_expr(Func::lower(Expr::col((a("auth_group"), a("name")))).into(), Order::Asc);
+    respond(
+        async {
+            let (r, auth) = begin(&state, req).await?;
+            auth.require_model_perms(&GROUP_MODEL)?;
+            let ctx = RequestContext::from_parts(&r.parts, state.config())?;
+            let mut q = base_select();
+            FilterSet::new().field("name", Expr::col((a("auth_group"), a("name"))), FieldKind::Char, CHAR_KWARGS).apply(
+                &mut q,
+                &ctx.query,
+                &FilterContext::new(&ctx, state.tz()),
+            )?;
+            match parse_ordering(&ctx.query, &["name"]) {
+                Some(terms) => apply_order_terms(&mut q, &terms, |_| Some(Expr::col((a("auth_group"), a("name"))).into())),
+                None => {
+                    q.order_by_expr(Func::lower(Expr::col((a("auth_group"), a("name")))).into(), Order::Asc);
+                }
             }
+            let (rows, info) = fetch_page(state.db(), &q, &PageRequest::from_query(&ctx.query)).await?;
+            let ids: Vec<i64> = rows.iter().map(|r| r.try_get::<i64, _>("id")).collect::<Result<_, _>>()?;
+            let results = groups_repr(state.db(), &ids).await?;
+            let all = if ctx.version().includes_all() {
+                let ids = fetch_all_ids(state.db(), &q, Expr::col((a("auth_group"), a("id"))).into()).await?;
+                Some(ids.into_iter().map(Value::from).collect())
+            } else {
+                None
+            };
+            Ok(Drf::ok(paginated_body(&ctx, &info, results, all)).into_response())
         }
-        let (rows, info) = fetch_page(state.db(), &q, &PageRequest::from_query(&ctx.query)).await?;
-        let ids: Vec<i64> = rows.iter().map(|r| r.try_get::<i64, _>("id")).collect::<Result<_, _>>()?;
-        let results = groups_repr(state.db(), &ids).await?;
-        let all = if ctx.version().includes_all() {
-            let ids = fetch_all_ids(state.db(), &q, Expr::col((a("auth_group"), a("id"))).into()).await?;
-            Some(ids.into_iter().map(Value::from).collect())
-        } else {
-            None
-        };
-        Ok(Drf::ok(paginated_body(&ctx, &info, results, all)).into_response())
-    }
-    .await)
+        .await,
+    )
 }
 
 async fn get_object_id(db: &PgPool, raw: &str) -> HResult<i64> {
@@ -121,14 +120,16 @@ async fn get_object_id(db: &PgPool, raw: &str) -> HResult<i64> {
 }
 
 pub async fn retrieve(State(state): State<AppState>, Path(id): Path<String>, req: Request) -> Response {
-    respond(async {
-        let (_r, auth) = begin(&state, req).await?;
-        auth.require_model_perms(&GROUP_MODEL)?;
-        let id = get_object_id(state.db(), &id).await?;
-        let body = groups_repr(state.db(), &[id]).await?.pop().ok_or_else(|| server_error("group vanished"))?;
-        Ok(Drf::ok(body).into_response())
-    }
-    .await)
+    respond(
+        async {
+            let (_r, auth) = begin(&state, req).await?;
+            auth.require_model_perms(&GROUP_MODEL)?;
+            let id = get_object_id(state.db(), &id).await?;
+            let body = groups_repr(state.db(), &[id]).await?.pop().ok_or_else(|| server_error("group vanished"))?;
+            Ok(Drf::ok(body).into_response())
+        }
+        .await,
+    )
 }
 
 struct GroupInput {
@@ -198,31 +199,34 @@ async fn set_group_permissions(tx: &mut sqlx::PgConnection, group_id: i64, perms
 }
 
 pub async fn create(State(state): State<AppState>, req: Request) -> Response {
-    respond(async {
-        let (r, auth) = begin(&state, req).await?;
-        auth.require_model_perms(&GROUP_MODEL)?;
-        let data = r.data().await?;
-        let input = validate_group(state.db(), &data, false, None).await?;
-        let mut tx = state.db().begin().await?;
-        let (sql, values) = Query::insert()
-            .into_table(a("auth_group"))
-            .columns([a("name")])
-            .values([input.name.unwrap_or_default().into()])
-            .map_err(crate::db::qerr)?
-            .returning(Query::returning().column(a("id")))
-            .build_sqlx(PostgresQueryBuilder);
-        let row = sqlx::query_with(&sql, values).fetch_one(&mut *tx).await.map_err(|e| {
-            if crate::db::is_unique_violation(&e) { server_error("IntegrityError: group name") } else { e.into() }
-        })?;
-        let id: i64 = i64::from(row.try_get::<i32, _>("id")?);
-        if let Some(p) = &input.permissions {
-            set_group_permissions(&mut tx, id, p).await?;
+    respond(
+        async {
+            let (r, auth) = begin(&state, req).await?;
+            auth.require_model_perms(&GROUP_MODEL)?;
+            let data = r.data().await?;
+            let input = validate_group(state.db(), &data, false, None).await?;
+            let mut tx = state.db().begin().await?;
+            let (sql, values) = Query::insert()
+                .into_table(a("auth_group"))
+                .columns([a("name")])
+                .values([input.name.unwrap_or_default().into()])
+                .map_err(crate::db::qerr)?
+                .returning(Query::returning().column(a("id")))
+                .build_sqlx(PostgresQueryBuilder);
+            let row = sqlx::query_with(&sql, values)
+                .fetch_one(&mut *tx)
+                .await
+                .map_err(|e| if crate::db::is_unique_violation(&e) { server_error("IntegrityError: group name") } else { e.into() })?;
+            let id: i64 = i64::from(row.try_get::<i32, _>("id")?);
+            if let Some(p) = &input.permissions {
+                set_group_permissions(&mut tx, id, p).await?;
+            }
+            tx.commit().await?;
+            let body = groups_repr(state.db(), &[id]).await?.pop().ok_or_else(|| server_error("group vanished"))?;
+            Ok(Drf::created(body).into_response())
         }
-        tx.commit().await?;
-        let body = groups_repr(state.db(), &[id]).await?.pop().ok_or_else(|| server_error("group vanished"))?;
-        Ok(Drf::created(body).into_response())
-    }
-    .await)
+        .await,
+    )
 }
 
 async fn update_impl(state: AppState, raw_id: String, req: Request, partial: bool) -> HResult<Response> {
@@ -239,9 +243,10 @@ async fn update_impl(state: AppState, raw_id: String, req: Request, partial: boo
             .value(a("name"), name)
             .and_where(Expr::col(a("id")).eq(id))
             .build_sqlx(PostgresQueryBuilder);
-        sqlx::query_with(&sql, values).execute(&mut *tx).await.map_err(|e| {
-            if crate::db::is_unique_violation(&e) { server_error("IntegrityError: group name") } else { e.into() }
-        })?;
+        sqlx::query_with(&sql, values)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| if crate::db::is_unique_violation(&e) { server_error("IntegrityError: group name") } else { e.into() })?;
     }
     if let Some(p) = &input.permissions {
         set_group_permissions(&mut tx, id, p).await?;
@@ -268,10 +273,11 @@ pub fn cleanup_permission_lists(settings: &mut Value, keys: &[&str], pk: i64) ->
     let mut updated = false;
     for key in keys {
         if let Some(Value::Array(list)) = perms.get_mut(*key)
-            && let Some(pos) = list.iter().position(|v| v.as_i64() == Some(pk) || v.as_f64() == Some(pk as f64)) {
-                list.remove(pos);
-                updated = true;
-            }
+            && let Some(pos) = list.iter().position(|v| v.as_i64() == Some(pk) || v.as_f64() == Some(pk as f64))
+        {
+            list.remove(pos);
+            updated = true;
+        }
     }
     updated
 }

@@ -25,13 +25,13 @@ use std::ops::Bound;
 
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use tantivy::query::{
-    AllQuery, BooleanQuery, BoostQuery, ConstScoreQuery, DisjunctionMaxQuery, EmptyQuery, ExistsQuery,
-    FuzzyTermQuery, Occur, PhraseQuery, Query, QueryParser, RangeQuery, RegexQuery, TermQuery,
+    AllQuery, BooleanQuery, BoostQuery, ConstScoreQuery, DisjunctionMaxQuery, EmptyQuery, ExistsQuery, FuzzyTermQuery, Occur, PhraseQuery,
+    Query, QueryParser, RangeQuery, RegexQuery, TermQuery,
 };
 use tantivy::schema::{Field, IndexRecordOption, Schema, Type};
 use tantivy::{Index, Term};
 
-use super::ast::{analyze, Node, RewriteLeaf, TermText};
+use super::ast::{Node, RewriteLeaf, TermText, analyze};
 use super::errors::{Diagnostic, DiagnosticKind, QueryError};
 use super::fields::{ExistsStrategy, FieldKind, FieldRef, FieldRegistry, Multitoken, PatternNormalizer, ResolvedField};
 
@@ -97,7 +97,12 @@ enum ClassResult {
 
 /// `_translate_class` (CPython fnmatch.translate bracket handling).
 /// `Err` = the IndexError a pathological chunk merge raises upstream.
-fn translate_class(p: &[char], i: usize, normalize: Option<&PatternNormalizer>, last_close: Option<usize>) -> Result<(ClassResult, usize), ()> {
+fn translate_class(
+    p: &[char],
+    i: usize,
+    normalize: Option<&PatternNormalizer>,
+    last_close: Option<usize>,
+) -> Result<(ClassResult, usize), ()> {
     let n = p.len();
     let mut j = i;
     if j < n && p[j] == '!' {
@@ -262,7 +267,14 @@ struct Emitter<'a> {
 }
 
 impl Emitter<'_> {
-    fn fail(&self, kind: DiagnosticKind, message: String, resolved: Option<&ResolvedField<'_>>, raw: Option<String>, div: Option<u32>) -> QueryError {
+    fn fail(
+        &self,
+        kind: DiagnosticKind,
+        message: String,
+        resolved: Option<&ResolvedField<'_>>,
+        raw: Option<String>,
+        div: Option<u32>,
+    ) -> QueryError {
         let mut d = Diagnostic::new(kind, message);
         if let Some(r) = resolved {
             d.field = Some(FieldRef { name: r.spec.name.clone(), json_path: r.json_path.clone() });
@@ -303,10 +315,8 @@ impl Emitter<'_> {
     /// `get_field` + type check of tantivy-py's `make_term`.
     fn field(&self, resolved: &ResolvedField<'_>, expect: Option<Type>) -> R<Field> {
         let name = &resolved.spec.name;
-        let f = self
-            .schema
-            .get_field(name)
-            .map_err(|_| self.value_error(resolved, format!("Field `{name}` is not defined in the schema.")))?;
+        let f =
+            self.schema.get_field(name).map_err(|_| self.value_error(resolved, format!("Field `{name}` is not defined in the schema.")))?;
         if let Some(t) = expect {
             let actual = self.schema.get_field_entry(f).field_type().value_type();
             if actual != t {
@@ -486,9 +496,7 @@ impl Emitter<'_> {
             }
             Some(ExistsStrategy::TermScan) => {
                 let f = self.field(resolved, None)?;
-                RegexQuery::from_pattern(".*", f)
-                    .map(|q| Box::new(q) as Q)
-                    .map_err(|e| self.value_error(resolved, e.to_string()))
+                RegexQuery::from_pattern(".*", f).map(|q| Box::new(q) as Q).map_err(|e| self.value_error(resolved, e.to_string()))
             }
             None => Err(self.fail(
                 DiagnosticKind::ExistsRequiresFast,
@@ -509,9 +517,7 @@ impl Emitter<'_> {
         let f = self.field(resolved, None)?;
         let escaped = text.replace('\\', "\\\\").replace('"', "\\\"");
         let qs = format!("{}:\"{escaped}\"", resolved.dotted_name());
-        QueryParser::for_index(self.index, vec![f])
-            .parse_query(&qs)
-            .map_err(|e| self.value_error(resolved, e.to_string()))
+        QueryParser::for_index(self.index, vec![f]).parse_query(&qs).map_err(|e| self.value_error(resolved, e.to_string()))
     }
 
     fn visit_term(&self, node: &Node) -> R<Q> {
@@ -539,7 +545,11 @@ impl Emitter<'_> {
                 let Some(v) = v else {
                     return Err(self.fail(
                         DiagnosticKind::AstBadNumber,
-                        format!("{} is not a valid number for {}", crate::error::py_repr(&text.py_str()), crate::error::py_repr(&spec.name)),
+                        format!(
+                            "{} is not a valid number for {}",
+                            crate::error::py_repr(&text.py_str()),
+                            crate::error::py_repr(&spec.name)
+                        ),
                         Some(&resolved),
                         Some(text.py_str()),
                         None,
@@ -678,10 +688,22 @@ impl Emitter<'_> {
             ));
         }
         if spec.kind == FieldKind::BooleanExists {
-            return Err(self.fail(DiagnosticKind::AstPatternOnKind, "wildcard/prefix patterns are not supported on boolean-exists field".into(), Some(resolved), None, Some(29)));
+            return Err(self.fail(
+                DiagnosticKind::AstPatternOnKind,
+                "wildcard/prefix patterns are not supported on boolean-exists field".into(),
+                Some(resolved),
+                None,
+                Some(29),
+            ));
         }
         if spec.kind == FieldKind::Json {
-            return Err(self.fail(DiagnosticKind::AstJsonNeedsSubpath, "pattern queries must address a subpath".into(), Some(resolved), None, None));
+            return Err(self.fail(
+                DiagnosticKind::AstJsonNeedsSubpath,
+                "pattern queries must address a subpath".into(),
+                Some(resolved),
+                None,
+                None,
+            ));
         }
         if !matches!(spec.kind, FieldKind::Text | FieldKind::Keyword) {
             return Err(self.fail(
@@ -696,7 +718,14 @@ impl Emitter<'_> {
     }
 
     /// `visit_daterange` (clamped into tantivy's i64-nanosecond window)
-    fn visit_daterange(&self, field: &FieldRef, lo: Option<DateTime<Utc>>, hi: Option<DateTime<Utc>>, incl_lo: bool, incl_hi: bool) -> R<Q> {
+    fn visit_daterange(
+        &self,
+        field: &FieldRef,
+        lo: Option<DateTime<Utc>>,
+        hi: Option<DateTime<Utc>>,
+        incl_lo: bool,
+        incl_hi: bool,
+    ) -> R<Q> {
         let resolved = self.resolve(Some(field))?;
         let mut lo = lo.map(|d| d.naive_utc());
         let mut hi = hi.map(|d| d.naive_utc());
@@ -721,11 +750,7 @@ impl Emitter<'_> {
             None => Bound::Unbounded,
             Some(v) => {
                 let t = Term::from_field_date(f, tantivy::DateTime::from_timestamp_secs(v.and_utc().timestamp()));
-                if incl {
-                    Bound::Included(t)
-                } else {
-                    Bound::Excluded(t)
-                }
+                if incl { Bound::Included(t) } else { Bound::Excluded(t) }
             }
         };
         Ok(Box::new(RangeQuery::new(b(lo, incl_lo), b(hi, incl_hi))))

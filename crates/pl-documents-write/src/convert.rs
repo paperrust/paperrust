@@ -34,7 +34,9 @@ use pl_pdftools::runner::RunError;
 
 use crate::drf::Errors;
 use crate::error::{ApiError, ApiResult};
-use crate::pdftools::{body_map, bool_of, cleanup, detail, label_of, ok, output_name, paths, queue_version, run_error, s, scratch_file, target_any};
+use crate::pdftools::{
+    body_map, bool_of, cleanup, detail, label_of, ok, output_name, paths, queue_version, run_error, s, scratch_file, target_any,
+};
 
 const LOG: &str = "paperrust.convert";
 
@@ -76,7 +78,9 @@ pub enum ImageError {
 impl ImageError {
     fn into_api(self) -> ApiError {
         match self {
-            ImageError::NoOcr => detail(StatusCode::SERVICE_UNAVAILABLE, "Text recognition (OCR) is not available on this server. Convert without OCR."),
+            ImageError::NoOcr => {
+                detail(StatusCode::SERVICE_UNAVAILABLE, "Text recognition (OCR) is not available on this server. Convert without OCR.")
+            }
             ImageError::Bad(m) => detail(StatusCode::BAD_REQUEST, m),
         }
     }
@@ -118,7 +122,8 @@ pub fn convert_image(src: &FsPath, mime_type: &str, ocr: bool, cfg: &pl_ocr::Ocr
     };
     let data = std::fs::read(src).map_err(|_| bad("file not readable"))?;
     let info = pl_ocr::imageinfo::probe(&data).map_err(|e| bad(e.message()))?;
-    let limit = pl_ocr::imageinfo::pil_pixel_limit(pl_core::config::var("PAPERLESS_MAX_IMAGE_PIXELS").and_then(|v| v.trim().parse::<i64>().ok()));
+    let limit =
+        pl_ocr::imageinfo::pil_pixel_limit(pl_core::config::var("PAPERLESS_MAX_IMAGE_PIXELS").and_then(|v| v.trim().parse::<i64>().ok()));
     info.decompression_bomb_check(limit).map_err(|e| bad(e.message()))?;
     let (input, mime) = if info.has_alpha { (flatten_alpha(&data, &info, work)?, "image/png") } else { (src.to_path_buf(), mime_type) };
     drop(data);
@@ -162,7 +167,13 @@ async fn convert_office(src: &FsPath, format: &str, out: &FsPath) -> Result<pl_p
 }
 
 /// POST /api/documents/{id}/convert_pdf/
-pub async fn convert_pdf_handler(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser, Path(pk): Path<String>, body: axum::body::Bytes) -> Response {
+pub async fn convert_pdf_handler(
+    State(state): State<AppState>,
+    ctx: RequestContext,
+    auth: AuthUser,
+    Path(pk): Path<String>,
+    body: axum::body::Bytes,
+) -> Response {
     match convert_pdf(&state, &ctx, &auth, &pk, &body).await {
         Ok(r) => r,
         Err(e) => e.into_response(),
@@ -204,8 +215,14 @@ async fn convert_pdf(state: &AppState, ctx: &RequestContext, auth: &AuthUser, pk
             let cfg = ocr_config(state).await?;
             let work = out.parent().map(|p| p.join("work")).unwrap_or_else(|| out.with_extension("work"));
             let (src2, mime, work2) = (src.clone(), t.source.mime_type.clone(), work.clone());
-            let r = tokio::task::spawn_blocking(move || convert_image(&src2, &mime, ocr, &cfg, &work2)).await.map_err(|e| ApiError::Uncaught(e.to_string()))?;
-            let moved = r.map_err(ImageError::into_api).and_then(|pdf| std::fs::rename(&pdf, &out).or_else(|_| std::fs::copy(&pdf, &out).map(|_| ())).map_err(|e| ApiError::Uncaught(e.to_string())));
+            let r = tokio::task::spawn_blocking(move || convert_image(&src2, &mime, ocr, &cfg, &work2))
+                .await
+                .map_err(|e| ApiError::Uncaught(e.to_string()))?;
+            let moved = r.map_err(ImageError::into_api).and_then(|pdf| {
+                std::fs::rename(&pdf, &out)
+                    .or_else(|_| std::fs::copy(&pdf, &out).map(|_| ()))
+                    .map_err(|e| ApiError::Uncaught(e.to_string()))
+            });
             let _ = std::fs::remove_dir_all(&work);
             moved.map(|()| {
                 tracing::info!(target: LOG, "Converted image document {} to PDF (OCR: {ocr})", t.root.id);

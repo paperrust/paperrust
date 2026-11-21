@@ -68,16 +68,12 @@ pub fn parse(
     }
     let mut canonical = Vec::with_capacity(default_fields.len());
     for name in default_fields {
-        let r = registry
-            .make_ref(name)
-            .ok_or_else(|| format!("default_fields names unknown field {}", crate::error::py_repr(name)))?;
+        let r = registry.make_ref(name).ok_or_else(|| format!("default_fields names unknown field {}", crate::error::py_repr(name)))?;
         canonical.push(r.to_string());
     }
     let mut boosts = Vec::with_capacity(field_boosts.len());
     for (k, b) in field_boosts {
-        let r = registry
-            .make_ref(k)
-            .ok_or_else(|| format!("field_boosts key {} does not name a known field", crate::error::py_repr(k)))?;
+        let r = registry.make_ref(k).ok_or_else(|| format!("field_boosts key {} does not name a known field", crate::error::py_repr(k)))?;
         boosts.push((r.to_string(), *b));
     }
     let mut p = parser::QueryParser::new(registry, canonical, boosts, tz, basedate);

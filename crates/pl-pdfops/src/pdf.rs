@@ -264,12 +264,7 @@ impl PageCopier {
     }
 
     fn in_tree_len(&self) -> usize {
-        self.doc
-            .get_dictionary(self.pages_id)
-            .and_then(|d| d.get(b"Kids"))
-            .and_then(Object::as_array)
-            .map(Vec::len)
-            .unwrap_or(0)
+        self.doc.get_dictionary(self.pages_id).and_then(|d| d.get(b"Kids")).and_then(Object::as_array).map(Vec::len).unwrap_or(0)
     }
 
     /// Append page `page` from `src` (source `source_key`, e.g. index of the opened file).
@@ -471,11 +466,9 @@ fn prune_resources(doc: &mut Document, owner: ObjectId, names: &BTreeSet<Vec<u8>
         if !visited.insert(f) {
             continue;
         }
-        let is_form = doc
-            .get_object(f)
-            .ok()
-            .and_then(|o| o.as_stream().ok())
-            .is_some_and(|s| s.dict.get(b"Subtype").and_then(Object::as_name).ok() == Some(b"Form".as_slice()) && s.dict.get(b"Resources").is_ok());
+        let is_form = doc.get_object(f).ok().and_then(|o| o.as_stream().ok()).is_some_and(|s| {
+            s.dict.get(b"Subtype").and_then(Object::as_name).ok() == Some(b"Form".as_slice()) && s.dict.get(b"Resources").is_ok()
+        });
         if !is_form {
             continue;
         }
@@ -558,7 +551,7 @@ pub(crate) mod testpdf {
         doc.objects.insert(
             pages_id,
             Object::Dictionary(dictionary! {"Type" => "Pages", "Kids" => kids, "Count" => n,
-                "Resources" => resources_id, "MediaBox" => vec![0.into(), 0.into(), 595.into(), 842.into()]}),
+            "Resources" => resources_id, "MediaBox" => vec![0.into(), 0.into(), 595.into(), 842.into()]}),
         );
         let cat = doc.add_object(dictionary! {"Type" => "Catalog", "Pages" => pages_id});
         doc.trailer.set("Root", cat);

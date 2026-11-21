@@ -143,12 +143,11 @@ async fn empty_trash_inner(state: &AppState, doc_ids: Option<&[i64]>) -> Result<
 ///    the document's template uses `custom_fields`. Move errors are logged, like the receiver.
 pub async fn process_cf_select_update(state: &AppState, field_id: i64) -> Result<(), String> {
     let db = state.db();
-    let extra: Option<Option<serde_json::Value>> =
-        sqlx::query_scalar("SELECT extra_data FROM documents_customfield WHERE id = $1")
-            .bind(field_id as i32)
-            .fetch_optional(db)
-            .await
-            .map_err(|e| e.to_string())?;
+    let extra: Option<Option<serde_json::Value>> = sqlx::query_scalar("SELECT extra_data FROM documents_customfield WHERE id = $1")
+        .bind(field_id as i32)
+        .fetch_optional(db)
+        .await
+        .map_err(|e| e.to_string())?;
     let Some(extra) = extra else { return Ok(()) };
     let keys: Vec<String> = extra
         .as_ref()

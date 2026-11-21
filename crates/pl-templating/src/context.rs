@@ -11,8 +11,8 @@ use unicode_normalization::UnicodeNormalization;
 use crate::error::TemplateError;
 use crate::pathvalidate::sanitize_filename;
 use crate::pystr::{name_stem, path_name, to_local};
-use crate::pyvalue::{date_iso, date_value, datetime_value, placeholder, MatchingModel};
-use crate::strftime::{strftime, TzInfo};
+use crate::pyvalue::{MatchingModel, date_iso, date_value, datetime_value, placeholder};
+use crate::strftime::{TzInfo, strftime};
 
 /// Linked object with a name (correspondent, document type).
 #[derive(Debug, Clone, PartialEq)]
@@ -188,10 +188,7 @@ pub(crate) fn custom_fields_context(fields: &[CustomFieldInstance]) -> Result<Va
                     Some(o) => Value::from(san(&o.label)),
                     // upstream: next(...) without default -> StopIteration
                     None => {
-                        return Err(TemplateError::Context(format!(
-                            "select option {id:?} of custom field {:?} not found",
-                            fi.field_name
-                        )))
+                        return Err(TemplateError::Context(format!("select option {id:?} of custom field {:?} not found", fi.field_name)));
                     }
                 }
             }
@@ -235,11 +232,7 @@ fn original_name(original: &str) -> Result<String, TemplateError> {
 }
 
 /// Context for `validate_filepath_template_and_render`.
-pub(crate) fn filepath_context(
-    doc: &DocumentContext,
-    created: Created,
-    tz: &chrono_tz::Tz,
-) -> Result<Value, TemplateError> {
+pub(crate) fn filepath_context(doc: &DocumentContext, created: Created, tz: &chrono_tz::Tz) -> Result<Value, TemplateError> {
     let mut ctx: Vec<(&'static str, Value)> = Vec::new();
 
     // {"document": get_safe_document_context(document, tags)}
@@ -247,11 +240,8 @@ pub(crate) fn filepath_context(
         Created::Date(d) => date_value(d),
         Created::DateTime(dt) => utc_value(&dt),
     };
-    let tags: Vec<Value> = doc
-        .tags
-        .iter()
-        .map(|t| Value::from_iter([("name", Value::from(t.name.clone())), ("id", opt_i64(t.id))]))
-        .collect();
+    let tags: Vec<Value> =
+        doc.tags.iter().map(|t| Value::from_iter([("name", Value::from(t.name.clone())), ("id", opt_i64(t.id))])).collect();
     let named = |r: &Option<NamedRef>| -> Value {
         match r {
             Some(r) => Value::from_object(MatchingModel { id: r.id, name: r.name.clone(), path: None }),
@@ -320,11 +310,7 @@ pub(crate) fn filepath_context(
         Created::Date(d) => (d.and_time(chrono::NaiveTime::MIN), TzInfo::Naive, date_iso(d)),
         Created::DateTime(dt) => {
             let off = chrono::Offset::fix(&chrono::Utc);
-            (
-                dt.naive_utc(),
-                TzInfo::Fixed(off),
-                crate::pyvalue::PyDateTime { naive: dt.naive_utc(), offset: Some(off) }.isoformat("T"),
-            )
+            (dt.naive_utc(), TzInfo::Fixed(off), crate::pyvalue::PyDateTime { naive: dt.naive_utc(), offset: Some(off) }.isoformat("T"))
         }
     };
     let cf = |f: &str| Value::from(strftime(&c_naive, c_tz, f));
@@ -383,10 +369,7 @@ pub(crate) fn dummy_document() -> (DocumentContext, Created) {
         correspondent: Some(NamedRef { id: None, name: "Sample Correspondent".into() }),
         document_type: Some(NamedRef { id: None, name: "Sample Type".into() }),
         storage_path: Some(StoragePathRef { id: None, name: String::new(), path: "/dummy/path".into() }),
-        tags: vec![
-            TagRef { id: None, name: "Test Tag 1".into() },
-            TagRef { id: None, name: "Another Test Tag".into() },
-        ],
+        tags: vec![TagRef { id: None, name: "Test Tag 1".into() }, TagRef { id: None, name: "Another Test Tag".into() }],
         custom_fields: vec![CustomFieldInstance {
             field_name: "Text Custom Field".into(),
             data_type: "string".into(),

@@ -122,14 +122,8 @@ pub const TRIGGER_FIELDS: &[Field] = &[
     f(FieldSpec::null("filter_path", CHAR256_NULL_BLANK), Col::Scalar("filter_path", ColTy::Str)),
     f(FieldSpec::null("filter_filename", CHAR256_NULL_BLANK), Col::Scalar("filter_filename", ColTy::Str)),
     f(FieldSpec::null("filter_mailrule", Kind::Pk(T_MAILRULE)), Col::Scalar("filter_mailrule_id", ColTy::Int)),
-    f(
-        FieldSpec::opt("matching_algorithm", Kind::Choice(Choices::Ints(MATCHING))),
-        Col::Scalar("matching_algorithm", ColTy::Int),
-    ),
-    f(
-        FieldSpec::opt("match", Kind::Char { max_len: Some(256), allow_blank: true }),
-        Col::Scalar("match", ColTy::Str),
-    ),
+    f(FieldSpec::opt("matching_algorithm", Kind::Choice(Choices::Ints(MATCHING))), Col::Scalar("matching_algorithm", ColTy::Int)),
+    f(FieldSpec::opt("match", Kind::Char { max_len: Some(256), allow_blank: true }), Col::Scalar("match", ColTy::Str)),
     f(FieldSpec::opt("is_insensitive", Kind::Bool), Col::Scalar("is_insensitive", ColTy::Bool)),
     f(
         FieldSpec::opt("filter_has_tags", Kind::ManyPk(T_TAG)),
@@ -143,76 +137,34 @@ pub const TRIGGER_FIELDS: &[Field] = &[
         FieldSpec::opt("filter_has_not_tags", Kind::ManyPk(T_TAG)),
         tm2m("documents_workflowtrigger_filter_has_not_tags", "tag_id", T_TAG, M2mOrder::Name),
     ),
-    f(
-        FieldSpec::null("filter_custom_field_query", TEXT_NULL_BLANK),
-        Col::Scalar("filter_custom_field_query", ColTy::Str),
-    ),
+    f(FieldSpec::null("filter_custom_field_query", TEXT_NULL_BLANK), Col::Scalar("filter_custom_field_query", ColTy::Str)),
     f(
         FieldSpec::opt("filter_has_any_correspondents", Kind::ManyPk(T_CORR)),
-        tm2m(
-            "documents_workflowtrigger_filter_has_any_correspondents",
-            "correspondent_id",
-            T_CORR,
-            M2mOrder::Name,
-        ),
+        tm2m("documents_workflowtrigger_filter_has_any_correspondents", "correspondent_id", T_CORR, M2mOrder::Name),
     ),
     f(
         FieldSpec::opt("filter_has_not_correspondents", Kind::ManyPk(T_CORR)),
-        tm2m(
-            "documents_workflowtrigger_filter_has_not_correspondents",
-            "correspondent_id",
-            T_CORR,
-            M2mOrder::Name,
-        ),
+        tm2m("documents_workflowtrigger_filter_has_not_correspondents", "correspondent_id", T_CORR, M2mOrder::Name),
     ),
     f(
         FieldSpec::opt("filter_has_any_document_types", Kind::ManyPk(T_DT)),
-        tm2m(
-            "documents_workflowtrigger_filter_has_any_document_types",
-            "documenttype_id",
-            T_DT,
-            M2mOrder::Name,
-        ),
+        tm2m("documents_workflowtrigger_filter_has_any_document_types", "documenttype_id", T_DT, M2mOrder::Name),
     ),
     f(
         FieldSpec::opt("filter_has_not_document_types", Kind::ManyPk(T_DT)),
-        tm2m(
-            "documents_workflowtrigger_filter_has_not_document_types",
-            "documenttype_id",
-            T_DT,
-            M2mOrder::Name,
-        ),
+        tm2m("documents_workflowtrigger_filter_has_not_document_types", "documenttype_id", T_DT, M2mOrder::Name),
     ),
     f(
         FieldSpec::opt("filter_has_any_storage_paths", Kind::ManyPk(T_SP)),
-        tm2m(
-            "documents_workflowtrigger_filter_has_any_storage_paths",
-            "storagepath_id",
-            T_SP,
-            M2mOrder::Name,
-        ),
+        tm2m("documents_workflowtrigger_filter_has_any_storage_paths", "storagepath_id", T_SP, M2mOrder::Name),
     ),
     f(
         FieldSpec::opt("filter_has_not_storage_paths", Kind::ManyPk(T_SP)),
-        tm2m(
-            "documents_workflowtrigger_filter_has_not_storage_paths",
-            "storagepath_id",
-            T_SP,
-            M2mOrder::Name,
-        ),
+        tm2m("documents_workflowtrigger_filter_has_not_storage_paths", "storagepath_id", T_SP, M2mOrder::Name),
     ),
-    f(
-        FieldSpec::null("filter_has_correspondent", Kind::Pk(T_CORR)),
-        Col::Scalar("filter_has_correspondent_id", ColTy::Int),
-    ),
-    f(
-        FieldSpec::null("filter_has_document_type", Kind::Pk(T_DT)),
-        Col::Scalar("filter_has_document_type_id", ColTy::Int),
-    ),
-    f(
-        FieldSpec::null("filter_has_storage_path", Kind::Pk(T_SP)),
-        Col::Scalar("filter_has_storage_path_id", ColTy::Int),
-    ),
+    f(FieldSpec::null("filter_has_correspondent", Kind::Pk(T_CORR)), Col::Scalar("filter_has_correspondent_id", ColTy::Int)),
+    f(FieldSpec::null("filter_has_document_type", Kind::Pk(T_DT)), Col::Scalar("filter_has_document_type_id", ColTy::Int)),
+    f(FieldSpec::null("filter_has_storage_path", Kind::Pk(T_SP)), Col::Scalar("filter_has_storage_path_id", ColTy::Int)),
     f(
         FieldSpec::opt("schedule_offset_days", Kind::Int { min: Some(INT4.0), max: Some(INT4.1) }),
         Col::Scalar("schedule_offset_days", ColTy::Int),
@@ -226,10 +178,7 @@ pub const TRIGGER_FIELDS: &[Field] = &[
         FieldSpec::opt("schedule_date_field", Kind::Choice(Choices::Strs(SCHEDULE_DATE_FIELDS))),
         Col::Scalar("schedule_date_field", ColTy::Str),
     ),
-    f(
-        FieldSpec::null("schedule_date_custom_field", Kind::Pk(T_CF)),
-        Col::Scalar("schedule_date_custom_field_id", ColTy::Int),
-    ),
+    f(FieldSpec::null("schedule_date_custom_field", Kind::Pk(T_CF)), Col::Scalar("schedule_date_custom_field_id", ColTy::Int)),
 ];
 
 /// Model defaults of `WorkflowTrigger` (Django writes all columns on INSERT).
@@ -257,10 +206,7 @@ pub fn trigger_defaults() -> Vec<(&'static str, ColTy, Value)> {
 
 pub const EMAIL_FIELDS: &[Field] = &[
     f(FieldSpec::null("id", Kind::Int { min: None, max: None }), Col::Pk),
-    f(
-        FieldSpec::req("subject", Kind::Char { max_len: Some(256), allow_blank: false }),
-        Col::Scalar("subject", ColTy::Str),
-    ),
+    f(FieldSpec::req("subject", Kind::Char { max_len: Some(256), allow_blank: false }), Col::Scalar("subject", ColTy::Str)),
     f(FieldSpec::req("body", Kind::Char { max_len: None, allow_blank: false }), Col::Scalar("body", ColTy::Str)),
     f(FieldSpec::req("to", Kind::Char { max_len: None, allow_blank: false }), Col::Scalar("to", ColTy::Str)),
     f(FieldSpec::opt("include_document", Kind::Bool), Col::Scalar("include_document", ColTy::Bool)),
@@ -277,10 +223,7 @@ pub fn email_defaults() -> Vec<(&'static str, ColTy, Value)> {
 
 pub const WEBHOOK_FIELDS: &[Field] = &[
     f(FieldSpec::null("id", Kind::Int { min: None, max: None }), Col::Pk),
-    f(
-        FieldSpec::req("url", Kind::Char { max_len: Some(256), allow_blank: false }),
-        Col::Scalar("url", ColTy::Str),
-    ),
+    f(FieldSpec::req("url", Kind::Char { max_len: Some(256), allow_blank: false }), Col::Scalar("url", ColTy::Str)),
     f(FieldSpec::opt("use_params", Kind::Bool), Col::Scalar("use_params", ColTy::Bool)),
     f(FieldSpec::opt("as_json", Kind::Bool), Col::Scalar("as_json", ColTy::Bool)),
     f(FieldSpec::null("params", Kind::Json), Col::Scalar("params", ColTy::Json)),
@@ -309,22 +252,10 @@ pub const ACTION_FIELDS: &[Field] = &[
     f(FieldSpec::null("id", Kind::Int { min: None, max: None }), Col::Pk),
     f(FieldSpec::opt("type", Kind::Choice(Choices::Ints(ACTION_TYPES))), Col::Scalar("type", ColTy::Int)),
     f(FieldSpec::null("assign_title", TEXT_NULL_BLANK), Col::Scalar("assign_title", ColTy::Str)),
-    f(
-        FieldSpec::opt("assign_tags", Kind::ManyPk(T_TAG)),
-        am2m("documents_workflowaction_assign_tags", "tag_id", T_TAG, M2mOrder::Name),
-    ),
-    f(
-        FieldSpec::null("assign_correspondent", Kind::Pk(T_CORR)),
-        Col::Scalar("assign_correspondent_id", ColTy::Int),
-    ),
-    f(
-        FieldSpec::null("assign_document_type", Kind::Pk(T_DT)),
-        Col::Scalar("assign_document_type_id", ColTy::Int),
-    ),
-    f(
-        FieldSpec::null("assign_storage_path", Kind::Pk(T_SP)),
-        Col::Scalar("assign_storage_path_id", ColTy::Int),
-    ),
+    f(FieldSpec::opt("assign_tags", Kind::ManyPk(T_TAG)), am2m("documents_workflowaction_assign_tags", "tag_id", T_TAG, M2mOrder::Name)),
+    f(FieldSpec::null("assign_correspondent", Kind::Pk(T_CORR)), Col::Scalar("assign_correspondent_id", ColTy::Int)),
+    f(FieldSpec::null("assign_document_type", Kind::Pk(T_DT)), Col::Scalar("assign_document_type_id", ColTy::Int)),
+    f(FieldSpec::null("assign_storage_path", Kind::Pk(T_SP)), Col::Scalar("assign_storage_path_id", ColTy::Int)),
     f(FieldSpec::null("assign_owner", Kind::Pk(T_USER)), Col::Scalar("assign_owner_id", ColTy::Int)),
     f(
         FieldSpec::opt("assign_view_users", Kind::ManyPk(T_USER)),
@@ -346,35 +277,20 @@ pub const ACTION_FIELDS: &[Field] = &[
         FieldSpec::opt("assign_custom_fields", Kind::ManyPk(T_CF)),
         am2m("documents_workflowaction_assign_custom_fields", "customfield_id", T_CF, M2mOrder::Created),
     ),
-    f(
-        FieldSpec::null("assign_custom_fields_values", Kind::Json),
-        Col::Scalar("assign_custom_fields_values", ColTy::Json),
-    ),
+    f(FieldSpec::null("assign_custom_fields_values", Kind::Json), Col::Scalar("assign_custom_fields_values", ColTy::Json)),
     f(FieldSpec::opt("remove_all_tags", Kind::Bool), Col::Scalar("remove_all_tags", ColTy::Bool)),
-    f(
-        FieldSpec::opt("remove_tags", Kind::ManyPk(T_TAG)),
-        am2m("documents_workflowaction_remove_tags", "tag_id", T_TAG, M2mOrder::Name),
-    ),
-    f(
-        FieldSpec::opt("remove_all_correspondents", Kind::Bool),
-        Col::Scalar("remove_all_correspondents", ColTy::Bool),
-    ),
+    f(FieldSpec::opt("remove_tags", Kind::ManyPk(T_TAG)), am2m("documents_workflowaction_remove_tags", "tag_id", T_TAG, M2mOrder::Name)),
+    f(FieldSpec::opt("remove_all_correspondents", Kind::Bool), Col::Scalar("remove_all_correspondents", ColTy::Bool)),
     f(
         FieldSpec::opt("remove_correspondents", Kind::ManyPk(T_CORR)),
         am2m("documents_workflowaction_remove_correspondents", "correspondent_id", T_CORR, M2mOrder::Name),
     ),
-    f(
-        FieldSpec::opt("remove_all_document_types", Kind::Bool),
-        Col::Scalar("remove_all_document_types", ColTy::Bool),
-    ),
+    f(FieldSpec::opt("remove_all_document_types", Kind::Bool), Col::Scalar("remove_all_document_types", ColTy::Bool)),
     f(
         FieldSpec::opt("remove_document_types", Kind::ManyPk(T_DT)),
         am2m("documents_workflowaction_remove_document_types", "documenttype_id", T_DT, M2mOrder::Name),
     ),
-    f(
-        FieldSpec::opt("remove_all_storage_paths", Kind::Bool),
-        Col::Scalar("remove_all_storage_paths", ColTy::Bool),
-    ),
+    f(FieldSpec::opt("remove_all_storage_paths", Kind::Bool), Col::Scalar("remove_all_storage_paths", ColTy::Bool)),
     f(
         FieldSpec::opt("remove_storage_paths", Kind::ManyPk(T_SP)),
         am2m("documents_workflowaction_remove_storage_paths", "storagepath_id", T_SP, M2mOrder::Name),
@@ -383,19 +299,13 @@ pub const ACTION_FIELDS: &[Field] = &[
         FieldSpec::opt("remove_custom_fields", Kind::ManyPk(T_CF)),
         am2m("documents_workflowaction_remove_custom_fields", "customfield_id", T_CF, M2mOrder::Created),
     ),
-    f(
-        FieldSpec::opt("remove_all_custom_fields", Kind::Bool),
-        Col::Scalar("remove_all_custom_fields", ColTy::Bool),
-    ),
+    f(FieldSpec::opt("remove_all_custom_fields", Kind::Bool), Col::Scalar("remove_all_custom_fields", ColTy::Bool)),
     f(FieldSpec::opt("remove_all_owners", Kind::Bool), Col::Scalar("remove_all_owners", ColTy::Bool)),
     f(
         FieldSpec::opt("remove_owners", Kind::ManyPk(T_USER)),
         am2m("documents_workflowaction_remove_owners", "user_id", T_USER, M2mOrder::Unordered),
     ),
-    f(
-        FieldSpec::opt("remove_all_permissions", Kind::Bool),
-        Col::Scalar("remove_all_permissions", ColTy::Bool),
-    ),
+    f(FieldSpec::opt("remove_all_permissions", Kind::Bool), Col::Scalar("remove_all_permissions", ColTy::Bool)),
     f(
         FieldSpec::opt("remove_view_users", Kind::ManyPk(T_USER)),
         am2m("documents_workflowaction_remove_view_users", "user_id", T_USER, M2mOrder::Unordered),
@@ -448,10 +358,7 @@ pub fn action_defaults() -> Vec<(&'static str, ColTy, Value)> {
 
 /// `WorkflowSerializer`: scalar fields (triggers/actions separate).
 pub const WORKFLOW_FIELDS: &[Field] = &[
-    f(
-        FieldSpec::req("name", Kind::Char { max_len: Some(256), allow_blank: false }),
-        Col::Scalar("name", ColTy::Str),
-    ),
+    f(FieldSpec::req("name", Kind::Char { max_len: Some(256), allow_blank: false }), Col::Scalar("name", ColTy::Str)),
     f(FieldSpec::opt("order", Kind::Int { min: None, max: None }), Col::Scalar("order", ColTy::Int)),
     f(FieldSpec::opt("enabled", Kind::Bool), Col::Scalar("enabled", ColTy::Bool)),
 ];

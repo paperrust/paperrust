@@ -41,17 +41,14 @@ fn tz_name_pattern(p: &str) -> &str {
 }
 
 static TZ: LazyLock<Option<TzTable>> = LazyLock::new(|| {
-    let pats: Vec<String> =
-        DATA.tz.iter().map(|(_, p, _)| format!("(?i){}", py_tz_pattern(tz_name_pattern(p)))).collect();
+    let pats: Vec<String> = DATA.tz.iter().map(|(_, p, _)| format!("(?i){}", py_tz_pattern(tz_name_pattern(p)))).collect();
     let set = regex::RegexSetBuilder::new(&pats).size_limit(256 * 1024 * 1024).build().ok()?;
     Some(TzTable { set, regexes: (0..pats.len()).map(|_| OnceLock::new()).collect() })
 });
 
 fn tz_regex(i: usize) -> Option<&'static Regex> {
     let t = TZ.as_ref()?;
-    t.regexes[i]
-        .get_or_init(|| regex::RegexBuilder::new(&py_tz_pattern(&DATA.tz[i].1)).case_insensitive(true).build().ok())
-        .as_ref()
+    t.regexes[i].get_or_init(|| regex::RegexBuilder::new(&py_tz_pattern(&DATA.tz[i].1)).case_insensitive(true).build().ok()).as_ref()
 }
 
 /// First tz table entry (in table order) whose regex matches `s`, with its span.
@@ -162,11 +159,8 @@ mod tests {
         assert_eq!(tz_name_pattern(r"(\W|\d|_)EST($|\W)"), "EST");
         assert_eq!(tz_name_pattern(r"(.)UTC\+10:30$"), r"UTC\+10:30");
         assert_eq!(tz_name_pattern(r"(.)X\$"), r"(.)X\$");
-        let full: Vec<Regex> = DATA
-            .tz
-            .iter()
-            .map(|(_, p, _)| regex::RegexBuilder::new(&py_tz_pattern(p)).case_insensitive(true).build().unwrap())
-            .collect();
+        let full: Vec<Regex> =
+            DATA.tz.iter().map(|(_, p, _)| regex::RegexBuilder::new(&py_tz_pattern(p)).case_insensitive(true).build().unwrap()).collect();
         for s in [
             "10:00 EST",
             "12. märz 2024 10:00 mez",

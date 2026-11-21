@@ -34,11 +34,8 @@ async fn fresh_db() -> PgPool {
     sqlx::query(&format!("CREATE DATABASE {DB} TEMPLATE template0")).execute(&a).await.expect("create");
     let url = format!("postgres://paperless:paperless@127.0.0.1:54329/{DB}");
     // load the schema on a separate connection (the dump sets search_path to '').
-    let schema: String = include_str!("../../../reference/schema/postgres.sql")
-        .lines()
-        .filter(|l| !l.starts_with('\\'))
-        .collect::<Vec<_>>()
-        .join("\n");
+    let schema: String =
+        include_str!("../../../reference/schema/postgres.sql").lines().filter(|l| !l.starts_with('\\')).collect::<Vec<_>>().join("\n");
     {
         use sqlx::Connection as _;
         let mut c = sqlx::PgConnection::connect(&url).await.expect("connect");
@@ -110,7 +107,12 @@ struct Resp {
 
 async fn send(app: &axum::Router, method: &str, path: &str, jar: &mut Jar, form: Option<&[(&str, &str)]>) -> Resp {
     let peer: std::net::SocketAddr = ([127, 0, 0, 1], 40000).into();
-    let mut b = Request::builder().method(method).uri(path).header("host", "localhost").header("cookie", jar.header()).extension(axum::extract::ConnectInfo(peer));
+    let mut b = Request::builder()
+        .method(method)
+        .uri(path)
+        .header("host", "localhost")
+        .header("cookie", jar.header())
+        .extension(axum::extract::ConnectInfo(peer));
     let body = match form {
         Some(f) => {
             b = b.header("content-type", "application/x-www-form-urlencoded");
@@ -185,10 +187,21 @@ async fn gaps_s1_to_s4() {
     let mut jar = Jar::default();
     let page = send(&app, "GET", "/accounts/login/", &mut jar, None).await;
     let tok = csrf_from(&page.body);
-    let r = send(&app, "POST", "/accounts/login/", &mut jar, Some(&[("csrfmiddlewaretoken", tok.as_str()), ("login", "mona"), ("password", "geheim-123")])).await;
+    let r = send(
+        &app,
+        "POST",
+        "/accounts/login/",
+        &mut jar,
+        Some(&[("csrfmiddlewaretoken", tok.as_str()), ("login", "mona"), ("password", "geheim-123")]),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::FOUND, "{}", r.body);
     assert_eq!(r.location.as_deref(), Some("/accounts/confirm-email/"));
-    let (rows, verified): (i64, bool) = sqlx::query_as("SELECT count(*), bool_or(verified) FROM account_emailaddress WHERE user_id = $1").bind(uid).fetch_one(&db).await.expect("addr");
+    let (rows, verified): (i64, bool) = sqlx::query_as("SELECT count(*), bool_or(verified) FROM account_emailaddress WHERE user_id = $1")
+        .bind(uid)
+        .fetch_one(&db)
+        .await
+        .expect("addr");
     assert_eq!((rows, verified), (1, false), "address synced from auth_user, still unverified");
     let sent = send(&app, "GET", "/accounts/confirm-email/", &mut jar, None).await;
     assert_eq!(sent.status, StatusCode::OK);
@@ -200,7 +213,14 @@ async fn gaps_s1_to_s4() {
     // after confirmation: normal login
     sqlx::query("UPDATE account_emailaddress SET verified = true WHERE user_id = $1").bind(uid).execute(&db).await.expect("verify");
     let tok = csrf_from(&again.body);
-    let r = send(&app, "POST", "/accounts/login/", &mut jar, Some(&[("csrfmiddlewaretoken", tok.as_str()), ("login", "mona"), ("password", "geheim-123")])).await;
+    let r = send(
+        &app,
+        "POST",
+        "/accounts/login/",
+        &mut jar,
+        Some(&[("csrfmiddlewaretoken", tok.as_str()), ("login", "mona"), ("password", "geheim-123")]),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::FOUND);
     assert_eq!(r.location.as_deref(), Some("/dashboard"));
     assert!(jar.get("sessionid").is_some());
@@ -215,7 +235,13 @@ async fn gaps_s1_to_s4() {
         "POST",
         "/accounts/signup/",
         &mut jar,
-        Some(&[("csrfmiddlewaretoken", tok.as_str()), ("username", "mona2"), ("email", "MONA@example.invalid"), ("password1", "Sehr-langes-Passwort-42"), ("password2", "Sehr-langes-Passwort-42")]),
+        Some(&[
+            ("csrfmiddlewaretoken", tok.as_str()),
+            ("username", "mona2"),
+            ("email", "MONA@example.invalid"),
+            ("password1", "Sehr-langes-Passwort-42"),
+            ("password2", "Sehr-langes-Passwort-42"),
+        ]),
     )
     .await;
     assert_eq!(r.status, StatusCode::FOUND, "{}", r.body);
@@ -227,9 +253,19 @@ async fn gaps_s1_to_s4() {
     let mut jar = Jar::default();
     let page = send(&app, "GET", "/accounts/login/", &mut jar, None).await;
     let tok = csrf_from(&page.body);
-    let r = send(&app, "POST", "/accounts/login/", &mut jar, Some(&[("csrfmiddlewaretoken", tok.as_str()), ("login", "mona"), ("password", "falsch")])).await;
+    let r = send(
+        &app,
+        "POST",
+        "/accounts/login/",
+        &mut jar,
+        Some(&[("csrfmiddlewaretoken", tok.as_str()), ("login", "mona"), ("password", "falsch")]),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::OK);
-    let (rl,): (i64,) = sqlx::query_as("SELECT count(*) FROM paperrust_cache WHERE cache_key LIKE ':1:allauth:rl:%'").fetch_one(&db).await.expect("rl rows");
+    let (rl,): (i64,) = sqlx::query_as("SELECT count(*) FROM paperrust_cache WHERE cache_key LIKE ':1:allauth:rl:%'")
+        .fetch_one(&db)
+        .await
+        .expect("rl rows");
     assert!(rl >= 1, "rate-limit rows in paperrust_cache");
 
     // --- S3: closed registration → notice page
@@ -241,7 +277,8 @@ async fn gaps_s1_to_s4() {
 
     // --- S2: complete GitHub flow against a local mock service (GITHUB_URL)
     let fake = fake_github().await;
-    let providers = format!(r#"{{"github": {{"GITHUB_URL": "{fake}", "APPS": [{{"client_id": "gh-cid", "secret": "gh-secret", "key": ""}}]}}}}"#);
+    let providers =
+        format!(r#"{{"github": {{"GITHUB_URL": "{fake}", "APPS": [{{"client_id": "gh-cid", "secret": "gh-secret", "key": ""}}]}}}}"#);
     let gh_app = self::app(
         &db,
         &[
@@ -257,16 +294,16 @@ async fn gaps_s1_to_s4() {
     let start = send(&gh_app, "POST", "/accounts/github/login/", &mut jar, Some(&[("csrfmiddlewaretoken", tok.as_str())])).await;
     let loc = start.location.clone().unwrap_or_default();
     assert!(loc.starts_with(&format!("{fake}/login/oauth/authorize?")), "{loc}");
-    let state = url::Url::parse(&loc).ok().and_then(|u| u.query_pairs().find(|(k, _)| k == "state").map(|(_, v)| v.into_owned())).expect("state");
+    let state =
+        url::Url::parse(&loc).ok().and_then(|u| u.query_pairs().find(|(k, _)| k == "state").map(|(_, v)| v.into_owned())).expect("state");
     let cb = send(&gh_app, "GET", &format!("/accounts/github/login/callback/?code=good&state={state}"), &mut jar, None).await;
     assert_eq!(cb.status, StatusCode::FOUND, "{}", cb.body);
     assert_eq!(cb.location.as_deref(), Some("/dashboard"));
-    let (uname, prov, suid): (String, String, String) = sqlx::query_as(
-        "SELECT u.username, s.provider, s.uid FROM socialaccount_socialaccount s JOIN auth_user u ON u.id = s.user_id",
-    )
-    .fetch_one(&db)
-    .await
-    .expect("social account");
+    let (uname, prov, suid): (String, String, String) =
+        sqlx::query_as("SELECT u.username, s.provider, s.uid FROM socialaccount_socialaccount s JOIN auth_user u ON u.id = s.user_id")
+            .fetch_one(&db)
+            .await
+            .expect("social account");
     assert_eq!((uname.as_str(), prov.as_str(), suid.as_str()), ("octocat", "github", "583231"));
 
     db.close().await;
@@ -290,7 +327,12 @@ async fn fake_github() -> String {
                 if h.get("authorization").and_then(|v| v.to_str().ok()) != Some("token tok123") {
                     return (StatusCode::UNAUTHORIZED, axum::Json(serde_json::json!({"message": "Bad credentials"})));
                 }
-                (StatusCode::OK, axum::Json(serde_json::json!({"id": 583231, "login": "octocat", "name": "The Octocat", "email": "octo@example.invalid"})))
+                (
+                    StatusCode::OK,
+                    axum::Json(
+                        serde_json::json!({"id": 583231, "login": "octocat", "name": "The Octocat", "email": "octo@example.invalid"}),
+                    ),
+                )
             }),
         );
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("bind");

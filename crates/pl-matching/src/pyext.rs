@@ -267,12 +267,7 @@ fn parse_fuzzy(body: &str) -> Option<Result<Limits, String>> {
     }
     let e = given[0].unwrap_or_else(|| given[1..].iter().flatten().sum());
     let dflt = if given[0].is_some() { e } else { 0 };
-    let l = Limits {
-        e,
-        s: given[1].unwrap_or(dflt).min(e),
-        i: given[2].unwrap_or(dflt).min(e),
-        d: given[3].unwrap_or(dflt).min(e),
-    };
+    let l = Limits { e, s: given[1].unwrap_or(dflt).min(e), i: given[2].unwrap_or(dflt).min(e), d: given[3].unwrap_or(dflt).min(e) };
     if l.e > MAX_ERRORS {
         return Some(Err(format!("fuzzy matching supports at most {MAX_ERRORS} errors")));
     }
@@ -562,12 +557,9 @@ fn inline_calls(p: &str, g: &Groups, depth: usize, max_depth: usize, budget: &mu
                 if let GroupKind::Call(t) = kind {
                     let n = match t {
                         CallTarget::Num(n) => n,
-                        CallTarget::Name(name) => g
-                            .names
-                            .iter()
-                            .find(|(k, _)| *k == name)
-                            .map(|(_, n)| *n)
-                            .ok_or_else(|| format!("unknown group name {name}"))?,
+                        CallTarget::Name(name) => {
+                            g.names.iter().find(|(k, _)| *k == name).map(|(_, n)| *n).ok_or_else(|| format!("unknown group name {name}"))?
+                        }
                     };
                     let body = g.content.get(n).cloned().flatten().ok_or_else(|| format!("invalid group reference {n}"))?;
                     if depth >= max_depth {

@@ -117,7 +117,11 @@ mod tests {
     fn catalog_complete() {
         let en = catalog("en-US").expect("en-US parses");
         assert!(!en.is_empty());
-        let key_ok = |k: &str| k.starts_with("auth.") && k.split('.').count() >= 2 && k.split('.').all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'));
+        let key_ok = |k: &str| {
+            k.starts_with("auth.")
+                && k.split('.').count() >= 2
+                && k.split('.').all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'))
+        };
         for loc in LOCALES {
             let c = catalog(loc).unwrap_or_else(|| panic!("{loc} parses"));
             let a: BTreeSet<&String> = en.keys().collect();

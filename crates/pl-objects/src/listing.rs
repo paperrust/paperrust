@@ -7,16 +7,16 @@
 
 use std::collections::{HashMap, HashSet};
 
-use sea_query::{Alias, Expr, JoinType, Order, PostgresQueryBuilder, Query, SelectStatement, SimpleExpr};
 use pl_core::sqlbind::SqlxBinder;
+use sea_query::{Alias, Expr, JoinType, Order, PostgresQueryBuilder, Query, SelectStatement, SimpleExpr};
 use serde_json::{Map, Value, json};
 use sqlx::{PgPool, Row};
 
-use pl_core::ApiError;
 use crate::model::{Kind, ObjectRow, TagExtra};
 use crate::perms;
 use crate::text::is_py_space;
 use pl_authz::User;
+use pl_core::ApiError;
 
 pub const ALIAS: &str = "o";
 
@@ -110,9 +110,7 @@ pub async fn fetch(
 ) -> Result<Vec<ObjectRow>, ApiError> {
     let (sql, values) = q.build_sqlx(PostgresQueryBuilder);
     let rows = sqlx::query_with(&sql, values).fetch_all(db).await?;
-    rows.iter()
-        .map(|r| decode(kind, r, with_count, with_last_corr).map_err(ApiError::from))
-        .collect()
+    rows.iter().map(|r| decode(kind, r, with_count, with_last_corr).map_err(ApiError::from)).collect()
 }
 
 /// Up to this many ids the count aggregation filters by id in SQL; above it counts all objects
@@ -328,20 +326,21 @@ pub fn apply_filters(q: &mut SelectStatement, kind: Kind, data: &FilterData) -> 
     let mut errors = Map::new();
     // id (exact) – NumberFilter
     if let Some(v) = data.get("id")
-        && let Some(s) = value_to_form_str(&v) {
-            match parse_decimal(&s) {
-                Num::Empty => {}
-                Num::Int(i) => {
-                    q.and_where(col("id").eq(i));
-                }
-                Num::NoMatch => {
-                    q.and_where(Expr::cust("FALSE"));
-                }
-                Num::Invalid => {
-                    errors.insert("id".into(), json!(["Enter a number."]));
-                }
+        && let Some(s) = value_to_form_str(&v)
+    {
+        match parse_decimal(&s) {
+            Num::Empty => {}
+            Num::Int(i) => {
+                q.and_where(col("id").eq(i));
+            }
+            Num::NoMatch => {
+                q.and_where(Expr::cust("FALSE"));
+            }
+            Num::Invalid => {
+                errors.insert("id".into(), json!(["Enter a number."]));
             }
         }
+    }
     // id__in – BaseInFilter(NumberFilter): BaseCSVWidget + BaseCSVField(DecimalField)
     if let Some(v) = data.get("id__in") {
         let items: Option<Vec<String>> = match &v {
@@ -353,24 +352,25 @@ pub fn apply_filters(q: &mut SelectStatement, kind: Kind, data: &FilterData) -> 
             _ => return Err(ApiError::internal("id__in filter value is not a string")),
         };
         if let Some(items) = items
-            && !items.is_empty() {
-                let mut ids: Vec<i64> = vec![];
-                let mut bad = false;
-                for it in &items {
-                    match parse_decimal(it) {
-                        Num::Empty | Num::NoMatch => {}
-                        Num::Int(i) => ids.push(i),
-                        Num::Invalid => bad = true,
-                    }
-                }
-                if bad {
-                    errors.insert("id__in".into(), json!(["Enter a number."]));
-                } else if ids.is_empty() {
-                    q.and_where(Expr::cust("FALSE"));
-                } else {
-                    q.and_where(col("id").is_in(ids));
+            && !items.is_empty()
+        {
+            let mut ids: Vec<i64> = vec![];
+            let mut bad = false;
+            for it in &items {
+                match parse_decimal(it) {
+                    Num::Empty | Num::NoMatch => {}
+                    Num::Int(i) => ids.push(i),
+                    Num::Invalid => bad = true,
                 }
             }
+            if bad {
+                errors.insert("id__in".into(), json!(["Enter a number."]));
+            } else if ids.is_empty() {
+                q.and_where(Expr::cust("FALSE"));
+            } else {
+                q.and_where(col("id").is_in(ids));
+            }
+        }
     }
     for field in kind.char_filter_fields() {
         for lookup in ["istartswith", "iendswith", "icontains", "iexact"] {
@@ -393,28 +393,29 @@ pub fn apply_filters(q: &mut SelectStatement, kind: Kind, data: &FilterData) -> 
         }
     }
     if kind == Kind::Tag
-        && let Some(v) = data.get("is_root") {
-            let b = match &v {
-                Value::String(s) => match s.to_lowercase().as_str() {
-                    "1" | "true" => Some(true),
-                    "0" | "false" => Some(false),
-                    _ => None,
-                },
-                Value::Bool(b) => Some(*b),
-                Value::Number(n) if n.as_f64() == Some(1.0) => Some(true),
-                Value::Number(n) if n.as_f64() == Some(0.0) => Some(false),
+        && let Some(v) = data.get("is_root")
+    {
+        let b = match &v {
+            Value::String(s) => match s.to_lowercase().as_str() {
+                "1" | "true" => Some(true),
+                "0" | "false" => Some(false),
                 _ => None,
-            };
-            match b {
-                Some(true) => {
-                    q.and_where(col("tn_parent_id").is_null());
-                }
-                Some(false) => {
-                    q.and_where(col("tn_parent_id").is_not_null());
-                }
-                None => {}
+            },
+            Value::Bool(b) => Some(*b),
+            Value::Number(n) if n.as_f64() == Some(1.0) => Some(true),
+            Value::Number(n) if n.as_f64() == Some(0.0) => Some(false),
+            _ => None,
+        };
+        match b {
+            Some(true) => {
+                q.and_where(col("tn_parent_id").is_null());
             }
+            Some(false) => {
+                q.and_where(col("tn_parent_id").is_not_null());
+            }
+            None => {}
         }
+    }
     if !errors.is_empty() && data.strict() {
         return Err(ApiError::validation(Value::Object(errors)));
     }

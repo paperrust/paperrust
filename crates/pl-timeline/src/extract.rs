@@ -44,10 +44,7 @@ struct Pattern {
 }
 
 fn p(kind: DateKind, src: &str) -> Pattern {
-    Pattern {
-        kind,
-        re: Regex::new(&format!(r"(?i)\b(?:{src})\b")).expect("timeline pattern"),
-    }
+    Pattern { kind, re: Regex::new(&format!(r"(?i)\b(?:{src})\b")).expect("timeline pattern") }
 }
 
 /// Generic phrases (lower confidence).
@@ -59,8 +56,7 @@ static GENERIC: LazyLock<Regex> = LazyLock::new(|| {
 static BLANK_LINE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\n[ \t\r\x0c]*\n").unwrap());
 
 /// Words between phrase and date that point to a start rather than an end.
-static START_WORDS: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?i)\b(?:ab|seit|vom|from|since)\b").unwrap());
+static START_WORDS: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)\b(?:ab|seit|vom|from|since)\b").unwrap());
 
 static PATTERNS: LazyLock<Vec<Pattern>> = LazyLock::new(|| {
     vec![
@@ -101,27 +97,16 @@ impl DateParse {
                 languages.push(l.into());
             }
         }
-        let order = if date_order.trim().is_empty() {
-            "DMY".to_string()
-        } else {
-            date_order.trim().to_uppercase()
-        };
+        let order = if date_order.trim().is_empty() { "DMY".to_string() } else { date_order.trim().to_uppercase() };
         let cfg = DateParserConfig {
             languages,
-            timezone_str: if timezone.trim().is_empty() {
-                "UTC".into()
-            } else {
-                timezone.trim().into()
-            },
+            timezone_str: if timezone.trim().is_empty() { "UTC".into() } else { timezone.trim().into() },
             ignore_dates: Default::default(),
             reference_time: Utc::now().fixed_offset(),
             filename_date_order: None,
             content_date_order: order.clone(),
         };
-        DateParse {
-            parser: RegexDateParser::new(cfg),
-            order,
-        }
+        DateParse { parser: RegexDateParser::new(cfg), order }
     }
 
     /// From settings (`PAPERLESS_DATE_ORDER`, `PAPERLESS_DATE_PARSER_LANGUAGES`,
@@ -129,8 +114,7 @@ impl DateParse {
     pub fn from_lookup(get: impl Fn(&str) -> Option<String>) -> Self {
         let order = get("PAPERLESS_DATE_ORDER").unwrap_or_else(|| "DMY".into());
         let ocr = get("PAPERLESS_OCR_LANGUAGE").unwrap_or_else(|| "eng".into());
-        let explicit =
-            parse_dateparser_languages(get("PAPERLESS_DATE_PARSER_LANGUAGES").as_deref()).ok();
+        let explicit = parse_dateparser_languages(get("PAPERLESS_DATE_PARSER_LANGUAGES").as_deref()).ok();
         let langs = resolve_languages(explicit.as_deref(), &ocr);
         let tz = get("PAPERLESS_TIME_ZONE").unwrap_or_else(|| "UTC".into());
         DateParse::new(langs, &tz, &order)
@@ -156,20 +140,12 @@ fn char_floor(s: &str, mut i: usize) -> usize {
 
 /// Byte end after at most `n` characters from `start`.
 fn advance(s: &str, start: usize, n: usize) -> usize {
-    s[start..]
-        .char_indices()
-        .nth(n)
-        .map(|(i, _)| start + i)
-        .unwrap_or(s.len())
+    s[start..].char_indices().nth(n).map(|(i, _)| start + i).unwrap_or(s.len())
 }
 
 fn flat(s: &str, max: usize) -> String {
     let f = s.split_whitespace().collect::<Vec<_>>().join(" ");
-    if f.chars().count() <= max {
-        f
-    } else {
-        f.chars().take(max).collect()
-    }
+    if f.chars().count() <= max { f } else { f.chars().take(max).collect() }
 }
 
 /// All detected dates in `content`; `created` (document date) lowers the confidence of earlier
@@ -201,13 +177,7 @@ pub fn extract(content: &str, created: Option<NaiveDate>, dp: &DateParse) -> Vec
             }
             let Some(date) = dp.parse(ds) else { continue };
             let mut conf = 0.95 - dist as f32 / 100.0;
-            if GENERIC.is_match(
-                m.as_str()
-                    .split_whitespace()
-                    .collect::<Vec<_>>()
-                    .join(" ")
-                    .as_str(),
-            ) {
+            if GENERIC.is_match(m.as_str().split_whitespace().collect::<Vec<_>>().join(" ").as_str()) {
                 conf -= 0.15;
             }
             if created.is_some_and(|c| date < c) {
@@ -232,11 +202,7 @@ pub fn extract(content: &str, created: Option<NaiveDate>, dp: &DateParse) -> Vec
     }
     let mut out: Vec<Found> = best.into_values().collect();
     if out.len() > MAX_PER_DOCUMENT {
-        out.sort_by(|a, b| {
-            b.confidence
-                .partial_cmp(&a.confidence)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        out.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal));
         out.truncate(MAX_PER_DOCUMENT);
     }
     out.sort_by_key(|f| (f.date, f.kind));
@@ -272,71 +238,24 @@ mod tests {
     #[test]
     fn german_phrases() {
         let cases = [
-            (
-                "Der Betrag ist fällig am 15.01.2027.",
-                DateKind::Due,
-                d(2027, 1, 15),
-            ),
-            (
-                "Fälligkeitsdatum: 1. März 2027",
-                DateKind::Due,
-                d(2027, 3, 1),
-            ),
+            ("Der Betrag ist fällig am 15.01.2027.", DateKind::Due, d(2027, 1, 15)),
+            ("Fälligkeitsdatum: 1. März 2027", DateKind::Due, d(2027, 3, 1)),
             ("Zahlungsziel 05.12.2026", DateKind::Due, d(2026, 12, 5)),
-            (
-                "Bitte überweisen Sie bis zum 20.12.2026",
-                DateKind::Due,
-                d(2026, 12, 20),
-            ),
-            (
-                "Ihr Ausweis ist gültig bis 31.08.2031",
-                DateKind::ValidUntil,
-                d(2031, 8, 31),
-            ),
-            (
-                "Gueltig bis: 2028-06-30",
-                DateKind::ValidUntil,
-                d(2028, 6, 30),
-            ),
-            (
-                "Laufzeit bis 31.12.2027",
-                DateKind::ValidUntil,
-                d(2027, 12, 31),
-            ),
-            (
-                "Kündigung bis spätestens 30.09.2027 möglich",
-                DateKind::CancelBy,
-                d(2027, 9, 30),
-            ),
+            ("Bitte überweisen Sie bis zum 20.12.2026", DateKind::Due, d(2026, 12, 20)),
+            ("Ihr Ausweis ist gültig bis 31.08.2031", DateKind::ValidUntil, d(2031, 8, 31)),
+            ("Gueltig bis: 2028-06-30", DateKind::ValidUntil, d(2028, 6, 30)),
+            ("Laufzeit bis 31.12.2027", DateKind::ValidUntil, d(2027, 12, 31)),
+            ("Kündigung bis spätestens 30.09.2027 möglich", DateKind::CancelBy, d(2027, 9, 30)),
             ("Kündbar zum 31.03.2027", DateKind::CancelBy, d(2027, 3, 31)),
-            (
-                "Kündigungstermin: 31.12.2026",
-                DateKind::CancelBy,
-                d(2026, 12, 31),
-            ),
-            (
-                "Garantie bis 14.02.2028",
-                DateKind::WarrantyUntil,
-                d(2028, 2, 14),
-            ),
-            (
-                "Gewährleistung bis 01.07.2028",
-                DateKind::WarrantyUntil,
-                d(2028, 7, 1),
-            ),
-            (
-                "Versicherungsbeginn 01.01.2026",
-                DateKind::ValidFrom,
-                d(2026, 1, 1),
-            ),
+            ("Kündigungstermin: 31.12.2026", DateKind::CancelBy, d(2026, 12, 31)),
+            ("Garantie bis 14.02.2028", DateKind::WarrantyUntil, d(2028, 2, 14)),
+            ("Gewährleistung bis 01.07.2028", DateKind::WarrantyUntil, d(2028, 7, 1)),
+            ("Versicherungsbeginn 01.01.2026", DateKind::ValidFrom, d(2026, 1, 1)),
             ("Gültig ab 01.04.2026", DateKind::ValidFrom, d(2026, 4, 1)),
         ];
         for (text, kind, date) in cases {
             let r = extract(text, None, &dp());
-            assert!(
-                r.iter().any(|f| f.kind == kind && f.date == date),
-                "{text}: {r:?}"
-            );
+            assert!(r.iter().any(|f| f.kind == kind && f.date == date), "{text}: {r:?}");
         }
     }
 
@@ -346,48 +265,22 @@ mod tests {
             ("Payment due: 12/01/2026", DateKind::Due, d(2026, 1, 12)),
             ("Due date 15 January 2027", DateKind::Due, d(2027, 1, 15)),
             ("Payable by 30.11.2026", DateKind::Due, d(2026, 11, 30)),
-            (
-                "This card is valid until 31.08.2030",
-                DateKind::ValidUntil,
-                d(2030, 8, 31),
-            ),
-            (
-                "Expiry date: 2029-05-31",
-                DateKind::ValidUntil,
-                d(2029, 5, 31),
-            ),
-            (
-                "Cancel by 01.03.2027 to avoid renewal",
-                DateKind::CancelBy,
-                d(2027, 3, 1),
-            ),
-            (
-                "Warranty until 20.06.2028",
-                DateKind::WarrantyUntil,
-                d(2028, 6, 20),
-            ),
+            ("This card is valid until 31.08.2030", DateKind::ValidUntil, d(2030, 8, 31)),
+            ("Expiry date: 2029-05-31", DateKind::ValidUntil, d(2029, 5, 31)),
+            ("Cancel by 01.03.2027 to avoid renewal", DateKind::CancelBy, d(2027, 3, 1)),
+            ("Warranty until 20.06.2028", DateKind::WarrantyUntil, d(2028, 6, 20)),
             ("Valid from 01.02.2026", DateKind::ValidFrom, d(2026, 2, 1)),
         ];
         for (text, kind, date) in cases {
             let r = extract(text, None, &dp());
-            assert!(
-                r.iter().any(|f| f.kind == kind && f.date == date),
-                "{text}: {r:?}"
-            );
+            assert!(r.iter().any(|f| f.kind == kind && f.date == date), "{text}: {r:?}");
         }
     }
 
     #[test]
     fn negatives_and_rules() {
         // no date after the phrase
-        assert!(
-            extract(
-                "Kündigungsfrist drei Monate. Garantie 2 Jahre.",
-                None,
-                &dp()
-            )
-            .is_empty()
-        );
+        assert!(extract("Kündigungsfrist drei Monate. Garantie 2 Jahre.", None, &dp()).is_empty());
         // "ab Kaufdatum" (German: "from purchase date") is a start, not a warranty end
         let r = extract("Garantie 24 Monate ab Kaufdatum 12.03.2025", None, &dp());
         assert!(r.is_empty(), "{r:?}");

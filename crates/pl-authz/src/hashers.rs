@@ -24,15 +24,12 @@ pub const UNUSABLE_PASSWORD_PREFIX: &str = "!";
 /// `UNUSABLE_PASSWORD_SUFFIX_LENGTH`.
 pub const UNUSABLE_PASSWORD_SUFFIX_LENGTH: usize = 40;
 /// `django.utils.crypto.RANDOM_STRING_CHARS`.
-pub const RANDOM_STRING_CHARS: &[u8] =
-    b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+pub const RANDOM_STRING_CHARS: &[u8] = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
 /// `get_random_string(length)`.
 pub fn get_random_string(length: usize) -> String {
     let mut rng = rand::rngs::OsRng;
-    (0..length)
-        .map(|_| RANDOM_STRING_CHARS[rng.gen_range(0..RANDOM_STRING_CHARS.len())] as char)
-        .collect()
+    (0..length).map(|_| RANDOM_STRING_CHARS[rng.gen_range(0..RANDOM_STRING_CHARS.len())] as char).collect()
 }
 
 /// `BasePasswordHasher.salt()`: ceil(128 / log2(62)) = 22 characters.
@@ -55,10 +52,7 @@ pub fn is_password_usable(encoded: Option<&str>) -> bool {
 
 /// `make_password(None)`: an unusable password.
 pub fn make_unusable_password() -> String {
-    format!(
-        "{UNUSABLE_PASSWORD_PREFIX}{}",
-        get_random_string(UNUSABLE_PASSWORD_SUFFIX_LENGTH)
-    )
+    format!("{UNUSABLE_PASSWORD_PREFIX}{}", get_random_string(UNUSABLE_PASSWORD_SUFFIX_LENGTH))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -76,22 +70,12 @@ fn pbkdf2_b64(algo: Algo, password: &str, salt: &str, iterations: u32) -> String
     match algo {
         Algo::Sha256 => {
             let mut out = [0u8; 32];
-            pbkdf2::pbkdf2_hmac::<sha2::Sha256>(
-                password.as_bytes(),
-                salt.as_bytes(),
-                iterations,
-                &mut out,
-            );
+            pbkdf2::pbkdf2_hmac::<sha2::Sha256>(password.as_bytes(), salt.as_bytes(), iterations, &mut out);
             b64_std(&out)
         }
         Algo::Sha1 => {
             let mut out = [0u8; 20];
-            pbkdf2::pbkdf2_hmac::<sha1::Sha1>(
-                password.as_bytes(),
-                salt.as_bytes(),
-                iterations,
-                &mut out,
-            );
+            pbkdf2::pbkdf2_hmac::<sha1::Sha1>(password.as_bytes(), salt.as_bytes(), iterations, &mut out);
             b64_std(&out)
         }
     }
@@ -106,10 +90,7 @@ fn algo_name(a: Algo) -> &'static str {
 
 /// `PBKDF2PasswordHasher.encode(password, salt, iterations)`.
 pub fn encode_pbkdf2_sha256(password: &str, salt: &str, iterations: u32) -> String {
-    format!(
-        "pbkdf2_sha256${iterations}${salt}${}",
-        pbkdf2_b64(Algo::Sha256, password, salt, iterations)
-    )
+    format!("pbkdf2_sha256${iterations}${salt}${}", pbkdf2_b64(Algo::Sha256, password, salt, iterations))
 }
 
 /// `make_password(password)` with the default hasher (pbkdf2_sha256, 1 000 000 iterations,
@@ -143,19 +124,12 @@ fn decode(encoded: &str) -> Option<Decoded<'_>> {
     let iterations: u32 = it.next()?.parse().ok()?;
     let salt = it.next()?;
     it.next()?;
-    Some(Decoded {
-        algo,
-        iterations,
-        salt,
-    })
+    Some(Decoded { algo, iterations, salt })
 }
 
 /// `verify_password(password, encoded)` with the default preferred hasher.
 pub fn verify_password(password: &str, encoded: &str) -> Verified {
-    let no = Verified {
-        is_correct: false,
-        must_update: false,
-    };
+    let no = Verified { is_correct: false, must_update: false };
     if !is_password_usable(Some(encoded)) {
         return no;
     }
@@ -169,10 +143,7 @@ pub fn verify_password(password: &str, encoded: &str) -> Verified {
         _ => None,
     };
     if let Some(is_correct) = other {
-        return Verified {
-            is_correct,
-            must_update: true,
-        };
+        return Verified { is_correct, must_update: true };
     }
     // unknown/uninstalled algorithm -> (False, False)
     let Some(d) = decode(encoded) else {
@@ -182,15 +153,8 @@ pub fn verify_password(password: &str, encoded: &str) -> Verified {
         return no;
     }
     let hasher_changed = d.algo != Algo::Sha256;
-    let must_update =
-        hasher_changed || d.iterations != PBKDF2_ITERATIONS || must_update_salt(d.salt);
-    let recomputed = format!(
-        "{}${}${}${}",
-        algo_name(d.algo),
-        d.iterations,
-        d.salt,
-        pbkdf2_b64(d.algo, password, d.salt, d.iterations)
-    );
+    let must_update = hasher_changed || d.iterations != PBKDF2_ITERATIONS || must_update_salt(d.salt);
+    let recomputed = format!("{}${}${}${}", algo_name(d.algo), d.iterations, d.salt, pbkdf2_b64(d.algo, password, d.salt, d.iterations));
     let is_correct = constant_time_eq(encoded.as_bytes(), recomputed.as_bytes());
     if !is_correct && !hasher_changed && must_update {
         // harden_runtime: run the missing iterations
@@ -198,18 +162,13 @@ pub fn verify_password(password: &str, encoded: &str) -> Verified {
             let _ = pbkdf2_b64(d.algo, password, d.salt, PBKDF2_ITERATIONS - d.iterations);
         }
     }
-    Verified {
-        is_correct,
-        must_update,
-    }
+    Verified { is_correct, must_update }
 }
 
 /// Base64 without padding (argon2-cffi / PHC strings: standard alphabet, no `=`).
 fn b64_nopad(s: &str) -> Option<Vec<u8>> {
     use base64::Engine as _;
-    base64::engine::general_purpose::STANDARD_NO_PAD
-        .decode(s.trim_end_matches('='))
-        .ok()
+    base64::engine::general_purpose::STANDARD_NO_PAD.decode(s.trim_end_matches('=')).ok()
 }
 
 /// `Argon2PasswordHasher.verify`: `argon2.PasswordHasher().verify("$" + rest, password)`.
@@ -264,10 +223,7 @@ fn verify_argon2(password: &str, encoded: &str) -> bool {
         return false;
     };
     let mut out = vec![0u8; expected.len()];
-    if argon2::Argon2::new(algorithm, version, params)
-        .hash_password_into(password.as_bytes(), &salt, &mut out)
-        .is_err()
-    {
+    if argon2::Argon2::new(algorithm, version, params).hash_password_into(password.as_bytes(), &salt, &mut out).is_err() {
         return false;
     }
     constant_time_eq(&out, &expected)
@@ -342,10 +298,7 @@ mod tests {
         assert!(v.must_update, "1000 iterations != 1_000_000");
         // A wrong password here would run harden_runtime (999 000 extra iterations), too slow
         // for an unoptimised test build; covered for sha1 below (no hardening on hasher change).
-        assert_eq!(
-            encode_pbkdf2_sha256("lètmein", "seasalt1234567890abcde", 1000),
-            V256
-        );
+        assert_eq!(encode_pbkdf2_sha256("lètmein", "seasalt1234567890abcde", 1000), V256);
     }
 
     #[test]
@@ -369,10 +322,7 @@ mod tests {
         assert!(!check_password("x", "bcrypt_sha256$garbage"));
         assert!(!check_password("x", "scrypt$1000$salt$8$1$abc"));
         // plain bcrypt is not in Django's default list
-        assert!(!check_password(
-            "U*U",
-            "bcrypt$$2a$05$CCCCCCCCCCCCCCCCCCCCC.E5YPO9kmyuRGyh0XouQYb4YMJKvyOeW"
-        ));
+        assert!(!check_password("U*U", "bcrypt$$2a$05$CCCCCCCCCCCCCCCCCCCCC.E5YPO9kmyuRGyh0XouQYb4YMJKvyOeW"));
         assert!(!check_password("x", "pbkdf2_sha256$abc"));
         assert!(!is_password_usable(Some(&make_unusable_password())));
         assert_eq!(make_unusable_password().len(), 41);

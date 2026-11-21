@@ -55,11 +55,7 @@ pub fn py_datetime(y: i64, m: i64, d: i64, h: i64, mi: i64, s: i64, us: i64) -> 
 
 /// Range check for the result of datetime arithmetic (OverflowError).
 pub fn py_check(dt: NaiveDateTime) -> DResult<NaiveDateTime> {
-    if (1..=9999).contains(&dt.year()) {
-        Ok(dt)
-    } else {
-        Err(DErr::Value)
-    }
+    if (1..=9999).contains(&dt.year()) { Ok(dt) } else { Err(DErr::Value) }
 }
 
 /// `dt + timedelta(...)`
@@ -443,9 +439,5 @@ pub fn relative_days(current_wday: i64, wday: i64, dir: i64) -> i64 {
     if current_wday == wday {
         return 7 * dir;
     }
-    if dir == 1 {
-        (wday + 7 - current_wday) % 7
-    } else {
-        -((current_wday + 7 - wday) % 7)
-    }
+    if dir == 1 { (wday + 7 - current_wday) % 7 } else { -((current_wday + 7 - wday) % 7) }
 }

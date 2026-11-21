@@ -127,10 +127,15 @@ mod tests {
     #[test]
     fn ordered_results_and_skips() {
         for jobs in [1, 2, 3, 8] {
-            let r = ordered(jobs, 20, |i| Ok((i % 5 != 3).then_some(i * 10)), |i, t| {
-                std::thread::sleep(delay(i));
-                Ok(format!("{i}:{t}"))
-            })
+            let r = ordered(
+                jobs,
+                20,
+                |i| Ok((i % 5 != 3).then_some(i * 10)),
+                |i, t| {
+                    std::thread::sleep(delay(i));
+                    Ok(format!("{i}:{t}"))
+                },
+            )
             .unwrap();
             let want: Vec<Option<String>> = (0..20).map(|i| (i % 5 != 3).then(|| format!("{i}:{}", i * 10))).collect();
             assert_eq!(r, want, "jobs={jobs}");

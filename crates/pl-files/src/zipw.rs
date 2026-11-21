@@ -86,8 +86,7 @@ fn dos_datetime(mtime: std::time::SystemTime, tz: chrono_tz::Tz) -> io::Result<(
         Ok(d) => d.as_secs() as i64,
         Err(e) => -(e.duration().as_secs() as i64),
     };
-    let utc = chrono::DateTime::<chrono::Utc>::from_timestamp(secs, 0)
-        .ok_or_else(|| io::Error::other("invalid mtime"))?;
+    let utc = chrono::DateTime::<chrono::Utc>::from_timestamp(secs, 0).ok_or_else(|| io::Error::other("invalid mtime"))?;
     let local = tz.from_utc_datetime(&utc.naive_utc());
     if local.year() < 1980 {
         // zipfile (strict_timestamps=True): ValueError -> 500 upstream
@@ -110,13 +109,7 @@ fn file_mode(_meta: &std::fs::Metadata) -> u32 {
 
 impl ZipWriter {
     pub fn new(file: File, method: Method, tz: chrono_tz::Tz) -> Self {
-        ZipWriter {
-            out: BufWriter::with_capacity(64 * 1024, file),
-            entries: Vec::new(),
-            names: HashSet::new(),
-            tz,
-            method,
-        }
+        ZipWriter { out: BufWriter::with_capacity(64 * 1024, file), entries: Vec::new(), names: HashSet::new(), tz, method }
     }
 
     /// `filename in zipf.namelist()`
@@ -135,11 +128,7 @@ impl ZipWriter {
         let (dos_time, dos_date) = dos_datetime(meta.modified()?, self.tz)?;
         let file_size = meta.len();
         let zip64 = (file_size as f64) * 1.05 > ZIP64_LIMIT as f64;
-        let (name_bytes, flags) = if name.is_ascii() {
-            (name.as_bytes().to_vec(), 0u16)
-        } else {
-            (name.as_bytes().to_vec(), 0x800u16)
-        };
+        let (name_bytes, flags) = if name.is_ascii() { (name.as_bytes().to_vec(), 0u16) } else { (name.as_bytes().to_vec(), 0x800u16) };
         let method = self.method;
         let extract_version = if zip64 { ZIP64_VERSION } else { DEFAULT_VERSION };
         let header_offset = self.out.stream_position()?;
@@ -216,8 +205,7 @@ impl ZipWriter {
         }
         self.out.write_all(&p)?;
         if zip64 {
-            self.out
-                .seek(SeekFrom::Start(header_offset + 30 + name_bytes.len() as u64 + 4))?;
+            self.out.seek(SeekFrom::Start(header_offset + 30 + name_bytes.len() as u64 + 4))?;
             let mut e = Vec::with_capacity(16);
             put64(&mut e, total);
             put64(&mut e, compress_size);

@@ -14,10 +14,10 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use pl_authz::models::DOCUMENT;
-use pl_authz::perms::{has_perms_owner_aware, ObjRef};
+use pl_authz::perms::{ObjRef, has_perms_owner_aware};
 use pl_authz::{AuthUser, User};
 use pl_core::{ApiError, AppState, Drf, RequestContext};
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use sqlx::Row;
 
 use crate::config::{AiConfig, AutoMode, LlmBackend};
@@ -28,16 +28,15 @@ use crate::prompt_store::{self, PromptKind, PromptSet};
 
 pub(crate) fn require_superuser(auth: &AuthUser) -> Result<&User, ApiError> {
     let u = auth.user();
-    if u.is_active && u.is_superuser {
-        Ok(u)
-    } else {
-        Err(ApiError::permission_denied())
-    }
+    if u.is_active && u.is_superuser { Ok(u) } else { Err(ApiError::permission_denied()) }
 }
 
 pub(crate) fn storage_err(e: sqlx::Error) -> ApiError {
     if matches!(&e, sqlx::Error::Database(d) if d.code().as_deref() == Some("42P01")) {
-        return ApiError::with_detail(StatusCode::SERVICE_UNAVAILABLE, "AI storage is not installed (migration 0003_paperrust_ai_prompts_jobs.sql).");
+        return ApiError::with_detail(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "AI storage is not installed (migration 0003_paperrust_ai_prompts_jobs.sql).",
+        );
     }
     tracing::error!(target: "pl_ai", error = %e, "ai storage failed");
     ApiError::internal("ai storage failed")
@@ -77,7 +76,10 @@ pub async fn load_options(db: &sqlx::PgPool) -> AiOptions {
 
 /// Custom fields (all; `supported` = the AI can handle the type).
 pub async fn load_field_defs(db: &sqlx::PgPool) -> Result<Vec<FieldDef>, ApiError> {
-    let rows = sqlx::query("SELECT id, name, data_type, extra_data FROM documents_customfield ORDER BY name, id").fetch_all(db).await.map_err(ApiError::internal)?;
+    let rows = sqlx::query("SELECT id, name, data_type, extra_data FROM documents_customfield ORDER BY name, id")
+        .fetch_all(db)
+        .await
+        .map_err(ApiError::internal)?;
     Ok(rows
         .iter()
         .filter_map(|r| {
@@ -157,7 +159,13 @@ fn parse_kind(k: &str) -> Result<PromptKind, ApiError> {
 }
 
 /// PUT /api/x-ai/prompts/{kind}/ `{"template": "…"}`
-pub async fn prompts_put(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser, Path(kind): Path<String>, body: Bytes) -> Result<Response, ApiError> {
+pub async fn prompts_put(
+    State(state): State<AppState>,
+    ctx: RequestContext,
+    auth: AuthUser,
+    Path(kind): Path<String>,
+    body: Bytes,
+) -> Result<Response, ApiError> {
     let user = require_superuser(&auth)?;
     let kind = parse_kind(&kind)?;
     let b = body_json(&body)?;
@@ -178,11 +186,18 @@ pub async fn prompts_put(State(state): State<AppState>, ctx: RequestContext, aut
     .await
     .map_err(storage_err)?;
     let set = load_prompts(state.db()).await;
-    Ok(Drf::ok(prompt_json(kind, &set, Some(pl_core::datetime::python_isoformat(&chrono::Utc::now())))).indent(ctx.negotiation.indent).into_response())
+    Ok(Drf::ok(prompt_json(kind, &set, Some(pl_core::datetime::python_isoformat(&chrono::Utc::now()))))
+        .indent(ctx.negotiation.indent)
+        .into_response())
 }
 
 /// DELETE /api/x-ai/prompts/{kind}/ – back to the built-in template.
-pub async fn prompts_reset(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser, Path(kind): Path<String>) -> Result<Response, ApiError> {
+pub async fn prompts_reset(
+    State(state): State<AppState>,
+    ctx: RequestContext,
+    auth: AuthUser,
+    Path(kind): Path<String>,
+) -> Result<Response, ApiError> {
     require_superuser(&auth)?;
     let kind = parse_kind(&kind)?;
     sqlx::query("DELETE FROM paperrust_ai_prompt WHERE kind = $1").bind(kind.as_str()).execute(state.db()).await.map_err(storage_err)?;
@@ -197,9 +212,22 @@ pub fn language_name(cfg: &AiConfig, ui_lang: Option<&str>) -> String {
 }
 
 /// Fills a template for a document (without a model call).
-pub async fn render_for_document(state: &AppState, cfg: &AiConfig, kind: PromptKind, template: &str, doc: &super::data::AiDoc, user: Option<&User>, fields: &[FieldDef]) -> String {
+pub async fn render_for_document(
+    state: &AppState,
+    cfg: &AiConfig,
+    kind: PromptKind,
+    template: &str,
+    doc: &super::data::AiDoc,
+    user: Option<&User>,
+    fields: &[FieldDef],
+) -> String {
     let content_head: String = doc.content.chars().take(crate::classifier::PROMPT_CONTENT_CHARS).collect();
-    let content = crate::classifier::Truncator::truncate_content(&crate::tokenizer::TiktokenTruncator, &content_head, cfg.llm_embedding_chunk_size as usize, cfg.llm_context_size as usize);
+    let content = crate::classifier::Truncator::truncate_content(
+        &crate::tokenizer::TiktokenTruncator,
+        &content_head,
+        cfg.llm_embedding_chunk_size as usize,
+        cfg.llm_context_size as usize,
+    );
     let filename = doc.filename.clone().unwrap_or_default();
     let lang = language_name(cfg, None);
     match kind {
@@ -208,13 +236,21 @@ pub async fn render_for_document(state: &AppState, cfg: &AiConfig, kind: PromptK
             let block = crate::classifier::format_taxonomy_for_prompt(&cands);
             prompt_store::render(
                 template,
-                &[("content", &content), ("filename", &filename), ("candidates", &block), ("candidate_rules", prompt_store::classification_rules(cands.any()))],
+                &[
+                    ("content", &content),
+                    ("filename", &filename),
+                    ("candidates", &block),
+                    ("candidate_rules", prompt_store::classification_rules(cands.any())),
+                ],
             )
         }
         PromptKind::Title => prompt_store::render(template, &[("content", &content), ("filename", &filename), ("language", &lang)]),
         PromptKind::CustomFields => {
             let today = chrono::Local::now().date_naive().format("%Y-%m-%d").to_string();
-            prompt_store::render(template, &[("content", &content), ("fields", &custom_fields::prompt_fields(fields)), ("language", &lang), ("today", &today)])
+            prompt_store::render(
+                template,
+                &[("content", &content), ("fields", &custom_fields::prompt_fields(fields)), ("language", &lang), ("today", &today)],
+            )
         }
         PromptKind::VisionOcr => prompt_store::render(template, &[("language", &lang)]),
         PromptKind::ChatSystem => template.trim().to_string(),
@@ -223,7 +259,13 @@ pub async fn render_for_document(state: &AppState, cfg: &AiConfig, kind: PromptK
 
 /// POST /api/x-ai/prompts/{kind}/preview/ `{"document": id, "template"?: "…", "run"?: bool}` →
 /// `{"prompt", "result"?, "error"?}`. `run` calls the model (classification, title, custom fields).
-pub async fn prompts_preview(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser, Path(kind): Path<String>, body: Bytes) -> Result<Response, ApiError> {
+pub async fn prompts_preview(
+    State(state): State<AppState>,
+    ctx: RequestContext,
+    auth: AuthUser,
+    Path(kind): Path<String>,
+    body: Bytes,
+) -> Result<Response, ApiError> {
     let user = require_superuser(&auth)?;
     let kind = parse_kind(&kind)?;
     let b = body_json(&body)?;
@@ -236,7 +278,15 @@ pub async fn prompts_preview(State(state): State<AppState>, ctx: RequestContext,
     let doc = match b.get("document").and_then(Value::as_i64) {
         Some(id) => {
             let d = super::data::load_doc(state.db(), id).await?.ok_or_else(ApiError::not_found)?;
-            if !has_perms_owner_aware(state.db(), Some(user), "view_document", &DOCUMENT, ObjRef { id: d.root_id, owner_id: d.root_owner_id }).await? {
+            if !has_perms_owner_aware(
+                state.db(),
+                Some(user),
+                "view_document",
+                &DOCUMENT,
+                ObjRef { id: d.root_id, owner_id: d.root_owner_id },
+            )
+            .await?
+            {
                 return Err(ApiError::not_found());
             }
             Some(d)
@@ -249,8 +299,14 @@ pub async fn prompts_preview(State(state): State<AppState>, ctx: RequestContext,
             return Err(ApiError::validation(json!({"document": ["This field is required."]})));
         }
         let lang = language_name(&cfg, None);
-        let p = if kind == PromptKind::VisionOcr { prompt_store::render(&template, &[("language", &lang)]) } else { template.trim().to_string() };
-        return Ok(Drf::ok(json!({"prompt": p, "result": Value::Null, "error": Value::Null})).indent(ctx.negotiation.indent).into_response());
+        let p = if kind == PromptKind::VisionOcr {
+            prompt_store::render(&template, &[("language", &lang)])
+        } else {
+            template.trim().to_string()
+        };
+        return Ok(Drf::ok(json!({"prompt": p, "result": Value::Null, "error": Value::Null}))
+            .indent(ctx.negotiation.indent)
+            .into_response());
     };
     let opts = load_options(state.db()).await;
     let fields: Vec<FieldDef> = load_field_defs(state.db()).await?.into_iter().filter(|f| opts.custom_fields.contains(&f.id)).collect();
@@ -375,7 +431,12 @@ pub async fn provider_check(State(state): State<AppState>, ctx: RequestContext, 
     cfg.llm_request_timeout = cfg.llm_request_timeout.min(20);
     let check = match LlmClient::from_config(&cfg) {
         Ok(c) => c.check_connection().await,
-        Err(e) => crate::llm_ext::ConnectionCheck { ok: false, models: Vec::new(), model_available: None, error: Some(crate::llm_ext::friendly_error(&e)) },
+        Err(e) => crate::llm_ext::ConnectionCheck {
+            ok: false,
+            models: Vec::new(),
+            model_available: None,
+            error: Some(crate::llm_ext::friendly_error(&e)),
+        },
     };
     Ok(Drf::ok(serde_json::to_value(check).unwrap_or(Value::Null)).indent(ctx.negotiation.indent).into_response())
 }

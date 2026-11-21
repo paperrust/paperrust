@@ -117,12 +117,13 @@ async fn rev(pool: &PgPool, kind: Kind, id: i64) -> Option<i64> {
 
 /// pending-list rows (count, any with perm_change)
 async fn pending(pool: &PgPool, kind: Kind, id: i64) -> (i64, bool) {
-    let r = sqlx::query("SELECT count(*), coalesce(bool_or(perm_change), false) FROM paperrust_sync_pending WHERE kind = $1 AND local_id = $2")
-        .bind(kind.code())
-        .bind(id)
-        .fetch_one(pool)
-        .await
-        .unwrap();
+    let r =
+        sqlx::query("SELECT count(*), coalesce(bool_or(perm_change), false) FROM paperrust_sync_pending WHERE kind = $1 AND local_id = $2")
+            .bind(kind.code())
+            .bind(id)
+            .fetch_one(pool)
+            .await
+            .unwrap();
     (r.get(0), r.get(1))
 }
 
@@ -314,7 +315,11 @@ async fn triggers_capture_every_table() {
     assert_eq!(perm_epoch(&pool).await, e0 + 4);
 
     // Delete
-    exec(&pool, &format!("DELETE FROM documents_customfieldinstance WHERE document_id = {d}; DELETE FROM documents_customfield WHERE id = {cf}")).await;
+    exec(
+        &pool,
+        &format!("DELETE FROM documents_customfieldinstance WHERE document_id = {d}; DELETE FROM documents_customfield WHERE id = {cf}"),
+    )
+    .await;
     assert_eq!(rev(&pool, Kind::CustomField, cf).await, Some(2));
 
     // rollback leaves nothing behind
@@ -351,19 +356,25 @@ async fn sequencer_upserts_tombstones_and_restores() {
     assert_eq!((oseq, deleted), (Some(s2), true));
 
     // Wiederherstellen → upsert, gleiche UUID
-    let uuid_before: uuid::Uuid = sqlx::query_scalar("SELECT uuid FROM paperrust_sync_log WHERE kind = 1 AND local_id = $1").bind(d).fetch_one(&pool).await.unwrap();
+    let uuid_before: uuid::Uuid =
+        sqlx::query_scalar("SELECT uuid FROM paperrust_sync_log WHERE kind = 1 AND local_id = $1").bind(d).fetch_one(&pool).await.unwrap();
     exec(&pool, &format!("UPDATE documents_document SET deleted_at = NULL WHERE id = {d}")).await;
     sequence_until(&pool, || async { log(&pool, Kind::Document, d).await.is_some_and(|l| l.0 > s2) }).await;
     let (s3, op, _, _) = log(&pool, Kind::Document, d).await.unwrap();
     assert_eq!(op, "u");
-    let uuid_after: uuid::Uuid = sqlx::query_scalar("SELECT uuid FROM paperrust_sync_log WHERE kind = 1 AND local_id = $1").bind(d).fetch_one(&pool).await.unwrap();
+    let uuid_after: uuid::Uuid =
+        sqlx::query_scalar("SELECT uuid FROM paperrust_sync_log WHERE kind = 1 AND local_id = $1").bind(d).fetch_one(&pool).await.unwrap();
     assert_eq!(uuid_before, uuid_after);
 
     // delete permanently → delete; exactly one log entry per object
     exec(&pool, &format!("DELETE FROM documents_document WHERE id = {d}")).await;
     sequence_until(&pool, || async { log(&pool, Kind::Document, d).await.is_some_and(|l| l.0 > s3) }).await;
     assert_eq!(log(&pool, Kind::Document, d).await.unwrap().1, "d");
-    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM paperrust_sync_log WHERE kind = 1 AND local_id = $1").bind(d).fetch_one(&pool).await.unwrap();
+    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM paperrust_sync_log WHERE kind = 1 AND local_id = $1")
+        .bind(d)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
     assert_eq!(n, 1);
 
     // perm_seq is kept on later changes without a permission change
@@ -411,7 +422,8 @@ async fn late_committing_transaction_is_not_skipped() {
     let cursor = page.next_cursor;
 
     ta.commit().await.unwrap();
-    sequence_until(&pool, || async { log(&pool, Kind::Document, a).await.is_some() && log(&pool, Kind::Document, b).await.is_some() }).await;
+    sequence_until(&pool, || async { log(&pool, Kind::Document, a).await.is_some() && log(&pool, Kind::Document, b).await.is_some() })
+        .await;
     let sa = log(&pool, Kind::Document, a).await.unwrap().0;
     let sb = log(&pool, Kind::Document, b).await.unwrap().0;
     assert!(sa > cursor && sb > cursor, "cursor {cursor}, a {sa}, b {sb}");
@@ -547,10 +559,11 @@ async fn disable_enable_rebuild_and_purge() {
     pl_sync::rebuild(&pool).await.unwrap();
     let st = pl_sync::status(&pool).await.unwrap();
     assert_eq!(st.objects, objects);
-    let dup: i64 = sqlx::query_scalar("SELECT count(*) FROM (SELECT kind, local_id FROM paperrust_sync_log GROUP BY 1, 2 HAVING count(*) > 1) x")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+    let dup: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM (SELECT kind, local_id FROM paperrust_sync_log GROUP BY 1, 2 HAVING count(*) > 1) x")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
     assert_eq!(dup, 0);
     let missing: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM documents_document d WHERE d.deleted_at IS NULL AND d.root_document_id IS NULL

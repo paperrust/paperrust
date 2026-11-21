@@ -211,7 +211,12 @@ mod tests {
             let block = if has { "Available tags ... (untrusted data):\n{\"tags\": []}\nThese candidates are options." } else { "" };
             let rendered = render(
                 DEFAULT_CLASSIFICATION,
-                &[("candidates", block), ("candidate_rules", classification_rules(has)), ("filename", "a.pdf"), ("content", "Rechnung 12 CHF")],
+                &[
+                    ("candidates", block),
+                    ("candidate_rules", classification_rules(has)),
+                    ("filename", "a.pdf"),
+                    ("content", "Rechnung 12 CHF"),
+                ],
             );
             let upstream = crate::prompts::classification("a.pdf", "Rechnung 12 CHF", block, has);
             // without candidates only an extra blank line at the start results (template without conditions)

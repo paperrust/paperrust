@@ -71,7 +71,8 @@ fn hashes(root: &Path) -> BTreeMap<String, String> {
 }
 
 async fn table_digests(pool: &PgPool) -> BTreeMap<String, (i64, String)> {
-    let tables: Vec<String> = sqlx::query_scalar("SELECT tablename::text FROM pg_tables WHERE schemaname = 'public' ORDER BY 1").fetch_all(pool).await.unwrap();
+    let tables: Vec<String> =
+        sqlx::query_scalar("SELECT tablename::text FROM pg_tables WHERE schemaname = 'public' ORDER BY 1").fetch_all(pool).await.unwrap();
     let mut out = BTreeMap::new();
     for t in tables {
         // run data of the backup itself changes between dump and comparison
@@ -125,7 +126,10 @@ async fn roundtrip(target: Target, src: PgPool, dst: PgPool) {
 
     // 4. restore into a new media folder and the second database
     let restored = work.path().join("restored");
-    let st = backup::restore(&target, &id, &RestoreOptions { snapshot: "latest", media_dir: Some(&restored), db: Some(&dst), overwrite: false }).await.unwrap();
+    let st =
+        backup::restore(&target, &id, &RestoreOptions { snapshot: "latest", media_dir: Some(&restored), db: Some(&dst), overwrite: false })
+            .await
+            .unwrap();
     assert_eq!(st.files, 77);
     assert!(st.db_tables.unwrap() > 50);
     assert_eq!(hashes(&restored), hashes(&media_root), "Medien Bit für Bit gleich");
@@ -136,28 +140,40 @@ async fn roundtrip(target: Target, src: PgPool, dst: PgPool) {
         assert_eq!(Some(v), b.get(t), "Tabelle {t} weicht ab");
     }
     // sequences reset: the next id is free
-    let free: bool = sqlx::query_scalar("SELECT nextval(pg_get_serial_sequence('documents_tag', 'id')) > (SELECT coalesce(max(id), 0) FROM documents_tag)")
-        .fetch_one(&dst)
-        .await
-        .unwrap();
+    let free: bool = sqlx::query_scalar(
+        "SELECT nextval(pg_get_serial_sequence('documents_tag', 'id')) > (SELECT coalesce(max(id), 0) FROM documents_tag)",
+    )
+    .fetch_one(&dst)
+    .await
+    .unwrap();
     assert!(free);
 
     // 5. restore an older state specifically: dup-b.txt has the old content there
     let old = work.path().join("restored-old");
-    backup::restore(&target, &id, &RestoreOptions { snapshot: &snaps[2].0, media_dir: Some(&old), db: None, overwrite: false }).await.unwrap();
+    backup::restore(&target, &id, &RestoreOptions { snapshot: &snaps[2].0, media_dir: Some(&old), db: None, overwrite: false })
+        .await
+        .unwrap();
     assert_eq!(std::fs::read(old.join("documents/originals/dup-b.txt")).unwrap(), b"same content");
     // existing, differing file is not silently overwritten
-    assert!(backup::restore(&target, &id, &RestoreOptions { snapshot: "latest", media_dir: Some(&old), db: None, overwrite: false }).await.is_err());
+    assert!(
+        backup::restore(&target, &id, &RestoreOptions { snapshot: "latest", media_dir: Some(&old), db: None, overwrite: false })
+            .await
+            .is_err()
+    );
 }
 
 #[tokio::test]
 #[ignore = "braucht PAPERRUST_GUARD_TEST_DATABASE_URL und PAPERRUST_GUARD_TEST_TARGET_DATABASE_URL (Wegwerf-DBs, siehe Kopf)"]
 async fn local_target_roundtrip() {
-    let (Some(src), Some(dst)) = (pool("PAPERRUST_GUARD_TEST_DATABASE_URL").await, pool("PAPERRUST_GUARD_TEST_TARGET_DATABASE_URL").await) else {
+    let (Some(src), Some(dst)) = (pool("PAPERRUST_GUARD_TEST_DATABASE_URL").await, pool("PAPERRUST_GUARD_TEST_TARGET_DATABASE_URL").await)
+    else {
         eprintln!("skipped: database URLs not set");
         return;
     };
-    sqlx::query("DROP TABLE IF EXISTS paperrust_backup_object, paperrust_backup_filecache, paperrust_backup_run").execute(&src).await.unwrap();
+    sqlx::query("DROP TABLE IF EXISTS paperrust_backup_object, paperrust_backup_filecache, paperrust_backup_run")
+        .execute(&src)
+        .await
+        .unwrap();
     pl_guard::store::migrate(&src).await.unwrap();
     let t = tempfile::tempdir().unwrap();
     roundtrip(Target::Local(t.path().join("backup")), src, dst).await;
@@ -174,11 +190,15 @@ async fn local_target_roundtrip() {
 #[tokio::test]
 #[ignore = "braucht PAPERRUST_GUARD_TEST_DATABASE_URL und PAPERRUST_GUARD_TEST_TARGET_DATABASE_URL (Wegwerf-DBs, siehe Kopf)"]
 async fn s3_target_roundtrip_with_object_lock() {
-    let (Some(src), Some(dst)) = (pool("PAPERRUST_GUARD_TEST_DATABASE_URL").await, pool("PAPERRUST_GUARD_TEST_TARGET_DATABASE_URL").await) else {
+    let (Some(src), Some(dst)) = (pool("PAPERRUST_GUARD_TEST_DATABASE_URL").await, pool("PAPERRUST_GUARD_TEST_TARGET_DATABASE_URL").await)
+    else {
         eprintln!("skipped: database URLs not set");
         return;
     };
-    sqlx::query("DROP TABLE IF EXISTS paperrust_backup_object, paperrust_backup_filecache, paperrust_backup_run").execute(&src).await.unwrap();
+    sqlx::query("DROP TABLE IF EXISTS paperrust_backup_object, paperrust_backup_filecache, paperrust_backup_run")
+        .execute(&src)
+        .await
+        .unwrap();
     pl_guard::store::migrate(&src).await.unwrap();
     let (ep, state) = s3mock::start().await;
     let target = s3mock::target(&ep, "nas", LockMode::Compliance);

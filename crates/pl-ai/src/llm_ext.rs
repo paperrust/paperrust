@@ -11,10 +11,12 @@
 //! (`PAPERLESS_AI_LLM_ALLOW_INTERNAL_ENDPOINTS`), no redirects, response size limited, the
 //! API key never appears in errors or logs.
 
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 
 use crate::config::LlmBackend;
-use crate::llm::{map_reqwest, pinned_client, read_body_limited, validate_and_pin, BodyError, LlmClient, LlmError, LLM_SYSTEM_PROMPT, MAX_RESPONSE_BYTES};
+use crate::llm::{
+    BodyError, LLM_SYSTEM_PROMPT, LlmClient, LlmError, MAX_RESPONSE_BYTES, map_reqwest, pinned_client, read_body_limited, validate_and_pin,
+};
 
 /// Result of the connection test.
 #[derive(Debug, Clone, serde::Serialize)]
@@ -150,8 +152,18 @@ impl LlmClient {
         let resp = req.send().await.map_err(map_reqwest)?;
         let v = read_json(resp).await?;
         let mut out: Vec<String> = match self.backend {
-            LlmBackend::Ollama => v.get("models").and_then(Value::as_array).map(|a| a.iter().filter_map(|m| m.get("name").or_else(|| m.get("model")).and_then(Value::as_str).map(str::to_string)).collect()).unwrap_or_default(),
-            LlmBackend::OpenAiLike => v.get("data").and_then(Value::as_array).map(|a| a.iter().filter_map(|m| m.get("id").and_then(Value::as_str).map(str::to_string)).collect()).unwrap_or_default(),
+            LlmBackend::Ollama => v
+                .get("models")
+                .and_then(Value::as_array)
+                .map(|a| {
+                    a.iter().filter_map(|m| m.get("name").or_else(|| m.get("model")).and_then(Value::as_str).map(str::to_string)).collect()
+                })
+                .unwrap_or_default(),
+            LlmBackend::OpenAiLike => v
+                .get("data")
+                .and_then(Value::as_array)
+                .map(|a| a.iter().filter_map(|m| m.get("id").and_then(Value::as_str).map(str::to_string)).collect())
+                .unwrap_or_default(),
         };
         out.sort();
         out.dedup();

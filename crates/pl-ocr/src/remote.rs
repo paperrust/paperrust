@@ -89,7 +89,12 @@ fn v4_is_private(ip: std::net::Ipv4Addr) -> bool {
 pub fn is_public_ip(ip: IpAddr) -> bool {
     match ip {
         IpAddr::V4(v4) => {
-            !(v4_is_private(v4) || v4.is_loopback() || v4.is_link_local() || v4.is_multicast() || v4.is_unspecified() || v4_in(v4, [100, 64, 0, 0], 10))
+            !(v4_is_private(v4)
+                || v4.is_loopback()
+                || v4.is_link_local()
+                || v4.is_multicast()
+                || v4.is_unspecified()
+                || v4_in(v4, [100, 64, 0, 0], 10))
         }
         IpAddr::V6(v6) => {
             if let Some(mapped) = v6.to_ipv4_mapped()
@@ -216,8 +221,8 @@ pub fn parse(
 /// Azure call (blocking). Runs in its own thread with its own Tokio runtime so that it can be
 /// called from synchronous as well as asynchronous context.
 pub fn azure_analyze(endpoint: &str, api_key: &str, document: Vec<u8>, allow_internal: bool) -> Result<(String, Vec<u8>)> {
-    let (base, pin) = validate_and_pin(endpoint, allow_internal)
-        .map_err(|e| OcrError::Parse(format!("Invalid remote OCR endpoint: {e}")))?;
+    let (base, pin) =
+        validate_and_pin(endpoint, allow_internal).map_err(|e| OcrError::Parse(format!("Invalid remote OCR endpoint: {e}")))?;
     run_azure(base, endpoint, api_key, document, allow_internal, pin)
 }
 
@@ -230,7 +235,14 @@ pub fn azure_analyze_pinned(endpoint: &str, api_key: &str, document: Vec<u8>, pi
     run_azure(base, endpoint, api_key, document, true, pin)
 }
 
-fn run_azure(base: reqwest::Url, endpoint: &str, api_key: &str, document: Vec<u8>, allow_internal: bool, pin: Option<Pin>) -> Result<(String, Vec<u8>)> {
+fn run_azure(
+    base: reqwest::Url,
+    endpoint: &str,
+    api_key: &str,
+    document: Vec<u8>,
+    allow_internal: bool,
+    pin: Option<Pin>,
+) -> Result<(String, Vec<u8>)> {
     let endpoint = endpoint.trim_end_matches('/').to_string();
     let key = api_key.to_string();
     let handle = std::thread::Builder::new()
@@ -248,7 +260,9 @@ fn run_azure(base: reqwest::Url, endpoint: &str, api_key: &str, document: Vec<u8
 }
 
 fn same_origin(a: &reqwest::Url, b: &reqwest::Url) -> bool {
-    a.scheme() == b.scheme() && a.host_str().map(str::to_ascii_lowercase) == b.host_str().map(str::to_ascii_lowercase) && a.port_or_known_default() == b.port_or_known_default()
+    a.scheme() == b.scheme()
+        && a.host_str().map(str::to_ascii_lowercase) == b.host_str().map(str::to_ascii_lowercase)
+        && a.port_or_known_default() == b.port_or_known_default()
 }
 
 /// Error text from an Azure error response (`{"error": {"code", "message"}}`), truncated like
@@ -295,7 +309,14 @@ fn check_follow_up(url: &str, pinned: bool, allow_internal: bool) -> std::result
     }
 }
 
-async fn azure_flow(base: reqwest::Url, endpoint: String, key: String, document: Vec<u8>, allow_internal: bool, pin: Option<Pin>) -> std::result::Result<(String, Vec<u8>), String> {
+async fn azure_flow(
+    base: reqwest::Url,
+    endpoint: String,
+    key: String,
+    document: Vec<u8>,
+    allow_internal: bool,
+    pin: Option<Pin>,
+) -> std::result::Result<(String, Vec<u8>), String> {
     use base64::Engine as _;
     let origin = base.clone();
     let pinned = pin.is_some();
@@ -355,7 +376,8 @@ async fn azure_flow(base: reqwest::Url, endpoint: String, key: String, document:
         .ok_or("operation location without result id")?;
     let started = std::time::Instant::now();
     let content = loop {
-        let r = client.get(op_url.clone()).header("Ocp-Apim-Subscription-Key", &key).send().await.map_err(|e| e.without_url().to_string())?;
+        let r =
+            client.get(op_url.clone()).header("Ocp-Apim-Subscription-Key", &key).send().await.map_err(|e| e.without_url().to_string())?;
         let status = r.status();
         let retry = r
             .headers()
@@ -379,7 +401,8 @@ async fn azure_flow(base: reqwest::Url, endpoint: String, key: String, document:
         }
         tokio::time::sleep(retry).await;
     };
-    let pdf_url = format!("{endpoint}/documentintelligence/documentModels/{MODEL_ID}/analyzeResults/{result_id}/pdf?api-version={API_VERSION}");
+    let pdf_url =
+        format!("{endpoint}/documentintelligence/documentModels/{MODEL_ID}/analyzeResults/{result_id}/pdf?api-version={API_VERSION}");
     let r = client.get(&pdf_url).header("Ocp-Apim-Subscription-Key", &key).send().await.map_err(|e| e.without_url().to_string())?;
     let status = r.status();
     let b = read_limited(r).await?;

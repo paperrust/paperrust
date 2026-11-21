@@ -261,8 +261,15 @@ pub fn format_date(v: f64, code: &str, date1904: bool) -> Option<String> {
             }
             Tok::MonthOrMin(n) => {
                 // Minute if directly (without a date part in between) after an hour or before seconds
-                let prev_h = toks[..k].iter().rev().find(|t| !matches!(t, Tok::Lit(_))).is_some_and(|t| matches!(t, Tok::Hour(_) | Tok::Elapsed('h', _)));
-                let next_s = toks[k + 1..].iter().find(|t| !matches!(t, Tok::Lit(_))).is_some_and(|t| matches!(t, Tok::Sec(_) | Tok::Elapsed('s', _)));
+                let prev_h = toks[..k]
+                    .iter()
+                    .rev()
+                    .find(|t| !matches!(t, Tok::Lit(_)))
+                    .is_some_and(|t| matches!(t, Tok::Hour(_) | Tok::Elapsed('h', _)));
+                let next_s = toks[k + 1..]
+                    .iter()
+                    .find(|t| !matches!(t, Tok::Lit(_)))
+                    .is_some_and(|t| matches!(t, Tok::Sec(_) | Tok::Elapsed('s', _)));
                 if *n <= 2 && (prev_h || next_s) {
                     if *n == 2 {
                         out.push_str(&format!("{:02}", dt.minute()));
@@ -320,7 +327,13 @@ pub fn format_date(v: f64, code: &str, date1904: bool) -> Option<String> {
             Tok::AmPm(s) => {
                 let pm = dt.hour() >= 12;
                 let lower = s.chars().next().is_some_and(char::is_lowercase);
-                let txt = if s.len() == 3 { if pm { "P" } else { "A" } } else if pm { "PM" } else { "AM" };
+                let txt = if s.len() == 3 {
+                    if pm { "P" } else { "A" }
+                } else if pm {
+                    "PM"
+                } else {
+                    "AM"
+                };
                 out.push_str(&if lower { txt.to_lowercase() } else { txt.to_owned() });
             }
             Tok::Elapsed(u, n) => {
@@ -515,7 +528,8 @@ mod tests {
 
     #[test]
     fn custom_date_formats() {
-        let c = vec![(164, "dd.mm.yyyy".to_owned()), (165, "[$-407]dddd, d. mmmm yyyy".to_owned()), (166, "yyyy-mm-dd hh:mm:ss".to_owned())];
+        let c =
+            vec![(164, "dd.mm.yyyy".to_owned()), (165, "[$-407]dddd, d. mmmm yyyy".to_owned()), (166, "yyyy-mm-dd hh:mm:ss".to_owned())];
         assert_eq!(format_cell(45366.0, 164, &c, false), "15.03.2024");
         assert_eq!(format_cell(45366.0, 165, &c, false), "Friday, 15. March 2024");
         assert_eq!(format_cell(45366.0 + 3723.0 / 86400.0, 166, &c, false), "2024-03-15 01:02:03");

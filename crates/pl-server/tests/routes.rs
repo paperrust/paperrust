@@ -28,10 +28,7 @@ use support::test_state;
 // ---------------------------------------------------------------- helpers
 
 async fn start(vars: &[(&str, &str)], routes: Vec<ApiRoute>, toml: &str) -> SocketAddr {
-    let m: HashMap<String, String> = vars
-        .iter()
-        .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
-        .collect();
+    let m: HashMap<String, String> = vars.iter().map(|(k, v)| ((*k).to_owned(), (*v).to_owned())).collect();
     let cfg = ServerConfig::from_lookup(|k| m.get(k).cloned()).unwrap();
     let parsed = routing::parse_routes_toml(toml).unwrap();
     let plan = routing::plan(routes, &parsed).unwrap();
@@ -46,28 +43,14 @@ fn client() -> Client<HttpConnector, Body> {
     Client::builder(TokioExecutor::new()).build(HttpConnector::new())
 }
 
-async fn send(
-    addr: SocketAddr,
-    method: Method,
-    path: &str,
-    headers: &[(&str, &str)],
-) -> (StatusCode, HeaderMap, Bytes) {
-    let mut b = hyper::Request::builder()
-        .method(method)
-        .uri(format!("http://{addr}{path}"));
+async fn send(addr: SocketAddr, method: Method, path: &str, headers: &[(&str, &str)]) -> (StatusCode, HeaderMap, Bytes) {
+    let mut b = hyper::Request::builder().method(method).uri(format!("http://{addr}{path}"));
     for (k, v) in headers {
         b = b.header(*k, *v);
     }
-    let resp = tokio::time::timeout(T, client().request(b.body(Body::empty()).unwrap()))
-        .await
-        .unwrap()
-        .unwrap();
+    let resp = tokio::time::timeout(T, client().request(b.body(Body::empty()).unwrap())).await.unwrap().unwrap();
     let (parts, body) = resp.into_parts();
-    let bytes = tokio::time::timeout(T, body.collect())
-        .await
-        .unwrap()
-        .unwrap()
-        .to_bytes();
+    let bytes = tokio::time::timeout(T, body.collect()).await.unwrap().unwrap().to_bytes();
     (parts.status, parts.headers, bytes)
 }
 
@@ -89,21 +72,9 @@ async fn health_is_internal() {
 
 fn demo_routes() -> Vec<ApiRoute> {
     vec![
-        ApiRoute {
-            id: "x.get",
-            method: Method::GET,
-            path: "/api/x/",
-            upstream: "test",
-            handler: get(|| async { "rust-get" }),
-        },
+        ApiRoute { id: "x.get", method: Method::GET, path: "/api/x/", upstream: "test", handler: get(|| async { "rust-get" }) },
         // "another crate" adds PUT on the same path
-        ApiRoute {
-            id: "x.put",
-            method: Method::PUT,
-            path: "/api/x/",
-            upstream: "test",
-            handler: put(|| async { "rust-put" }),
-        },
+        ApiRoute { id: "x.put", method: Method::PUT, path: "/api/x/", upstream: "test", handler: put(|| async { "rust-put" }) },
         ApiRoute {
             id: "x.post",
             method: Method::POST,
@@ -111,13 +82,7 @@ fn demo_routes() -> Vec<ApiRoute> {
             upstream: "test",
             handler: axum::routing::post(|| async { "rust-post" }),
         },
-        ApiRoute {
-            id: "x.detail",
-            method: Method::GET,
-            path: "/api/x/{id}/",
-            upstream: "test",
-            handler: get(|| async { "rust-detail" }),
-        },
+        ApiRoute { id: "x.detail", method: Method::GET, path: "/api/x/{id}/", upstream: "test", handler: get(|| async { "rust-detail" }) },
         ApiRoute {
             id: "boom",
             method: Method::GET,
@@ -137,11 +102,7 @@ fn demo_routes() -> Vec<ApiRoute> {
             path: "/api/big/",
             upstream: "test",
             handler: get(|| async {
-                (
-                    [("content-type", "application/json")],
-                    format!("[{}0]", "1234567890,".repeat(500)),
-                )
-                    .into_response()
+                ([("content-type", "application/json")], format!("[{}0]", "1234567890,".repeat(500))).into_response()
             }),
         },
     ]
@@ -179,16 +140,8 @@ async fn partial_methods_and_switched_off_routes() {
     let (s, _, _) = send(app, Method::GET, "/api/x", &[]).await;
     assert_eq!(s, StatusCode::NOT_FOUND);
     // CORS preflight: answered like CorsMiddleware
-    let (s, h, b) = send(
-        app,
-        Method::OPTIONS,
-        "/api/x/",
-        &[
-            ("origin", "http://localhost:8000"),
-            ("access-control-request-method", "GET"),
-        ],
-    )
-    .await;
+    let (s, h, b) =
+        send(app, Method::OPTIONS, "/api/x/", &[("origin", "http://localhost:8000"), ("access-control-request-method", "GET")]).await;
     assert_eq!((s, b.len()), (StatusCode::OK, 0));
     assert_eq!(h["access-control-allow-origin"], "http://localhost:8000");
     let (_, _, b) = send(app, Method::GET, "/api/x/5/", &[]).await;
@@ -198,16 +151,7 @@ async fn partial_methods_and_switched_off_routes() {
 #[tokio::test]
 async fn rust_responses_get_django_middleware_headers() {
     let app = start(&[], demo_routes(), DEMO_TOML).await;
-    let (_, h, _) = send(
-        app,
-        Method::GET,
-        "/api/x/",
-        &[
-            ("origin", "http://localhost:8000"),
-            ("accept-language", "de-CH,de;q=0.9"),
-        ],
-    )
-    .await;
+    let (_, h, _) = send(app, Method::GET, "/api/x/", &[("origin", "http://localhost:8000"), ("accept-language", "de-CH,de;q=0.9")]).await;
     assert_eq!(h["x-frame-options"], "SAMEORIGIN");
     assert_eq!(h["x-content-type-options"], "nosniff");
     assert_eq!(h["referrer-policy"], "same-origin");
@@ -219,32 +163,16 @@ async fn rust_responses_get_django_middleware_headers() {
     assert_eq!(h["access-control-expose-headers"], "Content-Disposition");
 
     // token auth: Django still sends Vary: Cookie (checked against the reference); foreign origin
-    let (_, h, _) = send(
-        app,
-        Method::GET,
-        "/api/x/",
-        &[
-            ("origin", "http://evil.example"),
-            ("authorization", "Token abc"),
-        ],
-    )
-    .await;
+    let (_, h, _) = send(app, Method::GET, "/api/x/", &[("origin", "http://evil.example"), ("authorization", "Token abc")]).await;
     assert_eq!(h["vary"], "Accept-Language, origin, Cookie");
     assert!(h.get("access-control-allow-origin").is_none());
 
     // compression like django-compression-middleware (zstd > br > gzip)
-    for (ae, enc) in [
-        ("gzip", "gzip"),
-        ("gzip, br", "br"),
-        ("gzip, br, zstd", "zstd"),
-    ] {
+    for (ae, enc) in [("gzip", "gzip"), ("gzip, br", "br"), ("gzip, br, zstd", "zstd")] {
         let (_, h, b) = send(app, Method::GET, "/api/big/", &[("accept-encoding", ae)]).await;
         assert_eq!(h["content-encoding"], enc);
         assert!(b.len() < 1000);
-        assert_eq!(
-            h["vary"],
-            "Accept-Language, origin, Cookie, Accept-Encoding"
-        );
+        assert_eq!(h["vary"], "Accept-Language, origin, Cookie, Accept-Encoding");
     }
     let (_, h, b) = send(app, Method::GET, "/api/big/", &[]).await;
     assert!(h.get("content-encoding").is_none());
@@ -279,18 +207,9 @@ fn routes_toml_validation() {
     let cfg = |s: &str| routing::parse_routes_toml(s);
     assert!(cfg("").unwrap().is_empty());
     assert!(cfg("[routes]\n").unwrap().is_empty());
-    assert_eq!(
-        cfg("[routes]\n\"a.b\" = \"rust\"\n").unwrap()["a.b"],
-        Backend::Rust
-    );
-    assert!(matches!(
-        cfg("[routes]\na = \"maybe\"\n"),
-        Err(RoutesError::Parse(_))
-    ));
-    assert!(matches!(
-        cfg("[other]\na = \"rust\"\n"),
-        Err(RoutesError::Parse(_))
-    ));
+    assert_eq!(cfg("[routes]\n\"a.b\" = \"rust\"\n").unwrap()["a.b"], Backend::Rust);
+    assert!(matches!(cfg("[routes]\na = \"maybe\"\n"), Err(RoutesError::Parse(_))));
+    assert!(matches!(cfg("[other]\na = \"rust\"\n"), Err(RoutesError::Parse(_))));
     assert!(matches!(cfg("a = \"rust\"\n"), Err(RoutesError::Parse(_))));
 
     assert_eq!(cfg("[routes]\n\"a.b\" = \"off\"\n").unwrap()["a.b"], Backend::Off);
@@ -313,23 +232,11 @@ fn routes_toml_validation() {
         upstream: "test",
         handler: axum::routing::delete(|| async { "" }),
     });
-    assert!(matches!(
-        routing::plan(dup, &BTreeMap::new()),
-        Err(RoutesError::DuplicateId(_))
-    ));
+    assert!(matches!(routing::plan(dup, &BTreeMap::new()), Err(RoutesError::DuplicateId(_))));
 
     let mut dup = demo_routes();
-    dup.push(ApiRoute {
-        id: "x.get2",
-        method: Method::GET,
-        path: "/api/x/{pk}/",
-        upstream: "test",
-        handler: get(|| async { "" }),
-    });
-    assert!(matches!(
-        routing::plan(dup, &BTreeMap::new()),
-        Err(RoutesError::DuplicateRoute { .. })
-    ));
+    dup.push(ApiRoute { id: "x.get2", method: Method::GET, path: "/api/x/{pk}/", upstream: "test", handler: get(|| async { "" }) });
+    assert!(matches!(routing::plan(dup, &BTreeMap::new()), Err(RoutesError::DuplicateRoute { .. })));
 
     let mut conflict = demo_routes();
     conflict.push(ApiRoute {
@@ -339,16 +246,9 @@ fn routes_toml_validation() {
         upstream: "test",
         handler: axum::routing::delete(|| async { "" }),
     });
-    assert!(matches!(
-        routing::plan(conflict, &BTreeMap::new()),
-        Err(RoutesError::ParamNameConflict { .. })
-    ));
+    assert!(matches!(routing::plan(conflict, &BTreeMap::new()), Err(RoutesError::ParamNameConflict { .. })));
 
-    let plan = routing::plan(
-        demo_routes(),
-        &routing::parse_routes_toml(DEMO_TOML).unwrap(),
-    )
-    .unwrap();
+    let plan = routing::plan(demo_routes(), &routing::parse_routes_toml(DEMO_TOML).unwrap()).unwrap();
     assert_eq!(plan.total, 6);
     let ids: Vec<_> = plan.active_info().iter().map(|r| r.id).collect();
     assert_eq!(ids, ["x.get", "x.put", "x.detail", "boom", "big"]);

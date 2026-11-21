@@ -17,12 +17,8 @@ use crate::py;
 /// `LogViewSet.ALLOWED_LOG_FILES` (dict order). PaperRust writes `paperrust.log` instead of
 /// upstream's `paperless.log`; an older `paperless.log` (earlier PaperRust, paperless-ngx) stays
 /// readable under its old key (Known difference: extra key `paperrust` first).
-pub const ALLOWED_LOG_FILES: &[(&str, &str)] = &[
-    ("paperrust", "paperrust.log"),
-    ("paperless", "paperless.log"),
-    ("mail", "mail.log"),
-    ("celery", "celery.log"),
-];
+pub const ALLOWED_LOG_FILES: &[(&str, &str)] =
+    &[("paperrust", "paperrust.log"), ("paperless", "paperless.log"), ("mail", "mail.log"), ("celery", "celery.log")];
 
 /// `paperless` falls back to `paperrust.log` when no `paperless.log` exists, so clients that ask
 /// for upstream's key (`/api/logs/paperless/`) keep working (parity rerun 2026-11-20).
@@ -120,9 +116,13 @@ mod tests {
     #[test]
     fn paperless_key_falls_back_to_paperrust_log() {
         let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("paperrust.log"), "a
+        std::fs::write(
+            dir.path().join("paperrust.log"),
+            "a
 b
-").unwrap();
+",
+        )
+        .unwrap();
         assert_eq!(read_log(dir.path(), "paperless", Some("1")), LogResult::Lines(vec!["b".into()]));
         assert_eq!(read_log(dir.path(), "paperless", Some("x")), LogResult::InvalidLimit);
     }
@@ -138,21 +138,12 @@ b
         assert_eq!(read_log(dir.path(), "paperrust", None), LogResult::Lines(vec!["neu".into()]));
         assert_eq!(read_log(dir.path(), "bogus_log", None), LogResult::NotFound);
         assert_eq!(read_log(dir.path(), "celery", None), LogResult::NotFound);
-        assert_eq!(
-            read_log(dir.path(), "paperless", None),
-            LogResult::Lines(vec!["test1".into(), "test2".into(), "test3".into()])
-        );
-        assert_eq!(
-            read_log(dir.path(), "paperless", Some("2")),
-            LogResult::Lines(vec!["test2".into(), "test3".into()])
-        );
+        assert_eq!(read_log(dir.path(), "paperless", None), LogResult::Lines(vec!["test1".into(), "test2".into(), "test3".into()]));
+        assert_eq!(read_log(dir.path(), "paperless", Some("2")), LogResult::Lines(vec!["test2".into(), "test3".into()]));
         assert_eq!(read_log(dir.path(), "paperless", Some("abc")), LogResult::InvalidLimit);
         assert_eq!(read_log(dir.path(), "paperless", Some("-5")), LogResult::InvalidLimit);
         assert_eq!(read_log(dir.path(), "paperless", Some("0")), LogResult::InvalidLimit);
-        assert_eq!(
-            read_log(dir.path(), "paperless", Some("100")),
-            LogResult::Lines(vec!["test1".into(), "test2".into(), "test3".into()])
-        );
+        assert_eq!(read_log(dir.path(), "paperless", Some("100")), LogResult::Lines(vec!["test1".into(), "test2".into(), "test3".into()]));
     }
 
     #[test]

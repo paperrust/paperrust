@@ -178,10 +178,9 @@ fn validate_move(old: &Path, new: &Path, root: &Path) -> Result<(), MoveFailed> 
 /// `_filename_template_uses_custom_fields(doc)`.
 pub async fn template_uses_custom_fields(conn: &mut PgConnection, cfg: &MediaCfg, doc: &DocRow) -> Result<bool, sqlx::Error> {
     let template: Option<String> = match doc.storage_path_id {
-        Some(sp) => sqlx::query_scalar("SELECT path FROM documents_storagepath WHERE id = $1")
-            .bind(sp as i32)
-            .fetch_optional(&mut *conn)
-            .await?,
+        Some(sp) => {
+            sqlx::query_scalar("SELECT path FROM documents_storagepath WHERE id = $1").bind(sp as i32).fetch_optional(&mut *conn).await?
+        }
         None => cfg.opts.filename_format.as_deref().map(pl_templating::convert_format_str_to_template_format),
     };
     Ok(template.is_some_and(|t| !t.is_empty() && t.contains("custom_fields")))
@@ -267,8 +266,8 @@ async fn move_under_lock(conn: &mut PgConnection, cfg: &MediaCfg, inst: &DocRow)
     let mut new_archive_filename = old_archive_filename.clone();
 
     let attempt: Result<(), MoveFailed> = async {
-        let candidate = generate_filename(&ctx, GenerateOptions::default(), &cfg.opts)
-            .map_err(|e| MoveFailed(format!("template: {e:?}")))?;
+        let candidate =
+            generate_filename(&ctx, GenerateOptions::default(), &cfg.opts).map_err(|e| MoveFailed(format!("template: {e:?}")))?;
         if candidate.len() > MAX_STORED_FILENAME_LENGTH {
             let m = format!("Generated filename exceeds db path limit ({} > {MAX_STORED_FILENAME_LENGTH})", candidate.len());
             tracing::warn!(target: "paperless.handlers", "{m}");
@@ -294,9 +293,8 @@ async fn move_under_lock(conn: &mut PgConnection, cfg: &MediaCfg, inst: &DocRow)
         if has_archive {
             let mut actx = ctx.clone();
             actx.filename = Some(new_filename.clone());
-            let archive_candidate =
-                generate_filename(&actx, GenerateOptions { archive_filename: true, ..Default::default() }, &cfg.opts)
-                    .map_err(|e| MoveFailed(format!("template: {e:?}")))?;
+            let archive_candidate = generate_filename(&actx, GenerateOptions { archive_filename: true, ..Default::default() }, &cfg.opts)
+                .map_err(|e| MoveFailed(format!("template: {e:?}")))?;
             if archive_candidate.len() > MAX_STORED_FILENAME_LENGTH {
                 let m = format!(
                     "Generated archive filename exceeds db path limit ({} > {MAX_STORED_FILENAME_LENGTH})",
@@ -363,23 +361,19 @@ async fn move_under_lock(conn: &mut PgConnection, cfg: &MediaCfg, inst: &DocRow)
                     pl_templating::create_source_path_directory(&new_source_path).map_err(|e| MoveFailed(e.to_string()))?;
                     shutil_move(&old_source_path, &new_source_path).map_err(|e| MoveFailed(e.to_string()))?;
                 }
-                if move_archive
-                    && let (Some(o), Some(n)) = (old_archive_path.as_ref(), new_archive_path.as_ref())
-                {
+                if move_archive && let (Some(o), Some(n)) = (old_archive_path.as_ref(), new_archive_path.as_ref()) {
                     validate_move(o, n, &cfg.archive_dir)?;
                     pl_templating::create_source_path_directory(n).map_err(|e| MoveFailed(e.to_string()))?;
                     shutil_move(o, n).map_err(|e| MoveFailed(e.to_string()))?;
                 }
-                sqlx::query(
-                    "UPDATE documents_document SET filename = $2, archive_filename = $3, modified = $4 WHERE id = $1",
-                )
-                .bind(inst.id as i32)
-                .bind(&new_filename)
-                .bind(&new_archive_filename)
-                .bind(now_micros())
-                .execute(&mut *conn)
-                .await
-                .map_err(|e| MoveFailed(e.to_string()))?;
+                sqlx::query("UPDATE documents_document SET filename = $2, archive_filename = $3, modified = $4 WHERE id = $1")
+                    .bind(inst.id as i32)
+                    .bind(&new_filename)
+                    .bind(&new_archive_filename)
+                    .bind(now_micros())
+                    .execute(&mut *conn)
+                    .await
+                    .map_err(|e| MoveFailed(e.to_string()))?;
                 Ok(())
             }
             .await;

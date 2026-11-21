@@ -44,11 +44,7 @@ impl Errors {
         self.0.is_empty()
     }
     pub fn into_result(self) -> Result<(), ApiError> {
-        if self.0.is_empty() {
-            Ok(())
-        } else {
-            Err(ApiError::bad_request(Value::Object(self.0)))
-        }
+        if self.0.is_empty() { Ok(()) } else { Err(ApiError::bad_request(Value::Object(self.0))) }
     }
 }
 
@@ -87,16 +83,10 @@ pub fn py_repr(v: &Value) -> String {
                 format!("'{}'", s.replace('\\', "\\\\").replace('\'', "\\'"))
             }
         }
-        Value::Array(a) => format!(
-            "[{}]",
-            a.iter().map(py_repr).collect::<Vec<_>>().join(", ")
-        ),
+        Value::Array(a) => format!("[{}]", a.iter().map(py_repr).collect::<Vec<_>>().join(", ")),
         Value::Object(o) => format!(
             "{{{}}}",
-            o.iter()
-                .map(|(k, v)| format!("{}: {}", py_repr(&Value::String(k.clone())), py_repr(v)))
-                .collect::<Vec<_>>()
-                .join(", ")
+            o.iter().map(|(k, v)| format!("{}: {}", py_repr(&Value::String(k.clone())), py_repr(v))).collect::<Vec<_>>().join(", ")
         ),
     }
 }
@@ -167,13 +157,7 @@ pub struct CharOpts {
 }
 
 /// DRF `CharField` (trim_whitespace=True). `Val(None)` = null.
-pub fn char_field(
-    data: &Map<String, Value>,
-    name: &str,
-    o: CharOpts,
-    partial: bool,
-    errs: &mut Errors,
-) -> F<Option<String>> {
+pub fn char_field(data: &Map<String, Value>, name: &str, o: CharOpts, partial: bool, errs: &mut Errors) -> F<Option<String>> {
     let v = get(data, name);
     if let Some(r) = empty_values(v, name, o.required, partial, o.allow_null, errs) {
         return r;
@@ -204,13 +188,11 @@ pub fn char_field(
         return F::Val(Some(String::new()));
     }
     if let Some(max) = o.max_length
-        && trimmed.chars().count() > max {
-            errs.add(
-                name,
-                &format!("Ensure this field has no more than {max} characters."),
-            );
-            return F::Err;
-        }
+        && trimmed.chars().count() > max
+    {
+        errs.add(name, &format!("Ensure this field has no more than {max} characters."));
+        return F::Err;
+    }
     F::Val(Some(trimmed))
 }
 
@@ -257,12 +239,7 @@ pub fn choice_int(v: &Value, choices: std::ops::RangeInclusive<i64>) -> Result<i
 }
 
 /// DRF `BooleanField` (allow_null=False).
-pub fn bool_field(
-    data: &Map<String, Value>,
-    name: &str,
-    partial: bool,
-    errs: &mut Errors,
-) -> F<bool> {
+pub fn bool_field(data: &Map<String, Value>, name: &str, partial: bool, errs: &mut Errors) -> F<bool> {
     let v = get(data, name);
     match empty_values::<bool>(v, name, false, partial, false, errs) {
         Some(F::Absent) => return F::Absent,
@@ -295,10 +272,8 @@ pub fn parse_bool(v: &Value) -> Option<bool> {
         }
         // DRF 3.18.3 `BooleanField._lower_if_str`: lowercased before the set lookup
         Value::String(s) => match s.to_lowercase().as_str() {
-            "t" | "T" | "y" | "Y" | "yes" | "Yes" | "YES" | "true" | "True" | "TRUE" | "on"
-            | "On" | "ON" | "1" => Some(true),
-            "f" | "F" | "n" | "N" | "no" | "No" | "NO" | "false" | "False" | "FALSE"
-            | "off" | "Off" | "OFF" | "0" => Some(false),
+            "t" | "T" | "y" | "Y" | "yes" | "Yes" | "YES" | "true" | "True" | "TRUE" | "on" | "On" | "ON" | "1" => Some(true),
+            "f" | "F" | "n" | "N" | "no" | "No" | "NO" | "false" | "False" | "FALSE" | "off" | "Off" | "OFF" | "0" => Some(false),
             _ => None,
         },
         _ => None,
@@ -315,18 +290,12 @@ pub fn parse_int(v: &Value) -> Option<i64> {
             } else {
                 let f = n.as_f64()?;
                 // str(5.0) = "5.0" → re_decimal removes ".0"
-                if f.fract() == 0.0 && f.abs() < 1e16 {
-                    Some(f as i64)
-                } else {
-                    None
-                }
+                if f.fract() == 0.0 && f.abs() < 1e16 { Some(f as i64) } else { None }
             }
         }
         Value::String(s) => {
             static RE: std::sync::OnceLock<Option<regex::Regex>> = std::sync::OnceLock::new();
-            let re = RE
-                .get_or_init(|| regex::Regex::new(r"\.0*\s*$").ok())
-                .as_ref()?;
+            let re = RE.get_or_init(|| regex::Regex::new(r"\.0*\s*$").ok()).as_ref()?;
             let cleaned = re.replace(s, "").to_string();
             cleaned.trim().parse::<i64>().ok()
         }
@@ -342,13 +311,7 @@ pub struct IntOpts {
     pub max: Option<i64>,
 }
 
-pub fn int_field(
-    data: &Map<String, Value>,
-    name: &str,
-    o: IntOpts,
-    partial: bool,
-    errs: &mut Errors,
-) -> F<Option<i64>> {
+pub fn int_field(data: &Map<String, Value>, name: &str, o: IntOpts, partial: bool, errs: &mut Errors) -> F<Option<i64>> {
     let v = get(data, name);
     if let Some(r) = empty_values(v, name, o.required, partial, o.allow_null, errs) {
         return r;
@@ -366,24 +329,20 @@ pub fn int_field(
 pub fn check_int(v: &Value, min: Option<i64>, max: Option<i64>) -> Result<i64, String> {
     let i = parse_int(v).ok_or_else(|| "A valid integer is required.".to_string())?;
     if let Some(m) = max
-        && i > m {
-            return Err(format!("Ensure this value is less than or equal to {m}."));
-        }
+        && i > m
+    {
+        return Err(format!("Ensure this value is less than or equal to {m}."));
+    }
     if let Some(m) = min
-        && i < m {
-            return Err(format!("Ensure this value is greater than or equal to {m}."));
-        }
+        && i < m
+    {
+        return Err(format!("Ensure this value is greater than or equal to {m}."));
+    }
     Ok(i)
 }
 
 /// DRF `JSONField` (every JSON value is valid).
-pub fn json_field(
-    data: &Map<String, Value>,
-    name: &str,
-    allow_null: bool,
-    partial: bool,
-    errs: &mut Errors,
-) -> F<Value> {
+pub fn json_field(data: &Map<String, Value>, name: &str, allow_null: bool, partial: bool, errs: &mut Errors) -> F<Value> {
     let v = get(data, name);
     match v {
         None => F::Absent,
@@ -401,12 +360,7 @@ pub fn json_field(
 /// Pre-check the PK input of a `PrimaryKeyRelatedField`.
 /// `Ok(pk)` → still check for existence; `Err(msg)` → field error.
 pub fn pk_input(v: &Value) -> Result<i64, String> {
-    let incorrect = |v: &Value| {
-        format!(
-            "Incorrect type. Expected pk value, received {}.",
-            py_type_name(v)
-        )
-    };
+    let incorrect = |v: &Value| format!("Incorrect type. Expected pk value, received {}.", py_type_name(v));
     match v {
         Value::Bool(_) => Err(incorrect(v)),
         Value::Number(n) => {
@@ -427,12 +381,7 @@ pub fn pk_missing_msg(v: &Value) -> String {
 }
 
 /// DRF `DateTimeField` (allow_null=True, required=False).
-pub fn datetime_field(
-    data: &Map<String, Value>,
-    name: &str,
-    partial: bool,
-    errs: &mut Errors,
-) -> F<Option<chrono::DateTime<chrono::Utc>>> {
+pub fn datetime_field(data: &Map<String, Value>, name: &str, partial: bool, errs: &mut Errors) -> F<Option<chrono::DateTime<chrono::Utc>>> {
     let v = get(data, name);
     if let Some(r) = empty_values(v, name, false, partial, true, errs) {
         return r;
@@ -475,12 +424,7 @@ mod tests {
 
     #[test]
     fn char_rules() {
-        let o = CharOpts {
-            required: true,
-            allow_null: false,
-            allow_blank: false,
-            max_length: Some(3),
-        };
+        let o = CharOpts { required: true, allow_null: false, allow_blank: false, max_length: Some(3) };
         let mut e = Errors::default();
         assert_eq!(char_field(&m(json!({})), "n", o, false, &mut e), F::Err);
         assert_eq!(e.0["n"], json!(["This field is required."]));
@@ -491,20 +435,13 @@ mod tests {
         char_field(&m(json!({"n": "abcd"})), "n", o, false, &mut e);
         assert_eq!(e.0["n"], json!(["Ensure this field has no more than 3 characters."]));
         let mut e = Errors::default();
-        assert_eq!(
-            char_field(&m(json!({"n": 12})), "n", o, false, &mut e),
-            F::Val(Some("12".into()))
-        );
+        assert_eq!(char_field(&m(json!({"n": 12})), "n", o, false, &mut e), F::Val(Some("12".into())));
         assert_eq!(char_field(&m(json!({})), "n", o, true, &mut e), F::Absent);
     }
 
     #[test]
     fn choice_and_bool() {
-        let o = ChoiceOpts {
-            required: false,
-            allow_null: false,
-            allow_blank: false,
-        };
+        let o = ChoiceOpts { required: false, allow_null: false, allow_blank: false };
         let mut e = Errors::default();
         choice_str(&m(json!({"c": "x"})), "c", &["a"], o, false, &mut e);
         assert_eq!(e.0["c"], json!(["\"x\" is not a valid choice."]));
@@ -523,10 +460,7 @@ mod tests {
         assert_eq!(parse_int(&json!(5.0)), Some(5));
         assert_eq!(parse_int(&json!(5.5)), None);
         assert_eq!(parse_int(&json!(true)), None);
-        assert_eq!(
-            check_int(&json!(0), Some(1), None),
-            Err("Ensure this value is greater than or equal to 1.".into())
-        );
+        assert_eq!(check_int(&json!(0), Some(1), None), Err("Ensure this value is greater than or equal to 1.".into()));
     }
 
     #[test]

@@ -84,8 +84,7 @@ fn consumer(pool: PgPool, root: &Path, case: &Value, queue: Arc<CapturingQueue>)
     }
     let mut parsing = NativeParsing::new(ocr, s.time_zone);
     parsing.tesseract = None;
-    parsing.pdfium =
-        pl_ocr::render::PdfiumRenderer::load(&repo().join("reference/venv/Lib/site-packages/pypdfium2_raw/pdfium.dll")).ok();
+    parsing.pdfium = pl_ocr::render::PdfiumRenderer::load(&repo().join("reference/venv/Lib/site-packages/pypdfium2_raw/pdfium.dll")).ok();
     // like run_upstream.sh (PAPERLESS_THUMBNAIL_FONT_NAME)
     if let Ok(f) = pl_pdfops::thumbnail::ThumbnailFont::load(Path::new("C:/Windows/Fonts/arial.ttf")) {
         parsing.thumbnail_font = Some(Arc::new(f));
@@ -163,11 +162,8 @@ async fn max_doc_id(pool: &PgPool) -> i64 {
 }
 
 async fn new_doc_ids(pool: &PgPool, after: i64) -> Vec<i64> {
-    let v: Vec<i32> = sqlx::query_scalar("SELECT id FROM documents_document WHERE id > $1 ORDER BY id")
-        .bind(after as i32)
-        .fetch_all(pool)
-        .await
-        .unwrap();
+    let v: Vec<i32> =
+        sqlx::query_scalar("SELECT id FROM documents_document WHERE id > $1 ORDER BY id").bind(after as i32).fetch_all(pool).await.unwrap();
     v.into_iter().map(i64::from).collect()
 }
 

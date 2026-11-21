@@ -18,7 +18,14 @@ pub const MAX_PIXELS: u64 = 6_000_000;
 pub type PageImage = (String, Vec<u8>);
 
 /// Page images of a file (PDF or image). Other types → empty.
-pub fn page_images(renderer: &dyn PdfRenderer, path: &Path, mime: &str, max_pages: usize, dpi: f64, max_bytes: usize) -> Result<Vec<PageImage>> {
+pub fn page_images(
+    renderer: &dyn PdfRenderer,
+    path: &Path,
+    mime: &str,
+    max_pages: usize,
+    dpi: f64,
+    max_bytes: usize,
+) -> Result<Vec<PageImage>> {
     if max_pages == 0 {
         return Ok(Vec::new());
     }
@@ -88,7 +95,9 @@ mod tests {
     use crate::render::UnavailableRenderer;
 
     fn png(w: u32, h: u32) -> Vec<u8> {
-        let img = image::DynamicImage::ImageRgb8(image::RgbImage::from_fn(w, h, |x, y| image::Rgb([(x * 7 % 256) as u8, (y * 13 % 256) as u8, ((x ^ y) % 256) as u8])));
+        let img = image::DynamicImage::ImageRgb8(image::RgbImage::from_fn(w, h, |x, y| {
+            image::Rgb([(x * 7 % 256) as u8, (y * 13 % 256) as u8, ((x ^ y) % 256) as u8])
+        }));
         write(&img, image::ImageFormat::Png).unwrap()
     }
 

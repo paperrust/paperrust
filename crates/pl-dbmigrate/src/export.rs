@@ -60,27 +60,18 @@ impl ExportSource {
     pub fn open(path: &Path) -> Result<ExportSource> {
         if path.is_dir() {
             if !path.join("manifest.json").is_file() {
-                bail!(
-                    "{} enthält keine manifest.json – kein paperless-ngx-Export",
-                    path.display()
-                );
+                bail!("{} enthält keine manifest.json – kein paperless-ngx-Export", path.display());
             }
             return Ok(ExportSource::Dir(path.to_path_buf()));
         }
         if path.is_file() && looks_like_zip(path) {
             let z = ZipIndex::open(path)?;
             if z.get("manifest.json").is_none() {
-                bail!(
-                    "{} enthält keine manifest.json – kein paperless-ngx-Export",
-                    path.display()
-                );
+                bail!("{} enthält keine manifest.json – kein paperless-ngx-Export", path.display());
             }
             return Ok(ExportSource::Zip(z));
         }
-        bail!(
-            "{} ist weder ein Export-Ordner noch eine ZIP-Datei",
-            path.display()
-        )
+        bail!("{} ist weder ein Export-Ordner noch eine ZIP-Datei", path.display())
     }
 
     pub fn exists(&self, rel: &str) -> bool {
@@ -94,8 +85,7 @@ impl ExportSource {
         match self {
             ExportSource::Dir(d) => {
                 let p = d.join(normalize(rel));
-                let f =
-                    std::fs::File::open(&p).with_context(|| format!("{} fehlt", p.display()))?;
+                let f = std::fs::File::open(&p).with_context(|| format!("{} fehlt", p.display()))?;
                 Ok(Box::new(BufReader::with_capacity(1 << 16, f)))
             }
             ExportSource::Zip(z) => z.open_entry(rel),
@@ -151,10 +141,7 @@ impl ExportSource {
                         let p = e.path();
                         if p.is_dir() {
                             stack.push(p);
-                        } else if p
-                            .file_name()
-                            .and_then(|n| n.to_str())
-                            .is_some_and(|n| n.ends_with("-manifest.json"))
+                        } else if p.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.ends_with("-manifest.json"))
                             && let Ok(rel) = p.strip_prefix(d)
                         {
                             v.push(rel.to_string_lossy().replace('\\', "/"));
@@ -177,10 +164,7 @@ impl ExportSource {
     /// `metadata.json` → `version` (missing in very old exports).
     pub fn version(&self) -> Option<String> {
         let mut s = String::new();
-        self.open_file("metadata.json")
-            .ok()?
-            .read_to_string(&mut s)
-            .ok()?;
+        self.open_file("metadata.json").ok()?.read_to_string(&mut s).ok()?;
         let v: Value = serde_json::from_str(&s).ok()?;
         v.get("version").and_then(Value::as_str).map(str::to_string)
     }
@@ -191,8 +175,7 @@ impl ExportSource {
         for name in self.manifest_names() {
             let r = self.open_file(&name)?;
             let mut de = serde_json::Deserializer::from_reader(r);
-            de.deserialize_seq(RecordsVisitor { sum: &mut sum })
-                .map_err(|e| anyhow!("{name}: Manifest nicht lesbar: {e}"))?;
+            de.deserialize_seq(RecordsVisitor { sum: &mut sum }).map_err(|e| anyhow!("{name}: Manifest nicht lesbar: {e}"))?;
             sum.manifests.push(name);
         }
         sum.docs.sort_by_key(|d| d.id);
@@ -230,8 +213,7 @@ struct Fields {
 }
 
 fn as_i64(v: &Value) -> Option<i64> {
-    v.as_i64()
-        .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
+    v.as_i64().or_else(|| v.as_str().and_then(|s| s.parse().ok()))
 }
 
 /// Excluded users like upstream (`_excluded_usernames`).
@@ -239,28 +221,13 @@ pub const EXCLUDED_USERS: [&str; 2] = ["consumer", "AnonymousUser"];
 
 impl ManifestSummary {
     fn add(&mut self, r: Record) {
-        if r.model == "auth.user"
-            && r.fields
-                .username
-                .as_deref()
-                .is_some_and(|u| EXCLUDED_USERS.contains(&u))
-        {
+        if r.model == "auth.user" && r.fields.username.as_deref().is_some_and(|u| EXCLUDED_USERS.contains(&u)) {
             return;
         }
         *self.counts.entry(r.model.clone()).or_default() += 1;
         if r.model == "documents.document" {
-            let tags: Vec<i64> = r
-                .fields
-                .tags
-                .as_deref()
-                .unwrap_or_default()
-                .iter()
-                .filter_map(as_i64)
-                .collect();
-            *self
-                .counts
-                .entry("documents.document_tags".into())
-                .or_default() += tags.len() as i64;
+            let tags: Vec<i64> = r.fields.tags.as_deref().unwrap_or_default().iter().filter_map(as_i64).collect();
+            *self.counts.entry("documents.document_tags".into()).or_default() += tags.len() as i64;
             self.docs.push(DocRow {
                 id: as_i64(&r.pk).unwrap_or(-1),
                 title: r.fields.title.unwrap_or_default(),
@@ -360,10 +327,7 @@ mod tests {
         assert!(matches!(e, ExportSource::Dir(_)));
         assert_eq!(e.version().as_deref(), Some("3.4.2"));
         let s = e.summarize().unwrap();
-        assert_eq!(
-            s.manifests,
-            vec!["manifest.json", "json/0000008-manifest.json"]
-        );
+        assert_eq!(s.manifests, vec!["manifest.json", "json/0000008-manifest.json"]);
         assert_eq!(s.counts["auth.user"], 1, "AnonymousUser zählt nicht");
         assert_eq!(s.counts["documents.tag"], 2);
         assert_eq!(s.counts["documents.document"], 2);
@@ -382,10 +346,7 @@ mod tests {
         let p = d.path().join("export.zip");
         std::fs::write(
             &p,
-            crate::zipread::testzip::build(&[
-                ("manifest.json", MANIFEST.as_bytes(), true),
-                ("originals/0000007.pdf", b"%PDF", false),
-            ]),
+            crate::zipread::testzip::build(&[("manifest.json", MANIFEST.as_bytes(), true), ("originals/0000007.pdf", b"%PDF", false)]),
         )
         .unwrap();
         let e = ExportSource::open(&p).unwrap();
@@ -393,16 +354,9 @@ mod tests {
         assert!(e.exists("originals/0000007.pdf"));
         assert_eq!(e.version(), None);
         assert_eq!(e.summarize().unwrap().docs.len(), 1);
-        assert!(
-            ExportSource::open(d.path()).is_err(),
-            "Ordner ohne manifest.json"
-        );
+        assert!(ExportSource::open(d.path()).is_err(), "Ordner ohne manifest.json");
         let bad = d.path().join("bad.zip");
-        std::fs::write(
-            &bad,
-            crate::zipread::testzip::build(&[("x.txt", b"1", false)]),
-        )
-        .unwrap();
+        std::fs::write(&bad, crate::zipread::testzip::build(&[("x.txt", b"1", false)])).unwrap();
         assert!(ExportSource::open(&bad).is_err());
     }
 }

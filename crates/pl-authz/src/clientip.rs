@@ -149,11 +149,7 @@ pub fn client_ip(headers: &HeaderMap, remote_addr: Option<IpAddr>, trusted_proxi
     let mut loopback: Vec<IpAddr> = Vec::new();
     let mut private: Vec<IpAddr> = Vec::new();
     for key in PRECEDENCE {
-        let value = if *key == "REMOTE_ADDR" {
-            remote_addr.map(|ip| ip.to_string())
-        } else {
-            crate::csrf::meta_header(headers, key)
-        };
+        let value = if *key == "REMOTE_ADDR" { remote_addr.map(|ip| ip.to_string()) } else { crate::csrf::meta_header(headers, key) };
         let Some(value) = value.map(|v| v.trim().to_string()).filter(|v| !v.is_empty()) else {
             continue;
         };
@@ -230,13 +226,7 @@ pub fn throttle_client_ip(headers: &HeaderMap, remote_addr: Option<IpAddr>, trus
         .map(canonical)
         .collect();
     // from the right: first address that is not a trusted proxy; otherwise the leftmost
-    chain
-        .iter()
-        .rev()
-        .find(|ip| !is_trusted_proxy(**ip, trusted_proxies))
-        .or(chain.first())
-        .copied()
-        .or(Some(peer))
+    chain.iter().rev().find(|ip| !is_trusted_proxy(**ip, trusted_proxies)).or(chain.first()).copied().or(Some(peer))
 }
 
 /// The log line of `handle_failed_login` (logger `paperless.auth`, level INFO).
@@ -292,7 +282,19 @@ mod tests {
         for g in ["8.8.8.8", "1.1.1.1", "192.0.0.9", "2001:4860:4860::8888", "2001:20::1"] {
             assert!(is_global(ip(g)), "{g} is global");
         }
-        for p in ["10.1.2.3", "127.0.0.1", "172.31.0.1", "192.168.1.1", "100.64.0.1", "169.254.1.1", "::1", "fd00::1", "fe80::1", "2001:db8::1", "0.0.0.0"] {
+        for p in [
+            "10.1.2.3",
+            "127.0.0.1",
+            "172.31.0.1",
+            "192.168.1.1",
+            "100.64.0.1",
+            "169.254.1.1",
+            "::1",
+            "fd00::1",
+            "fe80::1",
+            "2001:db8::1",
+            "0.0.0.0",
+        ] {
             assert!(!is_global(ip(p)), "{p} is not global");
         }
         assert!(is_loopback(ip("127.0.0.2")));

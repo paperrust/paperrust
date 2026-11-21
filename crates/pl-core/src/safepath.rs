@@ -67,8 +67,7 @@ pub fn is_windows_device_name(part: &str) -> bool {
             let mut it = s.chars();
             let head: String = it.by_ref().take(3).collect();
             let tail: Vec<char> = it.collect();
-            (head == "COM" || head == "LPT")
-                && matches!(tail.as_slice(), [c] if c.is_ascii_digit() || matches!(c, '¹' | '²' | '³'))
+            (head == "COM" || head == "LPT") && matches!(tail.as_slice(), [c] if c.is_ascii_digit() || matches!(c, '¹' | '²' | '³'))
         }
     }
 }

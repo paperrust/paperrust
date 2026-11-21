@@ -4,7 +4,7 @@
 //! parameters/traits.
 
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
 
 use crate::prompts;
@@ -88,19 +88,14 @@ pub fn node_document_weights(nodes: &[(Option<i64>, Option<f64>)]) -> Vec<Simila
         }
         *w.entry(*d).or_insert(0.0) += score.unwrap_or(0.0);
     }
-    let mut out: Vec<SimilarDocument> =
-        order.into_iter().map(|d| SimilarDocument { document_id: d, weight: w[&d] }).collect();
+    let mut out: Vec<SimilarDocument> = order.into_iter().map(|d| SimilarDocument { document_id: d, weight: w[&d] }).collect();
     out.sort_by(|a, b| b.weight.total_cmp(&a.weight));
     out
 }
 
 /// upstream `_fulltext_similar_documents`: weight from the rank (`top_k - rank`).
 pub fn fulltext_weights(similar_ids: &[i64], top_k: usize) -> Vec<SimilarDocument> {
-    similar_ids
-        .iter()
-        .enumerate()
-        .map(|(rank, id)| SimilarDocument { document_id: *id, weight: (top_k as f64) - rank as f64 })
-        .collect()
+    similar_ids.iter().enumerate().map(|(rank, id)| SimilarDocument { document_id: *id, weight: (top_k as f64) - rank as f64 }).collect()
 }
 
 /// Weights per object id in insertion order (Python `defaultdict` keeps the order).
@@ -164,9 +159,7 @@ pub fn visible_ranked(weights: &Weights, visible_names: &BTreeMap<i64, String>, 
     let mut c: Vec<TaxonomyCandidate> = weights
         .order
         .iter()
-        .filter_map(|id| {
-            visible_names.get(id).map(|n| TaxonomyCandidate { id: *id, name: n.clone(), weight: weights.w[id] })
-        })
+        .filter_map(|id| visible_names.get(id).map(|n| TaxonomyCandidate { id: *id, name: n.clone(), weight: weights.w[id] }))
         .collect();
     c.sort_by(|a, b| b.weight.total_cmp(&a.weight));
     c.truncate(limit);
@@ -248,11 +241,7 @@ pub fn context_blocks(docs: &[(Option<String>, Option<String>, Option<String>)])
         .take(CONTEXT_MAX_DOCS)
         .map(|(title, filename, content)| {
             let text: String = content.as_deref().unwrap_or("").chars().take(CONTEXT_DOC_CHARS).collect();
-            let t = title
-                .as_deref()
-                .filter(|s| !s.is_empty())
-                .or(filename.as_deref().filter(|s| !s.is_empty()))
-                .unwrap_or("Untitled");
+            let t = title.as_deref().filter(|s| !s.is_empty()).or(filename.as_deref().filter(|s| !s.is_empty())).unwrap_or("Untitled");
             format!("TITLE: {t}\n{text}")
         })
         .collect::<Vec<_>>()
@@ -324,7 +313,13 @@ pub fn get_llm_output_language(configured: Option<&str>, ui_settings: Option<&Va
 }
 
 /// Cache key part `llm_cache_backend` from `DocumentViewSet.ai_suggestions`.
-pub fn llm_cache_backend(backend: Option<&str>, model: Option<&str>, endpoint: Option<&str>, output_language: Option<&str>, user_id: i64) -> String {
+pub fn llm_cache_backend(
+    backend: Option<&str>,
+    model: Option<&str>,
+    endpoint: Option<&str>,
+    output_language: Option<&str>,
+    user_id: i64,
+) -> String {
     let user = format!("user={user_id}");
     [backend, model, endpoint, output_language, Some(user.as_str())]
         .into_iter()

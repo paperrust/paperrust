@@ -107,7 +107,9 @@ impl WsPayload {
     /// From JSON (e.g. from `NOTIFY`).
     pub fn from_value(v: &Value) -> Option<Self> {
         let data = v.get("data")?;
-        let ids = |k: &str| -> Vec<i64> { data.get(k).and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_i64).collect()).unwrap_or_default() };
+        let ids = |k: &str| -> Vec<i64> {
+            data.get(k).and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_i64).collect()).unwrap_or_default()
+        };
         let perms = || ViewPermissions {
             owner_id: data.get("owner_id").and_then(Value::as_i64),
             users_can_view: ids("users_can_view"),
@@ -283,7 +285,15 @@ impl ProgressManager {
     }
 
     /// `send_progress(status, message, current, max, document_id=, owner_id=, users_can_view=, groups_can_view=)`.
-    pub fn send_progress(&self, status: ProgressStatus, message: &str, current_progress: i64, max_progress: i64, document_id: Option<i64>, perms: ViewPermissions) {
+    pub fn send_progress(
+        &self,
+        status: ProgressStatus,
+        message: &str,
+        current_progress: i64,
+        max_progress: i64,
+        document_id: Option<i64>,
+        perms: ViewPermissions,
+    ) {
         self.bus.send(WsPayload::StatusUpdate {
             filename: self.filename.clone(),
             task_id: self.task_id.clone(),
@@ -348,7 +358,11 @@ impl Default for RelayBackoff {
 /// is issued again. The old listener is already discarded then: PostgreSQL does not redeliver
 /// NOTIFY, so there is no double delivery; messages during the gap are lost
 /// (like Channels/Redis without a subscriber). Returns only on `shutdown` (Ok) or a closed pool.
-pub async fn relay_notifications(pool: sqlx::PgPool, bus: EventBus, shutdown: tokio::sync::watch::Receiver<bool>) -> Result<(), sqlx::Error> {
+pub async fn relay_notifications(
+    pool: sqlx::PgPool,
+    bus: EventBus,
+    shutdown: tokio::sync::watch::Receiver<bool>,
+) -> Result<(), sqlx::Error> {
     relay_notifications_with(pool, bus, shutdown, RelayBackoff::default()).await
 }
 
@@ -458,7 +472,14 @@ mod tests {
         let bus = EventBus::new(8);
         let mut a = bus.subscribe();
         let mut b = bus.subscribe();
-        ProgressManager::new(bus.clone(), None, Some("t".into())).send_progress(ProgressStatus::Started, "x", 0, 100, None, ViewPermissions::default());
+        ProgressManager::new(bus.clone(), None, Some("t".into())).send_progress(
+            ProgressStatus::Started,
+            "x",
+            0,
+            100,
+            None,
+            ViewPermissions::default(),
+        );
         assert!(matches!(a.recv().await.unwrap(), WsPayload::StatusUpdate { status: ProgressStatus::Started, .. }));
         assert!(matches!(b.recv().await.unwrap(), WsPayload::StatusUpdate { .. }));
     }

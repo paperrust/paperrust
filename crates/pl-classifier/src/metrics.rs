@@ -23,11 +23,7 @@ pub struct TagMetrics {
 
 fn f1(tp: usize, fp: usize, fn_: usize) -> f64 {
     let d = 2 * tp + fp + fn_;
-    if d == 0 {
-        0.0
-    } else {
-        2.0 * tp as f64 / d as f64
-    }
+    if d == 0 { 0.0 } else { 2.0 * tp as f64 / d as f64 }
 }
 
 pub fn single(pred: &[Option<i64>], truth: &[Option<i64>]) -> SingleMetrics {
@@ -38,33 +34,14 @@ pub fn single(pred: &[Option<i64>], truth: &[Option<i64>]) -> SingleMetrics {
         .iter()
         .map(|&c| {
             let c = Some(c);
-            let tp = pred
-                .iter()
-                .zip(truth)
-                .filter(|(p, t)| **p == c && **t == c)
-                .count();
-            let fp = pred
-                .iter()
-                .zip(truth)
-                .filter(|(p, t)| **p == c && **t != c)
-                .count();
-            let fn_ = pred
-                .iter()
-                .zip(truth)
-                .filter(|(p, t)| **p != c && **t == c)
-                .count();
+            let tp = pred.iter().zip(truth).filter(|(p, t)| **p == c && **t == c).count();
+            let fp = pred.iter().zip(truth).filter(|(p, t)| **p == c && **t != c).count();
+            let fn_ = pred.iter().zip(truth).filter(|(p, t)| **p != c && **t == c).count();
             f1(tp, fp, fn_)
         })
         .collect();
-    let macro_f1 = if f1s.is_empty() {
-        0.0
-    } else {
-        f1s.iter().sum::<f64>() / f1s.len() as f64
-    };
-    SingleMetrics {
-        accuracy: acc,
-        macro_f1,
-    }
+    let macro_f1 = if f1s.is_empty() { 0.0 } else { f1s.iter().sum::<f64>() / f1s.len() as f64 };
+    SingleMetrics { accuracy: acc, macro_f1 }
 }
 
 pub fn tags(pred: &[Vec<i64>], truth: &[Vec<i64>]) -> TagMetrics {
@@ -86,19 +63,12 @@ pub fn tags(pred: &[Vec<i64>], truth: &[Vec<i64>]) -> TagMetrics {
         fn_all += fn_;
         f1s.push(f1(tp, fp, fn_));
     }
-    let exact = pred
-        .iter()
-        .zip(truth)
-        .filter(|(p, t)| p.iter().collect::<BTreeSet<_>>() == t.iter().collect::<BTreeSet<_>>())
-        .count() as f64
+    let exact = pred.iter().zip(truth).filter(|(p, t)| p.iter().collect::<BTreeSet<_>>() == t.iter().collect::<BTreeSet<_>>()).count()
+        as f64
         / truth.len().max(1) as f64;
     TagMetrics {
         micro_f1: f1(tp_all, fp_all, fn_all),
-        macro_f1: if f1s.is_empty() {
-            0.0
-        } else {
-            f1s.iter().sum::<f64>() / f1s.len() as f64
-        },
+        macro_f1: if f1s.is_empty() { 0.0 } else { f1s.iter().sum::<f64>() / f1s.len() as f64 },
         exact_match: exact,
     }
 }
@@ -109,10 +79,7 @@ mod tests {
 
     #[test]
     fn single_metrics() {
-        let m = single(
-            &[Some(1), None, Some(2), Some(1)],
-            &[Some(1), Some(2), Some(2), None],
-        );
+        let m = single(&[Some(1), None, Some(2), Some(1)], &[Some(1), Some(2), Some(2), None]);
         assert_eq!(m.accuracy, 0.5);
         // class 1: tp1 fp1 fn0 -> 2/3; class 2: tp1 fp0 fn1 -> 2/3
         assert!((m.macro_f1 - 2.0 / 3.0).abs() < 1e-12);

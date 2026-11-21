@@ -31,11 +31,7 @@ impl Csr {
     }
 
     pub fn from_rows(n_cols: usize, rows: &[Vec<(u32, f32)>]) -> Csr {
-        let mut m = Csr {
-            n_cols,
-            indptr: vec![0],
-            ..Default::default()
-        };
+        let mut m = Csr { n_cols, indptr: vec![0], ..Default::default() };
         for r in rows {
             for &(j, v) in r {
                 m.indices.push(j);
@@ -60,12 +56,7 @@ pub struct CountVectorizer {
 
 impl Default for CountVectorizer {
     fn default() -> Self {
-        CountVectorizer {
-            ngram_max: 2,
-            min_df: 0.01,
-            vocabulary: Vec::new(),
-            index: HashMap::new(),
-        }
+        CountVectorizer { ngram_max: 2, min_df: 0.01, vocabulary: Vec::new(), index: HashMap::new() }
     }
 }
 
@@ -98,12 +89,7 @@ fn analyze_doc(doc: &str, ngram_max: usize, mut f: impl FnMut(&str)) {
 
 impl CountVectorizer {
     pub fn rebuild_index(&mut self) {
-        self.index = self
-            .vocabulary
-            .iter()
-            .enumerate()
-            .map(|(i, t)| (t.clone(), i as u32))
-            .collect();
+        self.index = self.vocabulary.iter().enumerate().map(|(i, t)| (t.clone(), i as u32)).collect();
     }
 
     pub fn n_features(&self) -> usize {
@@ -111,10 +97,7 @@ impl CountVectorizer {
     }
 
     /// `fit_transform`: learns the vocabulary from already preprocessed documents.
-    pub fn fit_transform<I: IntoIterator<Item = String>>(
-        &mut self,
-        docs: I,
-    ) -> Result<Csr, ClassifierError> {
+    pub fn fit_transform<I: IntoIterator<Item = String>>(&mut self, docs: I) -> Result<Csr, ClassifierError> {
         let mut vocab: HashMap<String, u32> = HashMap::new();
         let mut df: Vec<u32> = Vec::new();
         let mut rows: Vec<Vec<(u32, u32)>> = Vec::new();
@@ -164,19 +147,11 @@ impl CountVectorizer {
         }
         self.vocabulary = kept.into_iter().map(|(t, _)| t).collect();
         self.rebuild_index();
-        let mut m = Csr {
-            n_cols: self.vocabulary.len(),
-            indptr: vec![0],
-            ..Default::default()
-        };
+        let mut m = Csr { n_cols: self.vocabulary.len(), indptr: vec![0], ..Default::default() };
         let mut tmp: Vec<(u32, f32)> = Vec::new();
         for row in rows {
             tmp.clear();
-            tmp.extend(
-                row.into_iter()
-                    .filter(|(id, _)| remap[*id as usize] != u32::MAX)
-                    .map(|(id, c)| (remap[id as usize], c as f32)),
-            );
+            tmp.extend(row.into_iter().filter(|(id, _)| remap[*id as usize] != u32::MAX).map(|(id, c)| (remap[id as usize], c as f32)));
             tmp.sort_unstable_by_key(|x| x.0);
             for &(j, v) in &tmp {
                 m.indices.push(j);
@@ -208,34 +183,21 @@ mod tests {
     #[test]
     fn small_corpus_keeps_all_terms_and_sorts() {
         let mut v = CountVectorizer::default();
-        let m = v
-            .fit_transform(["b a a".to_string(), "Cc b".to_string()])
-            .unwrap();
+        let m = v.fit_transform(["b a a".to_string(), "Cc b".to_string()]).unwrap();
         // single-char tokens are dropped by the default token pattern
         assert_eq!(v.vocabulary, vec!["cc"]);
         assert_eq!(m.n_rows(), 2);
         let mut v = CountVectorizer::default();
-        let m = v
-            .fit_transform(["zz yy zz".to_string(), "yy xx".to_string()])
-            .unwrap();
-        assert_eq!(
-            v.vocabulary,
-            vec!["xx", "yy", "yy xx", "yy zz", "zz", "zz yy"]
-        );
-        assert_eq!(
-            m.row(0),
-            (&[1u32, 3, 4, 5][..], &[1.0f32, 1.0, 2.0, 1.0][..])
-        );
+        let m = v.fit_transform(["zz yy zz".to_string(), "yy xx".to_string()]).unwrap();
+        assert_eq!(v.vocabulary, vec!["xx", "yy", "yy xx", "yy zz", "zz", "zz yy"]);
+        assert_eq!(m.row(0), (&[1u32, 3, 4, 5][..], &[1.0f32, 1.0, 2.0, 1.0][..]));
         assert_eq!(v.transform_one("zz zz qq"), vec![(4, 2.0)]);
     }
 
     #[test]
     fn empty_vocabulary_errors() {
         let mut v = CountVectorizer::default();
-        assert!(matches!(
-            v.fit_transform(["a b c".to_string()]),
-            Err(ClassifierError::EmptyVocabulary)
-        ));
+        assert!(matches!(v.fit_transform(["a b c".to_string()]), Err(ClassifierError::EmptyVocabulary)));
     }
 
     #[test]

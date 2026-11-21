@@ -134,7 +134,10 @@ async fn doc_meta(conn: &mut PgConnection, ids: &[i64]) -> AResult<std::collecti
     let mut out = std::collections::HashMap::new();
     for r in rows {
         let added: chrono::DateTime<chrono::Utc> = r.try_get(2)?;
-        out.insert(i64::from(r.try_get::<i32, _>(0)?), (r.try_get::<String, _>(1)?, added.to_rfc3339_opts(chrono::SecondsFormat::Secs, true)));
+        out.insert(
+            i64::from(r.try_get::<i32, _>(0)?),
+            (r.try_get::<String, _>(1)?, added.to_rfc3339_opts(chrono::SecondsFormat::Secs, true)),
+        );
     }
     Ok(out)
 }
@@ -314,7 +317,13 @@ async fn render_results(
 
 /// POST /workflows/{id}/apply – retroactively on selected documents (real execution in the worker
 /// via the task `run_workflows_for_documents`, PaperRust extension `match_trigger`).
-pub async fn apply(State(st): State<AppState>, who: Who, Path(id): Path<String>, headers: HeaderMap, body: Bytes) -> Result<Response, AErr> {
+pub async fn apply(
+    State(st): State<AppState>,
+    who: Who,
+    Path(id): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Response, AErr> {
     let user = who.require(&[VIEW_WORKFLOW, CHANGE_DOCUMENT])?;
     let id = common::path_id(&id)?;
     let b = common::body_object(&headers, &body)?;
@@ -351,7 +360,8 @@ pub async fn apply(State(st): State<AppState>, who: Who, Path(id): Path<String>,
     if let Some(t) = match_trigger {
         kw.insert("match_trigger".into(), json!(t));
     }
-    let mut req = pl_core::tasks::TaskRequest::new(pl_consumer::manual::RUN_WORKFLOWS_FOR_DOCUMENTS).trigger_source(pl_core::tasks::trigger_source::MANUAL);
+    let mut req = pl_core::tasks::TaskRequest::new(pl_consumer::manual::RUN_WORKFLOWS_FOR_DOCUMENTS)
+        .trigger_source(pl_core::tasks::trigger_source::MANUAL);
     req.kwargs = kw;
     let prepared = pl_core::tasks::prepare_task(&st, req).map_err(|_| AErr::Unavailable("No task queue available.".into()))?;
     let task_id = prepared.task_id;

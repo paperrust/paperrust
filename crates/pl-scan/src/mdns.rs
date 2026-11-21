@@ -106,7 +106,9 @@ pub fn parse_response(msg: &[u8], rec: &mut Records) -> Option<()> {
         return None;
     }
     let qd = u16::from_be_bytes([msg[4], msg[5]]) as usize;
-    let rr = u16::from_be_bytes([msg[6], msg[7]]) as usize + u16::from_be_bytes([msg[8], msg[9]]) as usize + u16::from_be_bytes([msg[10], msg[11]]) as usize;
+    let rr = u16::from_be_bytes([msg[6], msg[7]]) as usize
+        + u16::from_be_bytes([msg[8], msg[9]]) as usize
+        + u16::from_be_bytes([msg[10], msg[11]]) as usize;
     let mut pos = 12;
     for _ in 0..qd {
         let (_, p) = read_name(msg, pos)?;
@@ -167,7 +169,11 @@ pub fn assemble(rec: &Records, fallback: &HashMap<String, IpAddr>) -> Vec<Found>
         let ip: Option<IpAddr> = rec.a.get(target).map(|a| IpAddr::V4(*a)).or_else(|| fallback.get(&key).copied());
         let Some(ip) = ip else { continue };
         let txt = rec.txt.get(&key);
-        let rs = txt.and_then(|t| t.get("rs")).map(|s| s.trim_matches('/').to_string()).filter(|s| !s.is_empty()).unwrap_or_else(|| "eSCL".into());
+        let rs = txt
+            .and_then(|t| t.get("rs"))
+            .map(|s| s.trim_matches('/').to_string())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| "eSCL".into());
         let host = match ip {
             IpAddr::V4(v4) => v4.to_string(),
             IpAddr::V6(v6) => format!("[{v6}]"),
@@ -293,10 +299,18 @@ mod tests {
 
     #[test]
     fn parse_and_assemble() {
-        let pkt = testpkt::response("_uscan._tcp.local", "HP OfficeJet Pro 9010 [ABC]", "HPABC.local", [192, 168, 1, 20], 8080, &["txtvers=1", "ty=HP OfficeJet Pro 9010 series", "rs=eSCL", "UUID=1234"]);
+        let pkt = testpkt::response(
+            "_uscan._tcp.local",
+            "HP OfficeJet Pro 9010 [ABC]",
+            "HPABC.local",
+            [192, 168, 1, 20],
+            8080,
+            &["txtvers=1", "ty=HP OfficeJet Pro 9010 series", "rs=eSCL", "UUID=1234"],
+        );
         let mut rec = Records::default();
         parse_response(&pkt, &mut rec).unwrap();
-        let tls = testpkt::response("_uscans._tcp.local", "HP OfficeJet Pro 9010 [ABC]", "HPABC.local", [192, 168, 1, 20], 443, &["rs=/eSCL"]);
+        let tls =
+            testpkt::response("_uscans._tcp.local", "HP OfficeJet Pro 9010 [ABC]", "HPABC.local", [192, 168, 1, 20], 443, &["rs=/eSCL"]);
         parse_response(&tls, &mut rec).unwrap();
         let found = assemble(&rec, &HashMap::new());
         assert_eq!(found.len(), 2);

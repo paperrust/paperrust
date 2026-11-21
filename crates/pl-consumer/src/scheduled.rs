@@ -286,7 +286,8 @@ impl Consumer {
                     }
                     let Some(row) = db::load_document(&mut conn, id).await? else { continue };
                     let mut doc = DocInstance::from_db(row);
-                    let outcome = workflows::run_workflows(&mut conn, &self.run_env(&audit), TRIGGER_SCHEDULED, &mut doc, Some(workflow)).await?;
+                    let outcome =
+                        workflows::run_workflows(&mut conn, &self.run_env(&audit), TRIGGER_SCHEDULED, &mut doc, Some(workflow)).await?;
                     workflows::enqueue_ai_suggestions(self.queue.as_deref(), &outcome).await;
                     // Scheduled workflows dont send document_updated signal, so send a websocket update here
                     self.send_websocket_document_updated(&mut conn, id).await?;

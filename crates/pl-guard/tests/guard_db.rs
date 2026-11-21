@@ -33,19 +33,22 @@ async fn guard_against_database() {
     std::fs::create_dir_all(media.join("documents/archive")).unwrap();
     std::fs::create_dir_all(media.join("documents/thumbnails")).unwrap();
     // set file names/checksums of the copy to match the generated files
-    let ids: Vec<i64> = sqlx::query_scalar("SELECT id::bigint FROM documents_document ORDER BY id LIMIT 30").fetch_all(&pool).await.unwrap();
+    let ids: Vec<i64> =
+        sqlx::query_scalar("SELECT id::bigint FROM documents_document ORDER BY id LIMIT 30").fetch_all(&pool).await.unwrap();
     for id in &ids {
         let body = pdf(*id);
         std::fs::write(media.join(format!("documents/originals/g{id:07}.pdf")), &body).unwrap();
         std::fs::write(media.join(format!("documents/thumbnails/{id:07}.webp")), b"RIFF\0\0\0\0WEBPVP8 ").unwrap();
         let sha = pl_guard::backup::hex_of(&<sha2::Sha256 as sha2::Digest>::digest(&body));
-        sqlx::query("UPDATE documents_document SET filename = $1, checksum = $2, archive_filename = NULL, archive_checksum = NULL WHERE id = $3")
-            .bind(format!("g{id:07}.pdf"))
-            .bind(sha)
-            .bind(*id as i32)
-            .execute(&pool)
-            .await
-            .unwrap();
+        sqlx::query(
+            "UPDATE documents_document SET filename = $1, checksum = $2, archive_filename = NULL, archive_checksum = NULL WHERE id = $3",
+        )
+        .bind(format!("g{id:07}.pdf"))
+        .bind(sha)
+        .bind(*id as i32)
+        .execute(&pool)
+        .await
+        .unwrap();
     }
     sqlx::query("DROP TABLE IF EXISTS paperrust_guard_state, paperrust_guard_event, paperrust_guard_finding").execute(&pool).await.unwrap();
     pl_guard::store::migrate(&pool).await.unwrap();

@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::AutoMode;
 use crate::schema::ClassificationSuggestions;
-use crate::taxonomy::{check_duplicate, Alias, MatchOptions, TaxonomyEntry, TaxonomyKind};
+use crate::taxonomy::{Alias, MatchOptions, TaxonomyEntry, TaxonomyKind, check_duplicate};
 
 /// What triggers a run.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -64,7 +64,12 @@ pub enum Field {
 
 /// Custom field values → planned changes. Fields with an existing value (`filled`) are not
 /// overwritten; `apply` only in mode `Apply` from the threshold.
-pub fn custom_field_changes(values: &[crate::custom_fields::FieldValue], filled: &[i64], mode: AutoMode, limits: &RunLimits) -> Vec<PlannedChange> {
+pub fn custom_field_changes(
+    values: &[crate::custom_fields::FieldValue],
+    filled: &[i64],
+    mode: AutoMode,
+    limits: &RunLimits,
+) -> Vec<PlannedChange> {
     if mode == AutoMode::Off {
         return Vec::new();
     }
@@ -144,12 +149,30 @@ pub fn plan<'v>(
     let apply_ok = |c: f64| mode == AutoMode::Apply && c >= limits.min_confidence_apply;
     if fields.contains(&Field::Title) && !s.title.trim().is_empty() {
         let t: String = s.title.trim().chars().take(128).collect();
-        p.changes.push(PlannedChange { field: Field::Title, existing_id: None, new_name: None, value: Some(t), confidence: 0.6, apply: apply_ok(0.6), why: "LLM title".into(), data: None });
+        p.changes.push(PlannedChange {
+            field: Field::Title,
+            existing_id: None,
+            new_name: None,
+            value: Some(t),
+            confidence: 0.6,
+            apply: apply_ok(0.6),
+            why: "LLM title".into(),
+            data: None,
+        });
     }
     if fields.contains(&Field::Created)
         && let Some(d) = s.dates.iter().find(|d| chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").is_ok())
     {
-            p.changes.push(PlannedChange { field: Field::Created, existing_id: None, new_name: None, value: Some(d.clone()), confidence: 0.6, apply: apply_ok(0.6), why: "first valid suggested date".into(), data: None });
+        p.changes.push(PlannedChange {
+            field: Field::Created,
+            existing_id: None,
+            new_name: None,
+            value: Some(d.clone()),
+            confidence: 0.6,
+            apply: apply_ok(0.6),
+            why: "first valid suggested date".into(),
+            data: None,
+        });
     }
     let singles = [
         (Field::Correspondent, TaxonomyKind::Correspondent, &s.correspondents),
@@ -161,23 +184,59 @@ pub fn plan<'v>(
             continue;
         }
         if let Some(id) = choice.existing_ids.first() {
-            p.changes.push(PlannedChange { field, existing_id: Some(*id), new_name: None, value: None, confidence: 0.95, apply: apply_ok(0.95), why: "model picked a shown candidate".into(), data: None });
+            p.changes.push(PlannedChange {
+                field,
+                existing_id: Some(*id),
+                new_name: None,
+                value: None,
+                confidence: 0.95,
+                apply: apply_ok(0.95),
+                why: "model picked a shown candidate".into(),
+                data: None,
+            });
             continue;
         }
         let v = visible(kind);
         let Some(name) = choice.new_names.first() else { continue };
         let d = check_duplicate(kind, name, v.entries, v.aliases, opts);
         if let Some(c) = d.candidates.iter().find(|c| c.above_threshold) {
-            p.changes.push(PlannedChange { field, existing_id: Some(c.id), new_name: None, value: None, confidence: c.score, apply: apply_ok(c.score), why: format!("matched '{}' to existing '{}'", name, c.name), data: None });
+            p.changes.push(PlannedChange {
+                field,
+                existing_id: Some(c.id),
+                new_name: None,
+                value: None,
+                confidence: c.score,
+                apply: apply_ok(c.score),
+                why: format!("matched '{}' to existing '{}'", name, c.name),
+                data: None,
+            });
         } else if create_missing && kind != TaxonomyKind::StoragePath && p.new_objects < remaining_new_objects {
             p.new_objects += 1;
-            p.changes.push(PlannedChange { field, existing_id: None, new_name: Some(name.clone()), value: None, confidence: 0.5, apply: apply_ok(0.5), why: "no equivalent object exists".into(), data: None });
+            p.changes.push(PlannedChange {
+                field,
+                existing_id: None,
+                new_name: Some(name.clone()),
+                value: None,
+                confidence: 0.5,
+                apply: apply_ok(0.5),
+                why: "no equivalent object exists".into(),
+                data: None,
+            });
         }
     }
     if fields.contains(&Field::Tags) {
         let v = visible(TaxonomyKind::Tag);
         for id in &s.tags.existing_ids {
-            p.changes.push(PlannedChange { field: Field::Tags, existing_id: Some(*id), new_name: None, value: None, confidence: 0.95, apply: apply_ok(0.95), why: "model picked a shown candidate".into(), data: None });
+            p.changes.push(PlannedChange {
+                field: Field::Tags,
+                existing_id: Some(*id),
+                new_name: None,
+                value: None,
+                confidence: 0.95,
+                apply: apply_ok(0.95),
+                why: "model picked a shown candidate".into(),
+                data: None,
+            });
         }
         for name in &s.tags.new_names {
             let d = check_duplicate(TaxonomyKind::Tag, name, v.entries, v.aliases, opts);
@@ -185,10 +244,28 @@ pub fn plan<'v>(
                 if p.changes.iter().any(|x| x.field == Field::Tags && x.existing_id == Some(c.id)) {
                     continue;
                 }
-                p.changes.push(PlannedChange { field: Field::Tags, existing_id: Some(c.id), new_name: None, value: None, confidence: c.score, apply: apply_ok(c.score), why: format!("matched '{}' to existing '{}'", name, c.name), data: None });
+                p.changes.push(PlannedChange {
+                    field: Field::Tags,
+                    existing_id: Some(c.id),
+                    new_name: None,
+                    value: None,
+                    confidence: c.score,
+                    apply: apply_ok(c.score),
+                    why: format!("matched '{}' to existing '{}'", name, c.name),
+                    data: None,
+                });
             } else if create_missing && p.new_objects < remaining_new_objects {
                 p.new_objects += 1;
-                p.changes.push(PlannedChange { field: Field::Tags, existing_id: None, new_name: Some(name.clone()), value: None, confidence: 0.5, apply: apply_ok(0.5), why: "no equivalent tag exists".into(), data: None });
+                p.changes.push(PlannedChange {
+                    field: Field::Tags,
+                    existing_id: None,
+                    new_name: Some(name.clone()),
+                    value: None,
+                    confidence: 0.5,
+                    apply: apply_ok(0.5),
+                    why: "no equivalent tag exists".into(),
+                    data: None,
+                });
             }
         }
     }
@@ -206,8 +283,22 @@ mod tests {
         static ENTRIES: std::sync::OnceLock<Vec<TaxonomyEntry>> = std::sync::OnceLock::new();
         let entries = ENTRIES.get_or_init(|| {
             vec![
-                TaxonomyEntry { kind: TaxonomyKind::Correspondent, id: 1, name: "Swisscom (Schweiz) AG".into(), owner_id: None, extra: None, document_count: None },
-                TaxonomyEntry { kind: TaxonomyKind::Tag, id: 5, name: "Rechnung".into(), owner_id: None, extra: None, document_count: None },
+                TaxonomyEntry {
+                    kind: TaxonomyKind::Correspondent,
+                    id: 1,
+                    name: "Swisscom (Schweiz) AG".into(),
+                    owner_id: None,
+                    extra: None,
+                    document_count: None,
+                },
+                TaxonomyEntry {
+                    kind: TaxonomyKind::Tag,
+                    id: 5,
+                    name: "Rechnung".into(),
+                    owner_id: None,
+                    extra: None,
+                    document_count: None,
+                },
             ]
         });
         let vis = |_k: TaxonomyKind| Visible { entries: entries.as_slice(), aliases: &[] };

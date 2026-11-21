@@ -76,9 +76,15 @@ async fn ngx_degraded_sync() {
     assert_eq!(tags, server_tags["count"].as_i64().unwrap(), "all visible tags mirrored");
 
     // Selection: tag "Invoices" + one saved view
-    let tag_key: String = sqlx::query_scalar("SELECT key FROM object WHERE kind = 'tag' AND name = 'Invoices'").fetch_one(r.pool()).await.unwrap();
-    let tag_id: i64 = sqlx::query_scalar("SELECT legacy_id FROM object WHERE kind = 'tag' AND name = 'Invoices'").fetch_one(r.pool()).await.unwrap();
-    let views: Vec<(String, String, i64)> = sqlx::query_as("SELECT key, name, legacy_id FROM object WHERE kind = 'saved_view' ORDER BY legacy_id").fetch_all(r.pool()).await.unwrap();
+    let tag_key: String =
+        sqlx::query_scalar("SELECT key FROM object WHERE kind = 'tag' AND name = 'Invoices'").fetch_one(r.pool()).await.unwrap();
+    let tag_id: i64 =
+        sqlx::query_scalar("SELECT legacy_id FROM object WHERE kind = 'tag' AND name = 'Invoices'").fetch_one(r.pool()).await.unwrap();
+    let views: Vec<(String, String, i64)> =
+        sqlx::query_as("SELECT key, name, legacy_id FROM object WHERE kind = 'saved_view' ORDER BY legacy_id")
+            .fetch_all(r.pool())
+            .await
+            .unwrap();
     let mut items = vec![SelectionItem { kind: "tag".into(), key: tag_key.clone(), files: "preferred".into() }];
     // first view whose rules can be mapped
     let mut view_used = None;
@@ -98,14 +104,21 @@ async fn ngx_degraded_sync() {
     println!("P6 initial: {rep:?} in {:?}, view {view_used:?}", t.elapsed());
     let n_local = r.count_documents(true).await.unwrap();
     assert_eq!(n_local as u64, plan.total_documents);
-    let pdfs: i64 = sqlx::query_scalar("SELECT count(*) FROM file WHERE variant IN ('original','archive') AND state = 'complete'").fetch_one(r.pool()).await.unwrap();
+    let pdfs: i64 = sqlx::query_scalar("SELECT count(*) FROM file WHERE variant IN ('original','archive') AND state = 'complete'")
+        .fetch_one(r.pool())
+        .await
+        .unwrap();
     assert!(pdfs > 0, "files downloaded");
     // Inhalt + Notizen da, Volltext offline
-    let any: String = sqlx::query_scalar("SELECT key FROM document WHERE in_selection = 1 AND has_detail = 1 LIMIT 1").fetch_one(r.pool()).await.unwrap();
+    let any: String =
+        sqlx::query_scalar("SELECT key FROM document WHERE in_selection = 1 AND has_detail = 1 LIMIT 1").fetch_one(r.pool()).await.unwrap();
     assert!(r.document_full(&any, true, true).await.unwrap().unwrap()["content"].is_string());
 
     // Bulk tag (bulk_edit add_tag does not change `modified`) → only the fingerprint finds it
-    let doc_id: i64 = sqlx::query_scalar("SELECT legacy_id FROM document WHERE in_selection = 1 ORDER BY legacy_id LIMIT 1").fetch_one(r.pool()).await.unwrap();
+    let doc_id: i64 = sqlx::query_scalar("SELECT legacy_id FROM document WHERE in_selection = 1 ORDER BY legacy_id LIMIT 1")
+        .fetch_one(r.pool())
+        .await
+        .unwrap();
     let other_tag: i64 = sqlx::query_scalar("SELECT legacy_id FROM object WHERE kind = 'tag' AND legacy_id <> ? AND key NOT IN (SELECT tag FROM document_tag dt JOIN document d ON d.key = dt.doc WHERE d.legacy_id = ?) ORDER BY legacy_id LIMIT 1")
         .bind(tag_id)
         .bind(doc_id)
@@ -113,7 +126,13 @@ async fn ngx_degraded_sync() {
         .await
         .unwrap();
     let (_, before) = api(&url, "GET", &format!("api/documents/{doc_id}/"), None).await;
-    let (s, _) = api(&url, "POST", "api/documents/bulk_edit/", Some(json!({"documents": [doc_id], "method": "add_tag", "parameters": {"tag": other_tag}}))).await;
+    let (s, _) = api(
+        &url,
+        "POST",
+        "api/documents/bulk_edit/",
+        Some(json!({"documents": [doc_id], "method": "add_tag", "parameters": {"tag": other_tag}})),
+    )
+    .await;
     assert_eq!(s, 200);
     let (_, after) = api(&url, "GET", &format!("api/documents/{doc_id}/"), None).await;
     let modified_unchanged = before["modified"] == after["modified"];
@@ -137,7 +156,12 @@ async fn ngx_degraded_sync() {
     assert_eq!(tagged(r.clone()).await, 1, "fingerprint check found the bulk tag change");
 
     // Delete (trash) → detected via `all`
-    let del_id: i64 = sqlx::query_scalar("SELECT legacy_id FROM document WHERE in_selection = 1 AND legacy_id <> ? ORDER BY legacy_id DESC LIMIT 1").bind(doc_id).fetch_one(r.pool()).await.unwrap();
+    let del_id: i64 =
+        sqlx::query_scalar("SELECT legacy_id FROM document WHERE in_selection = 1 AND legacy_id <> ? ORDER BY legacy_id DESC LIMIT 1")
+            .bind(doc_id)
+            .fetch_one(r.pool())
+            .await
+            .unwrap();
     let (s, _) = api(&url, "DELETE", &format!("api/documents/{del_id}/"), None).await;
     assert_eq!(s, 204);
     c.sync_once().await.unwrap();
@@ -164,7 +188,11 @@ async fn ngx_degraded_sync() {
     c.sync_once().await.unwrap();
     let have: i64 = sqlx::query_scalar("SELECT count(*) FROM document WHERE legacy_id = ?").bind(rid).fetch_one(r.pool()).await.unwrap();
     assert_eq!(have, 1);
-    sqlx::query("DELETE FROM guardian_userobjectpermission WHERE object_pk = $1 AND user_id = 3").bind(rid.to_string()).execute(&pg).await.unwrap();
+    sqlx::query("DELETE FROM guardian_userobjectpermission WHERE object_pk = $1 AND user_id = 3")
+        .bind(rid.to_string())
+        .execute(&pg)
+        .await
+        .unwrap();
     c.sync_once().await.unwrap();
     let have: i64 = sqlx::query_scalar("SELECT count(*) FROM document WHERE legacy_id = ?").bind(rid).fetch_one(r.pool()).await.unwrap();
     assert_eq!(have, 0, "revoked document removed");
@@ -183,7 +211,8 @@ async fn ngx_degraded_sync() {
         assert!(st.success());
         tokio::time::sleep(Duration::from_millis(500)).await;
         assert!(c.sync_once().await.unwrap_err().is_offline());
-        let l = body(&gw.handle(get("/api/documents/", Some(&format!("page=1&page_size=25&ordering=-created&tags__id__all={tag_id}")))).await);
+        let l =
+            body(&gw.handle(get("/api/documents/", Some(&format!("page=1&page_size=25&ordering=-created&tags__id__all={tag_id}")))).await);
         assert!(l["count"].as_i64().unwrap() > 0, "{l}");
         let s = gw.handle(get("/api/documents/", Some("page=1&page_size=25&title_content=invoice"))).await;
         assert_eq!(s.header("x-paperrust-source"), Some("local"));

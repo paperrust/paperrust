@@ -57,16 +57,12 @@ async fn session_oauth_state(state: &AppState, headers: &HeaderMap) -> Result<Op
     if key.chars().count() < 8 || key.contains('\0') {
         return Ok(None);
     }
-    let row: Option<(String,)> =
-        sqlx::query_as("SELECT session_data FROM django_session WHERE session_key = $1 AND expire_date > now()")
-            .bind(&key)
-            .fetch_optional(state.db())
-            .await?;
+    let row: Option<(String,)> = sqlx::query_as("SELECT session_data FROM django_session WHERE session_key = $1 AND expire_date > now()")
+        .bind(&key)
+        .fetch_optional(state.db())
+        .await?;
     Ok(row.and_then(|(d,)| {
-        pl_authz::signing::decode_session(&d, &cfg.secret_key)
-            .get("oauth_state")
-            .and_then(Value::as_str)
-            .map(str::to_string)
+        pl_authz::signing::decode_session(&d, &cfg.secret_key).get("oauth_state").and_then(Value::as_str).map(str::to_string)
     }))
 }
 
@@ -89,11 +85,7 @@ pub fn provider_for_scope(scope: Option<&str>) -> Option<Provider> {
 /// `str(timezone.now())` (aware UTC datetime).
 fn py_now_str(now: chrono::DateTime<Utc>) -> String {
     let us = now.timestamp_subsec_micros();
-    if us == 0 {
-        now.format("%Y-%m-%d %H:%M:%S+00:00").to_string()
-    } else {
-        format!("{}.{us:06}+00:00", now.format("%Y-%m-%d %H:%M:%S"))
-    }
+    if us == 0 { now.format("%Y-%m-%d %H:%M:%S+00:00").to_string() } else { format!("{}.{us:06}+00:00", now.format("%Y-%m-%d %H:%M:%S")) }
 }
 
 /// `get_access_token(code, redirect_uri)`; `Ok(None)` = `GetAccessTokenError`.

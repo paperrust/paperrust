@@ -40,9 +40,7 @@ pub fn from_query(u: &Url) -> Option<Design> {
     if !matches!(u.scheme(), "http" | "https" | "prapi") || is_app_local(u) {
         return None;
     }
-    u.query_pairs()
-        .find(|(k, _)| k == "design")
-        .and_then(|(_, v)| Design::parse(&v))
+    u.query_pairs().find(|(k, _)| k == "design").and_then(|(_, v)| Design::parse(&v))
 }
 
 /// Start address of the main window: `base` (server root, `…/` – Angular UI) or, with the
@@ -129,14 +127,8 @@ mod tests {
         assert_eq!(start_url("http://127.0.0.1:58123/", Design::Modern), "http://127.0.0.1:58123/rs/app/m/");
         assert_eq!(start_url("http://127.0.0.1:58123", Design::Modern), "http://127.0.0.1:58123/rs/app/m/");
         // remote: base with subpath is kept
-        assert_eq!(
-            start_url("https://docs.example.ch/paperless/", Design::Modern),
-            "https://docs.example.ch/paperless/rs/app/m/"
-        );
-        assert_eq!(
-            start_url("https://docs.example.ch/paperless", Design::Modern),
-            "https://docs.example.ch/paperless/rs/app/m/"
-        );
+        assert_eq!(start_url("https://docs.example.ch/paperless/", Design::Modern), "https://docs.example.ch/paperless/rs/app/m/");
+        assert_eq!(start_url("https://docs.example.ch/paperless", Design::Modern), "https://docs.example.ch/paperless/rs/app/m/");
         assert_eq!(start_url("kaputt", Design::Modern), "kaputt");
     }
 

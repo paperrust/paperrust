@@ -5,8 +5,8 @@
 //! `PreparedTask::publish`, PostgreSQL queue).
 
 use chrono::Utc;
-use sea_query::{Alias, OnConflict, PostgresQueryBuilder, Query};
 use pl_core::sqlbind::SqlxBinder;
+use sea_query::{Alias, OnConflict, PostgresQueryBuilder, Query};
 use serde_json::{Value, json};
 use sqlx::PgConnection;
 use uuid::Uuid;

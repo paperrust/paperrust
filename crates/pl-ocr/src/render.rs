@@ -282,9 +282,8 @@ impl PdfiumRenderer {
         macro_rules! sym {
             ($name:literal) => {
                 // SAFETY: signatures correspond to fpdfview.h (PDFium chromium/7xxx).
-                *unsafe { lib.get($name) }.map_err(|e| {
-                    OcrError::Unavailable(format!("PDFium symbol {} missing: {e}", String::from_utf8_lossy($name)))
-                })?
+                *unsafe { lib.get($name) }
+                    .map_err(|e| OcrError::Unavailable(format!("PDFium symbol {} missing: {e}", String::from_utf8_lossy($name))))?
             };
         }
         let init: unsafe extern "C" fn() = sym!(b"FPDF_InitLibrary\0");
@@ -403,10 +402,7 @@ impl RenderDoc for PdfiumDoc<'_> {
             let dpi = fitted;
             let (w, h) = page_pixels(w_pt, h_pt, dpi);
             if !(w.is_finite() && h.is_finite()) || w * h > max_pixels as f64 || w > 65_000.0 || h > 65_000.0 {
-                return Err(OcrError::DecompressionBomb(format!(
-                    "Page {} at {dpi} dpi would be {w}x{h} pixels",
-                    index + 1
-                )));
+                return Err(OcrError::DecompressionBomb(format!("Page {} at {dpi} dpi would be {w}x{h} pixels", index + 1)));
             }
             let (w, h) = (w as c_int, h as c_int);
             // SAFETY: BGRx bitmap; buffer belongs to PDFium until Destroy.

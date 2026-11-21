@@ -44,8 +44,7 @@ fn dates_parity() {
     };
     let now = DateTime::parse_from_rfc3339(r["reference_now"].as_str().unwrap()).unwrap();
     let configs = r["configs"].as_array().unwrap();
-    let parsers_ign: Vec<RegexDateParser> =
-        configs.iter().map(|c| RegexDateParser::new(config(c, now, true))).collect();
+    let parsers_ign: Vec<RegexDateParser> = configs.iter().map(|c| RegexDateParser::new(config(c, now, true))).collect();
     let parsers: Vec<RegexDateParser> = configs.iter().map(|c| RegexDateParser::new(config(c, now, false))).collect();
 
     let mut failures = Vec::new();
@@ -55,8 +54,7 @@ fn dates_parity() {
         let ci = case["config"].as_u64().unwrap() as usize;
         let fname = case["filename"].as_str().unwrap();
         let content = case["content"].as_str().unwrap();
-        let expected_matches: Vec<&str> =
-            case["regex_matches"].as_array().unwrap().iter().map(|v| v.as_str().unwrap()).collect();
+        let expected_matches: Vec<&str> = case["regex_matches"].as_array().unwrap().iter().map(|v| v.as_str().unwrap()).collect();
         let got_matches = date_regex_matches(content);
         if got_matches != expected_matches {
             failures.push(format!("REGEX {content:?}: got {got_matches:?} want {expected_matches:?}"));

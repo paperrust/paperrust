@@ -32,9 +32,9 @@ impl EngineChoice {
             "windows" | "windows-ocr" | "winrt" => Ok(Self::Windows),
             "macos" | "vision" => Ok(Self::Macos),
             "auto" => Ok(Self::Auto),
-            other => Err(OcrError::Config(format!(
-                "PAPERRUST_OCR_ENGINE: invalid value {other:?} (allowed: tesseract, windows, macos, auto)"
-            ))),
+            other => {
+                Err(OcrError::Config(format!("PAPERRUST_OCR_ENGINE: invalid value {other:?} (allowed: tesseract, windows, macos, auto)")))
+            }
         }
     }
 
@@ -103,7 +103,10 @@ pub fn select_engine(choice: EngineChoice, tesseract: Option<TesseractCli>, lang
     let win = windows_engine(tesseract.clone());
     let langs_ok = win.as_ref().map(|w| w.check_languages(languages).is_ok());
     if choice == EngineChoice::Windows && langs_ok.is_none() {
-        once_warn("windows-missing", "PAPERRUST_OCR_ENGINE=windows, but Windows OCR (Windows.Media.Ocr) is not available here; using tesseract");
+        once_warn(
+            "windows-missing",
+            "PAPERRUST_OCR_ENGINE=windows, but Windows OCR (Windows.Media.Ocr) is not available here; using tesseract",
+        );
     }
     match decide(choice, tesseract.is_some(), langs_ok) {
         Selected::Windows => win,
@@ -208,10 +211,18 @@ pub fn lang_key(tag: &str) -> String {
     let rest: Vec<&str> = parts.collect();
     match primary.as_str() {
         "zh" => {
-            if rest.iter().any(|p| matches!(*p, "hant" | "tw" | "hk" | "mo")) { "zh-hant".into() } else { "zh-hans".into() }
+            if rest.iter().any(|p| matches!(*p, "hant" | "tw" | "hk" | "mo")) {
+                "zh-hant".into()
+            } else {
+                "zh-hans".into()
+            }
         }
         "sr" => {
-            if rest.contains(&"latn") { "sr-latn".into() } else { "sr-cyrl".into() }
+            if rest.contains(&"latn") {
+                "sr-latn".into()
+            } else {
+                "sr-cyrl".into()
+            }
         }
         "no" | "nn" => "nb".into(),
         _ => primary,

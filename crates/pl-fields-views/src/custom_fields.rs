@@ -12,20 +12,20 @@ use axum::http::StatusCode;
 use axum::response::Response;
 use chrono::{DateTime, Utc};
 use pl_core::AppState;
-use sea_query::{Alias, Expr, JoinType, PostgresQueryBuilder, Query, SelectStatement};
 use pl_core::sqlbind::SqlxBinder;
+use sea_query::{Alias, Expr, JoinType, PostgresQueryBuilder, Query, SelectStatement};
 use serde_json::{Map, Value, json};
 use sqlx::{PgPool, Row};
 
 use crate::audit::{self, CfState, CfiState};
 use crate::authz::require_model_perm;
-use pl_authz::models::{CUSTOM_FIELD, ObjectModel};
 use crate::fields::{CharOpts, ChoiceOpts, Errors, F, char_field, choice_str, json_field};
 use crate::query::{FilterErrors, apply_ordering, char_filters, id_filters, ordering_terms};
 use crate::shim::{
-    ApiError, ApiResult, Ctx, finish, get_random_string, json_response, no_content, page_request,
-    paginated, parse_body, parse_pk, require_object, resolve_page,
+    ApiError, ApiResult, Ctx, finish, get_random_string, json_response, no_content, page_request, paginated, parse_body, parse_pk,
+    require_object, resolve_page,
 };
+use pl_authz::models::{CUSTOM_FIELD, ObjectModel};
 
 pub const MODEL: &str = "customfield";
 const OM: ObjectModel = CUSTOM_FIELD;
@@ -33,18 +33,7 @@ const LABEL: &str = "CustomField";
 pub const LIST_ALLOW: &str = "GET, POST, HEAD, OPTIONS";
 pub const DETAIL_ALLOW: &str = "GET, PUT, PATCH, DELETE, HEAD, OPTIONS";
 
-pub const DATA_TYPES: &[&str] = &[
-    "string",
-    "url",
-    "date",
-    "boolean",
-    "integer",
-    "float",
-    "monetary",
-    "documentlink",
-    "select",
-    "longtext",
-];
+pub const DATA_TYPES: &[&str] = &["string", "url", "date", "boolean", "integer", "float", "monetary", "documentlink", "select", "longtext"];
 
 fn a(s: &str) -> Alias {
     Alias::new(s)
@@ -70,12 +59,7 @@ pub fn count_select_for(user: &pl_authz::User, ids: Option<&[i64]>, counters: bo
     cnt.expr_as(Expr::col((a("j"), a("field_id"))), a("field_id"))
         .expr_as(Expr::cust("COUNT(*)"), a("c"))
         .from_as(a("documents_customfieldinstance"), a("j"))
-        .join_as(
-            JoinType::InnerJoin,
-            a("documents_document"),
-            a("cd"),
-            Expr::col((a("cd"), a("id"))).equals((a("j"), a("document_id"))),
-        )
+        .join_as(JoinType::InnerJoin, a("documents_document"), a("cd"), Expr::col((a("cd"), a("id"))).equals((a("j"), a("document_id"))))
         .and_where(Expr::col((a("j"), a("deleted_at"))).is_null())
         .cond_where(crate::authz::permitted_doc_row_for(user, "cd"))
         .group_by_col((a("j"), a("field_id")));
@@ -106,10 +90,7 @@ fn select_columns(q: &mut SelectStatement, with_count: bool) {
         .expr_as(Expr::cust("cf.name"), a("name"))
         .expr_as(Expr::cust("cf.data_type"), a("data_type"))
         .expr_as(Expr::cust("cf.extra_data"), a("extra_data"))
-        .expr_as(
-            Expr::cust(if with_count { "COALESCE(cnt.c, 0)::int8" } else { "0::int8" }),
-            a("document_count"),
-        );
+        .expr_as(Expr::cust(if with_count { "COALESCE(cnt.c, 0)::int8" } else { "0::int8" }), a("document_count"));
 }
 
 /// `document_count` of the fields `ids` (no hit → missing → 0).
@@ -141,10 +122,7 @@ fn from_row(r: &sqlx::postgres::PgRow) -> Result<Row_, sqlx::Error> {
         created: r.try_get("created")?,
         name: r.try_get("name")?,
         data_type: r.try_get("data_type")?,
-        extra_data: r
-            .try_get::<Option<sqlx::types::Json<Value>>, _>("extra_data")?
-            .map(|j| j.0)
-            .unwrap_or(Value::Null),
+        extra_data: r.try_get::<Option<sqlx::types::Json<Value>>, _>("extra_data")?.map(|j| j.0).unwrap_or(Value::Null),
         document_count: r.try_get("document_count")?,
     })
 }
@@ -201,8 +179,7 @@ async fn list_inner(db: &PgPool, ctx: &Ctx) -> ApiResult<Response> {
     let mut count_q = q.clone();
     count_q.expr(Expr::cust("1"));
     let mut cq = Query::select();
-    cq.expr(Expr::cust("COUNT(*)::int8"))
-        .from_subquery(count_q, a("sub"));
+    cq.expr(Expr::cust("COUNT(*)::int8")).from_subquery(count_q, a("sub"));
     let (sql, values) = cq.build_sqlx(PostgresQueryBuilder);
     let count: i64 = sqlx::query_scalar_with(&sql, values).fetch_one(db).await?;
 
@@ -241,13 +218,7 @@ async fn list_inner(db: &PgPool, ctx: &Ctx) -> ApiResult<Response> {
     }
     let mut results = Vec::with_capacity(rows.len());
     for r in rows {
-        results.push(to_json(
-            r.id,
-            &r.name,
-            &r.data_type,
-            &r.extra_data,
-            Some(r.document_count),
-        ));
+        results.push(to_json(r.id, &r.name, &r.data_type, &r.extra_data, Some(r.document_count)));
     }
     Ok(paginated(ctx, &page, all_ids, results))
 }
@@ -264,10 +235,7 @@ async fn retrieve_inner(db: &PgPool, ctx: &Ctx, pk: &str) -> ApiResult<Response>
     require_model_perm(ctx, &OM)?;
     let id = parse_pk(pk)?;
     let r = load(db, ctx, id).await?;
-    Ok(json_response(
-        StatusCode::OK,
-        &to_json(r.id, &r.name, &r.data_type, &r.extra_data, Some(r.document_count)),
-    ))
+    Ok(json_response(StatusCode::OK, &to_json(r.id, &r.name, &r.data_type, &r.extra_data, Some(r.document_count))))
 }
 
 // ---------------------------------------------------------------------------
@@ -352,9 +320,10 @@ pub fn check_select(extra: Option<&mut Value>) -> Check {
     }
     for o in opts.iter_mut() {
         if let Value::Object(om) = o
-            && om.get("id").is_none_or(Value::is_null) {
-                om.insert("id".into(), Value::String(get_random_string(16)));
-            }
+            && om.get("id").is_none_or(Value::is_null)
+        {
+            om.insert("id".into(), Value::String(get_random_string(16)));
+        }
     }
     Check::Ok
 }
@@ -372,45 +341,29 @@ pub fn check_currency(extra: &Value) -> Check {
         None | Some(Value::Null) => Check::Ok,
         Some(Value::String(s)) => {
             let n = s.chars().count();
-            if n > 0 && n != 3 {
-                Check::Invalid(CURRENCY_ERR)
-            } else {
-                Check::Ok
-            }
+            if n > 0 && n != 3 { Check::Invalid(CURRENCY_ERR) } else { Check::Ok }
         }
         Some(_) => Check::Invalid(CURRENCY_ERR),
     }
 }
 
-async fn validate(
-    db: &PgPool,
-    data: &Map<String, Value>,
-    instance: Option<&Row_>,
-    partial: bool,
-) -> ApiResult<Attrs> {
+async fn validate(db: &PgPool, data: &Map<String, Value>, instance: Option<&Row_>, partial: bool) -> ApiResult<Attrs> {
     let mut errs = Errors::default();
     let name = char_field(
         data,
         "name",
-        CharOpts {
-            required: true,
-            allow_null: false,
-            allow_blank: false,
-            max_length: Some(128),
-        },
+        CharOpts { required: true, allow_null: false, allow_blank: false, max_length: Some(128) },
         partial,
         &mut errs,
     );
     let name = match name {
         F::Val(Some(n)) => {
             // UniqueValidator(queryset=CustomField.objects) excluding the instance itself
-            let exists: bool = sqlx::query_scalar(
-                "SELECT EXISTS (SELECT 1 FROM documents_customfield WHERE name = $1 AND id <> $2)",
-            )
-            .bind(&n)
-            .bind(instance.map(|i| i.id).unwrap_or(-1) as i32)
-            .fetch_one(db)
-            .await?;
+            let exists: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM documents_customfield WHERE name = $1 AND id <> $2)")
+                .bind(&n)
+                .bind(instance.map(|i| i.id).unwrap_or(-1) as i32)
+                .fetch_one(db)
+                .await?;
             if exists {
                 errs.add("name", "custom field with this name already exists.");
                 None
@@ -424,11 +377,7 @@ async fn validate(
         data,
         "data_type",
         DATA_TYPES,
-        ChoiceOpts {
-            required: true,
-            allow_null: false,
-            allow_blank: false,
-        },
+        ChoiceOpts { required: true, allow_null: false, allow_blank: false },
         partial,
         &mut errs,
     ) {
@@ -442,15 +391,10 @@ async fn validate(
     if !errs.is_empty() {
         errs.into_result()?;
     }
-    let mut attrs = Attrs {
-        name,
-        data_type,
-        extra_data,
-    };
+    let mut attrs = Attrs { name, data_type, extra_data };
 
     // validate()
-    let is_select = attrs.data_type.as_deref() == Some("select")
-        || instance.is_some_and(|i| i.data_type == "select");
+    let is_select = attrs.data_type.as_deref() == Some("select") || instance.is_some_and(|i| i.data_type == "select");
     if is_select {
         match check_select(attrs.extra_data.as_mut()) {
             Check::Ok => {}
@@ -458,13 +402,14 @@ async fn validate(
             Check::Crash => return Err(ApiError::ServerError),
         }
     } else if attrs.data_type.as_deref() == Some("monetary")
-        && let Some(extra) = &attrs.extra_data {
-            match check_currency(extra) {
-                Check::Ok => {}
-                Check::Invalid(m) => return Err(ApiError::bad_request(json!({"error": [m]}))),
-                Check::Crash => return Err(ApiError::ServerError),
-            }
+        && let Some(extra) = &attrs.extra_data
+    {
+        match check_currency(extra) {
+            Check::Ok => {}
+            Check::Invalid(m) => return Err(ApiError::bad_request(json!({"error": [m]}))),
+            Check::Crash => return Err(ApiError::ServerError),
         }
+    }
     Ok(attrs)
 }
 
@@ -505,71 +450,31 @@ async fn create_inner(db: &PgPool, ctx: &Ctx, body: &[u8]) -> ApiResult<Response
             now.into(),
             name.clone().into(),
             data_type.clone().into(),
-            if extra.is_null() {
-                sea_query::Value::Json(None).into()
-            } else {
-                extra.clone().into()
-            },
+            if extra.is_null() { sea_query::Value::Json(None).into() } else { extra.clone().into() },
         ])
         .returning(Query::returning().expr(Expr::cust("id::int8")));
     let (sql, values) = iq.build_sqlx(PostgresQueryBuilder);
-    let id: i64 = sqlx::query_scalar_with(&sql, values)
-        .fetch_one(&mut *tx)
-        .await?;
-    let state = CfState {
-        id,
-        created: now,
-        name: name.clone(),
-        data_type: data_type.clone(),
-        extra_data: extra.clone(),
-    };
-    audit::log(
-        &mut *tx,
-        ctx,
-        MODEL,
-        id,
-        &state.repr(),
-        audit::ACTION_CREATE,
-        &audit::cf_create_changes(&state),
-    )
-    .await?;
+    let id: i64 = sqlx::query_scalar_with(&sql, values).fetch_one(&mut *tx).await?;
+    let state = CfState { id, created: now, name: name.clone(), data_type: data_type.clone(), extra_data: extra.clone() };
+    audit::log(&mut *tx, ctx, MODEL, id, &state.repr(), audit::ACTION_CREATE, &audit::cf_create_changes(&state)).await?;
     tx.commit().await?;
     // post_save: new fields have no instances → no task.
-    Ok(json_response(
-        StatusCode::CREATED,
-        &to_json(id, &name, &data_type, &extra, None),
-    ))
+    Ok(json_response(StatusCode::CREATED, &to_json(id, &name, &data_type, &extra, None)))
 }
 
 // ---------------------------------------------------------------------------
 // update / partial_update
 // ---------------------------------------------------------------------------
 
-pub async fn update(
-    State(st): State<AppState>,
-    Path(pk): Path<String>,
-    ctx: Ctx,
-    body: Bytes,
-) -> Response {
+pub async fn update(State(st): State<AppState>, Path(pk): Path<String>, ctx: Ctx, body: Bytes) -> Response {
     finish(DETAIL_ALLOW, update_inner(&st, &ctx, &pk, &body, false).await)
 }
 
-pub async fn partial_update(
-    State(st): State<AppState>,
-    Path(pk): Path<String>,
-    ctx: Ctx,
-    body: Bytes,
-) -> Response {
+pub async fn partial_update(State(st): State<AppState>, Path(pk): Path<String>, ctx: Ctx, body: Bytes) -> Response {
     finish(DETAIL_ALLOW, update_inner(&st, &ctx, &pk, &body, true).await)
 }
 
-async fn update_inner(
-    st: &AppState,
-    ctx: &Ctx,
-    pk: &str,
-    body: &[u8],
-    partial: bool,
-) -> ApiResult<Response> {
+async fn update_inner(st: &AppState, ctx: &Ctx, pk: &str, body: &[u8], partial: bool) -> ApiResult<Response> {
     let db = &st.inner.db;
     require_model_perm(ctx, &OM)?;
     let id = parse_pk(pk)?;
@@ -578,14 +483,8 @@ async fn update_inner(
     let attrs = validate(db, &data, Some(&inst), partial).await?;
 
     let new_name = attrs.name.clone().unwrap_or_else(|| inst.name.clone());
-    let new_type = attrs
-        .data_type
-        .clone()
-        .unwrap_or_else(|| inst.data_type.clone());
-    let new_extra = attrs
-        .extra_data
-        .clone()
-        .unwrap_or_else(|| inst.extra_data.clone());
+    let new_type = attrs.data_type.clone().unwrap_or_else(|| inst.data_type.clone());
+    let new_extra = attrs.extra_data.clone().unwrap_or_else(|| inst.extra_data.clone());
 
     // post_save → check_paths_and_prune_custom_fields: process_cf_select_update(custom_field).
     // Upstream pickles the instance (Celery); here the task goes to the Rust worker with `custom_field_id`
@@ -618,35 +517,13 @@ async fn update_inner(
         .values([
             (a("name"), new_name.clone().into()),
             (a("data_type"), new_type.clone().into()),
-            (
-                a("extra_data"),
-                if new_extra.is_null() {
-                    sea_query::Value::Json(None).into()
-                } else {
-                    new_extra.clone().into()
-                },
-            ),
+            (a("extra_data"), if new_extra.is_null() { sea_query::Value::Json(None).into() } else { new_extra.clone().into() }),
         ])
         .and_where(Expr::col(a("id")).eq(id));
     let (sql, values) = uq.build_sqlx(PostgresQueryBuilder);
     sqlx::query_with(&sql, values).execute(&mut *tx).await?;
-    let new = CfState {
-        id,
-        created: inst.created,
-        name: new_name.clone(),
-        data_type: new_type.clone(),
-        extra_data: new_extra.clone(),
-    };
-    audit::log(
-        &mut *tx,
-        ctx,
-        MODEL,
-        id,
-        &new.repr(),
-        audit::ACTION_UPDATE,
-        &audit::cf_update_changes(&old, &new),
-    )
-    .await?;
+    let new = CfState { id, created: inst.created, name: new_name.clone(), data_type: new_type.clone(), extra_data: new_extra.clone() };
+    audit::log(&mut *tx, ctx, MODEL, id, &new.repr(), audit::ACTION_UPDATE, &audit::cf_update_changes(&old, &new)).await?;
     tx.commit().await?;
     if send_cf_select_update {
         let req = pl_core::tasks::TaskRequest::new(crate::celery::PROCESS_CF_SELECT_UPDATE).kwarg("custom_field_id", id);
@@ -654,10 +531,7 @@ async fn update_inner(
             tracing::error!(target: "paperless.handlers", "process_cf_select_update not queued: {e:?}");
         }
     }
-    Ok(json_response(
-        StatusCode::OK,
-        &to_json(id, &new_name, &new_type, &new_extra, Some(inst.document_count)),
-    ))
+    Ok(json_response(StatusCode::OK, &to_json(id, &new_name, &new_type, &new_extra, Some(inst.document_count))))
 }
 
 // ---------------------------------------------------------------------------
@@ -674,17 +548,11 @@ fn value_for_search(cf: &Row_, raw: &Option<String>) -> String {
         return "None".into();
     };
     if cf.data_type == "select" {
-        let label = cf
-            .extra_data
-            .get("select_options")
-            .and_then(Value::as_array)
-            .and_then(|opts| {
-                opts.iter().find_map(|o| {
-                    (o.get("id").and_then(Value::as_str) == Some(v.as_str()))
-                        .then(|| o.get("label").map(crate::fields::py_str))
-                        .flatten()
-                })
-            });
+        let label = cf.extra_data.get("select_options").and_then(Value::as_array).and_then(|opts| {
+            opts.iter().find_map(|o| {
+                (o.get("id").and_then(Value::as_str) == Some(v.as_str())).then(|| o.get("label").map(crate::fields::py_str)).flatten()
+            })
+        });
         return label.unwrap_or_else(|| "None".into());
     }
     v.clone()
@@ -711,20 +579,11 @@ async fn destroy_inner(db: &PgPool, ctx: &Ctx, pk: &str) -> ApiResult<Response> 
     // Order of the post_delete signals (= audit entries): Collector.sort() sorts by pk,
     // Collector.delete() reverses the list -> pk descending (django/db/models/deletion.py;
     // W2 parity run 2026-11-08, cf.destroy.state). See CFI_DELETE_SQL.
-    let cfis = sqlx::query(CFI_DELETE_SQL)
-    .bind(id32)
-    .fetch_all(&mut *tx)
-    .await?;
+    let cfis = sqlx::query(CFI_DELETE_SQL).bind(id32).fetch_all(&mut *tx).await?;
 
     // Fast deletes: M2M through tables of the WorkflowAction
-    for t in [
-        "documents_workflowaction_assign_custom_fields",
-        "documents_workflowaction_remove_custom_fields",
-    ] {
-        sqlx::query(&format!("DELETE FROM {t} WHERE customfield_id = $1"))
-            .bind(id32)
-            .execute(&mut *tx)
-            .await?;
+    for t in ["documents_workflowaction_assign_custom_fields", "documents_workflowaction_remove_custom_fields"] {
+        sqlx::query(&format!("DELETE FROM {t} WHERE customfield_id = $1")).bind(id32).execute(&mut *tx).await?;
     }
     // SET_NULL
     sqlx::query(
@@ -735,10 +594,7 @@ async fn destroy_inner(db: &PgPool, ctx: &Ctx, pk: &str) -> ApiResult<Response> 
     .execute(&mut *tx)
     .await?;
     // Hard-delete instances (+ post_delete auditlog per instance)
-    sqlx::query("DELETE FROM documents_customfieldinstance WHERE field_id = $1")
-        .bind(id32)
-        .execute(&mut *tx)
-        .await?;
+    sqlx::query("DELETE FROM documents_customfieldinstance WHERE field_id = $1").bind(id32).execute(&mut *tx).await?;
     for r in &cfis {
         let value_text: Option<String> = r.try_get("value_text")?;
         let value_bool: Option<String> = r.try_get("value_bool")?;
@@ -750,16 +606,10 @@ async fn destroy_inner(db: &PgPool, ctx: &Ctx, pk: &str) -> ApiResult<Response> 
         let value_monetary_amount: Option<String> = r.try_get("value_monetary_amount")?;
         let value_select: Option<String> = r.try_get("value_select")?;
         let value_long_text: Option<String> = r.try_get("value_long_text")?;
-        let value_document_ids: Value = r
-            .try_get::<Option<sqlx::types::Json<Value>>, _>("value_document_ids")?
-            .map(|j| j.0)
-            .unwrap_or(Value::Null);
+        let value_document_ids: Value =
+            r.try_get::<Option<sqlx::types::Json<Value>>, _>("value_document_ids")?.map(|j| j.0).unwrap_or(Value::Null);
         let value_float_s = value_float.map(crate::fields::py_float);
-        let doc_ids_s = if value_document_ids.is_null() {
-            None
-        } else {
-            Some(crate::fields::py_repr(&value_document_ids))
-        };
+        let doc_ids_s = if value_document_ids.is_null() { None } else { Some(crate::fields::py_repr(&value_document_ids)) };
         // CustomFieldInstance.value by data_type
         let current: Option<String> = match cf.data_type.as_str() {
             "string" => value_text.clone(),
@@ -797,52 +647,20 @@ async fn destroy_inner(db: &PgPool, ctx: &Ctx, pk: &str) -> ApiResult<Response> 
             ],
             value_document_ids,
         };
-        audit::log(
-            &mut *tx,
-            ctx,
-            "customfieldinstance",
-            state.id,
-            &repr,
-            audit::ACTION_DELETE,
-            &audit::cfi_delete_changes(&state),
-        )
-        .await?;
+        audit::log(&mut *tx, ctx, "customfieldinstance", state.id, &repr, audit::ACTION_DELETE, &audit::cfi_delete_changes(&state)).await?;
     }
-    sqlx::query("DELETE FROM documents_customfield WHERE id = $1")
-        .bind(id32)
-        .execute(&mut *tx)
-        .await?;
-    let state = CfState {
-        id,
-        created: cf.created,
-        name: cf.name.clone(),
-        data_type: cf.data_type.clone(),
-        extra_data: cf.extra_data.clone(),
-    };
-    audit::log(
-        &mut *tx,
-        ctx,
-        MODEL,
-        id,
-        &state.repr(),
-        audit::ACTION_DELETE,
-        &audit::cf_delete_changes(&state),
-    )
-    .await?;
+    sqlx::query("DELETE FROM documents_customfield WHERE id = $1").bind(id32).execute(&mut *tx).await?;
+    let state =
+        CfState { id, created: cf.created, name: cf.name.clone(), data_type: cf.data_type.clone(), extra_data: cf.extra_data.clone() };
+    audit::log(&mut *tx, ctx, MODEL, id, &state.repr(), audit::ACTION_DELETE, &audit::cf_delete_changes(&state)).await?;
 
     // post_delete: cleanup_custom_field_deletion
     let ident = format!("custom_field_{id}");
-    let views = sqlx::query(
-        "SELECT id, display_fields FROM documents_savedview WHERE display_fields IS NOT NULL",
-    )
-    .fetch_all(&mut *tx)
-    .await?;
+    let views =
+        sqlx::query("SELECT id, display_fields FROM documents_savedview WHERE display_fields IS NOT NULL").fetch_all(&mut *tx).await?;
     for v in views {
         let vid: i32 = v.try_get("id")?;
-        let df: Value = v
-            .try_get::<Option<sqlx::types::Json<Value>>, _>("display_fields")?
-            .map(|j| j.0)
-            .unwrap_or(Value::Null);
+        let df: Value = v.try_get::<Option<sqlx::types::Json<Value>>, _>("display_fields")?.map(|j| j.0).unwrap_or(Value::Null);
         match df {
             Value::Array(mut arr) => {
                 if let Some(pos) = arr.iter().position(|x| x.as_str() == Some(ident.as_str())) {
@@ -862,10 +680,7 @@ async fn destroy_inner(db: &PgPool, ctx: &Ctx, pk: &str) -> ApiResult<Response> 
             _ => {}
         }
     }
-    sqlx::query("UPDATE documents_savedview SET sort_field = 'created' WHERE sort_field = $1")
-        .bind(&ident)
-        .execute(&mut *tx)
-        .await?;
+    sqlx::query("UPDATE documents_savedview SET sort_field = 'created' WHERE sort_field = $1").bind(&ident).execute(&mut *tx).await?;
     tx.commit().await?;
     Ok(no_content())
 }
@@ -889,10 +704,7 @@ mod tests {
         assert_eq!(opts[0]["id"].as_str().map(str::len), Some(16));
         assert_eq!(opts[1]["id"], "x");
         // Input order is kept: label before id
-        assert_eq!(
-            opts[0].as_object().map(|m| m.keys().cloned().collect::<Vec<_>>()),
-            Some(vec!["label".to_string(), "id".to_string()])
-        );
+        assert_eq!(opts[0].as_object().map(|m| m.keys().cloned().collect::<Vec<_>>()), Some(vec!["label".to_string(), "id".to_string()]));
         assert_eq!(check_select(None), Check::Invalid(SELECT_ERR));
         assert_eq!(check_select(Some(&mut json!({"select_options": "x"}))), Check::Invalid(SELECT_ERR));
         assert_eq!(check_select(Some(&mut json!({"select_options": []}))), Check::Invalid(SELECT_ERR));

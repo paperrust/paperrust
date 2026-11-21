@@ -44,11 +44,9 @@ async fn django(method: &str, path: &str, body: Option<&Value>) -> (u16, Value) 
 #[ignore = "braucht Referenz-DB und Django (reference/README.md)"]
 async fn render_matches_django() {
     let mut c = conn().await;
-    for (path, table, kind) in [
-        ("/api/workflow_triggers/", T_TRIGGER, 0),
-        ("/api/workflow_actions/", T_ACTION, 1),
-        ("/api/workflows/", T_WORKFLOW, 2),
-    ] {
+    for (path, table, kind) in
+        [("/api/workflow_triggers/", T_TRIGGER, 0), ("/api/workflow_actions/", T_ACTION, 1), ("/api/workflows/", T_WORKFLOW, 2)]
+    {
         let (st, dj) = django("GET", &format!("{path}?page_size=1000"), None).await;
         assert_eq!(st, 200);
         let mut sel = load::select_rows(table);
@@ -223,9 +221,8 @@ async fn write_flows_rollback() {
 
     // test_api_update_workflow_no_trigger_actions: PATCH without triggers/actions
     let row = get(c, T_WORKFLOW, id).await;
-    let v = serializers::validate_workflow(c, Ctx { partial: true }, &json!({"name": "Workflow Updated", "order": 1}), Some(id))
-        .await
-        .unwrap();
+    let v =
+        serializers::validate_workflow(c, Ctx { partial: true }, &json!({"name": "Workflow Updated", "order": 1}), Some(id)).await.unwrap();
     write::workflow_update(c, &row, &v).await.unwrap();
     let row = get(c, T_WORKFLOW, id).await;
     let out = load::render_workflows(c, std::slice::from_ref(&row), true).await.unwrap();
@@ -250,16 +247,18 @@ async fn write_flows_rollback() {
     assert_eq!(e, json!({"non_field_errors": ["Remote OCR actions require a consumption started trigger"]}));
 
     // PATCH with an incomplete email sub-object → error of the re-validation at top level
-    let v = serializers::validate_workflow(c, Ctx { partial: true }, &json!({"actions": [{"type": 3, "email": {"subject": "x"}}]}), Some(id))
-        .await
-        .unwrap();
+    let v =
+        serializers::validate_workflow(c, Ctx { partial: true }, &json!({"actions": [{"type": 3, "email": {"subject": "x"}}]}), Some(id))
+            .await
+            .unwrap();
     let e = detail(write::workflow_update(c, &row, &v).await);
     assert_eq!(e, json!({"body": ["This field is required."], "to": ["This field is required."]}));
 
     // Trigger directly: create, PATCH, delete
-    let tattrs = serializers::validate_trigger(c, ctx, &json!({"type": 1, "sources": [2], "filter_filename": "*", "filter_path": ""}), None)
-        .await
-        .unwrap();
+    let tattrs =
+        serializers::validate_trigger(c, ctx, &json!({"type": 1, "sources": [2], "filter_filename": "*", "filter_path": ""}), None)
+            .await
+            .unwrap();
     assert_eq!(tattrs["filter_path"], Value::Null);
     let tid = write::model_create(c, true, &tattrs).await.unwrap();
     let trow = get(c, T_TRIGGER, tid).await;

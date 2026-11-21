@@ -21,8 +21,20 @@ use crate::files::{self, MediaCfg};
 /// Fields of the preloaded version (`only(id, added, checksum, version_label, root_document_id,
 /// version_index, page_count)`) plus the fields read/set in the cascade.
 const PREFETCH_LOADED_FIELDS: &[&str] = &[
-    "added", "checksum", "version_label", "root_document", "version_index", "page_count", "deleted_at",
-    "restored_at", "transaction_id", "title", "created", "correspondent", "filename", "archive_filename",
+    "added",
+    "checksum",
+    "version_label",
+    "root_document",
+    "version_index",
+    "page_count",
+    "deleted_at",
+    "restored_at",
+    "transaction_id",
+    "title",
+    "created",
+    "correspondent",
+    "filename",
+    "archive_filename",
     "mime_type",
 ];
 
@@ -128,12 +140,7 @@ pub async fn soft_delete_document(
 /// Like [`soft_delete_document`] for the instance from `DocumentViewSet.get_object()`: there
 /// `versions` are preloaded (prefetch), so the cascade treats the already deleted versions
 /// once more as related objects (repeated soft delete + `save()`).
-pub async fn soft_delete_document_prefetched(
-    conn: &mut PgConnection,
-    ctx: &LogCtx,
-    media: &MediaCfg,
-    doc_id: i64,
-) -> Result<(), ApiError> {
+pub async fn soft_delete_document_prefetched(conn: &mut PgConnection, ctx: &LogCtx, media: &MediaCfg, doc_id: i64) -> Result<(), ApiError> {
     Box::pin(soft_delete_inner(conn, ctx, media, doc_id, None, true)).await
 }
 
@@ -236,13 +243,8 @@ async fn restore_inner(
         Box::pin(restore_inner(conn, ctx, media, i64::from(v), Some(tid), true)).await?;
     }
     // notes
-    for n in notes_where(
-        conn,
-        "document_id = $1 AND deleted_at IS NOT NULL AND transaction_id IS NOT DISTINCT FROM $2",
-        doc_id,
-        tid,
-    )
-    .await?
+    for n in
+        notes_where(conn, "document_id = $1 AND deleted_at IS NOT NULL AND transaction_id IS NOT DISTINCT FROM $2", doc_id, tid).await?
     {
         let mut m = n.clone();
         m.deleted_at = None;
@@ -253,11 +255,7 @@ async fn restore_inner(
         note_save_audit(conn, ctx, &m, None).await?;
     }
     plain_restore(conn, "documents_sharelink", doc_id, tid).await?;
-    let deleted_cfis: Vec<_> = cfi::deleted_for_document(conn, doc_id)
-        .await?
-        .into_iter()
-        .filter(|c| c.transaction_id == tid)
-        .collect();
+    let deleted_cfis: Vec<_> = cfi::deleted_for_document(conn, doc_id).await?.into_iter().filter(|c| c.transaction_id == tid).collect();
     for c in deleted_cfis {
         cfi::restore(conn, ctx, media, &c).await?;
     }
@@ -333,15 +331,14 @@ pub async fn empty_trash(conn: &mut PgConnection, ctx: &LogCtx, media: &MediaCfg
         });
     }
     // Delete (dependents first)
-    for t in ["documents_note", "documents_documentbarcode", "documents_sharelink", "documents_customfieldinstance", "documents_workflowrun"] {
+    for t in
+        ["documents_note", "documents_documentbarcode", "documents_sharelink", "documents_customfieldinstance", "documents_workflowrun"]
+    {
         let sql = format!("DELETE FROM {t} WHERE document_id = ANY($1)");
         sqlx::query(&sql).bind(&all).execute(&mut *conn).await?;
     }
     sqlx::query("DELETE FROM documents_document_tags WHERE document_id = ANY($1)").bind(&all).execute(&mut *conn).await?;
-    sqlx::query("DELETE FROM documents_sharelinkbundle_documents WHERE document_id = ANY($1)")
-        .bind(&all)
-        .execute(&mut *conn)
-        .await?;
+    sqlx::query("DELETE FROM documents_sharelinkbundle_documents WHERE document_id = ANY($1)").bind(&all).execute(&mut *conn).await?;
     // Versions before roots
     sqlx::query("DELETE FROM documents_document WHERE id = ANY($1) AND root_document_id IS NOT NULL")
         .bind(&all)

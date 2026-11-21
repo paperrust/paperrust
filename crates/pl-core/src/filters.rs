@@ -103,8 +103,7 @@ pub const ID_KWARGS: &[Lookup] = &[Lookup::In, Lookup::Exact];
 /// upstream `INT_KWARGS`.
 pub const INT_KWARGS: &[Lookup] = &[Lookup::Exact, Lookup::Gt, Lookup::Gte, Lookup::Lt, Lookup::Lte, Lookup::IsNull];
 /// upstream `DATE_KWARGS`.
-pub const DATE_KWARGS: &[Lookup] =
-    &[Lookup::Year, Lookup::Month, Lookup::Day, Lookup::Gt, Lookup::Gte, Lookup::Lt, Lookup::Lte];
+pub const DATE_KWARGS: &[Lookup] = &[Lookup::Year, Lookup::Month, Lookup::Day, Lookup::Gt, Lookup::Gte, Lookup::Lt, Lookup::Lte];
 /// upstream `DATETIME_KWARGS`.
 pub const DATETIME_KWARGS: &[Lookup] = &[
     Lookup::Year,
@@ -169,7 +168,9 @@ impl<'a> FilterContext<'a> {
 pub enum IntValue {
     Value(i64),
     /// Magnitude too large for i64 (sign: `true` = negative).
-    Overflow { negative: bool },
+    Overflow {
+        negative: bool,
+    },
 }
 
 /// Message `DecimalField.invalid`.
@@ -312,19 +313,47 @@ pub fn int_condition(col: &SimpleExpr, lookup: Lookup, v: IntValue, min: i64, ma
     let c = Expr::expr(col.clone());
     match lookup {
         Lookup::Exact => {
-            if under || over { false_expr() } else { c.eq(val) }
+            if under || over {
+                false_expr()
+            } else {
+                c.eq(val)
+            }
         }
         Lookup::Gt => {
-            if over { false_expr() } else if under { true_expr() } else { c.gt(val) }
+            if over {
+                false_expr()
+            } else if under {
+                true_expr()
+            } else {
+                c.gt(val)
+            }
         }
         Lookup::Gte => {
-            if over { false_expr() } else if under { true_expr() } else { c.gte(val) }
+            if over {
+                false_expr()
+            } else if under {
+                true_expr()
+            } else {
+                c.gte(val)
+            }
         }
         Lookup::Lt => {
-            if under { false_expr() } else if over { true_expr() } else { c.lt(val) }
+            if under {
+                false_expr()
+            } else if over {
+                true_expr()
+            } else {
+                c.lt(val)
+            }
         }
         Lookup::Lte => {
-            if under { false_expr() } else if over { true_expr() } else { c.lte(val) }
+            if under {
+                false_expr()
+            } else if over {
+                true_expr()
+            } else {
+                c.lte(val)
+            }
         }
         _ => false_expr(),
     }
@@ -332,10 +361,9 @@ pub fn int_condition(col: &SimpleExpr, lookup: Lookup, v: IntValue, min: i64, ma
 
 fn extract(part: &str, col: &SimpleExpr, kind: FieldKind, tz: &Tz) -> SimpleExpr {
     match kind {
-        FieldKind::DateTime => Expr::cust_with_exprs(
-            format!("EXTRACT({part} FROM $1 AT TIME ZONE $2)"),
-            [col.clone(), Expr::val(tz.name()).into()],
-        ),
+        FieldKind::DateTime => {
+            Expr::cust_with_exprs(format!("EXTRACT({part} FROM $1 AT TIME ZONE $2)"), [col.clone(), Expr::val(tz.name()).into()])
+        }
         _ => Expr::cust_with_exprs(format!("EXTRACT({part} FROM $1)"), [col.clone()]),
     }
 }
@@ -438,9 +466,11 @@ impl FilterSet {
 pub fn build_condition(d: &FilterDef, raw: Option<&str>, ctx: &FilterContext<'_>) -> Result<Option<SimpleExpr>, String> {
     let col = &d.expr;
     if d.lookup == Lookup::IsNull {
-        return Ok(parse_bool_widget(raw).map(|b| {
-            if b { Expr::expr(col.clone()).is_null() } else { Expr::expr(col.clone()).is_not_null() }
-        }));
+        return Ok(parse_bool_widget(raw).map(
+            |b| {
+                if b { Expr::expr(col.clone()).is_null() } else { Expr::expr(col.clone()).is_not_null() }
+            },
+        ));
     }
     if d.kind == FieldKind::Boolean && d.lookup == Lookup::Exact {
         return Ok(parse_bool_widget(raw).map(|b| Expr::expr(col.clone()).eq(b)));
@@ -568,11 +598,7 @@ pub fn parse_ordering(q: &QueryParams, valid_fields: &[&str]) -> Option<Vec<Orde
 
 /// Applies sort terms. Duplicate fields are dropped (Django's compiler removes duplicate
 /// ORDER BY expressions; the first wins). `resolve` returns the SQL expression per field name.
-pub fn apply_order_terms(
-    select: &mut SelectStatement,
-    terms: &[OrderTerm],
-    resolve: impl Fn(&str) -> Option<SimpleExpr>,
-) {
+pub fn apply_order_terms(select: &mut SelectStatement, terms: &[OrderTerm], resolve: impl Fn(&str) -> Option<SimpleExpr>) {
     let mut seen: Vec<&str> = Vec::new();
     for t in terms {
         if seen.contains(&t.field.as_str()) {
@@ -587,12 +613,7 @@ pub fn apply_order_terms(
 
 /// Convenient: `ordering_fields` as a (name, expression) list; without a valid specification `default`
 /// applies (terms like `"-created"`, also resolved via `fields`). Returns the applied terms.
-pub fn apply_ordering(
-    select: &mut SelectStatement,
-    q: &QueryParams,
-    fields: &[(&str, SimpleExpr)],
-    default: &[&str],
-) -> Vec<OrderTerm> {
+pub fn apply_ordering(select: &mut SelectStatement, q: &QueryParams, fields: &[(&str, SimpleExpr)], default: &[&str]) -> Vec<OrderTerm> {
     let names: Vec<&str> = fields.iter().map(|(n, _)| *n).collect();
     let terms = parse_ordering(q, &names).unwrap_or_else(|| {
         default
@@ -669,10 +690,7 @@ mod tests {
         let (q, v) = s.build(PostgresQueryBuilder);
         assert_eq!(q, r#"SELECT "id" FROM "t" WHERE UPPER(CAST("name" AS text)) LIKE UPPER($1)"#);
         assert_eq!(v.0[0], sea_query::Value::String(Some(Box::new(r"%50\%\_a%".to_string()))));
-        assert_eq!(
-            sql(&tags(), "name__iexact=Foo").unwrap(),
-            r#"SELECT "id" FROM "t" WHERE UPPER(CAST("name" AS text)) = UPPER('Foo')"#
-        );
+        assert_eq!(sql(&tags(), "name__iexact=Foo").unwrap(), r#"SELECT "id" FROM "t" WHERE UPPER(CAST("name" AS text)) = UPPER('Foo')"#);
         assert_eq!(
             sql(&tags(), "name__istartswith=a&name__iendswith=b").unwrap(),
             r#"SELECT "id" FROM "t" WHERE UPPER(CAST("name" AS text)) LIKE UPPER('a%') AND UPPER(CAST("name" AS text)) LIKE UPPER('%b')"#
@@ -689,9 +707,12 @@ mod tests {
 
     #[test]
     fn dates() {
-        let fs = FilterSet::new()
-            .field("created", Expr::col(Alias::new("created")), FieldKind::Date, DATE_KWARGS)
-            .field("added", Expr::col(Alias::new("added")), FieldKind::DateTime, DATETIME_KWARGS);
+        let fs = FilterSet::new().field("created", Expr::col(Alias::new("created")), FieldKind::Date, DATE_KWARGS).field(
+            "added",
+            Expr::col(Alias::new("added")),
+            FieldKind::DateTime,
+            DATETIME_KWARGS,
+        );
         assert_eq!(
             sql(&fs, "created__gte=2024-01-02&added__date__lt=2024-03-01&added__year=2024").unwrap(),
             r#"SELECT "id" FROM "t" WHERE "created" >= '2024-01-02' AND (EXTRACT(YEAR FROM "added" AT TIME ZONE 'Europe/Berlin')) = 2024 AND (("added" AT TIME ZONE 'Europe/Berlin')::date) < '2024-03-01'"#

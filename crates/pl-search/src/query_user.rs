@@ -10,7 +10,7 @@ use std::sync::Arc;
 use tantivy::query::{BooleanQuery, BoostQuery, ConstScoreQuery, Occur, Query};
 use tantivy::tokenizer::{SimpleTokenizer, TextAnalyzer};
 
-use crate::error::{py_repr, py_repr_opt, SearchError};
+use crate::error::{SearchError, py_repr, py_repr_opt};
 use crate::query_simple::{cjk_runs, has_cjk};
 use crate::tokenizer::{analyze, ascii_fold, bigram_analyzer, paperless_text_analyzer, py_lower, stem_pattern_text};
 use crate::wc;
@@ -134,11 +134,7 @@ fn collapse(and: bool, mut children: Vec<Node>) -> Node {
     if children.len() == 1 {
         return children.remove(0);
     }
-    if and {
-        Node::And(children)
-    } else {
-        Node::Or(children)
-    }
+    if and { Node::And(children) } else { Node::Or(children) }
 }
 
 /// (field, str(leaf.text), is Phrase)
@@ -184,17 +180,11 @@ fn cjk_alternative(leaf: &Node) -> Option<Node> {
 /// `_fuzzy_alternative`
 fn fuzzy_alternative(leaf: &Node, splitter: &TextAnalyzer) -> Option<Node> {
     let (field, text, is_phrase) = leaf_parts(leaf)?;
-    let words: Vec<String> = analyze(splitter, &text)
-        .into_iter()
-        .filter(|w| w.chars().count() > 1 && !has_cjk(w))
-        .collect();
+    let words: Vec<String> = analyze(splitter, &text).into_iter().filter(|w| w.chars().count() > 1 && !has_cjk(w)).collect();
     if words.is_empty() {
         return None;
     }
-    let leaves = words
-        .into_iter()
-        .map(|w| Node::Fuzzy { field: field.clone(), text: w, distance: 1, prefix: true })
-        .collect();
+    let leaves = words.into_iter().map(|w| Node::Fuzzy { field: field.clone(), text: w, distance: 1, prefix: true }).collect();
     Some(collapse(is_phrase, leaves))
 }
 
@@ -258,16 +248,12 @@ fn field_name(d: &Diagnostic) -> Option<String> {
 fn single_diagnostic_message(d: &Diagnostic) -> String {
     let fname = field_name(d);
     match d.kind {
-        DiagnosticKind::BadDate => format!(
-            "Invalid date value {} for field {}.",
-            py_repr_opt(d.raw_value.as_deref()),
-            py_repr_opt(fname.as_deref())
-        ),
-        DiagnosticKind::BadNumber => format!(
-            "Invalid numeric value {} for field {}.",
-            py_repr_opt(d.raw_value.as_deref()),
-            py_repr_opt(fname.as_deref())
-        ),
+        DiagnosticKind::BadDate => {
+            format!("Invalid date value {} for field {}.", py_repr_opt(d.raw_value.as_deref()), py_repr_opt(fname.as_deref()))
+        }
+        DiagnosticKind::BadNumber => {
+            format!("Invalid numeric value {} for field {}.", py_repr_opt(d.raw_value.as_deref()), py_repr_opt(fname.as_deref()))
+        }
         DiagnosticKind::TooDeep => "The search query is nested too deeply.".to_string(),
         DiagnosticKind::PatternOnNumeric | DiagnosticKind::PatternOnBooleanExists | DiagnosticKind::PatternOnSubpath => {
             let label = d.field_kind.map(|k| format!(" ({})", k.name().to_lowercase())).unwrap_or_default();
@@ -329,14 +315,9 @@ fn map_emit_error(e: QueryError) -> SearchError {
 }
 
 /// `parse_user_query`
-pub fn parse_user_query(
-    index: &tantivy::Index,
-    raw_query: &str,
-    cfg: &UserQueryConfig,
-) -> Result<Box<dyn Query>, SearchError> {
+pub fn parse_user_query(index: &tantivy::Index, raw_query: &str, cfg: &UserQueryConfig) -> Result<Box<dyn Query>, SearchError> {
     let registry = get_field_registry(cfg.language);
-    let result = wc::parse(raw_query, &registry, &DEFAULT_SEARCH_FIELDS, &FIELD_BOOSTS, cfg.tz, cfg.now)
-        .map_err(SearchError::Internal)?;
+    let result = wc::parse(raw_query, &registry, &DEFAULT_SEARCH_FIELDS, &FIELD_BOOSTS, cfg.tz, cfg.now).map_err(SearchError::Internal)?;
     if !result.diagnostics.is_empty() {
         return Err(diagnostics_to_error(&result.diagnostics));
     }
@@ -383,7 +364,7 @@ mod tests {
 
     use super::*;
     use crate::schema::build_schema;
-    use crate::testutil::{build_doc, TestDoc};
+    use crate::testutil::{TestDoc, build_doc};
     use crate::tokenizer::register_tokenizers;
 
     const CHECKSUM: &str = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08";
@@ -430,10 +411,7 @@ mod tests {
             let mut doc = TantivyDocument::default();
             doc.add_u64(schema.get_field("id").unwrap(), *id);
             doc.add_text(schema.get_field("content").unwrap(), "dated body");
-            doc.add_date(
-                schema.get_field("added").unwrap(),
-                tantivy::DateTime::from_timestamp_secs(added.timestamp()),
-            );
+            doc.add_date(schema.get_field("added").unwrap(), tantivy::DateTime::from_timestamp_secs(added.timestamp()));
             w.add_document(doc).unwrap();
         }
         w.commit().unwrap();
@@ -578,10 +556,7 @@ mod tests {
             assert_eq!(ids(&idx, q), set(&[]), "{q}");
         }
         assert_eq!(ids(&idx, "added:['-1 week' to now]"), set(&[10, 11]));
-        assert_eq!(
-            errs(&idx, "added:2005-03-04T15:30:00Z", false),
-            msg("Invalid date value '2005-03-04T15:30:00Z' for field 'added'.")
-        );
+        assert_eq!(errs(&idx, "added:2005-03-04T15:30:00Z", false), msg("Invalid date value '2005-03-04T15:30:00Z' for field 'added'."));
     }
 
     #[test]
@@ -607,10 +582,7 @@ mod tests {
         for q in ["invoice", "created:today", "created:[2005 to 2009]", "added:\"previous month\"", "title:202[0-1]*"] {
             assert!(run(&idx, q, true).is_ok(), "{q}");
         }
-        assert_eq!(
-            errs(&idx, "invoice NOT title:[a to b]", true),
-            msg("Range searches are not supported for field 'title'.")
-        );
+        assert_eq!(errs(&idx, "invoice NOT title:[a to b]", true), msg("Range searches are not supported for field 'title'."));
     }
 
     #[test]
@@ -626,24 +598,17 @@ mod tests {
                 "Invalid numeric value 'notanumber' for field 'asn'.".to_string()
             ]
         );
-        assert_eq!(
-            errs(&idx, "notes.user:*", false),
-            msg("Existence searches (field:*) are not supported for field 'notes.user'.")
-        );
+        assert_eq!(errs(&idx, "notes.user:*", false), msg("Existence searches (field:*) are not supported for field 'notes.user'."));
         assert_eq!(errs(&idx, "title:[a to b]", false), msg("Range searches are not supported for field 'title'."));
         assert_eq!(errs(&idx, "asn:1*", false), msg("Wildcard patterns are not supported for field 'asn' (u64)."));
-        assert_eq!(
-            errs(&idx, "notes.user:adm*", false),
-            msg("Wildcard patterns are not supported for field 'notes.user' (json).")
-        );
+        assert_eq!(errs(&idx, "notes.user:adm*", false), msg("Wildcard patterns are not supported for field 'notes.user' (json)."));
         assert_eq!(
             errs(&idx, "title:200[1-9]", false),
-            msg("'200[1-9]' looks like a bracket range for field 'title', but '[' is not a wildcard character on its own. Combine it with a wildcard, e.g. a trailing '*', or double-quote the value to search it as literal text.")
+            msg(
+                "'200[1-9]' looks like a bracket range for field 'title', but '[' is not a wildcard character on its own. Combine it with a wildcard, e.g. a trailing '*', or double-quote the value to search it as literal text."
+            )
         );
-        assert_eq!(
-            errs(&idx, "created:december 2019", false),
-            msg("Invalid date value 'december 2019' for field 'created'.")
-        );
+        assert_eq!(errs(&idx, "created:december 2019", false), msg("Invalid date value 'december 2019' for field 'created'."));
         assert_eq!(errs(&idx, "type:x NOT asn:-5", false), msg("Invalid numeric value '-5' for field 'asn'."));
         let deep = format!("{}a{}", "(".repeat(300), ")".repeat(300));
         assert_eq!(errs(&idx, &deep, false), msg("The search query is nested too deeply."));

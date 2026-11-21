@@ -72,9 +72,7 @@ pub fn choose(accept_encoding: &str) -> Option<Encoding> {
     if has("*") {
         return Some(Encoding::Zstd);
     }
-    [Encoding::Zstd, Encoding::Br, Encoding::Gzip]
-        .into_iter()
-        .find(|e| has(e.name()))
+    [Encoding::Zstd, Encoding::Br, Encoding::Gzip].into_iter().find(|e| has(e.name()))
 }
 
 type BoxRead = Pin<Box<dyn AsyncRead + Send>>;
@@ -88,10 +86,7 @@ fn encoder<R: tokio::io::AsyncBufRead + Send + 'static>(enc: Encoding, r: R) -> 
 }
 
 fn is_event_stream(resp: &Response) -> bool {
-    resp.headers()
-        .get(header::CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .is_some_and(|ct| ct.starts_with("text/event-stream"))
+    resp.headers().get(header::CONTENT_TYPE).and_then(|v| v.to_str().ok()).is_some_and(|ct| ct.starts_with("text/event-stream"))
 }
 
 fn weaken_etag(resp: &mut Response) {
@@ -130,10 +125,7 @@ pub async fn compress(resp: Response, accept_encoding: &str) -> Response {
         parts.headers.remove(header::CONTENT_LENGTH);
         let mut resp = Response::from_parts(parts, body);
         weaken_etag(&mut resp);
-        resp.headers_mut().insert(
-            header::CONTENT_ENCODING,
-            HeaderValue::from_static(enc.name()),
-        );
+        resp.headers_mut().insert(header::CONTENT_ENCODING, HeaderValue::from_static(enc.name()));
         return resp;
     }
 
@@ -145,21 +137,15 @@ pub async fn compress(resp: Response, accept_encoding: &str) -> Response {
         }
     };
     let mut out = Vec::new();
-    let compressed = encoder(enc, io::Cursor::new(content.clone()))
-        .read_to_end(&mut out)
-        .await;
+    let compressed = encoder(enc, io::Cursor::new(content.clone())).read_to_end(&mut out).await;
     if compressed.is_err() || out.len() >= content.len().saturating_sub(MIN_IMPROVEMENT) {
         return Response::from_parts(parts, Body::from(content));
     }
     let len = out.len();
     let mut resp = Response::from_parts(parts, Body::from(out));
-    resp.headers_mut()
-        .insert(header::CONTENT_LENGTH, HeaderValue::from(len));
+    resp.headers_mut().insert(header::CONTENT_LENGTH, HeaderValue::from(len));
     weaken_etag(&mut resp);
-    resp.headers_mut().insert(
-        header::CONTENT_ENCODING,
-        HeaderValue::from_static(enc.name()),
-    );
+    resp.headers_mut().insert(header::CONTENT_ENCODING, HeaderValue::from_static(enc.name()));
     resp
 }
 
@@ -185,18 +171,14 @@ mod tests {
         assert!(r.headers().get(header::VARY).is_none());
 
         let mut big = Response::new(Body::from("abc".repeat(1000)));
-        big.headers_mut()
-            .insert(header::ETAG, HeaderValue::from_static("\"x\""));
+        big.headers_mut().insert(header::ETAG, HeaderValue::from_static("\"x\""));
         let r = compress(big, "gzip").await;
         assert_eq!(r.headers()[header::CONTENT_ENCODING], "gzip");
         assert_eq!(r.headers()[header::VARY], "Accept-Encoding");
         assert_eq!(r.headers()[header::ETAG], "W/\"x\"");
 
         let mut sse = Response::new(Body::from("a".repeat(1000)));
-        sse.headers_mut().insert(
-            header::CONTENT_TYPE,
-            HeaderValue::from_static("text/event-stream"),
-        );
+        sse.headers_mut().insert(header::CONTENT_TYPE, HeaderValue::from_static("text/event-stream"));
         let r = compress(sse, "gzip").await;
         assert!(r.headers().get(header::CONTENT_ENCODING).is_none());
     }

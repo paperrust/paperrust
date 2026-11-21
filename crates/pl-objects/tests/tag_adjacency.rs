@@ -20,8 +20,8 @@ use axum::body::Body;
 use axum::http::Request;
 use pl_authz::{AuthConfig, Authz};
 use pl_core::AppState;
-use pl_core::tasks::TaskRequest;
 use pl_core::config::Env;
+use pl_core::tasks::TaskRequest;
 use pl_core::tasks::{DispatchFuture, Dispatcher, TaskDispatch};
 use serde_json::{Value, json};
 use sqlx::PgPool;
@@ -111,7 +111,12 @@ async fn superuser(db: &PgPool) -> String {
     .await
     .unwrap();
     let token = format!("{:0>40}", format!("{id:x}ad"));
-    sqlx::query("INSERT INTO authtoken_token (key, created, user_id) VALUES ($1, now(), $2)").bind(&token).bind(id).execute(db).await.unwrap();
+    sqlx::query("INSERT INTO authtoken_token (key, created, user_id) VALUES ($1, now(), $2)")
+        .bind(&token)
+        .bind(id)
+        .execute(db)
+        .await
+        .unwrap();
     token
 }
 
@@ -219,13 +224,20 @@ async fn api_hierarchy_unchanged_after_migration() {
     let (st, moved) = call(&app, "POST", "/api/tags/", &token, Some(json!({"name": "move-me"}))).await;
     assert_eq!(st, 201);
     let moved = moved["id"].as_i64().unwrap();
-    let doc: i32 = sqlx::query_scalar("SELECT id FROM documents_document WHERE deleted_at IS NULL ORDER BY id LIMIT 1").fetch_one(&db).await.unwrap();
-    sqlx::query("INSERT INTO documents_document_tags (document_id, tag_id) VALUES ($1, $2)").bind(doc).bind(moved as i32).execute(&db).await.unwrap();
+    let doc: i32 =
+        sqlx::query_scalar("SELECT id FROM documents_document WHERE deleted_at IS NULL ORDER BY id LIMIT 1").fetch_one(&db).await.unwrap();
+    sqlx::query("INSERT INTO documents_document_tags (document_id, tag_id) VALUES ($1, $2)")
+        .bind(doc)
+        .bind(moved as i32)
+        .execute(&db)
+        .await
+        .unwrap();
     let target = leaf_deepest;
     let (st, t) = call(&app, "PATCH", &format!("/api/tags/{moved}/"), &token, Some(json!({"parent": target}))).await;
     assert_eq!(st, 200, "{t}");
     assert_eq!(t["parent"], json!(target));
-    let have: Vec<i32> = sqlx::query_scalar("SELECT tag_id FROM documents_document_tags WHERE document_id = $1").bind(doc).fetch_all(&db).await.unwrap();
+    let have: Vec<i32> =
+        sqlx::query_scalar("SELECT tag_id FROM documents_document_tags WHERE document_id = $1").bind(doc).fetch_all(&db).await.unwrap();
     let have: BTreeSet<i64> = have.into_iter().map(i64::from).collect();
     for a in std::iter::once(target).chain(tree.ancestors(target)) {
         assert!(have.contains(&a), "document {doc} misses ancestor {a}");
@@ -240,11 +252,8 @@ async fn api_hierarchy_unchanged_after_migration() {
     // deleting cascades via the parent edge
     let (st, _) = call(&app, "DELETE", &format!("/api/tags/{target}/"), &token, None).await;
     assert_eq!(st, 204);
-    let gone: i64 = sqlx::query_scalar("SELECT count(*) FROM documents_tag WHERE id = ANY($1)")
-        .bind(vec![target, moved])
-        .fetch_one(&db)
-        .await
-        .unwrap();
+    let gone: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM documents_tag WHERE id = ANY($1)").bind(vec![target, moved]).fetch_one(&db).await.unwrap();
     assert_eq!(gone, 0);
 
     drop_db(db).await;

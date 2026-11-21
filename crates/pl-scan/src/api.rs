@@ -104,7 +104,12 @@ pub async fn scanners_list(State(state): State<AppState>, ctx: RequestContext, a
 }
 
 /// POST /api/x-scan/scanners/ `{"name"?, "url"}` – checks the address (reads capabilities).
-pub async fn scanners_create(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser, body: Bytes) -> Result<Response, ApiError> {
+pub async fn scanners_create(
+    State(state): State<AppState>,
+    ctx: RequestContext,
+    auth: AuthUser,
+    body: Bytes,
+) -> Result<Response, ApiError> {
     let u = require_superuser(&auth)?.clone();
     let v = json_body(&body)?;
     let Some(url) = v.get("url").and_then(Value::as_str).map(str::trim).filter(|s| !s.is_empty()) else {
@@ -113,12 +118,16 @@ pub async fn scanners_create(State(state): State<AppState>, ctx: RequestContext,
     let base = normalize_base(url).map_err(|m| ApiError::validation(json!({"url": [m]})))?;
     let name = name_field(&v, "name", false)?;
     let client = Client::new(base.clone()).map_err(scan_error)?;
-    let caps = client.capabilities().await.map_err(|e| ApiError::validation(json!({"url": [format!("No eSCL scanner found at this address ({e}).")]})))?;
+    let caps = client
+        .capabilities()
+        .await
+        .map_err(|e| ApiError::validation(json!({"url": [format!("No eSCL scanner found at this address ({e}).")]})))?;
     let name = name.or_else(|| caps.make_and_model.clone()).unwrap_or_else(|| base.host_str().unwrap_or("Scanner").to_string());
     let name: String = name.chars().take(128).collect();
     let model: Option<String> = caps.make_and_model.as_ref().map(|m| m.chars().take(128).collect());
     let uuid: Option<String> = caps.uuid.as_ref().map(|m| m.chars().take(64).collect());
-    let Some(s) = store::insert_scanner(state.db(), &name, base.as_str(), uuid.as_deref(), model.as_deref(), u.id).await.map_err(db_err)? else {
+    let Some(s) = store::insert_scanner(state.db(), &name, base.as_str(), uuid.as_deref(), model.as_deref(), u.id).await.map_err(db_err)?
+    else {
         return Err(ApiError::validation(json!({"url": ["This scanner is already known."]})));
     };
     tracing::info!(target: "paperrust.scan", user = u.id, scanner = s.id, "scanner added");
@@ -126,7 +135,13 @@ pub async fn scanners_create(State(state): State<AppState>, ctx: RequestContext,
 }
 
 /// PATCH /api/x-scan/scanners/{id}/ `{"name"}`
-pub async fn scanners_update(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser, Path(id): Path<String>, body: Bytes) -> Result<Response, ApiError> {
+pub async fn scanners_update(
+    State(state): State<AppState>,
+    ctx: RequestContext,
+    auth: AuthUser,
+    Path(id): Path<String>,
+    body: Bytes,
+) -> Result<Response, ApiError> {
     require_superuser(&auth)?;
     let id = parse_id(&id)?;
     let v = json_body(&body)?;
@@ -149,7 +164,12 @@ pub async fn scanners_delete(State(state): State<AppState>, auth: AuthUser, Path
 }
 
 /// GET /api/x-scan/scanners/{id}/capabilities/
-pub async fn scanners_capabilities(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser, Path(id): Path<String>) -> Result<Response, ApiError> {
+pub async fn scanners_capabilities(
+    State(state): State<AppState>,
+    ctx: RequestContext,
+    auth: AuthUser,
+    Path(id): Path<String>,
+) -> Result<Response, ApiError> {
     require_add(&auth)?;
     let id = parse_id(&id)?;
     let Some(s) = store::get_scanner(state.db(), id).await.map_err(db_err)? else { return Err(ApiError::not_found()) };
@@ -213,12 +233,18 @@ pub async fn jobs_create(State(state): State<AppState>, ctx: RequestContext, aut
     }
     let color = match v.get("color_mode") {
         None | Some(Value::Null) => None,
-        Some(Value::String(s)) => Some(ColorMode::parse(s).ok_or_else(|| ApiError::validation(json!({"color_mode": ["Expected color, grayscale or bw."]})))?),
+        Some(Value::String(s)) => {
+            Some(ColorMode::parse(s).ok_or_else(|| ApiError::validation(json!({"color_mode": ["Expected color, grayscale or bw."]})))?)
+        }
         Some(_) => return Err(ApiError::validation(json!({"color_mode": ["Expected color, grayscale or bw."]}))),
     };
     let resolution = match v.get("resolution") {
         None | Some(Value::Null) => None,
-        Some(r) => Some(r.as_u64().filter(|r| (50..=2400).contains(r)).ok_or_else(|| ApiError::validation(json!({"resolution": ["Expected a resolution in dpi."]})))? as u32),
+        Some(r) => Some(
+            r.as_u64()
+                .filter(|r| (50..=2400).contains(r))
+                .ok_or_else(|| ApiError::validation(json!({"resolution": ["Expected a resolution in dpi."]})))? as u32,
+        ),
     };
     let title = name_field(&v, "title", false)?;
     let Some(s) = store::get_scanner(state.db(), scanner_id).await.map_err(db_err)? else {
@@ -280,7 +306,8 @@ pub async fn devices_create(State(state): State<AppState>, ctx: RequestContext, 
     let allowed = match v.get("allowed_ips") {
         None | Some(Value::Null) => String::new(),
         Some(Value::String(s)) => {
-            crate::net::parse_list(s).map_err(|e| ApiError::validation(json!({"allowed_ips": [format!("Invalid address or network: {e}")]})))?;
+            crate::net::parse_list(s)
+                .map_err(|e| ApiError::validation(json!({"allowed_ips": [format!("Invalid address or network: {e}")]})))?;
             s.trim().chars().take(2000).collect()
         }
         Some(_) => return Err(ApiError::validation(json!({"allowed_ips": ["Not a valid string."]}))),
@@ -298,7 +325,12 @@ pub async fn devices_create(State(state): State<AppState>, ctx: RequestContext, 
 }
 
 /// POST /api/x-scan/devices/{id}/revoke/
-pub async fn devices_revoke(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser, Path(id): Path<String>) -> Result<Response, ApiError> {
+pub async fn devices_revoke(
+    State(state): State<AppState>,
+    ctx: RequestContext,
+    auth: AuthUser,
+    Path(id): Path<String>,
+) -> Result<Response, ApiError> {
     let u = require_superuser(&auth)?;
     let id = parse_id(&id)?;
     if !store::revoke_device(state.db(), id).await.map_err(db_err)? {

@@ -209,7 +209,8 @@ impl Options {
             n if n <= 0 => auto_threads(),
             n => usize::try_from(n).unwrap_or(1).min(64),
         };
-        let report_keep = usize::try_from(env.int_or("PAPERRUST_INTEGRITY_REPORT_KEEP", DEFAULT_REPORT_KEEP).map_err(cfg)?.max(0)).unwrap_or(0);
+        let report_keep =
+            usize::try_from(env.int_or("PAPERRUST_INTEGRITY_REPORT_KEEP", DEFAULT_REPORT_KEEP).map_err(cfg)?.max(0)).unwrap_or(0);
         Ok(Self { incremental, record_state: incremental, full_hash_days, threads, report_keep })
     }
 
@@ -414,15 +415,7 @@ fn verify(run: &Run, pk: i64, kind: Kind, path: &Path, expected: &str, o: &mut D
     if run.opts.record_state
         && let Some((size, mtime_ns)) = fp
     {
-        o.verified.push(StateRow {
-            document_id: pk,
-            kind,
-            path: path_s.into_owned(),
-            size,
-            mtime_ns,
-            checksum: sum,
-            verified_at: run.now,
-        });
+        o.verified.push(StateRow { document_id: pk, kind, path: path_s.into_owned(), size, mtime_ns, checksum: sum, verified_at: run.now });
     }
     Ok(None)
 }
@@ -651,7 +644,8 @@ pub async fn check_sanity_with(c: &Ctx, opts: &Options) -> CliResult<(Messages, 
     let (opts2, dirs) = (opts.clone(), (c.cfg.thumbnail_dir.clone(), c.cfg.originals_dir.clone(), c.cfg.archive_dir.clone()));
     let n_docs = docs.len();
     let (docs, outcomes) = tokio::task::spawn_blocking(move || {
-        let run = Run { opts: &opts2, state: &state, now: Utc::now(), thumbnail_dir: &dirs.0, originals_dir: &dirs.1, archive_dir: &dirs.2 };
+        let run =
+            Run { opts: &opts2, state: &state, now: Utc::now(), thumbnail_dir: &dirs.0, originals_dir: &dirs.1, archive_dir: &dirs.2 };
         let outcomes = parallel_map(&docs, opts2.threads, |d| check_document(&run, d));
         (docs, outcomes)
     })
@@ -959,7 +953,8 @@ mod tests {
         assert_eq!(o.mode(), "incremental");
         // transition name PAPERLESS_RS_* counts as an alias
         assert!(Options::from_env(&env(&[("PAPERLESS_RS_INTEGRITY_INCREMENTAL", "1")])).unwrap().incremental);
-        let neg = Options::from_env(&env(&[("PAPERRUST_INTEGRITY_FULL_HASH_DAYS", "-3"), ("PAPERRUST_INTEGRITY_REPORT_KEEP", "-1")])).unwrap();
+        let neg =
+            Options::from_env(&env(&[("PAPERRUST_INTEGRITY_FULL_HASH_DAYS", "-3"), ("PAPERRUST_INTEGRITY_REPORT_KEEP", "-1")])).unwrap();
         assert_eq!((neg.full_hash_days, neg.report_keep), (0, 0));
         assert!(Options::from_env(&env(&[("PAPERRUST_INTEGRITY_INCREMENTAL", "vielleicht")])).is_err());
         assert!(Options::from_env(&env(&[("PAPERRUST_INTEGRITY_THREADS", "x")])).is_err());
@@ -986,7 +981,10 @@ mod tests {
         assert_eq!(m.order, vec![Some(3), Some(1), None]);
         assert_eq!((m.document_error_count, m.document_warning_count, m.document_info_count, m.global_warning_count), (1, 0, 2, 2));
         assert_eq!(m.len(), 6);
-        assert_eq!(task_summary(&m), "1 document(s) with errors, 2 document(s) with infos, 2 global warning(s) found. Check logs for details.");
+        assert_eq!(
+            task_summary(&m),
+            "1 document(s) with errors, 2 document(s) with infos, 2 global warning(s) found. Check logs for details."
+        );
         assert_eq!(task_summary(&Messages::default()), "No issues detected.");
         assert_eq!(task_summary(&msgs(&[(Some(1), INFO, "x")])), "1 document(s) with infos found.");
     }
@@ -1190,7 +1188,10 @@ mod tests {
         assert_eq!(r["mode"], "incremental");
         assert_eq!(r["result"], "1 document(s) with errors, 1 global warning(s) found. Check logs for details.");
         assert_eq!(r["files"]["skipped"], 1);
-        assert_eq!(r["issues"][0], json!({"level": "ERROR", "document_id": 7, "title": "Rechnung", "message": "Original of document does not exist."}));
+        assert_eq!(
+            r["issues"][0],
+            json!({"level": "ERROR", "document_id": 7, "title": "Rechnung", "message": "Original of document does not exist."})
+        );
         assert_eq!(r["issues"][1]["document_id"], Value::Null);
         assert_eq!(r["issues"][1]["title"], Value::Null);
         assert_eq!(r["started_at"], "2026-11-08T00:30:00.000Z");
@@ -1204,11 +1205,17 @@ mod tests {
         // same point in time → unique name
         let dup = write_report(dir.path(), &r, t0 + chrono::Duration::minutes(4), 3).unwrap();
         assert_ne!(dup, paths[4]);
-        let mut left: Vec<String> = std::fs::read_dir(dir.path()).unwrap().flatten().map(|e| e.file_name().to_string_lossy().into_owned()).collect();
+        let mut left: Vec<String> =
+            std::fs::read_dir(dir.path()).unwrap().flatten().map(|e| e.file_name().to_string_lossy().into_owned()).collect();
         left.sort();
         assert_eq!(
             left,
-            vec!["integrity-20261108T003300.000Z.json", "integrity-20261108T003400.000Z-1.json", "integrity-20261108T003400.000Z.json", "other.json"]
+            vec![
+                "integrity-20261108T003300.000Z.json",
+                "integrity-20261108T003400.000Z-1.json",
+                "integrity-20261108T003400.000Z.json",
+                "other.json"
+            ]
         );
         let back: Value = serde_json::from_slice(&std::fs::read(&paths[4]).unwrap()).unwrap();
         assert_eq!(back, r);
@@ -1217,7 +1224,8 @@ mod tests {
     #[test]
     fn finish_line_text() {
         let m = msgs(&[(Some(1), INFO, "Document contains no OCR data")]);
-        let stats = Stats { documents: 2, files_hashed: 3, files_skipped: 1, bytes_hashed: 3 * 1024 * 1024, orphaned_files: 0, duration_ms: 2500 };
+        let stats =
+            Stats { documents: 2, files_hashed: 3, files_skipped: 1, bytes_hashed: 3 * 1024 * 1024, orphaned_files: 0, duration_ms: 2500 };
         assert_eq!(
             finish_line(&m, &stats, &Options { threads: 2, ..Options::default() }, Some(Path::new("r.json"))),
             "Integrity check (full) finished in 2.5 s: 2 document(s), 3 file(s) hashed (3.0 MiB), 1 unchanged file(s) skipped, 0 orphaned file(s). Result: 1 document(s) with infos found. Report: r.json"

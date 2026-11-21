@@ -31,12 +31,7 @@ pub async fn field_def(conn: &mut PgConnection, id: i64) -> Result<Option<FieldD
         .fetch_optional(&mut *conn)
         .await?;
     r.map(|r| -> Result<FieldDef, sqlx::Error> {
-        Ok(FieldDef {
-            id: i64::from(r.try_get::<i32, _>(0)?),
-            name: r.try_get(1)?,
-            data_type: r.try_get(2)?,
-            extra_data: r.try_get(3)?,
-        })
+        Ok(FieldDef { id: i64::from(r.try_get::<i32, _>(0)?), name: r.try_get(1)?, data_type: r.try_get(2)?, extra_data: r.try_get(3)? })
     })
     .transpose()
 }
@@ -216,12 +211,7 @@ async fn repr(conn: &mut PgConnection, c: &CfiRow) -> Result<String, sqlx::Error
 
 /// `instance.save(update_fields=…)` of an existing instance: pre_save audit (old via
 /// `objects`, i.e. without trash), UPDATE of the value column or the delete fields, post_save.
-async fn save_audit(
-    conn: &mut PgConnection,
-    ctx: &LogCtx,
-    new: &CfiRow,
-    only: Option<&[&str]>,
-) -> Result<(), sqlx::Error> {
+async fn save_audit(conn: &mut PgConnection, ctx: &LogCtx, new: &CfiRow, only: Option<&[&str]>) -> Result<(), sqlx::Error> {
     if !ctx.enabled {
         return Ok(());
     }
@@ -327,13 +317,7 @@ pub async fn create(
 }
 
 /// `instance.save()` (all fields) of an existing instance with a new value (workflow assignment).
-pub async fn save_full(
-    conn: &mut PgConnection,
-    ctx: &LogCtx,
-    media: &MediaCfg,
-    c: &CfiRow,
-    data_type: &str,
-) -> Result<(), ApiError> {
+pub async fn save_full(conn: &mut PgConnection, ctx: &LogCtx, media: &MediaCfg, c: &CfiRow, data_type: &str) -> Result<(), ApiError> {
     save_audit(conn, ctx, c, None).await?;
     write_value(conn, c, data_type).await?;
     files::after_custom_field_saved(conn, media, c.document_id).await?;
@@ -416,12 +400,7 @@ pub async fn hard_delete(conn: &mut PgConnection, ctx: &LogCtx, rows: &[CfiRow])
 }
 
 /// `CustomFieldInstance.objects.filter(…).hard_delete()` (QuerySet.delete without soft delete).
-pub async fn hard_delete_where(
-    conn: &mut PgConnection,
-    ctx: &LogCtx,
-    doc_ids: &[i64],
-    field_ids: Option<&[i64]>,
-) -> Result<(), ApiError> {
+pub async fn hard_delete_where(conn: &mut PgConnection, ctx: &LogCtx, doc_ids: &[i64], field_ids: Option<&[i64]>) -> Result<(), ApiError> {
     let d: Vec<i32> = doc_ids.iter().map(|i| *i as i32).collect();
     let mut rows = Vec::new();
     let sql = format!("SELECT {COLS} FROM documents_customfieldinstance WHERE document_id = ANY($1) AND deleted_at IS NULL");

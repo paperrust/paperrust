@@ -287,7 +287,18 @@ mod tests {
         let enc = std::process::Command::new("gpg")
             .current_dir(&home)
             .args(["--homedir", "."])
-            .args(["--batch", "--yes", "--armor", "--trust-model", "always", "-r", "paperrust-test@example.invalid", "--encrypt", "-o", "-"])
+            .args([
+                "--batch",
+                "--yes",
+                "--armor",
+                "--trust-model",
+                "always",
+                "-r",
+                "paperrust-test@example.invalid",
+                "--encrypt",
+                "-o",
+                "-",
+            ])
             .arg("inner.eml")
             .output()
             .expect("gpg --encrypt");

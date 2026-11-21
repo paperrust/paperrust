@@ -56,10 +56,7 @@ fn routes() -> Vec<ApiRoute> {
 }
 
 async fn start(vars: &[(&str, &str)]) -> SocketAddr {
-    let m: HashMap<String, String> = vars
-        .iter()
-        .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
-        .collect();
+    let m: HashMap<String, String> = vars.iter().map(|(k, v)| ((*k).to_owned(), (*v).to_owned())).collect();
     let cfg = ServerConfig::from_lookup(|k| m.get(k).cloned()).unwrap();
     let plan = routing::plan(routes(), &routing::parse_routes_toml("").unwrap()).unwrap();
     let app = pl_server::build_app(&cfg, plan, test_state()).unwrap();
@@ -69,24 +66,13 @@ async fn start(vars: &[(&str, &str)]) -> SocketAddr {
     a
 }
 
-async fn send(
-    addr: SocketAddr,
-    method: Method,
-    path: &str,
-    headers: &[(&str, &str)],
-) -> (StatusCode, HeaderMap, Bytes) {
-    let mut b = hyper::Request::builder()
-        .method(method)
-        .uri(format!("http://{addr}{path}"))
-        .header("host", "127.0.0.1");
+async fn send(addr: SocketAddr, method: Method, path: &str, headers: &[(&str, &str)]) -> (StatusCode, HeaderMap, Bytes) {
+    let mut b = hyper::Request::builder().method(method).uri(format!("http://{addr}{path}")).header("host", "127.0.0.1");
     for (k, v) in headers {
         b = b.header(*k, *v);
     }
     let client = Client::builder(TokioExecutor::new()).build_http::<Body>();
-    let resp = tokio::time::timeout(T, client.request(b.body(Body::empty()).unwrap()))
-        .await
-        .unwrap()
-        .unwrap();
+    let resp = tokio::time::timeout(T, client.request(b.body(Body::empty()).unwrap())).await.unwrap().unwrap();
     let (p, body) = resp.into_parts();
     let bytes = body.collect().await.unwrap().to_bytes();
     (p.status, p.headers, bytes)
@@ -183,10 +169,7 @@ async fn assets_served() {
     let (st, h, body) = send(app, Method::HEAD, "/__rs/brand/favicon.svg", &[]).await;
     assert_eq!(st, StatusCode::OK);
     assert!(body.is_empty());
-    assert_eq!(
-        h["content-length"],
-        pl_server::branding::FAVICON_SVG.len().to_string().as_str()
-    );
+    assert_eq!(h["content-length"], pl_server::branding::FAVICON_SVG.len().to_string().as_str());
     // unknown brand path -> 404 like every unknown /__rs/ path
     let (st, _, body) = send(app, Method::GET, "/__rs/brand/nope.svg", &[]).await;
     assert_eq!(st, StatusCode::NOT_FOUND);

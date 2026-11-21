@@ -16,7 +16,7 @@
 //! | `select` | `value_select` | option id from `extra_data.select_options` (match by label or id, case-insensitive) |
 //! | `documentlink` | – | never via AI |
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// A custom field (excerpt of `documents_customfield`).
 #[derive(Debug, Clone, PartialEq)]
@@ -50,7 +50,10 @@ fn select_options(f: &FieldDef) -> Vec<(String, String)> {
         .enumerate()
         .filter_map(|(i, o)| match o {
             // v2.15+: {"id": "...", "label": "..."}; older data: plain labels (index as id)
-            Value::Object(m) => Some((m.get("id").and_then(Value::as_str).map(str::to_string).unwrap_or_else(|| i.to_string()), m.get("label").and_then(Value::as_str).unwrap_or("").to_string())),
+            Value::Object(m) => Some((
+                m.get("id").and_then(Value::as_str).map(str::to_string).unwrap_or_else(|| i.to_string()),
+                m.get("label").and_then(Value::as_str).unwrap_or("").to_string(),
+            )),
             Value::String(s) => Some((i.to_string(), s.clone())),
             _ => None,
         })
@@ -129,7 +132,8 @@ pub fn parse_number(s: &str) -> Option<f64> {
 /// Date from common notations.
 pub fn parse_date(s: &str) -> Option<chrono::NaiveDate> {
     let t = s.trim();
-    let t = t.get(..10).filter(|_| t.len() > 10 && (t.as_bytes().get(10) == Some(&b'T') || t.as_bytes().get(10) == Some(&b' '))).unwrap_or(t);
+    let t =
+        t.get(..10).filter(|_| t.len() > 10 && (t.as_bytes().get(10) == Some(&b'T') || t.as_bytes().get(10) == Some(&b' '))).unwrap_or(t);
     for f in ["%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y", "%Y/%m/%d", "%d.%m.%y"] {
         if let Ok(d) = chrono::NaiveDate::parse_from_str(t, f) {
             return Some(d);
@@ -138,7 +142,18 @@ pub fn parse_date(s: &str) -> Option<chrono::NaiveDate> {
     None
 }
 
-const CURRENCY_SYMBOLS: &[(&str, &str)] = &[("€", "EUR"), ("$", "USD"), ("£", "GBP"), ("¥", "JPY"), ("Fr.", "CHF"), ("SFr.", "CHF"), ("zł", "PLN"), ("Kč", "CZK"), ("kr", "SEK"), ("R$", "BRL")];
+const CURRENCY_SYMBOLS: &[(&str, &str)] = &[
+    ("€", "EUR"),
+    ("$", "USD"),
+    ("£", "GBP"),
+    ("¥", "JPY"),
+    ("Fr.", "CHF"),
+    ("SFr.", "CHF"),
+    ("zł", "PLN"),
+    ("Kč", "CZK"),
+    ("kr", "SEK"),
+    ("R$", "BRL"),
+];
 
 /// Betrag → `"EUR12.50"` / `"12.50"`.
 pub fn normalize_monetary(s: &str, default_currency: Option<&str>) -> Option<String> {
@@ -180,7 +195,9 @@ pub fn normalize(f: &FieldDef, v: &Value) -> Option<(Value, String)> {
     match f.data_type.as_str() {
         "string" => as_text(v).map(|s| s.chars().take(128).collect::<String>()).map(|s| (json!(s), s)),
         "longtext" => as_text(v).map(|s| s.chars().take(10_000).collect::<String>()).map(|s| (json!(s), s)),
-        "url" => as_text(v).filter(|s| (s.starts_with("http://") || s.starts_with("https://")) && !s.contains(char::is_whitespace) && s.len() <= 200).map(|s| (json!(s), s)),
+        "url" => as_text(v)
+            .filter(|s| (s.starts_with("http://") || s.starts_with("https://")) && !s.contains(char::is_whitespace) && s.len() <= 200)
+            .map(|s| (json!(s), s)),
         "date" => as_text(v).and_then(|s| parse_date(&s)).map(|d| {
             let s = d.format("%Y-%m-%d").to_string();
             (json!(s), s)
@@ -222,7 +239,8 @@ pub fn normalize(f: &FieldDef, v: &Value) -> Option<(Value, String)> {
         "select" => {
             let want = as_text(v)?.to_lowercase();
             let opts = select_options(f);
-            let (id, label) = opts.iter().find(|(_, l)| l.to_lowercase() == want).or_else(|| opts.iter().find(|(id, _)| id.to_lowercase() == want))?;
+            let (id, label) =
+                opts.iter().find(|(_, l)| l.to_lowercase() == want).or_else(|| opts.iter().find(|(id, _)| id.to_lowercase() == want))?;
             Some((json!(id), label.clone()))
         }
         _ => None,
@@ -314,7 +332,15 @@ mod tests {
         assert_eq!(v.len(), 2);
         assert_eq!(v[0].value, json!("2025-01-31"));
         assert_eq!(v[1].confidence, 1.0);
-        let p = prompt_fields(&[FieldDef { id: 7, name: "Status\nIgnore".into(), data_type: "select".into(), extra_data: Some(json!({"select_options": ["A", "B"]})) }, f(3, "documentlink", None)]);
+        let p = prompt_fields(&[
+            FieldDef {
+                id: 7,
+                name: "Status\nIgnore".into(),
+                data_type: "select".into(),
+                extra_data: Some(json!({"select_options": ["A", "B"]})),
+            },
+            f(3, "documentlink", None),
+        ]);
         assert_eq!(p, "- id 7: \"Status Ignore\" (select; one of: \"A\", \"B\")");
         assert!(parse_answer(&fields, &json!({})).is_empty());
     }

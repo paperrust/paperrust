@@ -164,7 +164,17 @@ async fn ai_suggestions_match_django() {
                 ok += 1;
             } else {
                 bad += 1;
-                println!("DIFF {name} {path}\n  django {} {} [{}] {}\n  rust   {} {} [{}] {}", dj.status, dj.ct, dj.cache, dj.body.chars().take(600).collect::<String>(), rs.status, rs.ct, rs.cache, rs.body.chars().take(600).collect::<String>());
+                println!(
+                    "DIFF {name} {path}\n  django {} {} [{}] {}\n  rust   {} {} [{}] {}",
+                    dj.status,
+                    dj.ct,
+                    dj.cache,
+                    dj.body.chars().take(600).collect::<String>(),
+                    rs.status,
+                    rs.ct,
+                    rs.cache,
+                    rs.body.chars().take(600).collect::<String>()
+                );
             }
             if reqs(&dj_log) == reqs(&rs_log) {
                 wire_ok += 1;
@@ -176,7 +186,11 @@ async fn ai_suggestions_match_django() {
                         let (a, b): (Vec<char>, Vec<char>) = (a.chars().collect(), b.chars().collect());
                         let p = a.iter().zip(&b).position(|(x, y)| x != y).unwrap_or(a.len().min(b.len()));
                         let s = p.saturating_sub(120);
-                        println!("  dj: …{}…\n  rs: …{}…", a[s..(p + 200).min(a.len())].iter().collect::<String>(), b[s..(p + 200).min(b.len())].iter().collect::<String>());
+                        println!(
+                            "  dj: …{}…\n  rs: …{}…",
+                            a[s..(p + 200).min(a.len())].iter().collect::<String>(),
+                            b[s..(p + 200).min(b.len())].iter().collect::<String>()
+                        );
                         break;
                     }
                 }
@@ -245,7 +259,17 @@ async fn chat_matches_django() {
                 ok += 1;
             } else {
                 bad += 1;
-                println!("DIFF {name} {b}\n  django {} {} [{}] {:?}\n  rust   {} {} [{}] {:?}", dj.status, dj.ct, dj.cache, dj.body.chars().take(400).collect::<String>(), rs.status, rs.ct, rs.cache, rs.body.chars().take(400).collect::<String>());
+                println!(
+                    "DIFF {name} {b}\n  django {} {} [{}] {:?}\n  rust   {} {} [{}] {:?}",
+                    dj.status,
+                    dj.ct,
+                    dj.cache,
+                    dj.body.chars().take(400).collect::<String>(),
+                    rs.status,
+                    rs.ct,
+                    rs.cache,
+                    rs.body.chars().take(400).collect::<String>()
+                );
             }
             if chat_reqs_v342(&dj_log) == reqs(&rs_log) {
                 wire_ok += 1;
@@ -283,9 +307,14 @@ async fn index_nodes_match_django_index() {
     let docs = pl_ai::server::index::load_index_docs(&state, None, 0, 100_000).await.unwrap();
     let (mut ok, mut bad) = (0, 0);
     for d in &docs {
-        let nodes = pl_ai::node::build_document_nodes(&d.id.to_string(), &d.text, &d.metadata, cfg.llm_embedding_chunk_size as usize, |i| i.to_string()).unwrap();
+        let nodes =
+            pl_ai::node::build_document_nodes(&d.id.to_string(), &d.text, &d.metadata, cfg.llm_embedding_chunk_size as usize, |i| {
+                i.to_string()
+            })
+            .unwrap();
         let mut got: Vec<(String, String)> = nodes.iter().map(|n| (n.text.clone(), serde_json::to_string(&n.metadata).unwrap())).collect();
-        let mut exp: Vec<(String, String)> = py.get(&d.id).map(|v| v.iter().map(|(t, m, _)| (t.clone(), m.clone())).collect()).unwrap_or_default();
+        let mut exp: Vec<(String, String)> =
+            py.get(&d.id).map(|v| v.iter().map(|(t, m, _)| (t.clone(), m.clone())).collect()).unwrap_or_default();
         got.sort();
         exp.sort();
         let modified_ok = mt.get(&d.id.to_string()) == Some(&d.modified_iso);
@@ -297,7 +326,11 @@ async fn index_nodes_match_django_index() {
                 println!("DIFF doc {} modified_ok={modified_ok} rust {} nodes, django {}", d.id, got.len(), exp.len());
                 for (a, b) in got.iter().zip(exp.iter()) {
                     if a != b {
-                        println!("  rust  : {:?}\n  django: {:?}", a.0.chars().take(300).collect::<String>(), b.0.chars().take(300).collect::<String>());
+                        println!(
+                            "  rust  : {:?}\n  django: {:?}",
+                            a.0.chars().take(300).collect::<String>(),
+                            b.0.chars().take(300).collect::<String>()
+                        );
                         println!("  meta rust  : {}\n  meta django: {}", a.1, b.1);
                         break;
                     }
@@ -377,7 +410,9 @@ async fn prepare(fields: &str, create: bool, overwrite: bool) -> (pl_core::AppSt
     .fetch_one(db)
     .await
     .unwrap();
-    let m = |t: &'static str| async move { sqlx::query_scalar::<_, i32>(&format!("SELECT COALESCE(max(id), 0) FROM {t}")).fetch_one(db).await.unwrap() };
+    let m = |t: &'static str| async move {
+        sqlx::query_scalar::<_, i32>(&format!("SELECT COALESCE(max(id), 0) FROM {t}")).fetch_one(db).await.unwrap()
+    };
     let max = (m("documents_tag").await, m("documents_correspondent").await, m("documents_documenttype").await);
     flush_cache(&state).await;
     take_log();
@@ -428,7 +463,12 @@ async fn workflow_apply_ai_suggestions_matches_django() {
             ok += 1;
         } else {
             bad += 1;
-            println!("DIFF doc {doc} fields {fields}\n  django {dj}\n  rust   {rs}\n  wire django {} rust {} equal={}", dj_log.len(), rs_log.len(), reqs(&dj_log) == reqs(&rs_log));
+            println!(
+                "DIFF doc {doc} fields {fields}\n  django {dj}\n  rust   {rs}\n  wire django {} rust {} equal={}",
+                dj_log.len(),
+                rs_log.len(),
+                reqs(&dj_log) == reqs(&rs_log)
+            );
         }
     }
     sh("tests/parity/pl-ai/w8-reset.sh");
@@ -456,7 +496,9 @@ async fn rust_built_index_is_read_by_django() {
     let msg = pl_ai::server::index::update_llm_index(&state, &cfg, false, None).await.expect("update");
     assert_eq!(msg, "No changes detected in LLM index.");
     let (mut ok, mut bad) = (0, 0);
-    for (tok, body) in [(TOKENS[0].1, r#"{"q": "Rechnung"}"#), (TOKENS[1].1, r#"{"q": "Steuern", "document_id": 7}"#), (TOKENS[2].1, r#"{"q": "Arzt"}"#)] {
+    for (tok, body) in
+        [(TOKENS[0].1, r#"{"q": "Rechnung"}"#), (TOKENS[1].1, r#"{"q": "Steuern", "document_id": 7}"#), (TOKENS[2].1, r#"{"q": "Arzt"}"#)]
+    {
         take_log();
         let dj = call_django("POST", "/api/documents/chat/", Some(tok), Some(body)).await;
         let dl = take_log();
@@ -466,7 +508,13 @@ async fn rust_built_index_is_read_by_django() {
             ok += 1;
         } else {
             bad += 1;
-            println!("DIFF chat {body}: {} {:?} / {} {:?}", dj.status, dj.body.chars().take(200).collect::<String>(), rs.status, rs.body.chars().take(200).collect::<String>());
+            println!(
+                "DIFF chat {body}: {} {:?} / {} {:?}",
+                dj.status,
+                dj.body.chars().take(200).collect::<String>(),
+                rs.status,
+                rs.body.chars().take(200).collect::<String>()
+            );
         }
     }
     for d in ["7", "100"] {

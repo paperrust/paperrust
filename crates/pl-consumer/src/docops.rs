@@ -5,8 +5,8 @@
 //           Document.add_nested_tags, Document.__str__), django.db.models.fields.related_descriptors
 //           (ManyRelatedManager._add_items/_remove_items/clear → m2m_changed), auditlog receivers.
 
-use sea_query::{Expr, PostgresQueryBuilder, Query};
 use pl_core::sqlbind::SqlxBinder as _;
+use sea_query::{Expr, PostgresQueryBuilder, Query};
 use sqlx::PgConnection;
 
 use crate::audit::{AuditLog, CreatedAttr, document_repr};
@@ -57,9 +57,22 @@ pub async fn save(
     };
     audit.document_updated(conn, &old, &doc.row, &doc.created_attr, update_fields, corr.as_deref()).await?;
     const ALL: &[&str] = &[
-        "title", "content", "archive_checksum", "page_count", "created", "modified", "filename", "archive_filename",
-        "archive_serial_number", "correspondent", "document_type", "storage_path", "owner", "version_label",
-        "deleted_at", "transaction_id",
+        "title",
+        "content",
+        "archive_checksum",
+        "page_count",
+        "created",
+        "modified",
+        "filename",
+        "archive_filename",
+        "archive_serial_number",
+        "correspondent",
+        "document_type",
+        "storage_path",
+        "owner",
+        "version_label",
+        "deleted_at",
+        "transaction_id",
     ];
     let fields: Vec<&str> = match update_fields {
         Some(f) => f.to_vec(),
@@ -107,10 +120,7 @@ pub async fn remove_tags(conn: &mut PgConnection, audit: &AuditLog, doc: &DocIns
 
 /// `document.tags.clear()` (auditlog logs `Tag.objects.all()` in the process).
 pub async fn clear_tags(conn: &mut PgConnection, audit: &AuditLog, doc: &DocInstance) -> Result<(), sqlx::Error> {
-    let d = Query::delete()
-        .from_table(a("documents_document_tags"))
-        .and_where(Expr::col(a("document_id")).eq(doc.row.id))
-        .to_owned();
+    let d = Query::delete().from_table(a("documents_document_tags")).and_where(Expr::col(a("document_id")).eq(doc.row.id)).to_owned();
     crate::lookup::forget_tags(doc.row.id);
     let (sql, v) = d.build_sqlx(PostgresQueryBuilder);
     sqlx::query_with(&sql, v).execute(&mut *conn).await?;

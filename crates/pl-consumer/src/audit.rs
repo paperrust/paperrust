@@ -13,8 +13,8 @@
 // None text fields do not.
 
 use chrono::{DateTime, NaiveDate, Utc};
-use sea_query::{PostgresQueryBuilder, Query};
 use pl_core::sqlbind::SqlxBinder as _;
+use sea_query::{PostgresQueryBuilder, Query};
 use serde_json::{Map, Value, json};
 use sqlx::PgConnection;
 
@@ -67,7 +67,10 @@ fn dt(v: &Option<DateTime<Utc>>) -> AV {
 pub enum CreatedAttr {
     Date(NaiveDate),
     /// (`str(dt)`, `dt.isoformat()`)
-    DateTime { str_: String, iso: String },
+    DateTime {
+        str_: String,
+        iso: String,
+    },
 }
 
 impl CreatedAttr {
@@ -144,9 +147,10 @@ pub fn update_diff(old: &[(&'static str, AV)], new: &[(&'static str, AV)], only:
     let mut m = Map::new();
     for ((k, o), (_, n)) in old.iter().zip(new.iter()) {
         if let Some(f) = only
-            && !f.contains(k) {
-                continue;
-            }
+            && !f.contains(k)
+        {
+            continue;
+        }
         if o != n {
             m.insert((*k).to_string(), json!([o.smart_str(), n.smart_str()]));
         }
@@ -199,8 +203,16 @@ impl AuditLog {
         let q = Query::insert()
             .into_table(a("auditlog_logentry"))
             .columns([
-                a("object_pk"), a("object_id"), a("object_repr"), a("action"), a("changes"), a("timestamp"),
-                a("actor_id"), a("content_type_id"), a("additional_data"), a("changes_text"),
+                a("object_pk"),
+                a("object_id"),
+                a("object_repr"),
+                a("action"),
+                a("changes"),
+                a("timestamp"),
+                a("actor_id"),
+                a("content_type_id"),
+                a("additional_data"),
+                a("changes_text"),
             ])
             .values_panic([
                 object_id.to_string().into(),
@@ -229,8 +241,7 @@ impl AuditLog {
         correspondent: Option<&str>,
     ) -> Result<(), sqlx::Error> {
         let ch = create_diff(&document_fields(d, created), DOCUMENT_REVERSE);
-        self.write(conn, "document", d.id, &document_repr(created, correspondent, &d.title), ACTION_CREATE, ch, None)
-            .await
+        self.write(conn, "document", d.id, &document_repr(created, correspondent, &d.title), ACTION_CREATE, ch, None).await
     }
 
     /// `log_update` (pre_save): difference DB state → instance; no entry without a change.
@@ -244,16 +255,11 @@ impl AuditLog {
         only: Option<&[&str]>,
         correspondent: Option<&str>,
     ) -> Result<(), sqlx::Error> {
-        let ch = update_diff(
-            &document_fields(old, &CreatedAttr::Date(old.created)),
-            &document_fields(new, new_created),
-            only,
-        );
+        let ch = update_diff(&document_fields(old, &CreatedAttr::Date(old.created)), &document_fields(new, new_created), only);
         if ch.is_empty() {
             return Ok(());
         }
-        self.write(conn, "document", new.id, &document_repr(new_created, correspondent, &new.title), ACTION_UPDATE, ch, None)
-            .await
+        self.write(conn, "document", new.id, &document_repr(new_created, correspondent, &new.title), ACTION_UPDATE, ch, None).await
     }
 
     /// `log_m2m_changes(..., "add", "tags")`; names by `Tag.Meta.ordering`.
@@ -290,8 +296,15 @@ impl AuditLog {
             ("document", AV::S(doc_id.to_string())),
         ];
         for vf in [
-            "value_text", "value_bool", "value_url", "value_date", "value_int", "value_float", "value_monetary",
-            "value_select", "value_long_text",
+            "value_text",
+            "value_bool",
+            "value_url",
+            "value_date",
+            "value_int",
+            "value_float",
+            "value_monetary",
+            "value_select",
+            "value_long_text",
         ] {
             let v = if vf == value_field { value_repr.clone() } else { None };
             fields.push((static_name(vf), AV::S(v.unwrap_or_else(|| "None".into()))));
@@ -353,7 +366,13 @@ pub fn custom_value_smart_str(data_type: &str, v: &Value) -> Option<String> {
         return None;
     }
     Some(match (data_type, v) {
-        ("boolean", Value::Bool(b)) => if *b { "True".into() } else { "False".into() },
+        ("boolean", Value::Bool(b)) => {
+            if *b {
+                "True".into()
+            } else {
+                "False".into()
+            }
+        }
         ("float", Value::Number(n)) => py_float_repr(n.as_f64().unwrap_or(0.0)),
         ("documentlink", other) => python_json_dumps(other),
         (_, Value::String(s)) => s.clone(),
@@ -481,10 +500,7 @@ mod tests {
         new.correspondent_id = Some(3);
         let c = CreatedAttr::DateTime { str_: "2019-01-14 10:00:00+01:00".into(), iso: "2019-01-14T10:00:00+01:00".into() };
         let ch = update_diff(&document_fields(&old, &CreatedAttr::Date(old.created)), &document_fields(&new, &c), None);
-        assert_eq!(
-            Value::Object(ch),
-            json!({"created": ["2019-01-14", "2019-01-14 10:00:00+01:00"], "correspondent": ["2", "3"]})
-        );
+        assert_eq!(Value::Object(ch), json!({"created": ["2019-01-14", "2019-01-14 10:00:00+01:00"], "correspondent": ["2", "3"]}));
         assert_eq!(document_repr(&c, Some("ACME"), "T"), "2019-01-14T10:00:00+01:00 ACME T");
     }
 

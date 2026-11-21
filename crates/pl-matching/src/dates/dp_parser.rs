@@ -29,10 +29,8 @@ type PResult<T> = Result<T, ParseError>;
 // strptime (CPython _strptime subset, English names as patched by dateparser)
 // ---------------------------------------------------------------------------
 
-const MONTHS: [&str; 12] = [
-    "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november",
-    "december",
-];
+const MONTHS: [&str; 12] =
+    ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
 const MONTH_ABBR: [&str; 12] = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 const DAYS: [&str; 7] = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
 const DAY_ABBR: [&str; 7] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
@@ -172,8 +170,7 @@ pub(crate) fn strptime(date_string: &str, fmt: &str, today_year: i32) -> PResult
 
 /// `_time_parser.__call__`
 pub(crate) fn time_parser(timestring: &str) -> PResult<NaiveTime> {
-    const DIRECTIVES: [&str; 8] =
-        ["%H:%M:%S", "%I:%M:%S %p", "%H:%M", "%I:%M %p", "%I %p", "%H:%M:%S.%f", "%I:%M:%S.%f %p", "%H:%M %p"];
+    const DIRECTIVES: [&str; 8] = ["%H:%M:%S", "%I:%M:%S %p", "%H:%M", "%I:%M %p", "%I %p", "%H:%M:%S.%f", "%I:%M:%S.%f %p", "%H:%M %p"];
     let t = timestring.trim();
     for d in DIRECTIVES {
         if let Ok(dt) = strptime(t, d, 1900) {
@@ -464,11 +461,7 @@ pub(crate) fn parse_absolute(datestring: &str, s: &ParseSettings) -> PResult<(Na
                     let index_next = index + 1;
                     let next = filtered.get(index_next)?;
                     let next_is_last = index_next == filtered.len() - 1;
-                    let after_next_is_period = if next_is_last {
-                        false
-                    } else {
-                        tokens.get(next.2 + 1)?.0 == "."
-                    };
+                    let after_next_is_period = if next_is_last { false } else { tokens.get(next.2 + 1)?.0 == "." };
                     if next_is_last || !after_next_is_period {
                         let new_token = format!("{}:{}", token, next.0);
                         if HOUR_MINUTE.is_match(&new_token) {
@@ -491,8 +484,7 @@ pub(crate) fn parse_absolute(datestring: &str, s: &ParseSettings) -> PResult<(Na
             if microsecond.is_some() {
                 meridian_index += 1;
             }
-            let meridian: Option<String> =
-                filtered.get(meridian_index).and_then(|t| MERIDIAN.find(&t.0)).map(|m| m.as_str().to_string());
+            let meridian: Option<String> = filtered.get(meridian_index).and_then(|t| MERIDIAN.find(&t.0)).map(|m| m.as_str().to_string());
 
             if token.contains(':') || meridian.is_some() || microsecond.is_some() {
                 st.time_token = Some(match (&meridian, &microsecond) {
@@ -528,12 +520,14 @@ pub(crate) fn parse_absolute(datestring: &str, s: &ParseSettings) -> PResult<(Na
     }
 
     // unresolved attrs from unset tokens
-    let unknown: Vec<Comp> =
-        [Comp::Year, Comp::Month, Comp::Day].into_iter().filter(|c| match c {
+    let unknown: Vec<Comp> = [Comp::Year, Comp::Month, Comp::Day]
+        .into_iter()
+        .filter(|c| match c {
             Comp::Day => st.day.is_none(),
             Comp::Month => st.month.is_none(),
             Comp::Year => st.year.is_none(),
-        }).collect();
+        })
+        .collect();
     for attr in unknown {
         for (tok, ty) in st.unset_tokens.clone() {
             if ty == 0 {
@@ -604,10 +598,7 @@ pub(crate) fn parse_absolute(datestring: &str, s: &ParseSettings) -> PResult<(Na
 
     // _correct_for_month (PREFER_MONTH_OF_YEAR = current)
     if st.token_month.is_none() {
-        dateobj = dateobj
-            .with_month(now.month())
-            .or_else(|| dateobj.with_month(12))
-            .ok_or(ParseError)?;
+        dateobj = dateobj.with_month(now.month()).or_else(|| dateobj.with_month(12)).ok_or(ParseError)?;
     }
 
     // _correct_for_day

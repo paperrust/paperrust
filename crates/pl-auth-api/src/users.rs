@@ -10,7 +10,10 @@
 
 use crate::db::a;
 use crate::fields::{validate_group_pks, validate_permission_codenames};
-use crate::http::{Data, FieldInput, FieldOpts, HResult, django_text, drf_bool, drf_char, get_list_value, get_value, is_valid_email, is_valid_username, server_error};
+use crate::http::{
+    Data, FieldInput, FieldOpts, HResult, django_text, drf_bool, drf_char, get_list_value, get_value, is_valid_email, is_valid_username,
+    server_error,
+};
 use crate::password::{UserAttrs, has_real_password, validate_password};
 use crate::profile::{begin, obfuscate, user_attrs};
 use axum::extract::{Path, Request, State};
@@ -20,19 +23,14 @@ use chrono::{DateTime, Utc};
 use pl_authz::ObjectModel;
 use pl_core::filters::{CHAR_KWARGS, FieldKind, FilterContext, FilterSet, apply_order_terms, parse_ordering};
 use pl_core::pagination::{PageRequest, fetch_all_ids, fetch_page, paginated_body};
+use pl_core::sqlbind::SqlxBinder as _;
 use pl_core::{ApiError, AppState, Drf, RequestContext, ValidationErrors};
 use sea_query::{Alias, Expr, Func, Order, PostgresQueryBuilder, Query, SelectStatement};
-use pl_core::sqlbind::SqlxBinder as _;
 use serde_json::{Map, Value};
 use sqlx::{PgPool, Row};
 
-pub const USER_MODEL: ObjectModel = ObjectModel {
-    app_label: "auth",
-    model_name: "user",
-    object_name: "User",
-    table: "auth_user",
-    soft_delete: false,
-};
+pub const USER_MODEL: ObjectModel =
+    ObjectModel { app_label: "auth", model_name: "user", object_name: "User", table: "auth_user", soft_delete: false };
 
 fn respond(r: HResult<Response>) -> Response {
     match r {
@@ -111,31 +109,33 @@ fn filterset() -> FilterSet {
 
 /// `GET /api/users/`
 pub async fn list(State(state): State<AppState>, req: Request) -> Response {
-    respond(async {
-        let (r, auth) = begin(&state, req).await?;
-        auth.require_model_perms(&USER_MODEL)?;
-        let ctx = RequestContext::from_parts(&r.parts, state.config())?;
-        let mut q = base_select();
-        filterset().apply(&mut q, &ctx.query, &FilterContext::new(&ctx, state.tz()))?;
-        match parse_ordering(&ctx.query, &["username"]) {
-            Some(terms) => apply_order_terms(&mut q, &terms, |_| Some(Expr::col((a("auth_user"), a("username"))).into())),
-            None => {
-                q.order_by_expr(Func::lower(Expr::col((a("auth_user"), a("username")))).into(), Order::Asc);
+    respond(
+        async {
+            let (r, auth) = begin(&state, req).await?;
+            auth.require_model_perms(&USER_MODEL)?;
+            let ctx = RequestContext::from_parts(&r.parts, state.config())?;
+            let mut q = base_select();
+            filterset().apply(&mut q, &ctx.query, &FilterContext::new(&ctx, state.tz()))?;
+            match parse_ordering(&ctx.query, &["username"]) {
+                Some(terms) => apply_order_terms(&mut q, &terms, |_| Some(Expr::col((a("auth_user"), a("username"))).into())),
+                None => {
+                    q.order_by_expr(Func::lower(Expr::col((a("auth_user"), a("username")))).into(), Order::Asc);
+                }
             }
+            let preq = PageRequest::from_query(&ctx.query);
+            let (rows, info) = fetch_page(state.db(), &q, &preq).await?;
+            let ids: Vec<i64> = rows.iter().map(|r| r.try_get::<i64, _>("id")).collect::<Result<_, _>>()?;
+            let results = users_repr(state.db(), state.tz(), &ids).await?;
+            let all = if ctx.version().includes_all() {
+                let ids = fetch_all_ids(state.db(), &q, Expr::col((a("auth_user"), a("id"))).into()).await?;
+                Some(ids.into_iter().map(Value::from).collect())
+            } else {
+                None
+            };
+            Ok(Drf::ok(paginated_body(&ctx, &info, results, all)).into_response())
         }
-        let preq = PageRequest::from_query(&ctx.query);
-        let (rows, info) = fetch_page(state.db(), &q, &preq).await?;
-        let ids: Vec<i64> = rows.iter().map(|r| r.try_get::<i64, _>("id")).collect::<Result<_, _>>()?;
-        let results = users_repr(state.db(), state.tz(), &ids).await?;
-        let all = if ctx.version().includes_all() {
-            let ids = fetch_all_ids(state.db(), &q, Expr::col((a("auth_user"), a("id"))).into()).await?;
-            Some(ids.into_iter().map(Value::from).collect())
-        } else {
-            None
-        };
-        Ok(Drf::ok(paginated_body(&ctx, &info, results, all)).into_response())
-    }
-    .await)
+        .await,
+    )
 }
 
 /// `get_object()`: pk parse (`ValueError` → 404 `Not found.`) and queryset lookup.
@@ -154,14 +154,16 @@ pub async fn get_object_id(db: &PgPool, raw: &str) -> HResult<i64> {
 
 /// `GET /api/users/{id}/`
 pub async fn retrieve(State(state): State<AppState>, Path(id): Path<String>, req: Request) -> Response {
-    respond(async {
-        let (_r, auth) = begin(&state, req).await?;
-        auth.require_model_perms(&USER_MODEL)?;
-        let id = get_object_id(state.db(), &id).await?;
-        let body = users_repr(state.db(), state.tz(), &[id]).await?.pop().ok_or_else(|| server_error("user vanished"))?;
-        Ok(Drf::ok(body).into_response())
-    }
-    .await)
+    respond(
+        async {
+            let (_r, auth) = begin(&state, req).await?;
+            auth.require_model_perms(&USER_MODEL)?;
+            let id = get_object_id(state.db(), &id).await?;
+            let body = users_repr(state.db(), state.tz(), &[id]).await?.pop().ok_or_else(|| server_error("user vanished"))?;
+            Ok(Drf::ok(body).into_response())
+        }
+        .await,
+    )
 }
 
 /// `UserViewSet._parse_requested_bool`: `None` = not provided / invalid.
@@ -218,7 +220,9 @@ async fn validate_user(state: &AppState, data: &Data, partial: bool, instance: O
             Ok(s) => {
                 let mut msgs = Vec::new();
                 if !is_valid_username(&s) {
-                    msgs.push("Enter a valid username. This value may contain only letters, numbers, and @/./+/-/_ characters.".to_string());
+                    msgs.push(
+                        "Enter a valid username. This value may contain only letters, numbers, and @/./+/-/_ characters.".to_string(),
+                    );
                 }
                 if !s.contains('\0') && username_taken(db, &s, instance).await? {
                     msgs.push("A user with that username already exists.".to_string());
@@ -327,7 +331,14 @@ async fn validate_user(state: &AppState, data: &Data, partial: bool, instance: O
     Ok(out)
 }
 
-async fn set_m2m(tx: &mut sqlx::PgConnection, table: &str, owner_col: &str, owner: i64, target_col: &str, targets: &[i64]) -> Result<(), sqlx::Error> {
+async fn set_m2m(
+    tx: &mut sqlx::PgConnection,
+    table: &str,
+    owner_col: &str,
+    owner: i64,
+    target_col: &str,
+    targets: &[i64],
+) -> Result<(), sqlx::Error> {
     // `.set(objs)`: remove rows not in targets, add missing ones (order of new rows = input order)
     let (sql, values) = Query::delete()
         .from_table(a(table))
@@ -369,81 +380,82 @@ pub(crate) fn m2m_insert(
 }
 
 async fn hash(pw: String) -> HResult<String> {
-    tokio::task::spawn_blocking(move || pl_authz::hashers::make_password(&pw))
-        .await
-        .map_err(server_error)
+    tokio::task::spawn_blocking(move || pl_authz::hashers::make_password(&pw)).await.map_err(server_error)
 }
 
 /// `POST /api/users/`
 pub async fn create(State(state): State<AppState>, req: Request) -> Response {
-    respond(async {
-        let (r, auth) = begin(&state, req).await?;
-        let me = auth.require_model_perms(&USER_MODEL)?.clone();
-        let data = r.data().await?;
-        if !me.is_superuser {
-            if requested_bool(&data, "is_superuser") == Some(true) {
-                return Err(django_text(StatusCode::FORBIDDEN, "Superuser status can only be granted by a superuser"));
+    respond(
+        async {
+            let (r, auth) = begin(&state, req).await?;
+            let me = auth.require_model_perms(&USER_MODEL)?.clone();
+            let data = r.data().await?;
+            if !me.is_superuser {
+                if requested_bool(&data, "is_superuser") == Some(true) {
+                    return Err(django_text(StatusCode::FORBIDDEN, "Superuser status can only be granted by a superuser"));
+                }
+                if requested_bool(&data, "is_staff") == Some(true) {
+                    return Err(django_text(StatusCode::FORBIDDEN, "Staff status can only be granted by a superuser"));
+                }
             }
-            if requested_bool(&data, "is_staff") == Some(true) {
-                return Err(django_text(StatusCode::FORBIDDEN, "Staff status can only be granted by a superuser"));
+            // PasswordValidationMixin: instance is None → request.user
+            let input = validate_user(&state, &data, false, None, &user_attrs(&me)).await?;
+            let password = match input.password.filter(|p| has_real_password(p)) {
+                Some(pw) => hash(pw).await?,
+                None => String::new(),
+            };
+            let mut tx = state.db().begin().await?;
+            let username = input.username.clone().unwrap_or_default();
+            let date_joined: sea_query::SimpleExpr = match input.date_joined {
+                Some(d) => Expr::val(d).into(),
+                None => Expr::current_timestamp().into(),
+            };
+            let (sql, values) = Query::insert()
+                .into_table(a("auth_user"))
+                .columns([
+                    a("password"),
+                    a("last_login"),
+                    a("is_superuser"),
+                    a("username"),
+                    a("first_name"),
+                    a("last_name"),
+                    a("email"),
+                    a("is_staff"),
+                    a("is_active"),
+                    a("date_joined"),
+                ])
+                .values([
+                    password.into(),
+                    Expr::val(Option::<String>::None).cast_as(Alias::new("timestamptz")),
+                    input.is_superuser.unwrap_or(false).into(),
+                    username.into(),
+                    input.first_name.unwrap_or_default().into(),
+                    input.last_name.unwrap_or_default().into(),
+                    input.email.unwrap_or_default().into(),
+                    input.is_staff.unwrap_or(false).into(),
+                    input.is_active.unwrap_or(true).into(),
+                    date_joined,
+                ])
+                .map_err(crate::db::qerr)?
+                .returning(Query::returning().column(a("id")))
+                .build_sqlx(PostgresQueryBuilder);
+            let row = sqlx::query_with(&sql, values)
+                .fetch_one(&mut *tx)
+                .await
+                .map_err(|e| if crate::db::is_unique_violation(&e) { server_error("IntegrityError: username") } else { e.into() })?;
+            let id: i64 = i64::from(row.try_get::<i32, _>("id")?);
+            if let Some(g) = input.groups.filter(|g| !g.is_empty()) {
+                set_m2m(&mut tx, "auth_user_groups", "user_id", id, "group_id", &g).await?;
             }
+            if let Some(p) = input.user_permissions.filter(|p| !p.is_empty()) {
+                set_m2m(&mut tx, "auth_user_user_permissions", "user_id", id, "permission_id", &p).await?;
+            }
+            tx.commit().await?;
+            let body = users_repr(state.db(), state.tz(), &[id]).await?.pop().ok_or_else(|| server_error("user vanished"))?;
+            Ok(Drf::created(body).into_response())
         }
-        // PasswordValidationMixin: instance is None → request.user
-        let input = validate_user(&state, &data, false, None, &user_attrs(&me)).await?;
-        let password = match input.password.filter(|p| has_real_password(p)) {
-            Some(pw) => hash(pw).await?,
-            None => String::new(),
-        };
-        let mut tx = state.db().begin().await?;
-        let username = input.username.clone().unwrap_or_default();
-        let date_joined: sea_query::SimpleExpr = match input.date_joined {
-            Some(d) => Expr::val(d).into(),
-            None => Expr::current_timestamp().into(),
-        };
-        let (sql, values) = Query::insert()
-            .into_table(a("auth_user"))
-            .columns([
-                a("password"),
-                a("last_login"),
-                a("is_superuser"),
-                a("username"),
-                a("first_name"),
-                a("last_name"),
-                a("email"),
-                a("is_staff"),
-                a("is_active"),
-                a("date_joined"),
-            ])
-            .values([
-                password.into(),
-                Expr::val(Option::<String>::None).cast_as(Alias::new("timestamptz")),
-                input.is_superuser.unwrap_or(false).into(),
-                username.into(),
-                input.first_name.unwrap_or_default().into(),
-                input.last_name.unwrap_or_default().into(),
-                input.email.unwrap_or_default().into(),
-                input.is_staff.unwrap_or(false).into(),
-                input.is_active.unwrap_or(true).into(),
-                date_joined,
-            ])
-            .map_err(crate::db::qerr)?
-            .returning(Query::returning().column(a("id")))
-            .build_sqlx(PostgresQueryBuilder);
-        let row = sqlx::query_with(&sql, values).fetch_one(&mut *tx).await.map_err(|e| {
-            if crate::db::is_unique_violation(&e) { server_error("IntegrityError: username") } else { e.into() }
-        })?;
-        let id: i64 = i64::from(row.try_get::<i32, _>("id")?);
-        if let Some(g) = input.groups.filter(|g| !g.is_empty()) {
-            set_m2m(&mut tx, "auth_user_groups", "user_id", id, "group_id", &g).await?;
-        }
-        if let Some(p) = input.user_permissions.filter(|p| !p.is_empty()) {
-            set_m2m(&mut tx, "auth_user_user_permissions", "user_id", id, "permission_id", &p).await?;
-        }
-        tx.commit().await?;
-        let body = users_repr(state.db(), state.tz(), &[id]).await?.pop().ok_or_else(|| server_error("user vanished"))?;
-        Ok(Drf::created(body).into_response())
-    }
-    .await)
+        .await,
+    )
 }
 
 /// `PUT` / `PATCH /api/users/{id}/`
@@ -461,13 +473,15 @@ async fn update_impl(state: AppState, raw_id: String, req: Request, partial: boo
     let data = r.data().await?;
     if !me.is_superuser {
         if let Some(b) = requested_bool(&data, "is_superuser")
-            && b != target.is_superuser {
-                return Err(django_text(StatusCode::FORBIDDEN, "Superuser status can only be changed by a superuser"));
-            }
+            && b != target.is_superuser
+        {
+            return Err(django_text(StatusCode::FORBIDDEN, "Superuser status can only be changed by a superuser"));
+        }
         if let Some(b) = requested_bool(&data, "is_staff")
-            && b != target.is_staff {
-                return Err(django_text(StatusCode::FORBIDDEN, "Staff status can only be changed by a superuser"));
-            }
+            && b != target.is_staff
+        {
+            return Err(django_text(StatusCode::FORBIDDEN, "Staff status can only be changed by a superuser"));
+        }
     }
     let input = validate_user(&state, &data, partial, Some(id), &user_attrs(&target)).await?;
     let mut q = Query::update();
@@ -498,9 +512,10 @@ async fn update_impl(state: AppState, raw_id: String, req: Request, partial: boo
     let mut tx = db.begin().await?;
     if any {
         let (sql, values) = q.build_sqlx(PostgresQueryBuilder);
-        sqlx::query_with(&sql, values).execute(&mut *tx).await.map_err(|e| {
-            if crate::db::is_unique_violation(&e) { server_error("IntegrityError: username") } else { e.into() }
-        })?;
+        sqlx::query_with(&sql, values)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| if crate::db::is_unique_violation(&e) { server_error("IntegrityError: username") } else { e.into() })?;
     }
     if let Some(g) = input.groups {
         set_m2m(&mut tx, "auth_user_groups", "user_id", id, "group_id", &g).await?;
@@ -529,22 +544,24 @@ pub async fn partial_update(State(state): State<AppState>, Path(id): Path<String
 
 /// `POST /api/users/{id}/deactivate_totp/`
 pub async fn deactivate_totp(State(state): State<AppState>, Path(id): Path<String>, req: Request) -> Response {
-    respond(async {
-        let (_r, auth) = begin(&state, req).await?;
-        let me = auth.require_model_perms(&USER_MODEL)?.clone();
-        // User.objects.get(pk=pk): ValueError / DoesNotExist are not handled → 500
-        let pk = pl_core::pagination::python_int(&id)
-            .and_then(|i| i32::try_from(i).ok())
-            .ok_or_else(|| server_error("ValueError: invalid user pk"))?;
-        let Some(user) = pl_authz::user::load_user_by_id(state.db(), i64::from(pk)).await? else {
-            return Err(server_error("User matching query does not exist."));
-        };
-        if !me.is_superuser && me.id != user.id {
-            return Err(django_text(StatusCode::FORBIDDEN, "You do not have permission to deactivate TOTP for this user"));
+    respond(
+        async {
+            let (_r, auth) = begin(&state, req).await?;
+            let me = auth.require_model_perms(&USER_MODEL)?.clone();
+            // User.objects.get(pk=pk): ValueError / DoesNotExist are not handled → 500
+            let pk = pl_core::pagination::python_int(&id)
+                .and_then(|i| i32::try_from(i).ok())
+                .ok_or_else(|| server_error("ValueError: invalid user pk"))?;
+            let Some(user) = pl_authz::user::load_user_by_id(state.db(), i64::from(pk)).await? else {
+                return Err(server_error("User matching query does not exist."));
+            };
+            if !me.is_superuser && me.id != user.id {
+                return Err(django_text(StatusCode::FORBIDDEN, "You do not have permission to deactivate TOTP for this user"));
+            }
+            crate::profile::delete_totp_of(&state, user.id).await
         }
-        crate::profile::delete_totp_of(&state, user.id).await
-    }
-    .await)
+        .await,
+    )
 }
 
 /// m2m through tables and CASCADE relations of `auth_user` (deleted rows), as
@@ -722,7 +739,10 @@ mod tests {
     fn user_cleanup_like_upstream() {
         let mut s = serde_json::json!({"permissions": {"default_owner": 4, "default_view_users": [4, 2, 4], "default_change_users": [1]}});
         assert_eq!(cleanup_user_permissions(&mut s, 4), Ok(true));
-        assert_eq!(s, serde_json::json!({"permissions": {"default_owner": null, "default_view_users": [2, 4], "default_change_users": [1]}}));
+        assert_eq!(
+            s,
+            serde_json::json!({"permissions": {"default_owner": null, "default_view_users": [2, 4], "default_change_users": [1]}})
+        );
         let mut s = serde_json::json!({"x": 1});
         assert_eq!(cleanup_user_permissions(&mut s, 4), Ok(false));
         assert!(cleanup_user_permissions(&mut Value::Null, 4).unwrap_err().contains("NoneType"));

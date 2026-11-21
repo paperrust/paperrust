@@ -90,9 +90,7 @@ pub fn newest_version(versions: &[VersionRow], pick: VersionPick) -> Option<&Ver
             let kb = (b.version_index.is_some(), b.version_index.unwrap_or(0), b.id);
             ka.cmp(&kb)
         }),
-        VersionPick::Prefetch => versions
-            .iter()
-            .max_by_key(|v| (v.version_index.unwrap_or(0), v.id)),
+        VersionPick::Prefetch => versions.iter().max_by_key(|v| (v.version_index.unwrap_or(0), v.id)),
     }
 }
 
@@ -133,14 +131,9 @@ impl CustomFieldRaw {
             },
             "select" => {
                 let value = self.value_select.as_ref()?;
-                let options = self
-                    .extra_data
-                    .as_ref()
-                    .and_then(|e| e.get("select_options"))
-                    .and_then(|o| o.as_array())?;
+                let options = self.extra_data.as_ref().and_then(|e| e.get("select_options")).and_then(|o| o.as_array())?;
                 options.iter().find_map(|o| {
-                    let id_matches =
-                        o.get("id").and_then(|i| i.as_str()).is_some_and(|i| i == value);
+                    let id_matches = o.get("id").and_then(|i| i.as_str()).is_some_and(|i| i == value);
                     if !id_matches {
                         return None;
                     }
@@ -244,10 +237,7 @@ pub fn py_repr_json(v: &serde_json::Value) -> String {
             format!("[{}]", inner.join(", "))
         }
         Value::Object(map) => {
-            let inner: Vec<String> = map
-                .iter()
-                .map(|(k, v)| format!("{}: {}", py_repr_str(k), py_repr_json(v)))
-                .collect();
+            let inner: Vec<String> = map.iter().map(|(k, v)| format!("{}: {}", py_repr_str(k), py_repr_json(v))).collect();
             format!("{{{}}}", inner.join(", "))
         }
     }
@@ -293,11 +283,7 @@ mod tests {
 
     #[test]
     fn value_for_search_types() {
-        let mut raw = CustomFieldRaw {
-            data_type: "boolean".into(),
-            value_bool: Some(false),
-            ..Default::default()
-        };
+        let mut raw = CustomFieldRaw { data_type: "boolean".into(), value_bool: Some(false), ..Default::default() };
         assert_eq!(raw.value_for_search().as_deref(), Some("False"));
         raw.data_type = "date".into();
         raw.value_date = NaiveDate::from_ymd_opt(2025, 1, 6);

@@ -14,7 +14,7 @@ use std::sync::OnceLock;
 
 use regex::Regex;
 
-use super::syntax::{replace_self, to_word, GroupKind, OpKind, SNode, TextKind};
+use super::syntax::{GroupKind, OpKind, SNode, TextKind, replace_self, to_word};
 use crate::wc::fields::FieldRegistry;
 
 /// plugins.py::_MAX_GROUP_NESTING_DEPTH
@@ -42,9 +42,7 @@ fn next_char(text: &str, pos: usize) -> Option<char> {
 /// plugins.py::_too_deep_node
 pub fn too_deep_node(node: Option<&SNode>) -> SNode {
     SNode::ErrorNode {
-        message: format!(
-            "query nesting exceeds the maximum supported depth ({MAX_GROUP_NESTING_DEPTH})"
-        ),
+        message: format!("query nesting exceeds the maximum supported depth ({MAX_GROUP_NESTING_DEPTH})"),
         sc: node.and_then(SNode::startchar),
         ec: node.and_then(SNode::endchar),
     }
@@ -53,10 +51,7 @@ pub fn too_deep_node(node: Option<&SNode>) -> SNode {
 /// plugins.py::folds_to_prefix
 pub fn folds_to_prefix(text: &str, qmarks: &str) -> bool {
     let n = text.chars().count();
-    n > 1
-        && !text.contains('[')
-        && !text.chars().any(|c| qmarks.contains(c))
-        && text.chars().position(|c| c == '*') == Some(n - 1)
+    n > 1 && !text.contains('[') && !text.chars().any(|c| qmarks.contains(c)) && text.chars().position(|c| c == '*') == Some(n - 1)
 }
 
 /// WildcardPlugin.qmarks
@@ -112,10 +107,7 @@ fn range_re() -> Option<&'static Regex> {
     RE.get_or_init(|| {
         // RangePlugin.expr; the start group's `(?=\b[Tt][Oo]\b)` look-ahead is
         // immediately followed by the same `\b[Tt][Oo]\b`, so it is dropped.
-        Regex::new(
-            r"\A(\{|\[)(?:('[^']*?'\s+)|([^\]}]+?))?\b[Tt][Oo]\b(?:(\s+'[^']*?')|([^\]}]+?))?(\}|\])",
-        )
-        .ok()
+        Regex::new(r"\A(\{|\[)(?:('[^']*?'\s+)|([^\]}]+?))?\b[Tt][Oo]\b(?:(\s+'[^']*?')|([^\]}]+?))?(\}|\])").ok()
     })
     .as_ref()
 }
@@ -123,8 +115,7 @@ fn range_re() -> Option<&'static Regex> {
 fn boost_re() -> Option<&'static Regex> {
     static RE: OnceLock<Option<Regex>> = OnceLock::new();
     // BoostPlugin.expr: \^(?P<boost>[0-9]*(\.[0-9]+)?)($|(?=[ \t\r\n)]))
-    RE.get_or_init(|| Regex::new(r"\A\^([0-9]*(?:\.[0-9]+)?)(?:\z|[ \t\r\n)])").ok())
-        .as_ref()
+    RE.get_or_init(|| Regex::new(r"\A\^([0-9]*(?:\.[0-9]+)?)(?:\z|[ \t\r\n)])").ok()).as_ref()
 }
 
 /// Per-parse tagger state (the skip memos).
@@ -167,15 +158,11 @@ fn tag_one(t: Tagger, st: &mut TagState, text: &str, pos: usize) -> Option<SNode
     };
     match t {
         Tagger::AndNot => match_op(text, pos, "ANDNOT", lead_space).map(|e| op(OpKind::AndNot, e)),
-        Tagger::AndMaybe => {
-            match_op(text, pos, "ANDMAYBE", lead_space).map(|e| op(OpKind::AndMaybe, e))
-        }
+        Tagger::AndMaybe => match_op(text, pos, "ANDMAYBE", lead_space).map(|e| op(OpKind::AndMaybe, e)),
         Tagger::Not => match_op(text, pos, "NOT", lead_not).map(|e| op(OpKind::Not, e)),
         Tagger::And => match_op(text, pos, "AND", lead_space).map(|e| op(OpKind::And, e)),
         Tagger::Or => match_op(text, pos, "OR", lead_space).map(|e| op(OpKind::Or, e)),
-        Tagger::Require => {
-            match_op(text, pos, "REQUIRE", lead_start_or_space).map(|e| op(OpKind::Require, e))
-        }
+        Tagger::Require => match_op(text, pos, "REQUIRE", lead_start_or_space).map(|e| op(OpKind::Require, e)),
         Tagger::Every => {
             // EveryPlugin.expr: [*]:[*]
             if text[pos..].starts_with("*:*") {
@@ -374,15 +361,7 @@ fn tag_range(text: &str, pos: usize) -> Option<SNode> {
         *e = if t.starts_with('\'') && t.ends_with('\'') { strip_quotes(&t) } else { t };
     }
     let (sc, ec) = sp(pos, pos + whole.end());
-    Some(SNode::Range {
-        start,
-        end,
-        startexcl: open == Some("{"),
-        endexcl: close == Some("}"),
-        fieldname: None,
-        sc,
-        ec,
-    })
+    Some(SNode::Range { start, end, startexcl: open == Some("{"), endexcl: close == Some("}"), fieldname: None, sc, ec })
 }
 
 /// `s[1:-1]`
@@ -607,9 +586,7 @@ pub fn do_fieldnames(group: SNode, reg: &FieldRegistry) -> SNode {
         if is_fn && !fieldname_is_recognized(reg, &nodes, i) {
             let mut node = nodes[i].clone();
             if let Some(p) = &prev_field {
-                if let (SNode::Fieldname { original, sc, .. }, SNode::Fieldname { original: po, sc: psc, .. }) =
-                    (&mut node, p)
-                {
+                if let (SNode::Fieldname { original, sc, .. }, SNode::Fieldname { original: po, sc: psc, .. }) = (&mut node, p) {
                     *original = format!("{po}{original}");
                     *sc = *psc;
                 }
@@ -672,10 +649,7 @@ pub fn do_comma_values(group: SNode, reg: &FieldRegistry) -> SNode {
         }
         if let SNode::Text { kind: TextKind::Word, text, fieldname: Some(fname), boost, sc, ec } = &node {
             if text.contains(',') {
-                let comma = reg
-                    .make_ref(fname)
-                    .and_then(|r| reg.resolve(&r).map(|rf| rf.spec.comma_values))
-                    .unwrap_or(false);
+                let comma = reg.make_ref(fname).and_then(|r| reg.resolve(&r).map(|rf| rf.spec.comma_values)).unwrap_or(false);
                 if comma {
                     let parts: Vec<&str> = text.split(',').filter(|p| !p.is_empty()).collect();
                     if !parts.is_empty() {
@@ -730,11 +704,7 @@ pub fn do_multifield(group: &mut SNode, fields: &[String], boosts: &[(String, f6
 pub fn remove_whitespace(group: SNode) -> SNode {
     let mut newgroup = group.empty_copy();
     let SNode::Group { nodes, .. } = group else { return group };
-    let out: Vec<SNode> = nodes
-        .into_iter()
-        .filter(|n| !n.is_ws())
-        .map(|n| if n.is_group() { remove_whitespace(n) } else { n })
-        .collect();
+    let out: Vec<SNode> = nodes.into_iter().filter(|n| !n.is_ws()).map(|n| if n.is_group() { remove_whitespace(n) } else { n }).collect();
     if let Some(n) = kids(&mut newgroup) {
         *n = out;
     }
@@ -766,16 +736,12 @@ pub fn do_boost(group: SNode) -> SNode {
     newgroup
 }
 
-const OP_ORDER: [OpKind; 6] =
-    [OpKind::Not, OpKind::And, OpKind::Or, OpKind::AndNot, OpKind::AndMaybe, OpKind::Require];
+const OP_ORDER: [OpKind; 6] = [OpKind::Not, OpKind::And, OpKind::Or, OpKind::AndNot, OpKind::AndMaybe, OpKind::Require];
 
 /// OperatorsPlugin._apply_operators (one group, not its subgroups)
 fn apply_operators(group: &mut SNode) {
     let SNode::Group { nodes, .. } = group else { return };
-    let nonmerging = nodes
-        .iter()
-        .filter(|t| matches!(t, SNode::Operator { op, .. } if op.is_infix() && !op.group().merging()))
-        .count();
+    let nonmerging = nodes.iter().filter(|t| matches!(t, SNode::Operator { op, .. } if op.is_infix() && !op.group().merging())).count();
     if nonmerging >= MAX_GROUP_NESTING_DEPTH {
         let e = too_deep_node(nodes.first());
         *group = SNode::group(GroupKind::And, vec![e]);

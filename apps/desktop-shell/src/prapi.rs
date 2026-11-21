@@ -72,11 +72,7 @@ pub fn to_gw(req: &Request<Vec<u8>>) -> GwRequest {
         method: req.method().as_str().to_string(),
         path: uri.path().to_string(),
         query: uri.query().map(str::to_string),
-        headers: req
-            .headers()
-            .iter()
-            .filter_map(|(k, v)| v.to_str().ok().map(|v| (k.as_str().to_string(), v.to_string())))
-            .collect(),
+        headers: req.headers().iter().filter_map(|(k, v)| v.to_str().ok().map(|v| (k.as_str().to_string(), v.to_string()))).collect(),
         body: req.body().clone(),
     }
 }
@@ -91,10 +87,7 @@ fn origin_of(req: &GwRequest) -> Option<String> {
 
 fn with_cors(mut b: tauri::http::response::Builder, origin: Option<&str>) -> tauri::http::response::Builder {
     if let Some(o) = origin {
-        b = b
-            .header("access-control-allow-origin", o)
-            .header("access-control-expose-headers", EXPOSE_HEADERS)
-            .header("vary", "origin");
+        b = b.header("access-control-allow-origin", o).header("access-control-expose-headers", EXPOSE_HEADERS).header("vary", "origin");
     }
     b
 }
@@ -174,7 +167,8 @@ mod tests {
 
     #[test]
     fn converts_request() {
-        let r = to_gw(&req("POST", "http://prapi.localhost/rs/api/v2/documents/query?source=local", &[("Origin", "http://tauri.localhost")]));
+        let r =
+            to_gw(&req("POST", "http://prapi.localhost/rs/api/v2/documents/query?source=local", &[("Origin", "http://tauri.localhost")]));
         assert_eq!(r.method, "POST");
         assert_eq!(r.path, "/rs/api/v2/documents/query");
         assert_eq!(r.query.as_deref(), Some("source=local"));
@@ -197,7 +191,11 @@ mod tests {
         let r = to_gw(&req("GET", "http://prapi.localhost/local/status", &[("Origin", "http://tauri.localhost")]));
         assert_eq!(precheck(&r).unwrap().as_deref(), Some("http://tauri.localhost"));
         // image without origin, but with referer of the app
-        let r = to_gw(&req("GET", "http://prapi.localhost/rs/api/v2/documents/x/files/thumbnail", &[("Referer", "http://tauri.localhost/index.html")]));
+        let r = to_gw(&req(
+            "GET",
+            "http://prapi.localhost/rs/api/v2/documents/x/files/thumbnail",
+            &[("Referer", "http://tauri.localhost/index.html")],
+        ));
         assert_eq!(precheck(&r).unwrap(), None);
     }
 

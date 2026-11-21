@@ -68,10 +68,7 @@ fn compile_lang(l: &DpLang, bad: &mut Vec<String>) -> Compiled {
     let (split_relative, match_relative) = if l.relative_strings.is_empty() {
         (None, None)
     } else {
-        (
-            compile(&format!(r"(?:\A|(?<=[\W_]))({alts})(?=\z|[\W_])"), bad),
-            compile(&format!(r"^({alts})$"), bad),
-        )
+        (compile(&format!(r"(?:\A|(?<=[\W_]))({alts})(?=\z|[\W_])"), bad), compile(&format!(r"^({alts})$"), bad))
     };
     let relative_translations = l.relative_translations.iter().filter_map(|(p, r)| compile(p, bad).map(|re| (re, *r))).collect();
     Compiled { simplifications, split_relative, match_relative, relative_translations, words: l.words.iter().copied().collect() }
@@ -176,7 +173,8 @@ fn sub_first(r: &Option<Regex>, s: &str, rep: &str) -> String {
     }
 }
 
-const APOSTROPHE_LOOK_ALIKE: [char; 9] = ['\u{2019}', '\u{2bc}', '\u{2bb}', '\u{55a}', '\u{a78c}', '\u{2032}', '\u{2035}', '\u{2b9}', '\u{ff07}'];
+const APOSTROPHE_LOOK_ALIKE: [char; 9] =
+    ['\u{2019}', '\u{2bc}', '\u{2bb}', '\u{55a}', '\u{a78c}', '\u{2032}', '\u{2035}', '\u{2b9}', '\u{ff07}'];
 
 pub(crate) fn sanitize_date(s: &str) -> String {
     let r = sanitize_res();
@@ -420,9 +418,7 @@ fn freshness(s: &str, now: NaiveDateTime) -> Option<NaiveDate> {
         return None;
     }
     let forward = in_word.is_match(&s).unwrap_or(false);
-    let get = |k: &str| {
-        kwargs.iter().find(|(u, _, _)| u == k).map(|(_, v, e)| if *e || forward { *v } else { -*v }).unwrap_or(0.0)
-    };
+    let get = |k: &str| kwargs.iter().find(|(u, _, _)| u == k).map(|(_, v, e)| if *e || forward { *v } else { -*v }).unwrap_or(0.0);
     // relativedelta: decades → years; years/months must be integral
     let years = get("year") + 10.0 * get("decade");
     let months = get("month");

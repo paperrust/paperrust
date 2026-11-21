@@ -5,9 +5,9 @@ use std::collections::BTreeMap;
 use std::sync::Mutex;
 
 use pl_ai::llm::LlmError;
-use pl_ai::node::{build_document_nodes, TextNode};
-use pl_ai::synth::{compact_and_refine, StreamLlm};
-use pl_ai::tokenizer::{count_tokens, truncate_content, truncate_embedding_query, PromptHelper, SentenceSplitter, TokenTextSplitter};
+use pl_ai::node::{TextNode, build_document_nodes};
+use pl_ai::synth::{StreamLlm, compact_and_refine};
+use pl_ai::tokenizer::{PromptHelper, SentenceSplitter, TokenTextSplitter, count_tokens, truncate_content, truncate_embedding_query};
 use pl_ai::vector_store::{DocFilter, VecStore};
 use pl_ai::{pickle, prompts, punkt};
 use serde_json::Value;
@@ -39,7 +39,13 @@ fn token_text_splitter() {
     let mut n = 0;
     for c in g["token_splitter"].as_array().unwrap() {
         let sp = TokenTextSplitter::new(" ", c["chunk_size"].as_u64().unwrap() as usize, c["overlap"].as_u64().unwrap() as usize);
-        assert_eq!(sp.split_text(s(&c["text"])), strs(&c["chunks"]), "cs={} text={:?}", c["chunk_size"], s(&c["text"]).chars().take(30).collect::<String>());
+        assert_eq!(
+            sp.split_text(s(&c["text"])),
+            strs(&c["chunks"]),
+            "cs={} text={:?}",
+            c["chunk_size"],
+            s(&c["text"]).chars().take(30).collect::<String>()
+        );
         n += 1;
     }
     assert!(n > 30);
@@ -89,7 +95,8 @@ fn index_nodes_like_llama_index() {
     let g = golden();
     for c in g["nodes"].as_array().unwrap() {
         let meta = c["metadata"].as_object().unwrap().clone();
-        let nodes = build_document_nodes("7", s(&c["text"]), &meta, c["chunk_size"].as_u64().unwrap() as usize, |i| format!("7-node-{i}")).unwrap();
+        let nodes =
+            build_document_nodes("7", s(&c["text"]), &meta, c["chunk_size"].as_u64().unwrap() as usize, |i| format!("7-node-{i}")).unwrap();
         let exp = c["nodes"].as_array().unwrap();
         assert_eq!(nodes.len(), exp.len(), "node count");
         for (n, e) in nodes.iter().zip(exp) {
@@ -179,7 +186,8 @@ fn writes_index_python_can_share() {
         r#"{"document_id":"9","title":"Neu","tags":[],"correspondent":null,"document_type":null,"filename":"n.pdf","storage_path":null,"archive_serial_number":null,"created":"2025-01-01","added":"2025-01-01T00:00:00+00:00","modified":"2025-01-09T00:00:00+00:00"}"#,
     )
     .unwrap();
-    let nodes = build_document_nodes("9", "Notes: \n\nContent:\n\nNeues Dokument über Steuern.", &meta, 1024, |i| format!("9-{i}")).unwrap();
+    let nodes =
+        build_document_nodes("9", "Notes: \n\nContent:\n\nNeues Dokument über Steuern.", &meta, 1024, |i| format!("9-{i}")).unwrap();
     let rows: Vec<_> = nodes.into_iter().map(|n| pl_ai::vector_store::Row { embedding: mock_embed(&n.embed_content()), node: n }).collect();
     st.upsert_document(9, &rows).unwrap();
     st.upsert_document(9, &rows).unwrap();
@@ -239,10 +247,8 @@ async fn chat_synthesis_like_llama_index() {
         let chunks: Vec<String> = hits.iter().map(|h| by_id[&h.node.id].llm_content()).collect();
         let llm = FakeLlm { sys: "SYS".into(), prompts: Mutex::new(Vec::new()) };
         let helper = PromptHelper::rag(c["chunk_size"].as_u64().unwrap() as usize, c["context_size"].as_u64().unwrap() as usize);
-        let stream = compact_and_refine(&llm, &helper, &prompts::chat_qa(lang), &prompts::chat_refine(lang), q, &chunks)
-            .await
-            .unwrap()
-            .unwrap();
+        let stream =
+            compact_and_refine(&llm, &helper, &prompts::chat_qa(lang), &prompts::chat_refine(lang), q, &chunks).await.unwrap().unwrap();
         let out: Vec<String> = stream.map(|r| r.unwrap()).collect().await;
         let mut exp_stream = strs(&c["stream"]);
         exp_stream.retain(|x| !x.is_empty());

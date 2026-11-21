@@ -57,7 +57,11 @@ async fn worker_runs_sanity_check_and_scheduled_workflows() {
         .expect("enqueue");
     let trash = setup
         .queue
-        .enqueue("documents.tasks.empty_trash", json!({"doc_ids": [196]}).as_object().cloned().unwrap_or_default(), EnqueueOptions::default())
+        .enqueue(
+            "documents.tasks.empty_trash",
+            json!({"doc_ids": [196]}).as_object().cloned().unwrap_or_default(),
+            EnqueueOptions::default(),
+        )
         .await
         .expect("enqueue");
 
@@ -85,16 +89,16 @@ async fn worker_runs_sanity_check_and_scheduled_workflows() {
     assert!(text == "No issues detected." || text.ends_with("found.") || text.ends_with("Check logs for details."), "{text}");
     assert_eq!(done[1].status, TaskStatus::Success, "check_scheduled_workflows");
     assert_eq!(done[2].status, TaskStatus::Success, "empty_trash");
-    let gone: Option<i32> = sqlx::query_scalar("SELECT id FROM documents_document WHERE id = 196").fetch_optional(state.db()).await.unwrap();
+    let gone: Option<i32> =
+        sqlx::query_scalar("SELECT id FROM documents_document WHERE id = 196").fetch_optional(state.db()).await.unwrap();
     assert_eq!(gone, None);
     // PaperlessTask rows of the tracked tasks
-    let types: Vec<(String, String)> = sqlx::query_as(
-        "SELECT task_type, status FROM documents_paperlesstask WHERE task_id = ANY($1) ORDER BY task_type",
-    )
-    .bind(vec![sanity.to_string(), sched.to_string(), trash.to_string()])
-    .fetch_all(state.db())
-    .await
-    .unwrap();
+    let types: Vec<(String, String)> =
+        sqlx::query_as("SELECT task_type, status FROM documents_paperlesstask WHERE task_id = ANY($1) ORDER BY task_type")
+            .bind(vec![sanity.to_string(), sched.to_string(), trash.to_string()])
+            .fetch_all(state.db())
+            .await
+            .unwrap();
     assert_eq!(types.len(), 3, "{types:?}");
     assert!(types.iter().all(|(_, s)| s == "success"), "{types:?}");
     reset();

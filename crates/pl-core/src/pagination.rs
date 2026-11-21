@@ -14,13 +14,13 @@
 //!   (all parameters sorted and re-encoded with `quote_plus`; `previous` on page 1 without `page`).
 //! * Response: `count`, `next`, `previous`, [`all` only v9], `results`.
 
-use sea_query::{Alias, Asterisk, Expr, PostgresQueryBuilder, Query, SelectStatement, SimpleExpr};
 use crate::sqlbind::SqlxBinder;
+use sea_query::{Alias, Asterisk, Expr, PostgresQueryBuilder, Query, SelectStatement, SimpleExpr};
 use serde_json::{Map, Value};
 use sqlx::postgres::PgRow;
 use sqlx::{PgPool, Row};
 
-use crate::{urlenc, ApiError, QueryParams, RequestContext};
+use crate::{ApiError, QueryParams, RequestContext, urlenc};
 
 /// `StandardPagination.page_size`.
 pub const DEFAULT_PAGE_SIZE: u64 = 25;
@@ -187,10 +187,7 @@ pub fn count_statement(select: &SelectStatement) -> SelectStatement {
     inner.clear_order_by();
     inner.reset_limit();
     inner.reset_offset();
-    Query::select()
-        .expr(Expr::col(Asterisk).count())
-        .from_subquery(inner, Alias::new("__pl_count"))
-        .to_owned()
+    Query::select().expr(Expr::col(Asterisk).count()).from_subquery(inner, Alias::new("__pl_count")).to_owned()
 }
 
 /// Runs `COUNT(*)` over the (filtered) query.

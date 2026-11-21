@@ -56,7 +56,13 @@ async fn redact_area_removes_only_covered_text() {
     let (src, out) = (t.path().join("text.pdf"), t.path().join("red.pdf"));
     text_pdf(&src);
     // rectangle over "GEHEIM 4711" on page 1 (baseline 700, 24 pt)
-    let op = Op::Redact { input: s(&src), output: s(&out), areas: vec![Area { page: 0, rect: [60.0, 690.0, 260.0, 725.0] }], terms: vec![], remove_metadata: false };
+    let op = Op::Redact {
+        input: s(&src),
+        output: s(&out),
+        areas: vec![Area { page: 0, rect: [60.0, 690.0, 260.0, 725.0] }],
+        terms: vec![],
+        remove_metadata: false,
+    };
     let r = run_with(&tool(), op, limits()).await.unwrap();
     assert!(matches!(r, Reply::Redacted(_)), "{r:?}");
     let text = extract_text(&out);
@@ -73,7 +79,13 @@ async fn redact_rejects_bad_input() {
     let t = tempfile::tempdir().unwrap();
     let (src, out) = (t.path().join("text.pdf"), t.path().join("red.pdf"));
     text_pdf(&src);
-    let op = Op::Redact { input: s(&src), output: s(&out), areas: vec![Area { page: 9, rect: [0.0, 0.0, 10.0, 10.0] }], terms: vec![], remove_metadata: false };
+    let op = Op::Redact {
+        input: s(&src),
+        output: s(&out),
+        areas: vec![Area { page: 9, rect: [0.0, 0.0, 10.0, 10.0] }],
+        terms: vec![],
+        remove_metadata: false,
+    };
     let e = run_with(&tool(), op, limits()).await.unwrap_err();
     assert!(e.user_message().contains("page 10 does not exist"), "{e:?}");
     let op = Op::Redact { input: s(&src), output: s(&out), areas: vec![], terms: vec!["nicht-vorhanden".into()], remove_metadata: false };
@@ -159,7 +171,13 @@ async fn redact_area_in_jpeg_scan_clears_only_that_area() {
     let (src, out) = (t.path().join("scan.pdf"), t.path().join("red.pdf"));
     jpeg_scan_pdf(&src);
     // mark over word B (x 100–300, y 300–340) and some white background to the right of it
-    let op = Op::Redact { input: s(&src), output: s(&out), areas: vec![Area { page: 0, rect: [90.0, 290.0, 400.0, 350.0] }], terms: vec![], remove_metadata: false };
+    let op = Op::Redact {
+        input: s(&src),
+        output: s(&out),
+        areas: vec![Area { page: 0, rect: [90.0, 290.0, 400.0, 350.0] }],
+        terms: vec![],
+        remove_metadata: false,
+    };
     let r = run_with(&tool(), op, limits()).await.unwrap();
     let Reply::Redacted(rep) = r else { panic!("{r:?}") };
     assert_eq!((rep.images_removed, rep.images_cleared), (0, 1), "{rep:?}");

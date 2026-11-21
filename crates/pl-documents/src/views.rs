@@ -15,9 +15,7 @@ use axum::response::{IntoResponse, Response};
 use chrono::{DateTime, Utc};
 use chrono_tz::Tz;
 use pl_authz::models::DOCUMENT;
-use pl_authz::perms::{
-    NOTE_PERMISSIONS, ObjRef, VIEW_DOCUMENTS_PERMISSIONS, has_perms_owner_aware,
-};
+use pl_authz::perms::{NOTE_PERMISSIONS, ObjRef, VIEW_DOCUMENTS_PERMISSIONS, has_perms_owner_aware};
 use pl_authz::{AuthUser, User};
 use pl_core::datetime::format_datetime;
 use pl_core::pagination::{self, PageRequest};
@@ -25,9 +23,7 @@ use pl_core::{ApiError, AppState, Drf, RequestContext};
 use sea_query::{Cond, Expr, Func, Order, Query};
 use serde_json::{Map, Value, json};
 
-use crate::db::{
-    ApiResult, a, fetch_all, fetch_optional, get, i64_col, id_in_list, id_list, opt_i64,
-};
+use crate::db::{ApiResult, a, fetch_all, fetch_optional, get, i64_col, id_in_list, id_list, opt_i64};
 use crate::listing::{self, DOC};
 use crate::serializer::{SerializeAction, SerializeOpts, serialize_documents_db};
 
@@ -55,20 +51,14 @@ pub async fn selection_data_list(db: &sqlx::PgPool, ids: &[i64]) -> ApiResult<Va
 // ---------------------------------------------------------------- documents.list
 
 /// GET /api/documents/ – `UnifiedSearchViewSet.list` (with and without full text).
-pub async fn list(
-    State(state): State<AppState>,
-    ctx: RequestContext,
-    auth: AuthUser,
-) -> ApiResult<Response> {
+pub async fn list(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser) -> ApiResult<Response> {
     // (IsAuthenticated, PaperlessObjectPermissions) → documents.view_document
     let user = auth.require_model_perms(&DOCUMENT)?;
     let db = state.db();
     let params = ctx.query.pairs();
     if is_search_request(params) {
         // parse_search_params → _validate_tantivy_search_params (before the filters)
-        if let Err(r) = pl_search::views::validate_search_params(
-            &pl_search::views::active_search_params(params),
-        ) {
+        if let Err(r) = pl_search::views::validate_search_params(&pl_search::views::active_search_params(params)) {
             return Err(listing::view_response(r));
         }
         let q = listing::filtered_documents(db, *state.tz(), user, &ctx.query).await?;
@@ -77,34 +67,26 @@ pub async fn list(
     }
     let (q, content_text) = listing::filtered_documents_ext(db, *state.tz(), user, &ctx.query).await?;
     // DocumentViewSet.list: selection_data over the filtered set (before pagination)
-    let selection =
-        if pl_authz::owned::get_boolean(ctx.query.get("include_selection_data").unwrap_or("false"))
-        {
-            // without filter: from the label counters (PERF-SCALE §13), otherwise selection as a subquery
-            // (no ID list over the wire, PERF-SCALE Q3)
-            let fast = if crate::selection_data::list_is_unfiltered(db, *state.tz(), &ctx.query).await {
-                crate::selection_data::for_all_unfiltered(db, user, &[], crate::selection_data::Variant::List).await?
-            } else {
-                None
-            };
-            match fast {
-                Some(v) => Some(v),
-                None => Some(crate::selection_data::for_query(db, &q, crate::selection_data::Variant::List).await?),
-            }
+    let selection = if pl_authz::owned::get_boolean(ctx.query.get("include_selection_data").unwrap_or("false")) {
+        // without filter: from the label counters (PERF-SCALE §13), otherwise selection as a subquery
+        // (no ID list over the wire, PERF-SCALE Q3)
+        let fast = if crate::selection_data::list_is_unfiltered(db, *state.tz(), &ctx.query).await {
+            crate::selection_data::for_all_unfiltered(db, user, &[], crate::selection_data::Variant::List).await?
         } else {
             None
         };
+        match fast {
+            Some(v) => Some(v),
+            None => Some(crate::selection_data::for_query(db, &q, crate::selection_data::Variant::List).await?),
+        }
+    } else {
+        None
+    };
     let req = PageRequest::from_query(&ctx.query);
     // Substring search in the content: page + count in one scan (pgvalidate.md section 9)
-    let (rows, info) = if content_text {
-        pagination::fetch_page_windowed(db, &q, &req).await?
-    } else {
-        pagination::fetch_page(db, &q, &req).await?
-    };
-    let ids: Vec<i64> = rows
-        .iter()
-        .map(|r| i64_col(r, "id"))
-        .collect::<ApiResult<_>>()?;
+    let (rows, info) =
+        if content_text { pagination::fetch_page_windowed(db, &q, &req).await? } else { pagination::fetch_page(db, &q, &req).await? };
+    let ids: Vec<i64> = rows.iter().map(|r| i64_col(r, "id")).collect::<ApiResult<_>>()?;
     let opts = SerializeOpts::from_query(&ctx.query, SerializeAction::List);
     let results = serialize_documents_db(db, *state.tz(), user, &ids, &opts).await?;
     let all = if ctx.version().includes_all() {
@@ -127,12 +109,7 @@ fn parse_pk(pk: &str) -> Option<i64> {
 }
 
 /// GET /api/documents/{id}/
-pub async fn retrieve(
-    State(state): State<AppState>,
-    ctx: RequestContext,
-    auth: AuthUser,
-    Path(pk): Path<String>,
-) -> ApiResult<Response> {
+pub async fn retrieve(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser, Path(pk): Path<String>) -> ApiResult<Response> {
     let user = auth.require_model_perms(&DOCUMENT)?;
     let db = state.db();
     let p = &ctx.query;
@@ -149,21 +126,11 @@ pub async fn retrieve(
     let Some(doc) = doc_auth(db, id, false).await? else {
         return Err(ApiError::not_found_model("Document"));
     };
-    auth.check_object_perms(
-        db,
-        &DOCUMENT,
-        ObjRef {
-            id: doc.id,
-            owner_id: doc.own_owner_self,
-        },
-    )
-    .await?;
+    auth.check_object_perms(db, &DOCUMENT, ObjRef { id: doc.id, owner_id: doc.own_owner_self }).await?;
     if is_search_request(p.pairs()) {
         // UnifiedSearchViewSet.get_serializer_class → SearchResultSerializer, whose
         // to_representation(Document) fails with TypeError (hit["id"]) → 500 as upstream.
-        return Err(ApiError::internal(
-            "SearchResultSerializer cannot serialize a Document instance",
-        ));
+        return Err(ApiError::internal("SearchResultSerializer cannot serialize a Document instance"));
     }
     let opts = SerializeOpts::from_query(p, SerializeAction::Retrieve);
     let mut docs = serialize_documents_db(db, *state.tz(), user, &[id], &opts).await?;
@@ -186,36 +153,21 @@ pub async fn retrieve(
 }
 
 /// `_resolve_file_doc` with `include_deleted=True` → (content, page_count) of the version.
-async fn resolve_version(
-    db: &sqlx::PgPool,
-    root_id: i64,
-    param: &str,
-) -> ApiResult<(Option<String>, Option<i64>)> {
+async fn resolve_version(db: &sqlx::PgPool, root_id: i64, param: &str) -> ApiResult<(Option<String>, Option<i64>)> {
     let mut q = Query::select();
-    q.columns(["id", "root_document_id", "content", "page_count"].map(a))
-        .from(a(DOC));
+    q.columns(["id", "root_document_id", "content", "page_count"].map(a)).from(a(DOC));
     if param.is_empty() {
         // get_latest_version_for_root(include_deleted=True) or root
-        q.cond_where(
-            Cond::any()
-                .add(Expr::col(a("root_document_id")).eq(root_id))
-                .add(Expr::col(a("id")).eq(root_id)),
-        )
-        // Root last: first versions by versions_newest_first
-        .order_by_expr(Expr::col(a("root_document_id")).is_null(), Order::Asc)
-        .order_by_with_nulls(
-            a("version_index"),
-            Order::Desc,
-            sea_query::NullOrdering::Last,
-        )
-        .order_by(a("id"), Order::Desc)
-        .limit(1);
+        q.cond_where(Cond::any().add(Expr::col(a("root_document_id")).eq(root_id)).add(Expr::col(a("id")).eq(root_id)))
+            // Root last: first versions by versions_newest_first
+            .order_by_expr(Expr::col(a("root_document_id")).is_null(), Order::Asc)
+            .order_by_with_nulls(a("version_index"), Order::Desc, sea_query::NullOrdering::Last)
+            .order_by(a("id"), Order::Desc)
+            .limit(1);
     } else {
         let vid = pagination::python_int(param)
             .and_then(|v| i64::try_from(v).ok())
-            .ok_or_else(|| {
-                ApiError::with_detail(StatusCode::NOT_FOUND, "Invalid version parameter")
-            })?;
+            .ok_or_else(|| ApiError::with_detail(StatusCode::NOT_FOUND, "Invalid version parameter"))?;
         q.and_where(Expr::col(a("id")).eq(vid));
     }
     let Some(r) = fetch_optional(db, &q).await? else {
@@ -241,10 +193,7 @@ struct DocAuth {
 impl DocAuth {
     /// The root document as an object for `has_perms_owner_aware`.
     fn root_ref(&self) -> ObjRef {
-        ObjRef {
-            id: self.root_id,
-            owner_id: self.own_owner,
-        }
+        ObjRef { id: self.root_id, owner_id: self.own_owner }
     }
 }
 
@@ -257,12 +206,7 @@ async fn doc_auth(db: &sqlx::PgPool, id: i64, include_deleted: bool) -> ApiResul
         .expr_as(Expr::col((a("r"), a("id"))), a("r_id"))
         .expr_as(Expr::col((a("r"), a("owner_id"))), a("r_owner"))
         .from_as(a(DOC), a("d"))
-        .join_as(
-            sea_query::JoinType::LeftJoin,
-            a(DOC),
-            a("r"),
-            Expr::col((a("r"), a("id"))).equals((a("d"), a("root_document_id"))),
-        )
+        .join_as(sea_query::JoinType::LeftJoin, a(DOC), a("r"), Expr::col((a("r"), a("id"))).equals((a("d"), a("root_document_id"))))
         .and_where(Expr::col((a("d"), a("id"))).eq(id));
     if !include_deleted {
         q.and_where(Expr::col((a("d"), a("deleted_at"))).is_null());
@@ -274,25 +218,16 @@ async fn doc_auth(db: &sqlx::PgPool, id: i64, include_deleted: bool) -> ApiResul
     let owner = opt_i64(&r, "owner_id")?;
     // get_root_document: version with existing root → root, otherwise the document itself
     Ok(Some(match opt_i64(&r, "r_id")? {
-        Some(rid) if opt_i64(&r, "root_document_id")?.is_some() => DocAuth {
-            id,
-            root_id: rid,
-            own_owner: opt_i64(&r, "r_owner")?,
-            own_owner_self: owner,
-        },
-        _ => DocAuth {
-            id,
-            root_id: id,
-            own_owner: owner,
-            own_owner_self: owner,
-        },
+        Some(rid) if opt_i64(&r, "root_document_id")?.is_some() => {
+            DocAuth { id, root_id: rid, own_owner: opt_i64(&r, "r_owner")?, own_owner_self: owner }
+        }
+        _ => DocAuth { id, root_id: id, own_owner: owner, own_owner_self: owner },
     }))
 }
 
 /// Primary key of a detail action: `Model.objects.get(pk=...)` with a non-number → ValueError → 500.
 fn action_pk(pk: &str) -> ApiResult<i64> {
-    parse_pk(pk)
-        .ok_or_else(|| ApiError::internal(format!("Field 'id' expected a number but got '{pk}'.")))
+    parse_pk(pk).ok_or_else(|| ApiError::internal(format!("Field 'id' expected a number but got '{pk}'.")))
 }
 
 /// `has_perms_owner_aware(request.user, perm, root)`.
@@ -303,12 +238,7 @@ async fn owner_aware(db: &sqlx::PgPool, user: &User, perm: &str, doc: &DocAuth) 
 // ---------------------------------------------------------------- documents.root
 
 /// GET /api/documents/{id}/root/
-pub async fn root(
-    State(state): State<AppState>,
-    ctx: RequestContext,
-    auth: AuthUser,
-    Path(pk): Path<String>,
-) -> ApiResult<Response> {
+pub async fn root(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser, Path(pk): Path<String>) -> ApiResult<Response> {
     let user = auth.require_model_perms(&DOCUMENT)?;
     let db = state.db();
     let id = action_pk(&pk)?;
@@ -324,12 +254,7 @@ pub async fn root(
 // ---------------------------------------------------------------- documents.notes.list
 
 /// GET /api/documents/{id}/notes/
-pub async fn notes(
-    State(state): State<AppState>,
-    ctx: RequestContext,
-    auth: AuthUser,
-    Path(pk): Path<String>,
-) -> ApiResult<Response> {
+pub async fn notes(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser, Path(pk): Path<String>) -> ApiResult<Response> {
     // permission_classes=[PaperlessNotePermissions] (GET: view_note + view_document)
     auth.check_perms_by_method(NOTE_PERMISSIONS)?;
     let user = auth.user();
@@ -342,10 +267,7 @@ pub async fn notes(
         return Err(forbidden_text("Insufficient permissions to view notes"));
     }
     let mut notes = crate::serializer::load_notes(db, &[doc.id], *state.tz()).await?;
-    Ok(ok(
-        &ctx,
-        Value::Array(notes.remove(&doc.id).unwrap_or_default()),
-    ))
+    Ok(ok(&ctx, Value::Array(notes.remove(&doc.id).unwrap_or_default())))
 }
 
 // ---------------------------------------------------------------- documents.share_links
@@ -377,25 +299,12 @@ pub async fn share_links(
         .column((a("s"), a("file_version")))
         .expr_as(Expr::col((a("d"), a("title"))), a("document_title"))
         .from_as(a("documents_sharelink"), a("s"))
-        .join_as(
-            sea_query::JoinType::InnerJoin,
-            a(DOC),
-            a("d"),
-            Expr::col((a("d"), a("id"))).equals((a("s"), a("document_id"))),
-        )
+        .join_as(sea_query::JoinType::InnerJoin, a(DOC), a("d"), Expr::col((a("d"), a("id"))).equals((a("s"), a("document_id"))))
         // PaperRust (pl-pdftools §4.1, Known difference): for the root document also the links to its
         // versions, so that the sharing dialog shows which version (redacted or not) a link serves.
-        .cond_where(
-            Cond::any()
-                .add(Expr::col((a("s"), a("document_id"))).eq(id))
-                .add(Expr::col((a("d"), a("root_document_id"))).eq(id)),
-        )
+        .cond_where(Cond::any().add(Expr::col((a("s"), a("document_id"))).eq(id)).add(Expr::col((a("d"), a("root_document_id"))).eq(id)))
         .and_where(Expr::col((a("s"), a("deleted_at"))).is_null())
-        .cond_where(
-            Cond::any()
-                .add(Expr::col((a("s"), a("expiration"))).is_null())
-                .add(Expr::col((a("s"), a("expiration"))).gte(now)),
-        )
+        .cond_where(Cond::any().add(Expr::col((a("s"), a("expiration"))).is_null()).add(Expr::col((a("s"), a("expiration"))).gte(now)))
         .order_by((a("s"), a("created")), Order::Desc)
         .to_owned();
     let mut out = Vec::new();
@@ -427,11 +336,7 @@ fn action_display(a: i64) -> &'static str {
     }
 }
 
-async fn log_entries(
-    db: &sqlx::PgPool,
-    model: &str,
-    object_ids: &[i64],
-) -> ApiResult<Vec<sqlx::postgres::PgRow>> {
+async fn log_entries(db: &sqlx::PgPool, model: &str, object_ids: &[i64]) -> ApiResult<Vec<sqlx::postgres::PgRow>> {
     let ctype = Query::select()
         .column(a("id"))
         .from(a("django_content_type"))
@@ -448,12 +353,7 @@ async fn log_entries(
         .expr_as(Expr::col((a("u"), a("id"))), a("actor_id"))
         .expr_as(Expr::col((a("u"), a("username"))), a("actor_username"))
         .from_as(a("auditlog_logentry"), a("l"))
-        .join_as(
-            sea_query::JoinType::LeftJoin,
-            a("auth_user"),
-            a("u"),
-            Expr::col((a("u"), a("id"))).equals((a("l"), a("actor_id"))),
-        )
+        .join_as(sea_query::JoinType::LeftJoin, a("auth_user"), a("u"), Expr::col((a("u"), a("id"))).equals((a("l"), a("actor_id"))))
         .and_where(Expr::col((a("l"), a("content_type_id"))).in_subquery(ctype))
         .and_where(Expr::col((a("l"), a("object_id"))).is_in(object_ids.iter().copied()))
         .order_by((a("l"), a("timestamp")), Order::Desc)
@@ -469,27 +369,17 @@ fn actor_json(r: &sqlx::postgres::PgRow) -> ApiResult<Value> {
 }
 
 /// GET /api/documents/{id}/history/
-pub async fn history(
-    State(state): State<AppState>,
-    ctx: RequestContext,
-    auth: AuthUser,
-    Path(pk): Path<String>,
-) -> ApiResult<Response> {
+pub async fn history(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser, Path(pk): Path<String>) -> ApiResult<Response> {
     let user = auth.require_model_perms(&DOCUMENT)?;
     let db = state.db();
     if !state.config().audit_log_enabled {
-        return Err(ApiError::django_text(
-            StatusCode::BAD_REQUEST,
-            "Audit log is disabled",
-        ));
+        return Err(ApiError::django_text(StatusCode::BAD_REQUEST, "Audit log is disabled"));
     }
     let id = action_pk(&pk)?;
     let Some(doc) = doc_auth(db, id, false).await? else {
         return Err(ApiError::not_found());
     };
-    if !user.has_perm("auditlog.view_logentry")
-        || (doc.own_owner.is_some() && doc.own_owner != Some(user.id) && !user.is_superuser)
-    {
+    if !user.has_perm("auditlog.view_logentry") || (doc.own_owner.is_some() && doc.own_owner != Some(user.id) && !user.is_superuser) {
         return Err(forbidden_text("Insufficient permissions"));
     }
     let mut entries: Vec<(DateTime<Utc>, Value)> = Vec::new();
@@ -541,20 +431,13 @@ pub async fn history(
     }
     // sorted(..., key=timestamp, reverse=True) – stable
     entries.sort_by_key(|e| std::cmp::Reverse(e.0));
-    Ok(ok(
-        &ctx,
-        Value::Array(entries.into_iter().map(|(_, v)| v).collect()),
-    ))
+    Ok(ok(&ctx, Value::Array(entries.into_iter().map(|(_, v)| v).collect())))
 }
 
 // ---------------------------------------------------------------- documents.next_asn
 
 /// GET /api/documents/next_asn/
-pub async fn next_asn(
-    State(state): State<AppState>,
-    ctx: RequestContext,
-    auth: AuthUser,
-) -> ApiResult<Response> {
+pub async fn next_asn(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser) -> ApiResult<Response> {
     auth.require_model_perms(&DOCUMENT)?;
     let q = next_asn_query();
     let max = match fetch_optional(state.db(), &q).await? {
@@ -569,10 +452,7 @@ pub async fn next_asn(
 /// then fails on uniqueness (A-109). PaperRust counts the trash too
 /// (Known differences).
 fn next_asn_query() -> sea_query::SelectStatement {
-    Query::select()
-        .expr_as(Func::max(Expr::col(a("archive_serial_number"))), a("m"))
-        .from(a(DOC))
-        .to_owned()
+    Query::select().expr_as(Func::max(Expr::col(a("archive_serial_number"))), a("m")).from(a(DOC)).to_owned()
 }
 
 #[cfg(test)]
@@ -602,9 +482,7 @@ fn py_type(v: &Value) -> &'static str {
 /// DRF `IntegerField.to_internal_value`.
 fn drf_int(v: &Value) -> Option<i64> {
     match v {
-        Value::Number(n) => n
-            .as_i64()
-            .or_else(|| n.as_f64().filter(|f| f.fract() == 0.0).map(|f| f as i64)),
+        Value::Number(n) => n.as_i64().or_else(|| n.as_f64().filter(|f| f.fract() == 0.0).map(|f| f as i64)),
         Value::String(s) if s.len() <= 1000 => {
             let t = s.trim();
             let t = t.strip_suffix('.').unwrap_or(t);
@@ -624,10 +502,7 @@ fn int_list(v: &Value) -> Result<Vec<i64>, Value> {
         if v.is_null() {
             return Err(json!(["This field may not be null."]));
         }
-        return Err(json!([format!(
-            "Expected a list of items but got type \"{}\".",
-            py_type(v)
-        )]));
+        return Err(json!([format!("Expected a list of items but got type \"{}\".", py_type(v))]));
     };
     let mut out = Vec::new();
     let mut errs = Map::new();
@@ -643,11 +518,7 @@ fn int_list(v: &Value) -> Result<Vec<i64>, Value> {
             }
         }
     }
-    if errs.is_empty() {
-        Ok(out)
-    } else {
-        Err(Value::Object(errs))
-    }
+    if errs.is_empty() { Ok(out) } else { Err(Value::Object(errs)) }
 }
 
 /// DRF `BooleanField.to_internal_value`.
@@ -657,10 +528,8 @@ fn drf_bool(v: &Value) -> Option<bool> {
         Value::Number(n) if n.as_i64() == Some(1) => Some(true),
         Value::Number(n) if n.as_i64() == Some(0) => Some(false),
         Value::String(s) => match s.as_str() {
-            "t" | "T" | "y" | "Y" | "yes" | "Yes" | "YES" | "true" | "True" | "TRUE" | "on"
-            | "On" | "ON" | "1" => Some(true),
-            "f" | "F" | "n" | "N" | "no" | "No" | "NO" | "false" | "False" | "FALSE" | "off"
-            | "Off" | "OFF" | "0" => Some(false),
+            "t" | "T" | "y" | "Y" | "yes" | "Yes" | "YES" | "true" | "True" | "TRUE" | "on" | "On" | "ON" | "1" => Some(true),
+            "f" | "F" | "n" | "N" | "no" | "No" | "NO" | "false" | "False" | "FALSE" | "off" | "Off" | "OFF" | "0" => Some(false),
             _ => None,
         },
         _ => None,
@@ -781,22 +650,13 @@ pub(crate) fn selection_form_data(pairs: &[(String, String)]) -> Map<String, Val
 }
 
 /// POST /api/documents/selection_data/
-pub async fn selection_data_view(
-    State(state): State<AppState>,
-    ctx: RequestContext,
-    auth: AuthUser,
-    body: Bytes,
-) -> ApiResult<Response> {
+pub async fn selection_data_view(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser, body: Bytes) -> ApiResult<Response> {
     // (IsAuthenticated, ViewDocumentsPermissions)
     let user = auth.require_perms_by_method(VIEW_DOCUMENTS_PERMISSIONS)?;
     let db = state.db();
     // SelectionDataView.parser_classes = (MultiPartParser, JSONParser): JSON as is, multipart via
     // `selection_form_data`, anything else (incl. form-urlencoded) DRF's 415.
-    let ct_raw = ctx
-        .headers
-        .get("content-type")
-        .map(|v| String::from_utf8_lossy(v.as_bytes()).into_owned())
-        .unwrap_or_default();
+    let ct_raw = ctx.headers.get("content-type").map(|v| String::from_utf8_lossy(v.as_bytes()).into_owned()).unwrap_or_default();
     let media = ct_raw.split(';').next().unwrap_or("").trim().to_ascii_lowercase();
     let data: Value = if body.is_empty() {
         // Request._parse without stream: {} (an empty QueryDict validates the same way)
@@ -825,10 +685,7 @@ pub async fn selection_data_view(
             Ok(list) => {
                 // validate_documents → _validate_document_id_list
                 if count_existing(db, &list).await? != list.len() as i64 {
-                    errors.insert(
-                        "documents".into(),
-                        json!(["Some documents in documents don't exist or were specified twice."]),
-                    );
+                    errors.insert("documents".into(), json!(["Some documents in documents don't exist or were specified twice."]));
                 } else {
                     documents = Some(list);
                 }
@@ -858,13 +715,7 @@ pub async fn selection_data_view(
                 errors.insert("filters".into(), json!(["This field may not be null."]));
             }
             other => {
-                errors.insert(
-                    "filters".into(),
-                    json!([format!(
-                        "Expected a dictionary of items but got type \"{}\".",
-                        py_type(other)
-                    )]),
-                );
+                errors.insert("filters".into(), json!([format!("Expected a dictionary of items but got type \"{}\".", py_type(other))]));
             }
         }
     }
@@ -887,8 +738,7 @@ pub async fn selection_data_view(
         // root documents, each id once – `count() == len(ids)` and `exclude(permitted)` empty.
         // without filter: from the label counters (PERF-SCALE §13)
         if crate::selection_data::selection_is_unfiltered(db, *state.tz(), &filter_map).await
-            && let Some(v) =
-                crate::selection_data::for_all_unfiltered(db, user, &excluded, crate::selection_data::Variant::Post).await?
+            && let Some(v) = crate::selection_data::for_all_unfiltered(db, user, &excluded, crate::selection_data::Variant::Post).await?
         {
             return Ok(ok(&ctx, v));
         }
@@ -974,11 +824,21 @@ mod selection_form_tests {
     #[test]
     fn multipart_like_drf() {
         assert_eq!(
-            Value::Object(selection_form_data(&p(&[("documents", "1"), ("documents", "2"), ("filters.title__icontains", "a"), ("filters.title__icontains", "b")]))),
+            Value::Object(selection_form_data(&p(&[
+                ("documents", "1"),
+                ("documents", "2"),
+                ("filters.title__icontains", "a"),
+                ("filters.title__icontains", "b")
+            ]))),
             json!({"documents": ["1", "2"], "all": false, "filters": {"title__icontains": "b"}})
         );
         assert_eq!(
-            Value::Object(selection_form_data(&p(&[("documents[1]", "5"), ("documents[0]", "4"), ("all", ""), ("excluded_documents", "9")]))),
+            Value::Object(selection_form_data(&p(&[
+                ("documents[1]", "5"),
+                ("documents[0]", "4"),
+                ("all", ""),
+                ("excluded_documents", "9")
+            ]))),
             json!({"documents": ["4", "5"], "filters": {}, "excluded_documents": ["9"]})
         );
         assert_eq!(Value::Object(selection_form_data(&[])), json!({"all": false, "filters": {}}));

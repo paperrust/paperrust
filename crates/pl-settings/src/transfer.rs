@@ -21,9 +21,7 @@ fn b64(d: &[u8]) -> String {
 
 fn unb64(s: &str) -> Result<Vec<u8>, String> {
     use base64::Engine as _;
-    base64::engine::general_purpose::STANDARD
-        .decode(s)
-        .map_err(|_| "invalid base64".to_string())
+    base64::engine::general_purpose::STANDARD.decode(s).map_err(|_| "invalid base64".to_string())
 }
 
 fn key(passphrase: &str, salt: &[u8], iterations: u32) -> [u8; 32] {
@@ -44,9 +42,7 @@ pub fn encrypt(doc: &Value, passphrase: &str) -> Result<Value, String> {
     let k = key(passphrase, &salt, ITERATIONS);
     let cipher = XChaCha20Poly1305::new(chacha20poly1305::Key::from_slice(&k));
     let plain = serde_json::to_vec(doc).map_err(|e| e.to_string())?;
-    let ct = cipher
-        .encrypt(XNonce::from_slice(&nonce), plain.as_slice())
-        .map_err(|_| "encryption failed".to_string())?;
+    let ct = cipher.encrypt(XNonce::from_slice(&nonce), plain.as_slice()).map_err(|_| "encryption failed".to_string())?;
     Ok(json!({
         "format": FORMAT, "version": 1, "kdf": "pbkdf2-sha256", "iterations": ITERATIONS,
         "salt": b64(&salt), "nonce": b64(&nonce), "ciphertext": b64(&ct),
@@ -60,16 +56,8 @@ pub fn is_encrypted(doc: &Value) -> bool {
 
 /// Decrypts an export (wrong passphrase → error).
 pub fn decrypt(doc: &Value, passphrase: &str) -> Result<Value, String> {
-    let s = |k: &str| {
-        doc.get(k)
-            .and_then(Value::as_str)
-            .ok_or_else(|| format!("missing field {k}"))
-    };
-    let iterations = doc
-        .get("iterations")
-        .and_then(Value::as_u64)
-        .and_then(|i| u32::try_from(i).ok())
-        .unwrap_or(ITERATIONS);
+    let s = |k: &str| doc.get(k).and_then(Value::as_str).ok_or_else(|| format!("missing field {k}"));
+    let iterations = doc.get("iterations").and_then(Value::as_u64).and_then(|i| u32::try_from(i).ok()).unwrap_or(ITERATIONS);
     if !(10_000..=10_000_000).contains(&iterations) {
         return Err("unsupported iteration count".into());
     }
@@ -81,9 +69,7 @@ pub fn decrypt(doc: &Value, passphrase: &str) -> Result<Value, String> {
     let ct = unb64(s("ciphertext")?)?;
     let k = key(passphrase, &salt, iterations);
     let cipher = XChaCha20Poly1305::new(chacha20poly1305::Key::from_slice(&k));
-    let plain = cipher
-        .decrypt(XNonce::from_slice(&nonce), ct.as_slice())
-        .map_err(|_| "wrong passphrase or damaged file".to_string())?;
+    let plain = cipher.decrypt(XNonce::from_slice(&nonce), ct.as_slice()).map_err(|_| "wrong passphrase or damaged file".to_string())?;
     serde_json::from_slice(&plain).map_err(|e| e.to_string())
 }
 
@@ -98,11 +84,7 @@ mod tests {
         assert!(is_encrypted(&enc));
         assert!(!enc.to_string().contains("hunter2"));
         assert_eq!(decrypt(&enc, "correct horse").unwrap(), doc);
-        assert!(
-            decrypt(&enc, "wrong horse!")
-                .unwrap_err()
-                .contains("wrong passphrase")
-        );
+        assert!(decrypt(&enc, "wrong horse!").unwrap_err().contains("wrong passphrase"));
         assert!(encrypt(&doc, "short").is_err());
     }
 }

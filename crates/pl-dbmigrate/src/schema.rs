@@ -70,10 +70,8 @@ pub mod v220 {
 ///   `pl_objects.0001_paperrust_tag_adjacency`.
 /// - documents.0029_alter_workflowrun_type_alter_workflowtrigger_type: only a new choice "Manual",
 ///   no database change (type smallint, nullability and CHECK unchanged).
-pub const KNOWN_NEWER: &[(&str, &str)] = &[
-    ("documents", "0028_replace_tag_tree_fields"),
-    ("documents", "0029_alter_workflowrun_type_alter_workflowtrigger_type"),
-];
+pub const KNOWN_NEWER: &[(&str, &str)] =
+    &[("documents", "0028_replace_tag_tree_fields"), ("documents", "0029_alter_workflowrun_type_alter_workflowtrigger_type")];
 
 /// The columns of documents_tag removed by documents.0028 (or pl_objects.0001).
 pub const TREENODE_DERIVED: &[&str] = &[
@@ -138,8 +136,8 @@ pub fn parse_columns(tsv: &str) -> Result<Vec<Table>, String> {
             return Err(format!("columns.tsv Zeile {}: 8 Felder erwartet", ln + 1));
         }
         let max_len = if f[4].is_empty() { None } else { f[4].parse().ok() };
-        let kind = Kind::from_udt(f[3], max_len)
-            .ok_or_else(|| format!("Spaltentyp {} ({}.{}) wird nicht unterstützt", f[3], f[0], f[1]))?;
+        let kind =
+            Kind::from_udt(f[3], max_len).ok_or_else(|| format!("Spaltentyp {} ({}.{}) wird nicht unterstützt", f[3], f[0], f[1]))?;
         let col = Column {
             name: f[1].to_string(),
             udt: f[3].to_string(),
@@ -169,10 +167,7 @@ pub fn expected_migrations() -> BTreeSet<(String, String)> {
 /// (app, name) → (app, squashed_name): migrations that were replaced by a squashed migration.
 /// Older, incrementally upgraded installations additionally have these rows.
 pub fn replaced_migrations() -> BTreeMap<(String, String), (String, String)> {
-    pairs(REPLACED, 4)
-        .into_iter()
-        .map(|v| ((v[0].clone(), v[1].clone()), (v[2].clone(), v[3].clone())))
-        .collect()
+    pairs(REPLACED, 4).into_iter().map(|v| ((v[0].clone(), v[1].clone()), (v[2].clone(), v[3].clone()))).collect()
 }
 
 fn pairs(tsv: &str, n: usize) -> Vec<Vec<String>> {

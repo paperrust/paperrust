@@ -122,8 +122,7 @@ fn consumer(pool: PgPool, root: &Path, fx: &Value, queue: Arc<CapturingQueue>) -
     ocr.archive_file_generation = pl_ocr::config::ArchiveFileGeneration::parse("never").unwrap();
     let mut parsing = NativeParsing::new(ocr, s.time_zone);
     parsing.tesseract = None;
-    parsing.pdfium =
-        pl_ocr::render::PdfiumRenderer::load(&repo().join("reference/venv/Lib/site-packages/pypdfium2_raw/pdfium.dll")).ok();
+    parsing.pdfium = pl_ocr::render::PdfiumRenderer::load(&repo().join("reference/venv/Lib/site-packages/pypdfium2_raw/pdfium.dll")).ok();
     if let Ok(f) = pl_pdfops::thumbnail::ThumbnailFont::load(Path::new("C:/Windows/Fonts/arial.ttf")) {
         parsing.thumbnail_font = Some(Arc::new(f));
     }

@@ -104,9 +104,7 @@ pub async fn first_install(ctx: &Ctx) -> R<bool> {
 /// serialise concurrent first signups, so only one of them becomes superuser. The caller inserts
 /// the user (and its default groups) in the same transaction and commits afterwards.
 pub async fn first_install_locked(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>) -> R<bool> {
-    sqlx::query("SELECT id FROM django_content_type WHERE app_label = 'auth' AND model = 'user' FOR UPDATE")
-        .fetch_one(&mut **tx)
-        .await?;
+    sqlx::query("SELECT id FROM django_content_type WHERE app_label = 'auth' AND model = 'user' FOR UPDATE").fetch_one(&mut **tx).await?;
     let (users, docs): (i64, i64) = sqlx::query_as(
         "SELECT (SELECT count(*) FROM auth_user WHERE username NOT IN ('consumer', 'AnonymousUser')),                 (SELECT count(*) FROM documents_document)",
     )
@@ -148,16 +146,10 @@ pub async fn base_with(ctx: &mut Ctx, form_errors: &[Vec<String>], with_csrf: bo
     for (k, v) in &ctx.query {
         get.insert(k.clone(), Value::from(v.clone()));
     }
-    let urls: Map<String, Value> = [
-        "account_login",
-        "account_logout",
-        "account_signup",
-        "account_reset_password",
-        "account_inactive",
-    ]
-    .iter()
-    .map(|n| (n.to_string(), Value::from(url(ctx, n))))
-    .collect();
+    let urls: Map<String, Value> = ["account_login", "account_logout", "account_signup", "account_reset_password", "account_inactive"]
+        .iter()
+        .map(|n| (n.to_string(), Value::from(url(ctx, n))))
+        .collect();
     let providers = social::template_providers(ctx).await?;
     let mut m = Map::new();
     m.insert("LANG".into(), Value::from(ctx.lang));
@@ -168,7 +160,8 @@ pub async fn base_with(ctx: &mut Ctx, form_errors: &[Vec<String>], with_csrf: bo
     }
     m.insert("APP_TITLE".into(), title.map(Value::from).unwrap_or(Value::Null));
     // Built-in PaperRust logo (pl-server `branding::LOGO_PATH`): the light variant in dark mode.
-    let logo_dark = logo.as_deref().and_then(|l| l.strip_suffix("/__rs/brand/logo.svg")).map(|p| format!("{p}/__rs/brand/logo-inverse.svg"));
+    let logo_dark =
+        logo.as_deref().and_then(|l| l.strip_suffix("/__rs/brand/logo.svg")).map(|p| format!("{p}/__rs/brand/logo-inverse.svg"));
     m.insert("APP_LOGO_DARK".into(), logo_dark.map(Value::from).unwrap_or(Value::Null));
     m.insert("APP_LOGO".into(), logo.map(Value::from).unwrap_or(Value::Null));
     m.insert("messages".into(), Value::Array(msgs));

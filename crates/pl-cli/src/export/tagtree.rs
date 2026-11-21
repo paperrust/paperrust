@@ -64,10 +64,8 @@ pub fn placeholder_sql(sql: &str) -> String {
 pub async fn computed(conn: &mut PgConnection) -> Result<HashMap<i64, TreeFields>, sqlx::Error> {
     let rows: Vec<(i32, Option<i32>, String)> =
         sqlx::query_as("SELECT id, tn_parent_id, name FROM documents_tag").fetch_all(&mut *conn).await?;
-    let nodes: Vec<Node> = rows
-        .into_iter()
-        .map(|(id, p, name)| Node { pk: i64::from(id), parent: p.map(i64::from), priority: 0, name })
-        .collect();
+    let nodes: Vec<Node> =
+        rows.into_iter().map(|(id, p, name)| Node { pk: i64::from(id), parent: p.map(i64::from), priority: 0, name }).collect();
     Ok(compute(&nodes))
 }
 

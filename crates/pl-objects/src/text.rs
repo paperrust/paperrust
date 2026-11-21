@@ -22,10 +22,7 @@ pub fn slugify(value: &str) -> String {
     let ascii: String = value.nfkd().filter(|c| c.is_ascii()).collect();
     let lowered = ascii.to_lowercase();
     // re.sub(r"[^\w\s-]", "", value)
-    let kept: String = lowered
-        .chars()
-        .filter(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-' || is_py_ascii_space(*c))
-        .collect();
+    let kept: String = lowered.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-' || is_py_ascii_space(*c)).collect();
     // re.sub(r"[-\s]+", "-", value)
     let mut out = String::with_capacity(kept.len());
     let mut in_run = false;
@@ -75,8 +72,7 @@ pub fn text_color(color: &str) -> &'static str {
             None => return "#000000",
         }
     }
-    let luminance =
-        (0.299 * (rgb[0] * rgb[0]) + 0.587 * (rgb[1] * rgb[1]) + 0.114 * (rgb[2] * rgb[2])).sqrt();
+    let luminance = (0.299 * (rgb[0] * rgb[0]) + 0.587 * (rgb[1] * rgb[1]) + 0.114 * (rgb[2] * rgb[2])).sqrt();
     if luminance < 0.53 { "#ffffff" } else { "#000000" }
 }
 
@@ -117,11 +113,7 @@ pub fn py_float_repr(f: f64) -> String {
     let digits: String = mant.chars().filter(|c| c.is_ascii_digit()).collect();
     let sign = if neg { "-" } else { "" };
     if !(-4..16).contains(&exp) {
-        let m = if digits.len() > 1 {
-            format!("{}.{}", &digits[..1], &digits[1..])
-        } else {
-            digits.clone()
-        };
+        let m = if digits.len() > 1 { format!("{}.{}", &digits[..1], &digits[1..]) } else { digits.clone() };
         let es = if exp < 0 { format!("-{:02}", -exp) } else { format!("+{exp:02}") };
         return format!("{sign}{m}e{es}");
     }
@@ -158,10 +150,7 @@ fn py_repr_composite(v: &Value) -> String {
         match v {
             Value::String(s) => format!("'{}'", s.replace('\\', "\\\\").replace('\'', "\\'")),
             Value::Array(a) => format!("[{}]", a.iter().map(r).collect::<Vec<_>>().join(", ")),
-            Value::Object(o) => format!(
-                "{{{}}}",
-                o.iter().map(|(k, v)| format!("'{}': {}", k, r(v))).collect::<Vec<_>>().join(", ")
-            ),
+            Value::Object(o) => format!("{{{}}}", o.iter().map(|(k, v)| format!("'{}': {}", k, r(v))).collect::<Vec<_>>().join(", ")),
             other => py_str(other),
         }
     }

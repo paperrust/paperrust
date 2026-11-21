@@ -138,10 +138,7 @@ pub fn normalize_email(email: &str) -> String {
 /// `UnicodeUsernameValidator` (`^[\w.@+-]+\Z`) + `max_length=150`.
 pub fn validate_username(username: &str) -> Result<(), String> {
     if username.chars().count() > 150 {
-        return Err(format!(
-            "Ensure this value has at most 150 characters (it has {}).",
-            username.chars().count()
-        ));
+        return Err(format!("Ensure this value has at most 150 characters (it has {}).", username.chars().count()));
     }
     if username.is_empty() || !username.chars().all(|c| c.is_alphanumeric() || matches!(c, '_' | '.' | '@' | '+' | '-')) {
         return Err("Enter a valid username. This value may contain only letters, numbers, and @/./+/-/_ characters.".into());
@@ -211,7 +208,8 @@ pub async fn createsuperuser(argv: Vec<String>) -> CliResult {
     }
     // interactive
     let default_user = std::env::var("USERNAME").or_else(|_| std::env::var("USER")).unwrap_or_default().to_lowercase();
-    let default_ok = !default_user.is_empty() && validate_username(&default_user).is_ok() && !username_exists(&c.pool, &default_user).await?;
+    let default_ok =
+        !default_user.is_empty() && validate_username(&default_user).is_ok() && !username_exists(&c.pool, &default_user).await?;
     let username = loop {
         let prompt = if default_ok { format!("Username (leave blank to use '{default_user}'): ") } else { "Username: ".to_string() };
         let Some(mut u) = (match a.value("username") {
@@ -343,7 +341,11 @@ pub async fn changepassword(argv: Vec<String>) -> CliResult {
     let Some(p) = password else {
         return Err(CliError::Command(format!("Aborting password change for user '{}' after {count} attempts", attrs.username)));
     };
-    sqlx::query("UPDATE auth_user SET password = $1 WHERE id = $2").bind(pl_authz::hashers::make_password(&p)).bind(id).execute(&c.pool).await?;
+    sqlx::query("UPDATE auth_user SET password = $1 WHERE id = $2")
+        .bind(pl_authz::hashers::make_password(&p))
+        .bind(id)
+        .execute(&c.pool)
+        .await?;
     // Security review 2026-11-19 F13: device tokens do not survive a password change (like reset/profile)
     if let Err(e) = pl_authz::device::revoke_all_for_user(&c.pool, i64::from(id)).await {
         eprintln!("warning: could not revoke device tokens: {e}");
@@ -359,15 +361,18 @@ mod tests {
     #[test]
     fn validators_like_django() {
         let u = UserAttrs { username: "alice".into(), email: "alice@example.com".into(), ..Default::default() };
-        assert_eq!(validate_password("alice", Some(&u)), vec![
-            "The password is too similar to the username.".to_string(),
-            "This password is too short. It must contain at least 8 characters.".to_string(),
-            "This password is too common.".to_string(),
-        ]);
-        assert_eq!(validate_password("12345678", None), vec![
-            "This password is too common.".to_string(),
-            "This password is entirely numeric.".to_string(),
-        ]);
+        assert_eq!(
+            validate_password("alice", Some(&u)),
+            vec![
+                "The password is too similar to the username.".to_string(),
+                "This password is too short. It must contain at least 8 characters.".to_string(),
+                "This password is too common.".to_string(),
+            ]
+        );
+        assert_eq!(
+            validate_password("12345678", None),
+            vec!["This password is too common.".to_string(), "This password is entirely numeric.".to_string(),]
+        );
         assert!(validate_password("correct horse battery staple 9", Some(&u)).is_empty());
         assert_eq!(validate_password("98127346501", None), vec!["This password is entirely numeric.".to_string()]);
     }

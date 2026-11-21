@@ -8,9 +8,9 @@ use axum::extract::State;
 use axum::response::{IntoResponse, Response};
 use pl_authz::models::{CORRESPONDENT, DOCUMENT, DOCUMENT_TYPE, ObjectModel, STORAGE_PATH, TAG};
 use pl_authz::{AuthUser, User, objects, perms};
+use pl_core::sqlbind::SqlxBinder as _;
 use pl_core::{AppState, Drf, RequestContext};
 use sea_query::{Alias, Condition, Expr, Func, PostgresQueryBuilder, Query, SelectStatement, SimpleExpr};
-use pl_core::sqlbind::SqlxBinder as _;
 use serde_json::{Map, Value};
 use sqlx::PgPool;
 
@@ -32,22 +32,19 @@ fn a(s: &str) -> Alias {
 /// the plain row predicate `owner = user OR owner IS NULL OR granted(id)` – no self-join, no second
 /// scan; the grant test is `pl_authz::objects::granted_key_cond` (L5 swap point).
 fn documents_cond(user: &User, global: bool) -> Condition {
-    let mut c = Condition::all()
-        .add(Expr::col((a("d"), a("deleted_at"))).is_null())
-        .add(Expr::col((a("d"), a("root_document_id"))).is_null());
+    let mut c =
+        Condition::all().add(Expr::col((a("d"), a("deleted_at"))).is_null()).add(Expr::col((a("d"), a("root_document_id"))).is_null());
     if !global {
         if !user.is_active {
             c = c.add(Expr::cust("FALSE"));
         } else if !user.is_superuser {
             let owner = Expr::col((a("d"), a("owner_id")));
-            c = c.add(
-                Condition::any().add(owner.clone().eq(user.id)).add(owner.is_null()).add(objects::granted_key_cond(
-                    user,
-                    &DOCUMENT,
-                    "view_document",
-                    Expr::col((a("d"), a("id"))).into(),
-                )),
-            );
+            c = c.add(Condition::any().add(owner.clone().eq(user.id)).add(owner.is_null()).add(objects::granted_key_cond(
+                user,
+                &DOCUMENT,
+                "view_document",
+                Expr::col((a("d"), a("id"))).into(),
+            )));
         }
     }
     c
@@ -100,7 +97,9 @@ pub async fn compute(db: &PgPool, user: &User) -> Result<Value> {
     // mime_type_stats: [[mime_type, count, chars], …] ordered by count descending.
     // With ASN_MAX_USES_FILTERED_DOCUMENTS the ASN maximum runs over the same documents.
     let rows: Vec<(String, i64, Option<i64>)> = match groups {
-        Some(g) => serde_json::from_str(&g).map_err(|e| crate::error::Error::Api(pl_core::ApiError::internal(format!("mime groups: {e}"))))?,
+        Some(g) => {
+            serde_json::from_str(&g).map_err(|e| crate::error::Error::Api(pl_core::ApiError::internal(format!("mime groups: {e}"))))?
+        }
         None => Vec::new(),
     };
     let filtered_asn_max: i64 = asn_max.unwrap_or(0);
@@ -136,10 +135,7 @@ pub async fn compute(db: &PgPool, user: &User) -> Result<Value> {
     out.insert("documents_total".into(), Value::from(documents_total));
     out.insert("documents_inbox".into(), documents_inbox);
     out.insert("inbox_tag".into(), inbox_tag_pks.first().map_or(Value::Null, |v| Value::from(*v)));
-    out.insert(
-        "inbox_tags".into(),
-        if inbox_tag_pks.is_empty() { Value::Null } else { Value::from(inbox_tag_pks.clone()) },
-    );
+    out.insert("inbox_tags".into(), if inbox_tag_pks.is_empty() { Value::Null } else { Value::from(inbox_tag_pks.clone()) });
     out.insert("document_file_type_counts".into(), Value::Array(file_type_counts));
     out.insert("character_count".into(), Value::from(character_count));
     out.insert("tag_count".into(), Value::from(tag_count));
@@ -168,10 +164,7 @@ fn statement(user: &User, global: bool) -> String {
         .from_as(a("documents_document_tags"), a("dt"))
         .and_where(Expr::col((a("dt"), a("tag_id"))).in_subquery(inbox_tag_ids));
     let mut inbox_docs = Query::select();
-    inbox_docs
-        .expr(Expr::cust("COUNT(*)"))
-        .from_as(a("vis"), a("v"))
-        .and_where(Expr::col((a("v"), a("id"))).in_subquery(inbox_doc_ids));
+    inbox_docs.expr(Expr::cust("COUNT(*)")).from_as(a("vis"), a("v")).and_where(Expr::col((a("v"), a("id"))).in_subquery(inbox_doc_ids));
     let sub = |s: SelectStatement| SimpleExpr::SubQuery(None, Box::new(s.into_sub_query_statement()));
     let mut q = Query::select();
     q.expr_as(sub(tag_count), a("tag_count"))
@@ -188,14 +181,9 @@ fn statement(user: &User, global: bool) -> String {
 
     // documents.values("mime_type").annotate(Count("id"), Sum("content_length")) (+ ASN maximum)
     let mut vis = Query::select();
-    vis.columns([
-        (a("d"), a("id")),
-        (a("d"), a("mime_type")),
-        (a("d"), a("content_length")),
-        (a("d"), a("archive_serial_number")),
-    ])
-    .from_as(a("documents_document"), a("d"))
-    .cond_where(documents_cond(user, global));
+    vis.columns([(a("d"), a("id")), (a("d"), a("mime_type")), (a("d"), a("content_length")), (a("d"), a("archive_serial_number"))])
+        .from_as(a("documents_document"), a("d"))
+        .cond_where(documents_cond(user, global));
     let materialized = if global { "NOT MATERIALIZED" } else { "MATERIALIZED" };
     format!(
         "WITH vis AS {materialized} ({vis}), \

@@ -6,7 +6,6 @@
 
 use serde_json::{Map, Value, json};
 
-
 use crate::text::{is_py_space, py_str, py_type_name};
 
 /// Raw input of one field.

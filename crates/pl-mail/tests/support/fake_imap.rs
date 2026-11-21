@@ -341,7 +341,11 @@ async fn serve(sock: tokio::net::TcpStream, st: Shared, cfg: Config, conn_no: us
                 let s = st.lock().unwrap();
                 match s.folders.get(&name) {
                     Some(f) => {
-                        out.push_str(&format!("* {} EXISTS\r\n* 0 RECENT\r\n* OK [UIDVALIDITY {}] UIDs valid\r\n", f.msgs.len(), f.uidvalidity));
+                        out.push_str(&format!(
+                            "* {} EXISTS\r\n* 0 RECENT\r\n* OK [UIDVALIDITY {}] UIDs valid\r\n",
+                            f.msgs.len(),
+                            f.uidvalidity
+                        ));
                         out.push_str(&format!("{tag} OK [READ-WRITE] SELECT completed\r\n"));
                         selected = Some(name);
                     }
@@ -417,29 +421,38 @@ async fn serve(sock: tokio::net::TcpStream, st: Shared, cfg: Config, conn_no: us
                         let (set, _items) = sargs.split_once(' ').unwrap_or((sargs, ""));
                         let uids = uid_set(set);
                         let bytes = {
-                        let s = st.lock().unwrap();
-                        let f = &s.folders[&folder];
-                        let mut bytes: Vec<u8> = Vec::new();
-                        for (seq, m) in f.msgs.iter().enumerate() {
-                            if !uids.contains(&m.uid) {
-                                continue;
-                            }
-                            let flags: Vec<String> = m.flags.iter().cloned().collect();
-                            bytes.extend_from_slice(
-                                format!("* {} FETCH (UID {} FLAGS ({}) RFC822.SIZE {} BODY[] {{{}}}\r\n", seq + 1, m.uid, flags.join(" "), m.raw.len(), m.raw.len())
+                            let s = st.lock().unwrap();
+                            let f = &s.folders[&folder];
+                            let mut bytes: Vec<u8> = Vec::new();
+                            for (seq, m) in f.msgs.iter().enumerate() {
+                                if !uids.contains(&m.uid) {
+                                    continue;
+                                }
+                                let flags: Vec<String> = m.flags.iter().cloned().collect();
+                                bytes.extend_from_slice(
+                                    format!(
+                                        "* {} FETCH (UID {} FLAGS ({}) RFC822.SIZE {} BODY[] {{{}}}\r\n",
+                                        seq + 1,
+                                        m.uid,
+                                        flags.join(" "),
+                                        m.raw.len(),
+                                        m.raw.len()
+                                    )
                                     .as_bytes(),
-                            );
-                            bytes.extend_from_slice(&m.raw);
-                            bytes.extend_from_slice(b")\r\n");
-                        }
-                        bytes
+                                );
+                                bytes.extend_from_slice(&m.raw);
+                                bytes.extend_from_slice(b")\r\n");
+                            }
+                            bytes
                         };
                         w.write_all(&bytes).await?;
                         ok(&mut out, "FETCH completed");
                     }
                     "STORE" if tokens(sargs).len() < 3 => {
-                        out.push_str(&format!("{tag} BAD Missing arguments
-"));
+                        out.push_str(&format!(
+                            "{tag} BAD Missing arguments
+"
+                        ));
                     }
                     "STORE" => {
                         let t = tokens(sargs);

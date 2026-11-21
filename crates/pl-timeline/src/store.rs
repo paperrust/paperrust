@@ -16,10 +16,7 @@ use crate::fields::{FieldInfo, FieldKinds, parse_monetary};
 use crate::{DateKind, Result, Source, TimelineError, invalid};
 
 /// Migration (name, SQL) for `paperrust manage migrate`.
-pub const MIGRATION: (&str, &str) = (
-    "pl_timeline.0001_paperrust_design2",
-    include_str!("../migrations/0001_paperrust_design2.sql"),
-);
+pub const MIGRATION: (&str, &str) = ("pl_timeline.0001_paperrust_design2", include_str!("../migrations/0001_paperrust_design2.sql"));
 
 pub mod migrations {
     pub const ALL: &[(&str, &str)] = &[super::MIGRATION];
@@ -59,9 +56,7 @@ fn statements(sql: &str) -> Vec<String> {
 /// Create tables (idempotent, serialised via an advisory lock).
 pub async fn migrate(pool: &PgPool) -> Result<()> {
     let mut tx = pool.begin().await?;
-    sqlx::query("SELECT pg_advisory_xact_lock(hashtext('paperrust_design2'))")
-        .execute(&mut *tx)
-        .await?;
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtext('paperrust_design2'))").execute(&mut *tx).await?;
     // Single statements (raw_sql on a transaction does not yield a generally `Send` future)
     for stmt in statements(MIGRATION.1) {
         sqlx::query(&stmt).execute(&mut *tx).await?;
@@ -114,25 +109,18 @@ pub async fn uuids(pool: &PgPool, kind: i16, ids: &[i64]) -> Result<HashMap<i64,
         return Ok(HashMap::new());
     }
     let fetch = |ids: Vec<i64>| async move {
-        let rows: Vec<(i64, Uuid)> = sqlx::query_as("SELECT local_id::int8, uuid FROM paperrust_sync_object WHERE kind = $1 AND local_id = ANY($2::int8[])")
-            .bind(kind)
-            .bind(&ids)
-            .fetch_all(pool)
-            .await?;
+        let rows: Vec<(i64, Uuid)> =
+            sqlx::query_as("SELECT local_id::int8, uuid FROM paperrust_sync_object WHERE kind = $1 AND local_id = ANY($2::int8[])")
+                .bind(kind)
+                .bind(&ids)
+                .fetch_all(pool)
+                .await?;
         Ok::<_, sqlx::Error>(rows.into_iter().collect::<HashMap<i64, Uuid>>())
     };
     let mut out = fetch(ids.clone()).await?;
-    let missing: Vec<i64> = ids
-        .iter()
-        .copied()
-        .filter(|i| !out.contains_key(i))
-        .collect();
+    let missing: Vec<i64> = ids.iter().copied().filter(|i| !out.contains_key(i)).collect();
     if !missing.is_empty() {
-        sqlx::query("SELECT paperrust_sync_ensure($1, $2::int8[])")
-            .bind(kind)
-            .bind(&missing)
-            .execute(pool)
-            .await?;
+        sqlx::query("SELECT paperrust_sync_ensure($1, $2::int8[])").bind(kind).bind(&missing).execute(pool).await?;
         out.extend(fetch(missing).await?);
     }
     Ok(out)
@@ -143,48 +131,36 @@ pub async fn resolve(pool: &PgPool, kind: i16, uuids: &[Uuid]) -> Result<HashMap
     if uuids.is_empty() {
         return Ok(HashMap::new());
     }
-    let rows: Vec<(Uuid, i64)> =
-        sqlx::query_as("SELECT uuid, local_id::int8 FROM paperrust_sync_object WHERE kind = $1 AND uuid = ANY($2::uuid[]) AND deleted_at IS NULL")
-            .bind(kind)
-            .bind(uuids)
-            .fetch_all(pool)
-            .await?;
+    let rows: Vec<(Uuid, i64)> = sqlx::query_as(
+        "SELECT uuid, local_id::int8 FROM paperrust_sync_object WHERE kind = $1 AND uuid = ANY($2::uuid[]) AND deleted_at IS NULL",
+    )
+    .bind(kind)
+    .bind(uuids)
+    .fetch_all(pool)
+    .await?;
     Ok(rows.into_iter().collect())
 }
 
 /// Visible document for a UUID (otherwise `NotFound`).
 pub async fn visible_document(pool: &PgPool, vis: &Visibility, uuid: Uuid) -> Result<i64> {
-    let id = resolve(pool, KIND_DOCUMENT, &[uuid])
-        .await?
-        .remove(&uuid)
-        .ok_or(TimelineError::NotFound)?;
-    let ok: Option<i64> = sqlx::query_scalar(&format!(
-        "SELECT v.id::int8 FROM ({}) AS v(id) WHERE v.id = $1",
-        vis.documents
-    ))
-    .bind(id as i32)
-    .fetch_optional(pool)
-    .await?;
+    let id = resolve(pool, KIND_DOCUMENT, &[uuid]).await?.remove(&uuid).ok_or(TimelineError::NotFound)?;
+    let ok: Option<i64> = sqlx::query_scalar(&format!("SELECT v.id::int8 FROM ({}) AS v(id) WHERE v.id = $1", vis.documents))
+        .bind(id as i32)
+        .fetch_optional(pool)
+        .await?;
     ok.ok_or(TimelineError::NotFound)
 }
 
 /// Visible subset of `ids`.
-pub async fn visible_documents(
-    pool: &PgPool,
-    vis: &Visibility,
-    ids: &[i64],
-) -> Result<HashSet<i64>> {
+pub async fn visible_documents(pool: &PgPool, vis: &Visibility, ids: &[i64]) -> Result<HashSet<i64>> {
     if ids.is_empty() {
         return Ok(HashSet::new());
     }
     let ids32: Vec<i32> = ids.iter().map(|i| *i as i32).collect();
-    let rows: Vec<i64> = sqlx::query_scalar(&format!(
-        "SELECT v.id::int8 FROM ({}) AS v(id) WHERE v.id = ANY($1)",
-        vis.documents
-    ))
-    .bind(&ids32)
-    .fetch_all(pool)
-    .await?;
+    let rows: Vec<i64> = sqlx::query_scalar(&format!("SELECT v.id::int8 FROM ({}) AS v(id) WHERE v.id = ANY($1)", vis.documents))
+        .bind(&ids32)
+        .fetch_all(pool)
+        .await?;
     Ok(rows.into_iter().collect())
 }
 
@@ -196,11 +172,7 @@ fn area_from(r: &sqlx::postgres::PgRow) -> Result<Area> {
     Ok(Area {
         id: r.try_get("id")?,
         uuid: r.try_get("uuid")?,
-        scope: if user_id.is_some() {
-            Scope::User
-        } else {
-            Scope::Instance
-        },
+        scope: if user_id.is_some() { Scope::User } else { Scope::Instance },
         user_id: user_id.map(i64::from),
         name: r.try_get("name")?,
         color: r.try_get("color")?,
@@ -224,7 +196,9 @@ pub async fn list_areas(pool: &PgPool, scope: Scope, user_id: i64) -> Result<Vec
                 .await?
         }
         Scope::Instance => {
-            sqlx::query(&format!("SELECT {AREA_COLS} FROM paperrust_life_area WHERE user_id IS NULL ORDER BY sort, name, id")).fetch_all(pool).await?
+            sqlx::query(&format!("SELECT {AREA_COLS} FROM paperrust_life_area WHERE user_id IS NULL ORDER BY sort, name, id"))
+                .fetch_all(pool)
+                .await?
         }
     };
     rows.iter().map(area_from).collect()
@@ -242,12 +216,7 @@ pub async fn effective_areas(pool: &PgPool, user_id: i64) -> Result<(Vec<Area>, 
 }
 
 pub async fn get_area(pool: &PgPool, uuid: Uuid) -> Result<Option<Area>> {
-    let r = sqlx::query(&format!(
-        "SELECT {AREA_COLS} FROM paperrust_life_area WHERE uuid = $1"
-    ))
-    .bind(uuid)
-    .fetch_optional(pool)
-    .await?;
+    let r = sqlx::query(&format!("SELECT {AREA_COLS} FROM paperrust_life_area WHERE uuid = $1")).bind(uuid).fetch_optional(pool).await?;
     r.as_ref().map(area_from).transpose()
 }
 
@@ -259,20 +228,13 @@ fn owner(scope: Scope, user_id: i64) -> Option<i32> {
 }
 
 async fn count_scope(conn: &mut sqlx::PgConnection, scope: Scope, user_id: i64) -> Result<i64> {
-    Ok(sqlx::query_scalar(
-        "SELECT count(*) FROM paperrust_life_area WHERE user_id IS NOT DISTINCT FROM $1",
-    )
-    .bind(owner(scope, user_id))
-    .fetch_one(&mut *conn)
-    .await?)
+    Ok(sqlx::query_scalar("SELECT count(*) FROM paperrust_life_area WHERE user_id IS NOT DISTINCT FROM $1")
+        .bind(owner(scope, user_id))
+        .fetch_one(&mut *conn)
+        .await?)
 }
 
-pub async fn insert_area(
-    pool: &PgPool,
-    scope: Scope,
-    user_id: i64,
-    v: &AreaValues,
-) -> Result<Area> {
+pub async fn insert_area(pool: &PgPool, scope: Scope, user_id: i64, v: &AreaValues) -> Result<Area> {
     let mut tx = pool.begin().await?;
     if count_scope(&mut tx, scope, user_id).await? as usize >= MAX_AREAS {
         return Err(invalid("items", format!("At most {MAX_AREAS} life areas.")));
@@ -309,47 +271,32 @@ pub async fn update_area(pool: &PgPool, id: i64, v: &AreaValues) -> Result<Area>
 }
 
 pub async fn delete_area(pool: &PgPool, id: i64) -> Result<()> {
-    sqlx::query("DELETE FROM paperrust_life_area WHERE id = $1")
-        .bind(id)
-        .execute(pool)
-        .await?;
+    sqlx::query("DELETE FROM paperrust_life_area WHERE id = $1").bind(id).execute(pool).await?;
     Ok(())
 }
 
 pub async fn delete_scope(pool: &PgPool, scope: Scope, user_id: i64) -> Result<()> {
-    sqlx::query("DELETE FROM paperrust_life_area WHERE user_id IS NOT DISTINCT FROM $1")
-        .bind(owner(scope, user_id))
-        .execute(pool)
-        .await?;
+    sqlx::query("DELETE FROM paperrust_life_area WHERE user_id IS NOT DISTINCT FROM $1").bind(owner(scope, user_id)).execute(pool).await?;
     Ok(())
 }
 
 /// Replace the whole set; entries with `uuid` from this set keep their identity.
-pub async fn replace_areas(
-    pool: &PgPool,
-    scope: Scope,
-    user_id: i64,
-    items: &[(Option<Uuid>, AreaValues)],
-) -> Result<Vec<Area>> {
+pub async fn replace_areas(pool: &PgPool, scope: Scope, user_id: i64, items: &[(Option<Uuid>, AreaValues)]) -> Result<Vec<Area>> {
     if items.len() > MAX_AREAS {
         return Err(invalid("items", format!("At most {MAX_AREAS} life areas.")));
     }
     let mut tx = pool.begin().await?;
     let o = owner(scope, user_id);
-    let existing: Vec<(i64, Uuid)> = sqlx::query_as(
-        "SELECT id, uuid FROM paperrust_life_area WHERE user_id IS NOT DISTINCT FROM $1 FOR UPDATE",
-    )
-    .bind(o)
-    .fetch_all(&mut *tx)
-    .await?;
+    let existing: Vec<(i64, Uuid)> =
+        sqlx::query_as("SELECT id, uuid FROM paperrust_life_area WHERE user_id IS NOT DISTINCT FROM $1 FOR UPDATE")
+            .bind(o)
+            .fetch_all(&mut *tx)
+            .await?;
     let by_uuid: HashMap<Uuid, i64> = existing.iter().map(|(i, u)| (*u, *i)).collect();
     let mut keep: HashSet<i64> = HashSet::new();
     for (u, v) in items {
         let rules = serde_json::to_value(&v.rules).unwrap_or_default();
-        match u
-            .and_then(|u| by_uuid.get(&u).copied())
-            .filter(|id| !keep.contains(id))
-        {
+        match u.and_then(|u| by_uuid.get(&u).copied()).filter(|id| !keep.contains(id)) {
             Some(id) => {
                 keep.insert(id);
                 sqlx::query("UPDATE paperrust_life_area SET name = $2, color = $3, icon = $4, sort = $5, rules = $6, modified = now() WHERE id = $1")
@@ -378,15 +325,8 @@ pub async fn replace_areas(
             }
         }
     }
-    let drop: Vec<i64> = existing
-        .iter()
-        .map(|(i, _)| *i)
-        .filter(|i| !keep.contains(i))
-        .collect();
-    sqlx::query("DELETE FROM paperrust_life_area WHERE id = ANY($1)")
-        .bind(&drop)
-        .execute(&mut *tx)
-        .await?;
+    let drop: Vec<i64> = existing.iter().map(|(i, _)| *i).filter(|i| !keep.contains(i)).collect();
+    sqlx::query("DELETE FROM paperrust_life_area WHERE id = ANY($1)").bind(&drop).execute(&mut *tx).await?;
     tx.commit().await?;
     list_areas(pool, scope, user_id).await
 }
@@ -422,10 +362,7 @@ pub async fn check_rules_visible(pool: &PgPool, rules: &Rules, vis: &Visibility)
         .fetch_all(pool)
         .await?;
         if let Some(bad) = list.iter().find(|u| !ok.contains(u)) {
-            return Err(invalid(
-                &format!("rules.{name}"),
-                format!("Unknown object \"{bad}\"."),
-            ));
+            return Err(invalid(&format!("rules.{name}"), format!("Unknown object \"{bad}\".")));
         }
     }
     Ok(())
@@ -446,15 +383,9 @@ pub async fn doc_keys(pool: &PgPool, vis: &Visibility) -> Result<Vec<DocKeys>> {
             Ok(DocKeys {
                 id: r.try_get("id")?,
                 tags: r.try_get("tags")?,
-                document_type: r
-                    .try_get::<Option<i32>, _>("document_type_id")?
-                    .map(i64::from),
-                storage_path: r
-                    .try_get::<Option<i32>, _>("storage_path_id")?
-                    .map(i64::from),
-                correspondent: r
-                    .try_get::<Option<i32>, _>("correspondent_id")?
-                    .map(i64::from),
+                document_type: r.try_get::<Option<i32>, _>("document_type_id")?.map(i64::from),
+                storage_path: r.try_get::<Option<i32>, _>("storage_path_id")?.map(i64::from),
+                correspondent: r.try_get::<Option<i32>, _>("correspondent_id")?.map(i64::from),
             })
         })
         .collect()
@@ -465,18 +396,8 @@ pub async fn candidates(pool: &PgPool, vis: &Visibility) -> Result<Vec<Candidate
     let mut out = Vec::new();
     for (list, kind, table, inbox) in [
         ("tags", KIND_TAG, "documents_tag", "is_inbox_tag"),
-        (
-            "document_types",
-            KIND_DOCUMENT_TYPE,
-            "documents_documenttype",
-            "false",
-        ),
-        (
-            "storage_paths",
-            KIND_STORAGE_PATH,
-            "documents_storagepath",
-            "false",
-        ),
+        ("document_types", KIND_DOCUMENT_TYPE, "documents_documenttype", "false"),
+        ("storage_paths", KIND_STORAGE_PATH, "documents_storagepath", "false"),
     ] {
         let rows: Vec<(i64, String, bool)> = sqlx::query_as(&format!(
             "SELECT o.id::int8, o.name::text, {inbox} FROM {table} o WHERE o.id IN (SELECT v.id FROM ({}) AS v(id)) ORDER BY o.name, o.id",
@@ -488,13 +409,7 @@ pub async fn candidates(pool: &PgPool, vis: &Visibility) -> Result<Vec<Candidate
         let u = uuids(pool, kind, &ids).await?;
         for (id, name, is_inbox) in rows {
             if let Some(uuid) = u.get(&id) {
-                out.push(Candidate {
-                    list,
-                    id,
-                    uuid: *uuid,
-                    name,
-                    is_inbox,
-                });
+                out.push(Candidate { list, id, uuid: *uuid, name, is_inbox });
             }
         }
     }
@@ -505,19 +420,9 @@ pub async fn candidates(pool: &PgPool, vis: &Visibility) -> Result<Vec<Candidate
 
 /// All custom fields.
 pub async fn custom_fields(pool: &PgPool) -> Result<Vec<FieldInfo>> {
-    let rows: Vec<(i64, String, String)> = sqlx::query_as(
-        "SELECT id::int8, name::text, data_type::text FROM documents_customfield ORDER BY id",
-    )
-    .fetch_all(pool)
-    .await?;
-    Ok(rows
-        .into_iter()
-        .map(|(id, name, data_type)| FieldInfo {
-            id,
-            name,
-            data_type,
-        })
-        .collect())
+    let rows: Vec<(i64, String, String)> =
+        sqlx::query_as("SELECT id::int8, name::text, data_type::text FROM documents_customfield ORDER BY id").fetch_all(pool).await?;
+    Ok(rows.into_iter().map(|(id, name, data_type)| FieldInfo { id, name, data_type }).collect())
 }
 
 /// What is to be loaded.
@@ -532,21 +437,18 @@ pub struct LoadSpec<'a> {
 }
 
 /// Load documents and date rows for the user (visible documents only).
-pub async fn load(
-    pool: &PgPool,
-    vis: &Visibility,
-    spec: &LoadSpec<'_>,
-) -> Result<(HashMap<i64, DocRow>, Vec<DateRow>)> {
+pub async fn load(pool: &PgPool, vis: &Visibility, spec: &LoadSpec<'_>) -> Result<(HashMap<i64, DocRow>, Vec<DateRow>)> {
     let in_vis = format!("IN (SELECT v.id FROM ({}) AS v(id))", vis.documents);
     let mut rows: Vec<DateRow> = Vec::new();
     // 1. Document date
     if let Some((from, to)) = spec.created_range {
-        let r: Vec<(i64, NaiveDate)> =
-            sqlx::query_as(&format!("SELECT d.id::int8, d.created FROM documents_document d WHERE d.id {in_vis} AND d.created BETWEEN $1 AND $2"))
-                .bind(from)
-                .bind(to)
-                .fetch_all(pool)
-                .await?;
+        let r: Vec<(i64, NaiveDate)> = sqlx::query_as(&format!(
+            "SELECT d.id::int8, d.created FROM documents_document d WHERE d.id {in_vis} AND d.created BETWEEN $1 AND $2"
+        ))
+        .bind(from)
+        .bind(to)
+        .fetch_all(pool)
+        .await?;
         rows.extend(r.into_iter().map(|(id, date)| DateRow {
             doc_id: id,
             kind: DateKind::Created,
@@ -561,18 +463,8 @@ pub async fn load(
     }
     // 2. Custom fields of type date
     let field_ids: Vec<i32> = spec.fields.dates.keys().map(|i| *i as i32).collect();
-    let field_uuids = uuids(
-        pool,
-        KIND_CUSTOM_FIELD,
-        &spec
-            .fields
-            .dates
-            .keys()
-            .chain(spec.fields.amount.iter())
-            .copied()
-            .collect::<Vec<_>>(),
-    )
-    .await?;
+    let field_uuids =
+        uuids(pool, KIND_CUSTOM_FIELD, &spec.fields.dates.keys().chain(spec.fields.amount.iter()).copied().collect::<Vec<_>>()).await?;
     if !field_ids.is_empty() {
         let r: Vec<(i64, i64, NaiveDate)> = sqlx::query_as(&format!(
             "SELECT i.document_id::int8, i.field_id::int8, i.value_date FROM documents_customfieldinstance i
@@ -591,14 +483,9 @@ pub async fn load(
                 date,
                 source: Source::CustomField,
                 confidence: 1.0,
-                field: field_uuids.get(&field).map(|u| RefOut {
-                    uuid: *u,
-                    name: if vis.custom_field_names {
-                        spec.field_names.get(&field).cloned()
-                    } else {
-                        None
-                    },
-                }),
+                field: field_uuids
+                    .get(&field)
+                    .map(|u| RefOut { uuid: *u, name: if vis.custom_field_names { spec.field_names.get(&field).cloned() } else { None } }),
                 phrase: None,
                 page: None,
                 reminder: None,
@@ -615,10 +502,9 @@ pub async fn load(
     .fetch_all(pool)
     .await?;
     for x in r {
-        let (Some(kind), Some(source)) = (
-            DateKind::parse(&x.try_get::<String, _>("kind")?),
-            Source::parse(&x.try_get::<String, _>("source")?),
-        ) else {
+        let (Some(kind), Some(source)) =
+            (DateKind::parse(&x.try_get::<String, _>("kind")?), Source::parse(&x.try_get::<String, _>("source")?))
+        else {
             continue;
         };
         rows.push(DateRow {
@@ -626,21 +512,12 @@ pub async fn load(
             kind,
             date: x.try_get("date")?,
             source,
-            confidence: if source == Source::User {
-                1.0
-            } else {
-                x.try_get("confidence")?
-            },
+            confidence: if source == Source::User { 1.0 } else { x.try_get("confidence")? },
             field: None,
             phrase: x.try_get("phrase")?,
             page: x.try_get("page")?,
             reminder: (source == Source::User)
-                .then(|| -> Result<ReminderRef> {
-                    Ok(ReminderRef {
-                        id: x.try_get("id")?,
-                        note: x.try_get("note")?,
-                    })
-                })
+                .then(|| -> Result<ReminderRef> { Ok(ReminderRef { id: x.try_get("id")?, note: x.try_get("note")? }) })
                 .transpose()?,
         });
     }
@@ -654,12 +531,7 @@ pub async fn load(
 }
 
 /// Document rows (without renewed visibility check: `ids` come from visible sets).
-async fn docs(
-    pool: &PgPool,
-    vis: &Visibility,
-    ids: &[i64],
-    fields: &FieldKinds,
-) -> Result<HashMap<i64, DocRow>> {
+async fn docs(pool: &PgPool, vis: &Visibility, ids: &[i64], fields: &FieldKinds) -> Result<HashMap<i64, DocRow>> {
     if ids.is_empty() {
         return Ok(HashMap::new());
     }
@@ -683,22 +555,8 @@ async fn docs(
             types.push(t.into());
         }
     }
-    let corr_ref = refs(
-        pool,
-        vis,
-        KIND_CORRESPONDENT,
-        "documents_correspondent",
-        &corr,
-    )
-    .await?;
-    let type_ref = refs(
-        pool,
-        vis,
-        KIND_DOCUMENT_TYPE,
-        "documents_documenttype",
-        &types,
-    )
-    .await?;
+    let corr_ref = refs(pool, vis, KIND_CORRESPONDENT, "documents_correspondent", &corr).await?;
+    let type_ref = refs(pool, vis, KIND_DOCUMENT_TYPE, "documents_documenttype", &types).await?;
     // Amount
     let mut amounts: HashMap<i64, Amount> = HashMap::new();
     if !fields.amount.is_empty() {
@@ -717,14 +575,7 @@ async fn docs(
         .await?;
         for (doc, field, v) in r {
             if let (Some((value, currency)), Some(u)) = (parse_monetary(&v), fu.get(&field)) {
-                amounts.insert(
-                    doc,
-                    Amount {
-                        value,
-                        currency,
-                        field: *u,
-                    },
-                );
+                amounts.insert(doc, Amount { value, currency, field: *u });
             }
         }
     }
@@ -734,12 +585,8 @@ async fn docs(
         let Some(uuid) = doc_uuids.get(&id) else {
             continue;
         };
-        let c = r
-            .try_get::<Option<i32>, _>("correspondent_id")?
-            .map(i64::from);
-        let t = r
-            .try_get::<Option<i32>, _>("document_type_id")?
-            .map(i64::from);
+        let c = r.try_get::<Option<i32>, _>("correspondent_id")?.map(i64::from);
+        let t = r.try_get::<Option<i32>, _>("document_type_id")?.map(i64::from);
         out.insert(
             id,
             DocRow {
@@ -750,9 +597,7 @@ async fn docs(
                     id,
                     tags: r.try_get("tags")?,
                     document_type: t,
-                    storage_path: r
-                        .try_get::<Option<i32>, _>("storage_path_id")?
-                        .map(i64::from),
+                    storage_path: r.try_get::<Option<i32>, _>("storage_path_id")?.map(i64::from),
                     correspondent: c,
                 },
                 correspondent: c.and_then(|c| corr_ref.get(&c).cloned()),
@@ -765,13 +610,7 @@ async fn docs(
 }
 
 /// References with names (visible names only).
-async fn refs(
-    pool: &PgPool,
-    vis: &Visibility,
-    kind: i16,
-    table: &str,
-    ids: &[i64],
-) -> Result<HashMap<i64, RefOut>> {
+async fn refs(pool: &PgPool, vis: &Visibility, kind: i16, table: &str, ids: &[i64]) -> Result<HashMap<i64, RefOut>> {
     let mut ids = ids.to_vec();
     ids.sort_unstable();
     ids.dedup();
@@ -789,49 +628,25 @@ async fn refs(
     .await?
     .into_iter()
     .collect();
-    Ok(ids
-        .iter()
-        .filter_map(|i| {
-            Some((
-                *i,
-                RefOut {
-                    uuid: *u.get(i)?,
-                    name: names.get(i).cloned(),
-                },
-            ))
-        })
-        .collect())
+    Ok(ids.iter().filter_map(|i| Some((*i, RefOut { uuid: *u.get(i)?, name: names.get(i).cloned() }))).collect())
 }
 
 // ------------------------------------------------------------------------------ State
 
 /// States of the user for `docs`.
-pub async fn states(
-    pool: &PgPool,
-    user_id: i64,
-    docs: &[i64],
-) -> Result<HashMap<String, ItemState>> {
+pub async fn states(pool: &PgPool, user_id: i64, docs: &[i64]) -> Result<HashMap<String, ItemState>> {
     if docs.is_empty() {
         return Ok(HashMap::new());
     }
     let ids32: Vec<i32> = docs.iter().map(|i| *i as i32).collect();
-    let r: Vec<(String, Option<DateTime<Utc>>, Option<NaiveDate>)> =
-        sqlx::query_as("SELECT item::text, done_at, snoozed_until FROM paperrust_timeline_state WHERE user_id = $1 AND document_id = ANY($2)")
-            .bind(user_id as i32)
-            .bind(&ids32)
-            .fetch_all(pool)
-            .await?;
-    Ok(r.into_iter()
-        .map(|(i, d, s)| {
-            (
-                i,
-                ItemState {
-                    done_at: d,
-                    snoozed_until: s,
-                },
-            )
-        })
-        .collect())
+    let r: Vec<(String, Option<DateTime<Utc>>, Option<NaiveDate>)> = sqlx::query_as(
+        "SELECT item::text, done_at, snoozed_until FROM paperrust_timeline_state WHERE user_id = $1 AND document_id = ANY($2)",
+    )
+    .bind(user_id as i32)
+    .bind(&ids32)
+    .fetch_all(pool)
+    .await?;
+    Ok(r.into_iter().map(|(i, d, s)| (i, ItemState { done_at: d, snoozed_until: s })).collect())
 }
 
 /// Set the state of an entry. `done`: `Some` sets/clears; `snoozed`: `Some` sets/clears.
@@ -861,10 +676,7 @@ pub async fn set_state(
     .bind(snoozed.flatten())
     .fetch_one(pool)
     .await?;
-    Ok(ItemState {
-        done_at: r.0,
-        snoozed_until: r.1,
-    })
+    Ok(ItemState { done_at: r.0, snoozed_until: r.1 })
 }
 
 pub async fn clear_state(pool: &PgPool, user_id: i64, item: &str) -> Result<()> {
@@ -939,11 +751,7 @@ pub async fn add_reminder(
 }
 
 /// Eigene Erinnerungen an sichtbaren Dokumenten.
-pub async fn list_reminders(
-    pool: &PgPool,
-    user_id: i64,
-    vis: &Visibility,
-) -> Result<Vec<Reminder>> {
+pub async fn list_reminders(pool: &PgPool, user_id: i64, vis: &Visibility) -> Result<Vec<Reminder>> {
     let r = sqlx::query(&format!(
         "SELECT id, document_id::int8 AS document_id, kind, date, note, created FROM paperrust_doc_date
           WHERE source = 'user' AND created_by = $1 AND document_id IN (SELECT v.id FROM ({}) AS v(id)) ORDER BY date, id",
@@ -957,26 +765,19 @@ pub async fn list_reminders(
 
 /// Delete own reminder (`false` = not found).
 pub async fn delete_reminder(pool: &PgPool, user_id: i64, id: i64) -> Result<bool> {
-    let n = sqlx::query(
-        "DELETE FROM paperrust_doc_date WHERE id = $1 AND source = 'user' AND created_by = $2",
-    )
-    .bind(id)
-    .bind(user_id as i32)
-    .execute(pool)
-    .await?
-    .rows_affected();
+    let n = sqlx::query("DELETE FROM paperrust_doc_date WHERE id = $1 AND source = 'user' AND created_by = $2")
+        .bind(id)
+        .bind(user_id as i32)
+        .execute(pool)
+        .await?
+        .rows_affected();
     Ok(n > 0)
 }
 
 /// (Document, date) of all dates that can already be on the timeline for the user
 /// (own reminders, content detection, custom fields of type date).
 /// Content dates count only with `content` (detection switched on), like on the timeline.
-pub async fn existing_dates(
-    pool: &PgPool,
-    user_id: i64,
-    docs: &[i64],
-    content: bool,
-) -> Result<HashSet<(i64, NaiveDate)>> {
+pub async fn existing_dates(pool: &PgPool, user_id: i64, docs: &[i64], content: bool) -> Result<HashSet<(i64, NaiveDate)>> {
     if docs.is_empty() {
         return Ok(HashSet::new());
     }
@@ -1002,12 +803,8 @@ pub async fn contents(pool: &PgPool, ids: &[i64]) -> Result<HashMap<i64, (String
         return Ok(HashMap::new());
     }
     let ids32: Vec<i32> = ids.iter().map(|i| *i as i32).collect();
-    let r: Vec<(i64, String, NaiveDate)> = sqlx::query_as(
-        "SELECT id::int8, content, created FROM documents_document WHERE id = ANY($1)",
-    )
-    .bind(&ids32)
-    .fetch_all(pool)
-    .await?;
+    let r: Vec<(i64, String, NaiveDate)> =
+        sqlx::query_as("SELECT id::int8, content, created FROM documents_document WHERE id = ANY($1)").bind(&ids32).fetch_all(pool).await?;
     Ok(r.into_iter().map(|(i, c, d)| (i, (c, d))).collect())
 }
 
@@ -1018,14 +815,9 @@ pub async fn titles(pool: &PgPool, ids: &[i64]) -> Result<HashMap<i64, (Uuid, St
     }
     let ids32: Vec<i32> = ids.iter().map(|i| *i as i32).collect();
     let r: Vec<(i64, String)> =
-        sqlx::query_as("SELECT id::int8, title::text FROM documents_document WHERE id = ANY($1)")
-            .bind(&ids32)
-            .fetch_all(pool)
-            .await?;
+        sqlx::query_as("SELECT id::int8, title::text FROM documents_document WHERE id = ANY($1)").bind(&ids32).fetch_all(pool).await?;
     let u = uuids(pool, KIND_DOCUMENT, ids).await?;
-    Ok(r.into_iter()
-        .filter_map(|(i, t)| Some((i, (*u.get(&i)?, t))))
-        .collect())
+    Ok(r.into_iter().filter_map(|(i, t)| Some((i, (*u.get(&i)?, t)))).collect())
 }
 
 // ------------------------------------------------------------------------------ Detection state
@@ -1049,11 +841,7 @@ pub async fn extraction_stats(pool: &PgPool) -> Result<ExtractionStats> {
     .bind(crate::extract::EXTRACTOR_VERSION)
     .fetch_one(pool)
     .await?;
-    Ok(ExtractionStats {
-        documents,
-        extracted,
-        stale: documents - extracted,
-    })
+    Ok(ExtractionStats { documents, extracted, stale: documents - extracted })
 }
 
 #[cfg(test)]
@@ -1064,14 +852,8 @@ mod tests {
     fn migration_statements() {
         let s = statements(MIGRATION.1);
         assert_eq!(s.len(), 11, "{s:#?}");
-        assert!(
-            s.iter()
-                .all(|x| x.trim_end().ends_with(';') && !x.contains("--"))
-        );
+        assert!(s.iter().all(|x| x.trim_end().ends_with(';') && !x.contains("--")));
         assert!(s.iter().all(|x| x.contains("IF NOT EXISTS")), "idempotent");
-        assert!(
-            s.iter().all(|x| !x.contains("documents_")),
-            "keine Django-Tabellen anfassen (expand-only)"
-        );
+        assert!(s.iter().all(|x| !x.contains("documents_")), "keine Django-Tabellen anfassen (expand-only)");
     }
 }

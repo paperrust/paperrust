@@ -10,7 +10,7 @@
 //! `Node.hash`, `MediaResource.hash`, `get_content`, `get_metadata_str`),
 //! `vector_stores/utils.py::node_to_metadata_dict`.
 
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use sha2::{Digest, Sha256};
 
 use crate::pyjson;
@@ -38,7 +38,11 @@ pub fn py_repr_str(s: &str) -> String {
                 out.push_str(&format!("\\u{u:04x}"))
             }
             _ if (0xe000..=0xf8ff).contains(&u) || u >= 0xf0000 => {
-                if u > 0xffff { out.push_str(&format!("\\U{u:08x}")) } else { out.push_str(&format!("\\u{u:04x}")) }
+                if u > 0xffff {
+                    out.push_str(&format!("\\U{u:08x}"))
+                } else {
+                    out.push_str(&format!("\\u{u:04x}"))
+                }
             }
             c => out.push(c),
         }
@@ -64,10 +68,9 @@ pub fn py_repr(v: &Value) -> String {
         Value::Number(n) => n.to_string(),
         Value::String(s) => py_repr_str(s),
         Value::Array(a) => format!("[{}]", a.iter().map(py_repr).collect::<Vec<_>>().join(", ")),
-        Value::Object(m) => format!(
-            "{{{}}}",
-            m.iter().map(|(k, v)| format!("{}: {}", py_repr_str(k), py_repr(v))).collect::<Vec<_>>().join(", ")
-        ),
+        Value::Object(m) => {
+            format!("{{{}}}", m.iter().map(|(k, v)| format!("{}: {}", py_repr_str(k), py_repr(v))).collect::<Vec<_>>().join(", "))
+        }
     }
 }
 
@@ -189,7 +192,10 @@ impl TextNode {
         let inner_s = outer.get("_node_content").and_then(Value::as_str).ok_or("Node content not found in metadata dict.")?;
         let n: Value = serde_json::from_str(inner_s).map_err(|e| e.to_string())?;
         let strs = |k: &str| -> Vec<String> {
-            n.get(k).and_then(Value::as_array).map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default()
+            n.get(k)
+                .and_then(Value::as_array)
+                .map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect())
+                .unwrap_or_default()
         };
         let st = |k: &str, d: &str| n.get(k).and_then(Value::as_str).unwrap_or(d).to_string();
         let relationships = n.get("relationships").and_then(Value::as_object).cloned().unwrap_or_default();

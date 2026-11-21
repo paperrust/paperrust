@@ -132,8 +132,7 @@ fn codepage(n: i32) -> &'static Encoding {
         437 | 850 => "ibm866",
         10000 => "macintosh",
         1250..=1258 => {
-            return Encoding::for_label(format!("windows-{n}").as_bytes())
-                .unwrap_or(encoding_rs::WINDOWS_1252);
+            return Encoding::for_label(format!("windows-{n}").as_bytes()).unwrap_or(encoding_rs::WINDOWS_1252);
         }
         _ => "windows-1252",
     };
@@ -156,12 +155,7 @@ pub fn extract(data: &[u8], limits: &Limits, deadline: Deadline) -> Result<Offic
         time_cur: None,
     };
     let mut stack: Vec<Group> = Vec::new();
-    let mut g = Group {
-        skip: false,
-        uc: 1,
-        info: None,
-        time: None,
-    };
+    let mut g = Group { skip: false, uc: 1, info: None, time: None };
     let mut skip_chars = 0usize;
     let mut steps = 0u64;
     let mut new_group = false;
@@ -220,9 +214,7 @@ pub fn extract(data: &[u8], limits: &Limits, deadline: Deadline) -> Result<Offic
                         while r.i < r.d.len() && r.d[r.i].is_ascii_digit() && r.i - ps < 11 {
                             r.i += 1;
                         }
-                        param = std::str::from_utf8(&r.d[ps..r.i])
-                            .ok()
-                            .and_then(|s| s.parse().ok());
+                        param = std::str::from_utf8(&r.d[ps..r.i]).ok().and_then(|s| s.parse().ok());
                     }
                     if r.i < r.d.len() && r.d[r.i] == b' ' {
                         r.i += 1;
@@ -254,8 +246,8 @@ pub fn extract(data: &[u8], limits: &Limits, deadline: Deadline) -> Result<Offic
                             r.flush(&g)?;
                             r.emit_str(&g, "\t")?;
                         }
-                        "emdash" | "endash" | "bullet" | "lquote" | "rquote" | "ldblquote"
-                        | "rdblquote" | "emspace" | "enspace" | "qmspace" => {
+                        "emdash" | "endash" | "bullet" | "lquote" | "rquote" | "ldblquote" | "rdblquote" | "emspace" | "enspace"
+                        | "qmspace" => {
                             r.flush(&g)?;
                             let s = match word.as_str() {
                                 "emdash" => "\u{2014}",
@@ -302,11 +294,7 @@ pub fn extract(data: &[u8], limits: &Limits, deadline: Deadline) -> Result<Offic
                         }
                         w if first && INFO_FIELDS.iter().any(|(n, _)| *n == w) => {
                             r.flush(&g)?;
-                            let key = INFO_FIELDS
-                                .iter()
-                                .find(|(n, _)| *n == w)
-                                .map(|(_, k)| *k)
-                                .unwrap_or("");
+                            let key = INFO_FIELDS.iter().find(|(n, _)| *n == w).map(|(_, k)| *k).unwrap_or("");
                             g.info = Some(key);
                             g.skip = true;
                             r.info_cur = Some((key, String::new()));
@@ -325,9 +313,7 @@ pub fn extract(data: &[u8], limits: &Limits, deadline: Deadline) -> Result<Offic
                 match n {
                     b'\'' => {
                         let h =
-                            r.d.get(r.i..r.i + 2)
-                                .and_then(|x| std::str::from_utf8(x).ok())
-                                .and_then(|x| u8::from_str_radix(x, 16).ok());
+                            r.d.get(r.i..r.i + 2).and_then(|x| std::str::from_utf8(x).ok()).and_then(|x| u8::from_str_radix(x, 16).ok());
                         r.i += 2;
                         if skip_chars > 0 {
                             skip_chars -= 1;
@@ -395,10 +381,7 @@ pub fn extract(data: &[u8], limits: &Limits, deadline: Deadline) -> Result<Offic
     let mut created = None;
     for (k, t) in &r.times {
         if t[0] > 0 {
-            let v = format!(
-                "{:04}-{:02}-{:02}T{:02}:{:02}:00",
-                t[0], t[1], t[2], t[3], t[4]
-            );
+            let v = format!("{:04}-{:02}-{:02}T{:02}:{:02}:00", t[0], t[1], t[2], t[3], t[4]);
             if *k == "dcterms:created" {
                 created = Some(v.clone());
             }
@@ -406,11 +389,7 @@ pub fn extract(data: &[u8], limits: &Limits, deadline: Deadline) -> Result<Offic
         }
     }
     md.push(("Content-Type".into(), "application/rtf".into()));
-    Ok(OfficeContent {
-        text: r.out.buf,
-        metadata: md,
-        created,
-    })
+    Ok(OfficeContent { text: r.out.buf, metadata: md, created })
 }
 
 #[cfg(test)]
@@ -420,17 +399,9 @@ mod tests {
     #[test]
     fn basic_rtf() {
         let d = b"{\\rtf1\\ansi\\ansicpg1252{\\fonttbl{\\f0 Arial;}}{\\info{\\title RTF Titel}{\\author Erika}{\\creatim\\yr2025\\mo1\\dy6\\hr8\\min0}}\\f0 Erster \\'fc\\'e4\\par\nZweiter\\tab x \\u8364?.\\par{\\pict 89504e}{\\*\\generator X;}Ende\\line Z\\par}";
-        let c = extract(
-            d,
-            &Limits::default(),
-            Deadline::from_limits(&Limits::default()),
-        )
-        .unwrap();
+        let c = extract(d, &Limits::default(), Deadline::from_limits(&Limits::default())).unwrap();
         assert_eq!(c.text, "Erster üä\nZweiter\tx €.\nEnde\nZ\n");
-        assert!(
-            c.metadata
-                .contains(&("dc:title".into(), "RTF Titel".into()))
-        );
+        assert!(c.metadata.contains(&("dc:title".into(), "RTF Titel".into())));
         assert_eq!(c.created.as_deref(), Some("2025-01-06T08:00:00"));
     }
 }

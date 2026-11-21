@@ -19,8 +19,8 @@ use crate::drf::{self, AuditMeta, ClientAddr, HResult};
 use crate::fields::{self, Input, Out, input};
 use crate::listing::{self, ALIAS, FilterData};
 use crate::model::Kind;
-use crate::tagtree::TagTree;
 use crate::objects;
+use crate::tagtree::TagTree;
 use crate::text::{py_str, py_type_name};
 
 fn choice(inp: Input, choices: &[&str]) -> Result<String, Value> {
@@ -156,18 +156,19 @@ pub async fn post(State(state): State<AppState>, ctx: RequestContext, auth: Auth
     }
     let mut permissions: Option<PermissionsSpec> = None;
     if operation == "set_permissions"
-        && let Some(raw) = &permissions_raw {
-            if raw.view.is_none() && raw.change.is_none() {
-                return Err(ApiError::non_field_error("permissions must not be empty"));
-            }
-            match owned::validate_set_permissions(db, raw).await.map_err(drf::auth)? {
-                Ok(s) => permissions = Some(s),
-                Err(e) => {
-                    let msg = e.0.get(0).and_then(|m| m.as_str()).unwrap_or_default().to_string();
-                    return Err(ApiError::non_field_error(msg));
-                }
+        && let Some(raw) = &permissions_raw
+    {
+        if raw.view.is_none() && raw.change.is_none() {
+            return Err(ApiError::non_field_error("permissions must not be empty"));
+        }
+        match owned::validate_set_permissions(db, raw).await.map_err(drf::auth)? {
+            Ok(s) => permissions = Some(s),
+            Err(e) => {
+                let msg = e.0.get(0).and_then(|m| m.as_str()).unwrap_or_default().to_string();
+                return Err(ApiError::non_field_error(msg));
             }
         }
+    }
 
     // --- view
     let action = if operation == "set_permissions" { "change" } else { "delete" };
@@ -177,11 +178,8 @@ pub async fn post(State(state): State<AppState>, ctx: RequestContext, auth: Auth
         let mut q = listing::select(kind, user, false, false, false);
         q.cond_where(crate::perms::permitted_ids_cond(user, kind, codename, ALIAS));
         // Review 2 N23: the permitted rows are only needed for tag descendants
-        let permitted: Vec<i64> = if kind == Kind::Tag {
-            listing::fetch(db, kind, &q, false, false).await?.iter().map(|r| r.id).collect()
-        } else {
-            Vec::new()
-        };
+        let permitted: Vec<i64> =
+            if kind == Kind::Tag { listing::fetch(db, kind, &q, false, false).await?.iter().map(|r| r.id).collect() } else { Vec::new() };
         let f = filters.clone().unwrap_or_default();
         let mut fq = q.clone();
         listing::apply_filters(&mut fq, kind, &FilterData::Json(&f))?;
@@ -230,17 +228,15 @@ pub async fn post(State(state): State<AppState>, ctx: RequestContext, auth: Auth
         let res: Result<(), ApiError> = async {
             let mut tx = db.begin().await?;
             if let Some(o) = owner
-                && (!merge || o.is_some()) {
-                    let only_unowned = if merge { " AND owner_id IS NULL" } else { "" };
-                    sqlx::query(&format!(
-                        "UPDATE {} SET owner_id = $1::integer WHERE id = ANY($2::bigint[]){only_unowned}",
-                        kind.table()
-                    ))
+                && (!merge || o.is_some())
+            {
+                let only_unowned = if merge { " AND owner_id IS NULL" } else { "" };
+                sqlx::query(&format!("UPDATE {} SET owner_id = $1::integer WHERE id = ANY($2::bigint[]){only_unowned}", kind.table()))
                     .bind(o.map(|x| x as i32))
                     .bind(&object_ids)
                     .execute(&mut *tx)
                     .await?;
-                }
+            }
             if let Some(spec) = &permissions {
                 let existing: Vec<i64> = sqlx::query(&format!("SELECT id FROM {} WHERE id = ANY($1::bigint[]) ORDER BY id", kind.table()))
                     .bind(&object_ids)

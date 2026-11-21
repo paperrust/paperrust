@@ -13,13 +13,13 @@ use std::sync::Arc;
 
 use chrono::{DateTime, NaiveDate, Utc};
 use pl_core::AppState;
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use sqlx::Row;
 
 use crate::config::AiConfig;
-use crate::embedding::{build_llm_index_text, Embedder};
+use crate::embedding::{Embedder, build_llm_index_text};
 use crate::llm::LlmError;
-use crate::locks::{self, RwGuard, WriteLock, COMPACTION_LOCK_TIMEOUT};
+use crate::locks::{self, COMPACTION_LOCK_TIMEOUT, RwGuard, WriteLock};
 use crate::node::build_document_nodes;
 use crate::tokenizer::truncate_embedding_query;
 use crate::vector_store::{DocFilter, Hit, Row as VRow, VecStore};
@@ -107,15 +107,14 @@ fn cf_instance_str(name: &str, data_type: &str, r: &sqlx::postgres::PgRow, extra
         "longtext" => r.try_get::<Option<String>, _>("value_long_text").ok().flatten().unwrap_or(none),
         "monetary" => r.try_get::<Option<String>, _>("value_monetary").ok().flatten().unwrap_or(none),
         "date" => r.try_get::<Option<NaiveDate>, _>("value_date").ok().flatten().map(|d| d.format("%Y-%m-%d").to_string()).unwrap_or(none),
-        "boolean" => r.try_get::<Option<bool>, _>("value_bool").ok().flatten().map(|b| if b { "True" } else { "False" }.to_string()).unwrap_or(none),
+        "boolean" => {
+            r.try_get::<Option<bool>, _>("value_bool").ok().flatten().map(|b| if b { "True" } else { "False" }.to_string()).unwrap_or(none)
+        }
         "integer" => r.try_get::<Option<i32>, _>("value_int").ok().flatten().map(|i| i.to_string()).unwrap_or(none),
         "float" => r.try_get::<Option<f64>, _>("value_float").ok().flatten().map(py_float).unwrap_or(none),
-        "documentlink" => r
-            .try_get::<Option<Value>, _>("value_document_ids")
-            .ok()
-            .flatten()
-            .map(|v| crate::node::py_repr(&v))
-            .unwrap_or(none),
+        "documentlink" => {
+            r.try_get::<Option<Value>, _>("value_document_ids").ok().flatten().map(|v| crate::node::py_repr(&v)).unwrap_or(none)
+        }
         "select" => {
             let sel: Option<String> = r.try_get("value_select").ok().flatten();
             match sel {
@@ -155,11 +154,12 @@ pub async fn load_index_docs(state: &AppState, ids: Option<&[i64]>, after_id: i6
     let rows = sqlx::query(&sql).bind(after_id as i32).bind(ids32).bind(limit).fetch_all(db).await.map_err(store_err)?;
     let doc_ids: Vec<i32> = rows.iter().filter_map(|r| r.try_get::<i32, _>("id").ok()).collect();
     // notes (Note.objects, ordering created)
-    let notes = sqlx::query("SELECT document_id, note FROM documents_note WHERE document_id = ANY($1) AND deleted_at IS NULL ORDER BY created, id")
-        .bind(&doc_ids)
-        .fetch_all(db)
-        .await
-        .map_err(store_err)?;
+    let notes =
+        sqlx::query("SELECT document_id, note FROM documents_note WHERE document_id = ANY($1) AND deleted_at IS NULL ORDER BY created, id")
+            .bind(&doc_ids)
+            .fetch_all(db)
+            .await
+            .map_err(store_err)?;
     let cfs = sqlx::query(
         "SELECT i.document_id, f.name, f.data_type, f.extra_data, i.value_text, i.value_url, i.value_long_text, i.value_monetary, \
          i.value_date, i.value_bool, i.value_int, i.value_float, i.value_document_ids, i.value_select \
@@ -241,7 +241,12 @@ fn compact_excl(dir: &std::path::Path, st: &mut VecStore, force: bool) {
 }
 
 /// upstream `update_llm_index(rebuild=, document_ids=)` → message text.
-pub async fn update_llm_index(state: &AppState, cfg: &AiConfig, mut rebuild: bool, document_ids: Option<Vec<i64>>) -> Result<String, AiTaskError> {
+pub async fn update_llm_index(
+    state: &AppState,
+    cfg: &AiConfig,
+    mut rebuild: bool,
+    document_ids: Option<Vec<i64>>,
+) -> Result<String, AiTaskError> {
     let dir = index_dir(state);
     {
         let _w = write_lock(dir.clone()).await?;
@@ -252,10 +257,11 @@ pub async fn update_llm_index(state: &AppState, cfg: &AiConfig, mut rebuild: boo
             rebuild = true;
         }
     }
-    let any_docs: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM documents_document WHERE root_document_id IS NULL AND deleted_at IS NULL)")
-        .fetch_one(state.db())
-        .await
-        .map_err(store_err)?;
+    let any_docs: bool =
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM documents_document WHERE root_document_id IS NULL AND deleted_at IS NULL)")
+            .fetch_one(state.db())
+            .await
+            .map_err(store_err)?;
     if !any_docs && !rebuild && !llm_index_exists(state).await? {
         tracing::warn!(target: "pl_ai", "No documents found to index.");
         return Ok("No documents found to index.".into());
@@ -348,7 +354,9 @@ pub async fn update_document_in_llm_index(state: &AppState, document_id: i64) ->
     if !cfg.llm_index_enabled() {
         return Ok(());
     }
-    let root = crate::server::data::root_id(state.db(), document_id).await.map_err(|e| AiTaskError::new("DatabaseError", e.status().to_string()))?;
+    let root = crate::server::data::root_id(state.db(), document_id)
+        .await
+        .map_err(|e| AiTaskError::new("DatabaseError", e.status().to_string()))?;
     let docs = load_index_docs(state, Some(&[root]), 0, 1).await?;
     let Some(d) = docs.first() else { return Ok(()) };
     let emb = Embedder::from_config(&cfg)?;

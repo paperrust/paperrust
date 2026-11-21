@@ -39,9 +39,7 @@ pub struct StatusSocket {
 }
 
 fn peer(req: &Request) -> Option<SocketAddr> {
-    req.extensions()
-        .get::<ConnectInfo<SocketAddr>>()
-        .map(|c| c.0)
+    req.extensions().get::<ConnectInfo<SocketAddr>>().map(|c| c.0)
 }
 
 /// What Django's middleware decides before any view. Percent-encoded paths are routed in Rust
@@ -79,12 +77,8 @@ fn health(f: &Frontline) -> Response {
     let instance = pl_core::config::var("PAPERRUST_INSTANCE_ID");
     let body = health_body(f.rust_routes, instance.as_deref());
     let mut r = Response::new(Body::from(body.to_string()));
-    r.headers_mut().insert(
-        header::CONTENT_TYPE,
-        HeaderValue::from_static("application/json"),
-    );
-    r.headers_mut()
-        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    r.headers_mut().insert(header::CONTENT_TYPE, HeaderValue::from_static("application/json"));
+    r.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     r
 }
 
@@ -200,63 +194,51 @@ pub async fn frontline(State(f): State<Arc<Frontline>>, req: Request, next: Next
     // inserted; the response is then compressed here by Django's rules with the original
     // Accept-Encoding.
     let brand = f.branding.is_candidate(&method, &path, req.headers());
-    let original_ae =
-        django_mw::header_str(req.headers(), &header::ACCEPT_ENCODING).unwrap_or_default();
+    let original_ae = django_mw::header_str(req.headers(), &header::ACCEPT_ENCODING).unwrap_or_default();
     if brand {
         req.headers_mut().remove(header::ACCEPT_ENCODING);
     }
 
-    let (resp, via) = if path == HEALTH_PATH
-        && (method == Method::GET || method == Method::HEAD)
-        && health_is_local(peer_addr, req.headers())
-    {
-        (health(&f), "internal")
-    } else if let Some(asset) = f
-        .branding
-        .enabled
-        .then(|| crate::branding::asset_response(&method, &path))
-        .flatten()
-    {
-        (asset, "internal")
-    } else if let Some(ws) = f
-        .status_ws
-        .as_ref()
-        .filter(|_| path == crate::ws::PATH && req.headers().contains_key(header::UPGRADE))
-    {
-        // Channels routes websockets without Django's HTTP middleware (no host check). A plain
-        // HTTP GET on /ws/status/ is ordinary Django HTTP (urlpatterns → IndexView catch-all).
-        let resp = crate::ws::status_socket(axum::Extension(ws.authz.clone()), axum::Extension(ws.bus.clone()), req).await;
-        (resp, "rust")
-    } else {
-        let mut info = RequestInfo::capture(&method, &path, req.headers(), &f.settings);
-        info.accept_encoding = original_ae.clone();
-        // pl-authz notes authentication / session-cookie deletion here.
-        let notes = pl_core::RequestNotes::new();
-        let mut req = req;
-        req.extensions_mut().insert(notes.clone());
-        let early = before_views(&req, &f.settings);
-        // A panicking handler must not kill the connection: answer like Django's
-        // generic 500 page (the middleware headers still apply, as in Django).
-        let mut resp = match early {
-            Some(r) => r,
-            None => match std::panic::AssertUnwindSafe(next.run(req)).catch_unwind().await {
-                Ok(r) => r,
-                Err(_) => {
-                    tracing::error!(method = %method, path = %log_path(&path), "handler panicked");
-                    pl_core::ApiError::internal("handler panicked").into_response()
-                }
-            },
+    let (resp, via) =
+        if path == HEALTH_PATH && (method == Method::GET || method == Method::HEAD) && health_is_local(peer_addr, req.headers()) {
+            (health(&f), "internal")
+        } else if let Some(asset) = f.branding.enabled.then(|| crate::branding::asset_response(&method, &path)).flatten() {
+            (asset, "internal")
+        } else if let Some(ws) = f.status_ws.as_ref().filter(|_| path == crate::ws::PATH && req.headers().contains_key(header::UPGRADE)) {
+            // Channels routes websockets without Django's HTTP middleware (no host check). A plain
+            // HTTP GET on /ws/status/ is ordinary Django HTTP (urlpatterns → IndexView catch-all).
+            let resp = crate::ws::status_socket(axum::Extension(ws.authz.clone()), axum::Extension(ws.bus.clone()), req).await;
+            (resp, "rust")
+        } else {
+            let mut info = RequestInfo::capture(&method, &path, req.headers(), &f.settings);
+            info.accept_encoding = original_ae.clone();
+            // pl-authz notes authentication / session-cookie deletion here.
+            let notes = pl_core::RequestNotes::new();
+            let mut req = req;
+            req.extensions_mut().insert(notes.clone());
+            let early = before_views(&req, &f.settings);
+            // A panicking handler must not kill the connection: answer like Django's
+            // generic 500 page (the middleware headers still apply, as in Django).
+            let mut resp = match early {
+                Some(r) => r,
+                None => match std::panic::AssertUnwindSafe(next.run(req)).catch_unwind().await {
+                    Ok(r) => r,
+                    Err(_) => {
+                        tracing::error!(method = %method, path = %log_path(&path), "handler panicked");
+                        pl_core::ApiError::internal("handler panicked").into_response()
+                    }
+                },
+            };
+            apply_notes(&mut resp, &notes);
+            django_mw::finish_headers(&mut resp, &info, &f.settings);
+            if brand {
+                resp = f.branding.inject_response(resp).await;
+            }
+            if compression_enabled(&f.settings) {
+                resp = compress::compress(resp, &info.accept_encoding).await;
+            }
+            (resp, "rust")
         };
-        apply_notes(&mut resp, &notes);
-        django_mw::finish_headers(&mut resp, &info, &f.settings);
-        if brand {
-            resp = f.branding.inject_response(resp).await;
-        }
-        if compression_enabled(&f.settings) {
-            resp = compress::compress(resp, &info.accept_encoding).await;
-        }
-        (resp, "rust")
-    };
 
     guard.done = true;
     guard.emit(resp.status().as_u16(), via, "ok");
@@ -278,9 +260,7 @@ fn apply_notes(resp: &mut Response, notes: &pl_core::RequestNotes) {
 /// `PAPERLESS_ENABLE_COMPRESSION` live (value from the UI, docs/SETTINGS.md WP4b); invalid
 /// or missing values → start value.
 fn compression_enabled(s: &crate::config::DjangoSettings) -> bool {
-    pl_core::config::var("PAPERLESS_ENABLE_COMPRESSION")
-        .and_then(|v| pl_core::config::str_to_bool(&v))
-        .unwrap_or(s.enable_compression)
+    pl_core::config::var("PAPERLESS_ENABLE_COMPRESSION").and_then(|v| pl_core::config::str_to_bool(&v)).unwrap_or(s.enable_compression)
 }
 
 #[cfg(test)]

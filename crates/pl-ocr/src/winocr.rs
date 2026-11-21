@@ -251,8 +251,8 @@ mod imp {
         /// Checks whether the WinRT class is present (`AvailableRecognizerLanguages`), otherwise
         /// [`OcrError::Unavailable`].
         pub fn new(osd: Option<TesseractCli>) -> Result<Self> {
-            let max_dim = WinEngine::MaxImageDimension()
-                .map_err(|e| OcrError::Unavailable(format!("Windows.Media.Ocr not available: {e}")))?;
+            let max_dim =
+                WinEngine::MaxImageDimension().map_err(|e| OcrError::Unavailable(format!("Windows.Media.Ocr not available: {e}")))?;
             WinEngine::AvailableRecognizerLanguages()
                 .map_err(|e| OcrError::Unavailable(format!("Windows.Media.Ocr not available: {e}")))?;
             Ok(Self { osd: osd.filter(TesseractCli::is_available), max_dim })
@@ -262,9 +262,7 @@ mod imp {
         pub fn installed_tags() -> Result<Vec<String>> {
             let langs = WinEngine::AvailableRecognizerLanguages().map_err(werr("languages"))?;
             let n = langs.Size().map_err(werr("languages"))?;
-            (0..n)
-                .map(|i| langs.GetAt(i).and_then(|l| l.LanguageTag()).map(|t| t.to_string()).map_err(werr("languages")))
-                .collect()
+            (0..n).map(|i| langs.GetAt(i).and_then(|l| l.LanguageTag()).map(|t| t.to_string()).map_err(werr("languages"))).collect()
         }
 
         fn plan(&self, languages: &str) -> Result<LangPlan> {
@@ -293,8 +291,8 @@ mod imp {
             let mut gray = to_gray(raster.channels, &raster.data);
             let (mut w, mut h) = (raster.width, raster.height);
             if scale < 1.0 {
-                let img = image::GrayImage::from_raw(w, h, gray)
-                    .ok_or_else(|| OcrError::Other("raster size does not match its data".into()))?;
+                let img =
+                    image::GrayImage::from_raw(w, h, gray).ok_or_else(|| OcrError::Other("raster size does not match its data".into()))?;
                 w = ((f64::from(w) * scale).floor() as u32).max(1);
                 h = ((f64::from(h) * scale).floor() as u32).max(1);
                 gray = image::imageops::resize(&img, w, h, image::imageops::FilterType::Triangle).into_raw();
@@ -303,8 +301,8 @@ mod imp {
             writer.WriteBytes(&gray).map_err(werr("buffer"))?;
             let buffer = writer.DetachBuffer().map_err(werr("buffer"))?;
             let to_i32 = |v: u32| i32::try_from(v).map_err(|_| OcrError::Other("image too large".into()));
-            let bitmap = SoftwareBitmap::CreateCopyFromBuffer(&buffer, BitmapPixelFormat::Gray8, to_i32(w)?, to_i32(h)?)
-                .map_err(werr("bitmap"))?;
+            let bitmap =
+                SoftwareBitmap::CreateCopyFromBuffer(&buffer, BitmapPixelFormat::Gray8, to_i32(w)?, to_i32(h)?).map_err(werr("bitmap"))?;
             let engine = Self::take_engine(tag)?;
             let result = run(&engine, &bitmap, timeout);
             // On timeout the recognition may still be running: do not reuse the instance.
@@ -417,7 +415,9 @@ mod imp {
                 None => {
                     static WARNED: std::sync::Once = std::sync::Once::new();
                     WARNED.call_once(|| {
-                        tracing::warn!("Windows OCR cannot detect page orientation and tesseract (OSD) is not available; pages are not rotated");
+                        tracing::warn!(
+                            "Windows OCR cannot detect page orientation and tesseract (OSD) is not available; pages are not rotated"
+                        );
                     });
                     Ok(None)
                 }

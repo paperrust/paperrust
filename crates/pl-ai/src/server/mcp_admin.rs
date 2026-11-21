@@ -13,7 +13,7 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use pl_authz::{AuthUser, User};
 use pl_core::{ApiError, AppState, Drf, RequestContext};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::mcp::api::SideStore as _;
 use crate::mcp::backend::AuditEntry;
@@ -22,16 +22,15 @@ use crate::pg::PgSideStore;
 
 fn require_superuser(auth: &AuthUser) -> Result<&User, ApiError> {
     let u = auth.user();
-    if u.is_active && u.is_superuser {
-        Ok(u)
-    } else {
-        Err(ApiError::permission_denied())
-    }
+    if u.is_active && u.is_superuser { Ok(u) } else { Err(ApiError::permission_denied()) }
 }
 
 fn storage_err(e: sqlx::Error) -> ApiError {
     if matches!(&e, sqlx::Error::Database(d) if d.code().as_deref() == Some("42P01")) {
-        return ApiError::with_detail(StatusCode::SERVICE_UNAVAILABLE, "MCP scope storage is not installed (migration 0002_paperrust_ai_mcp_scope.sql).");
+        return ApiError::with_detail(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "MCP scope storage is not installed (migration 0002_paperrust_ai_mcp_scope.sql).",
+        );
     }
     tracing::error!(target: "pl_ai", error = %e, "mcp scope storage failed");
     ApiError::internal("mcp scope storage failed")

@@ -105,12 +105,7 @@ pub fn parse_body(body: &[u8]) -> Check {
 
 /// One GitHub request (`Accept: application/vnd.github+json`), status ≠ 2xx → unknown.
 pub async fn fetch(client: &reqwest::Client, url: &str) -> Check {
-    let resp = client
-        .get(url)
-        .header(reqwest::header::ACCEPT, "application/vnd.github+json")
-        .timeout(FETCH_TIMEOUT)
-        .send()
-        .await;
+    let resp = client.get(url).header(reqwest::header::ACCEPT, "application/vnd.github+json").timeout(FETCH_TIMEOUT).send().await;
     let mut resp = match resp {
         Ok(r) if r.status().is_success() => r,
         Ok(r) => {
@@ -201,10 +196,7 @@ pub fn update_check_enabled(cfg: &Config) -> bool {
 
 /// Query URL: test hook `PAPERRUST_REMOTE_VERSION_URL` (alt `PAPERLESS_RS_REMOTE_VERSION_URL`).
 fn check_url(cfg: &Config) -> &str {
-    cfg.env
-        .get("PAPERRUST_REMOTE_VERSION_URL")
-        .or_else(|| cfg.env.get("PAPERLESS_RS_REMOTE_VERSION_URL"))
-        .unwrap_or(GITHUB_LATEST_URL)
+    cfg.env.get("PAPERRUST_REMOTE_VERSION_URL").or_else(|| cfg.env.get("PAPERLESS_RS_REMOTE_VERSION_URL")).unwrap_or(GITHUB_LATEST_URL)
 }
 
 fn client() -> &'static reqwest::Client {
@@ -224,11 +216,7 @@ fn client() -> &'static reqwest::Client {
 /// `GET /api/remote_version/`
 pub async fn get(State(state): State<AppState>, _ctx: RequestContext, _auth: MaybeUser) -> Result<Response> {
     let cfg = state.config();
-    let check = if update_check_enabled(cfg) {
-        check_with(&CACHE, client(), check_url(cfg)).await
-    } else {
-        Check::Disabled
-    };
+    let check = if update_check_enabled(cfg) { check_with(&CACHE, client(), check_url(cfg)).await } else { Check::Disabled };
     Ok(Drf::ok(response_body(&check, CURRENT_VERSION)).into_response())
 }
 

@@ -18,8 +18,8 @@
 use pl_authz::models::{self, ObjectModel};
 use pl_authz::objects::{self, PermOpts};
 use pl_authz::{owned, perms, user};
-use sea_query::PostgresQueryBuilder;
 use pl_core::sqlbind::SqlxBinder as _;
+use sea_query::PostgresQueryBuilder;
 use serde_json::Value;
 use sqlx::PgPool;
 
@@ -33,8 +33,7 @@ async fn pool() -> PgPool {
     if std::env::var("PL_AUTHZ_ENGINE").as_deref() == Ok("grants") {
         pl_authz::grants::set_override(Some(pl_authz::grants::Engine::Grants));
     }
-    let url = std::env::var("PL_AUTHZ_TEST_DB")
-        .unwrap_or_else(|_| "postgres://paperless:paperless@127.0.0.1:54329/paperless".into());
+    let url = std::env::var("PL_AUTHZ_TEST_DB").unwrap_or_else(|_| "postgres://paperless:paperless@127.0.0.1:54329/paperless".into());
     sqlx::postgres::PgPoolOptions::new().max_connections(2).connect(&url).await.unwrap()
 }
 
@@ -73,8 +72,7 @@ async fn users_groups_and_model_perms() {
         let u = user::load_user_by_username(&db, name).await.unwrap().unwrap();
         assert_eq!(u.id, e["id"].as_i64().unwrap(), "{name}");
         assert_eq!(u.groups, ids(&e["groups"]), "{name}");
-        let want: Vec<String> =
-            e["perms"].as_array().unwrap().iter().map(|p| p.as_str().unwrap().to_string()).collect();
+        let want: Vec<String> = e["perms"].as_array().unwrap().iter().map(|p| p.as_str().unwrap().to_string()).collect();
         assert_eq!(u.all_permissions_sorted(), want, "{name}");
     }
 }
@@ -85,11 +83,7 @@ async fn permitted_object_ids_match_django() {
     let db = pool().await;
     let exp = expected();
     for (name, per_model) in exp["permitted"].as_object().unwrap() {
-        let u = if name == "<anon>" {
-            None
-        } else {
-            Some(user::load_user_by_username(&db, name).await.unwrap().unwrap())
-        };
+        let u = if name == "<anon>" { None } else { Some(user::load_user_by_username(&db, name).await.unwrap().unwrap()) };
         for (key, want) in per_model.as_object().unwrap() {
             let (m, action) = key.split_once('.').unwrap();
             let q = if m == "document" {
@@ -128,8 +122,7 @@ async fn grantees_shared_and_object_perms_match_django() {
     }
     for (key, per_user) in exp["obj_perm"].as_object().unwrap() {
         let m = model(key);
-        let all: Vec<i64> =
-            exp["grantees"][key].as_object().unwrap().keys().map(|k| k.parse().unwrap()).collect();
+        let all: Vec<i64> = exp["grantees"][key].as_object().unwrap().keys().map(|k| k.parse().unwrap()).collect();
         for (name, per_action) in per_user.as_object().unwrap() {
             let u = user::load_user_by_username(&db, name).await.unwrap().unwrap();
             for (action, want) in per_action.as_object().unwrap() {
@@ -165,8 +158,7 @@ async fn owned_info_single_query_equals_separate_helpers() {
     let exp = expected();
     for key in exp["grantees"].as_object().unwrap().keys() {
         let m = model(key);
-        let mut pks: Vec<i64> =
-            exp["grantees"][key].as_object().unwrap().keys().map(|k| k.parse().unwrap()).collect();
+        let mut pks: Vec<i64> = exp["grantees"][key].as_object().unwrap().keys().map(|k| k.parse().unwrap()).collect();
         pks.push(999_999); // unknown pk: entry without grants
         let all = owned::OwnedFields::new(false, true);
         let info = owned::OwnedInfo::load(&db, &m, &pks, all, true).await.unwrap();

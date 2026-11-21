@@ -157,10 +157,7 @@ pub async fn load_user_by_username(db: &PgPool, username: &str) -> Result<Option
 
 /// allauth `get_user_by_username(username)`: candidates by `username__iexact`, then those whose
 /// stored username `.lower()` equals `username.lower()`; exactly one → that user, else `None`.
-pub async fn load_user_by_username_iexact(
-    db: &PgPool,
-    username: &str,
-) -> Result<Option<User>, sqlx::Error> {
+pub async fn load_user_by_username_iexact(db: &PgPool, username: &str) -> Result<Option<User>, sqlx::Error> {
     let sql = format!("{USER_SELECT} WHERE UPPER(u.username::text) = UPPER($1)");
     let rows = sqlx::query(&sql).bind(username).fetch_all(db).await?;
     let wanted = username.to_lowercase();
@@ -198,20 +195,13 @@ pub async fn warm_up(conn: &mut sqlx::PgConnection) -> Result<(), sqlx::Error> {
 /// allauth `DefaultMFAAdapter.is_mfa_enabled(user)`: any `mfa_authenticator` row.
 pub async fn is_mfa_enabled(db: &PgPool, user_id: i64) -> Result<bool, sqlx::Error> {
     let (b,): (bool,) =
-        sqlx::query_as("SELECT EXISTS(SELECT 1 FROM mfa_authenticator WHERE user_id = $1)")
-            .bind(user_id)
-            .fetch_one(db)
-            .await?;
+        sqlx::query_as("SELECT EXISTS(SELECT 1 FROM mfa_authenticator WHERE user_id = $1)").bind(user_id).fetch_one(db).await?;
     Ok(b)
 }
 
 /// Persist a new password hash (Django's `check_password` setter after `must_update`).
 pub async fn update_password(db: &PgPool, user_id: i64, encoded: &str) -> Result<(), sqlx::Error> {
-    sqlx::query("UPDATE auth_user SET password = $1 WHERE id = $2")
-        .bind(encoded)
-        .bind(user_id)
-        .execute(db)
-        .await?;
+    sqlx::query("UPDATE auth_user SET password = $1 WHERE id = $2").bind(encoded).bind(user_id).execute(db).await?;
     Ok(())
 }
 

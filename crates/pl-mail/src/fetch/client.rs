@@ -676,9 +676,7 @@ impl MailBox {
             return Err(ImapError::Status { kind: "MailboxUidsError", message: format!("\"{}\" received", r.typ) });
         }
         match r.data.first() {
-            Some(Some(Item::Line(l))) if !l.is_empty() => {
-                Ok(String::from_utf8_lossy(l).split_whitespace().map(str::to_string).collect())
-            }
+            Some(Some(Item::Line(l))) if !l.is_empty() => Ok(String::from_utf8_lossy(l).split_whitespace().map(str::to_string).collect()),
             _ => Ok(Vec::new()),
         }
     }

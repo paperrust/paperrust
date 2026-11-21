@@ -48,10 +48,7 @@ pub fn parse_qs(qs: &str) -> Vec<(String, String)> {
 const QUOTE_PLUS: &AsciiSet = &NON_ALPHANUMERIC.remove(b'_').remove(b'.').remove(b'-').remove(b'~');
 
 fn quote_plus(s: &str) -> String {
-    s.split(' ')
-        .map(|part| utf8_percent_encode(part, QUOTE_PLUS).to_string())
-        .collect::<Vec<_>>()
-        .join("+")
+    s.split(' ').map(|part| utf8_percent_encode(part, QUOTE_PLUS).to_string()).collect::<Vec<_>>().join("+")
 }
 
 /// `api_version` from the Accept header (AcceptHeaderVersioning, default 10).
@@ -72,10 +69,7 @@ pub fn parse_api_version(accept: Option<&str>) -> Result<u32, ApiError> {
                     return match v {
                         "9" => Ok(9),
                         "10" => Ok(10),
-                        _ => Err(ApiError::detail(
-                            StatusCode::NOT_ACCEPTABLE,
-                            "Invalid version in \"Accept\" header.",
-                        )),
+                        _ => Err(ApiError::detail(StatusCode::NOT_ACCEPTABLE, "Invalid version in \"Accept\" header.")),
                     };
                 }
             }
@@ -117,9 +111,7 @@ impl ReqInfo {
 
     /// `?full_perms=` → `get_boolean`.
     pub fn full_perms(&self) -> bool {
-        self.param("full_perms")
-            .map(|v| matches!(v.to_lowercase().as_str(), "yes" | "y" | "1" | "t" | "true"))
-            .unwrap_or(false)
+        self.param("full_perms").map(|v| matches!(v.to_lowercase().as_str(), "yes" | "y" | "1" | "t" | "true")).unwrap_or(false)
     }
 
     fn url_with(&self, key: &str, value: Option<String>) -> String {
@@ -147,12 +139,7 @@ impl ReqInfo {
         keys.sort();
         let q: Vec<String> = keys
             .iter()
-            .flat_map(|k| {
-                vals.get(k)
-                    .into_iter()
-                    .flatten()
-                    .map(move |v| format!("{}={}", quote_plus(k), quote_plus(v)))
-            })
+            .flat_map(|k| vals.get(k).into_iter().flatten().map(move |v| format!("{}={}", quote_plus(k), quote_plus(v))))
             .collect();
         let mut url = format!("{}://{}{}", self.scheme, self.host, self.path);
         if !q.is_empty() {
@@ -214,28 +201,18 @@ pub fn paginate(info: &ReqInfo, count: i64) -> Result<Page, ApiError> {
 pub fn paginated(info: &ReqInfo, page: &Page, results: Vec<Value>, all_ids: Option<Vec<i32>>) -> Value {
     let mut m = Map::new();
     m.insert("count".into(), Value::from(page.count));
-    let next = if page.number < page.num_pages {
-        Value::String(info.url_with("page", Some((page.number + 1).to_string())))
-    } else {
-        Value::Null
-    };
+    let next =
+        if page.number < page.num_pages { Value::String(info.url_with("page", Some((page.number + 1).to_string()))) } else { Value::Null };
     let previous = if page.number > 1 {
         let p = page.number - 1;
-        Value::String(if p == 1 {
-            info.url_with("page", None)
-        } else {
-            info.url_with("page", Some(p.to_string()))
-        })
+        Value::String(if p == 1 { info.url_with("page", None) } else { info.url_with("page", Some(p.to_string())) })
     } else {
         Value::Null
     };
     m.insert("next".into(), next);
     m.insert("previous".into(), previous);
     if info.api_version < 10 {
-        m.insert(
-            "all".into(),
-            Value::Array(all_ids.unwrap_or_default().into_iter().map(Value::from).collect()),
-        );
+        m.insert("all".into(), Value::Array(all_ids.unwrap_or_default().into_iter().map(Value::from).collect()));
     }
     m.insert("results".into(), Value::Array(results));
     Value::Object(m)

@@ -96,9 +96,8 @@ fn parse_body(headers: &HeaderMap, body: &Bytes) -> Result<Value, Response> {
     if main != "application/json" {
         return Err(e(ApiError::unsupported_media_type(ct)));
     }
-    serde_json::from_slice::<Value>(body).map_err(|err| {
-        e(ApiError::json_parse_error(&crate::pyjson::decode_error(body).unwrap_or_else(|| err.to_string())))
-    })
+    serde_json::from_slice::<Value>(body)
+        .map_err(|err| e(ApiError::json_parse_error(&crate::pyjson::decode_error(body).unwrap_or_else(|| err.to_string()))))
 }
 
 /// `Serializer.is_valid` with `data=None` → `{"non_field_errors": ["No data provided"]}`.
@@ -120,10 +119,7 @@ async fn render(db: &mut PgConnection, kind: Kind, rows: &[Map<String, Value>], 
 }
 
 async fn render_one(db: &mut PgConnection, kind: Kind, id: i64, prefetch: bool) -> Result<Value, Response> {
-    let row = load::get_row(db, kind.table(), id)
-        .await
-        .map_err(db_err)?
-        .ok_or_else(|| e(ApiError::internal("saved object vanished")))?;
+    let row = load::get_row(db, kind.table(), id).await.map_err(db_err)?.ok_or_else(|| e(ApiError::internal("saved object vanished")))?;
     let mut v = render(db, kind, &[row], prefetch).await?;
     v.pop().ok_or_else(|| e(ApiError::internal("render failed")))
 }
@@ -228,15 +224,7 @@ fn check_body_id(data: &Value, pk: &str) -> Result<(), Response> {
     Ok(())
 }
 
-pub async fn update(
-    kind: Kind,
-    partial: bool,
-    state: AppState,
-    auth: AuthUser,
-    pk: String,
-    headers: HeaderMap,
-    body: Bytes,
-) -> HR {
+pub async fn update(kind: Kind, partial: bool, state: AppState, auth: AuthUser, pk: String, headers: HeaderMap, body: Bytes) -> HR {
     auth.require_model_perms(kind.model()).map_err(e)?;
     let data = parse_body(&headers, &body)?;
     if partial && kind != Kind::Workflow {

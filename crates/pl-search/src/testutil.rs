@@ -128,10 +128,7 @@ pub fn build_doc(index: &Index, d: &TestDoc) -> TantivyDocument {
     for g in &d.viewer_group_ids {
         doc.add_u64(f(index, "viewer_group_id"), *g);
     }
-    let mut words: Vec<String> = sources
-        .iter()
-        .flat_map(|s| autocomplete_tokens(s))
-        .collect();
+    let mut words: Vec<String> = sources.iter().flat_map(|s| autocomplete_tokens(s)).collect();
     words.sort();
     words.dedup();
     for w in words {

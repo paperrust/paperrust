@@ -47,11 +47,8 @@ fn token(user: &str) -> Option<String> {
 }
 
 fn reset() {
-    let st = std::process::Command::new("bash")
-        .arg(w4_dir().join("reset.sh"))
-        .stdout(std::process::Stdio::null())
-        .status()
-        .expect("reset.sh");
+    let st =
+        std::process::Command::new("bash").arg(w4_dir().join("reset.sh")).stdout(std::process::Stdio::null()).status().expect("reset.sh");
     assert!(st.success(), "reset failed");
 }
 
@@ -247,10 +244,13 @@ async fn rust_call(case: &Value, norm: &mut Norm) -> Resp {
     let mut by_path: BTreeMap<&str, axum::routing::MethodRouter<pl_core::AppState>> = BTreeMap::new();
     for r in pl_documents_write::routes() {
         let e = by_path.remove(r.path);
-        by_path.insert(r.path, match e {
-            Some(m) => m.merge(r.handler),
-            None => r.handler,
-        });
+        by_path.insert(
+            r.path,
+            match e {
+                Some(m) => m.merge(r.handler),
+                None => r.handler,
+            },
+        );
     }
     for (p, h) in by_path {
         router = router.route(p, h);
@@ -340,10 +340,8 @@ fn media_root() -> PathBuf {
 #[ignore = "braucht die W4-Referenz-Kopie (tests/parity/pl-documents-write/django-start.sh) und w4env.sh"]
 async fn write_paths_match_django() {
     assert_eq!(std::env::var("PAPERLESS_DBNAME").as_deref(), Ok("pl_w4_ref"), "source w4env.sh first");
-    let cases: Vec<Value> = serde_json::from_str(
-        &std::fs::read_to_string(w4_dir().join("write_cases.json")).expect("write_cases.json"),
-    )
-    .expect("cases json");
+    let cases: Vec<Value> =
+        serde_json::from_str(&std::fs::read_to_string(w4_dir().join("write_cases.json")).expect("write_cases.json")).expect("cases json");
     let only: Option<Vec<String>> = std::env::var("W4_CASES").ok().map(|s| s.split(',').map(str::to_string).collect());
     let t0 = Utc::now() - chrono::Duration::seconds(5);
     let mut report = Vec::new();

@@ -9,26 +9,16 @@ use crate::error::ApiError;
 
 /// `request.data`: empty body → `{}`; JSON → value; other content type → 415.
 pub fn parse_body(headers: &HeaderMap, body: &[u8]) -> Result<Value, ApiError> {
-    let ct = headers
-        .get(header::CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .trim()
-        .to_string();
+    let ct = headers.get(header::CONTENT_TYPE).and_then(|v| v.to_str().ok()).unwrap_or("").trim().to_string();
     if body.is_empty() {
         return Ok(Value::Object(Map::new()));
     }
     let mt = ct.split(';').next().unwrap_or("").trim().to_ascii_lowercase();
     if mt != "application/json" {
         let shown = if ct.is_empty() { "".to_string() } else { ct.clone() };
-        return Err(ApiError::detail(
-            StatusCode::UNSUPPORTED_MEDIA_TYPE,
-            format!("Unsupported media type \"{shown}\" in request."),
-        ));
+        return Err(ApiError::detail(StatusCode::UNSUPPORTED_MEDIA_TYPE, format!("Unsupported media type \"{shown}\" in request.")));
     }
-    serde_json::from_slice::<Value>(body).map_err(|e| {
-        ApiError::detail(StatusCode::BAD_REQUEST, format!("JSON parse error - {e}"))
-    })
+    serde_json::from_slice::<Value>(body).map_err(|e| ApiError::detail(StatusCode::BAD_REQUEST, format!("JSON parse error - {e}")))
 }
 
 /// Body as object, otherwise DRF `non_field_errors` (Serializer.to_internal_value).

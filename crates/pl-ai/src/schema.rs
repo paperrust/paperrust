@@ -10,7 +10,7 @@
 //! * [`model_to_classification_suggestions`] = function of the same name (check candidate ids).
 
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// upstream `MAX_EXISTING_IDS`.
@@ -103,9 +103,7 @@ fn int_list(obj: &Map<String, Value>, key: &str, max: usize) -> Result<Vec<i64>,
             .map(|v| match v {
                 // pydantic (lax): int, integral float, numeric string
                 Value::Number(n) if n.as_i64().is_some() => Ok(n.as_i64().unwrap_or_default()),
-                Value::Number(n) if n.as_f64().is_some_and(|f| f.fract() == 0.0) => {
-                    Ok(n.as_f64().unwrap_or_default() as i64)
-                }
+                Value::Number(n) if n.as_f64().is_some_and(|f| f.fract() == 0.0) => Ok(n.as_f64().unwrap_or_default() as i64),
                 Value::String(s) if s.trim().parse::<i64>().is_ok() => Ok(s.trim().parse().unwrap_or_default()),
                 _ => Err(SchemaError(format!("{key}: Input should be a valid integer"))),
             })
@@ -200,24 +198,9 @@ pub fn model_to_classification_suggestions(m: &ClassifierResponse, allowed: &All
     ClassificationSuggestions {
         title: m.title.clone(),
         tags: choice(&m.tags, &m.matched_tags, &m.tag_ids, allowed.get("tags")),
-        correspondents: choice(
-            &m.correspondents,
-            &m.matched_correspondents,
-            &m.correspondent_ids,
-            allowed.get("correspondents"),
-        ),
-        document_types: choice(
-            &m.document_types,
-            &m.matched_document_types,
-            &m.document_type_ids,
-            allowed.get("document_types"),
-        ),
-        storage_paths: choice(
-            &m.storage_paths,
-            &m.matched_storage_paths,
-            &m.storage_path_ids,
-            allowed.get("storage_paths"),
-        ),
+        correspondents: choice(&m.correspondents, &m.matched_correspondents, &m.correspondent_ids, allowed.get("correspondents")),
+        document_types: choice(&m.document_types, &m.matched_document_types, &m.document_type_ids, allowed.get("document_types")),
+        storage_paths: choice(&m.storage_paths, &m.matched_storage_paths, &m.storage_path_ids, allowed.get("storage_paths")),
         dates: m.dates.clone(),
     }
 }

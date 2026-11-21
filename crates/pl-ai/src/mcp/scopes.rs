@@ -23,9 +23,19 @@ pub const GROUPS: [&str; 3] = ["read", "write", "ingest"];
 /// Group of a tool (`None` = unknown tool).
 pub fn tool_group(tool: &str) -> Option<&'static str> {
     Some(match tool {
-        "list_taxonomy" | "find_similar" | "search_documents" | "get_document" | "suggest_metadata" | "ask_documents"
-        | "get_document_content" | "list_recent_documents" | "list_saved_views" | "run_saved_view" | "get_custom_fields"
-        | "list_notes" | "get_task_status" => "read",
+        "list_taxonomy"
+        | "find_similar"
+        | "search_documents"
+        | "get_document"
+        | "suggest_metadata"
+        | "ask_documents"
+        | "get_document_content"
+        | "list_recent_documents"
+        | "list_saved_views"
+        | "run_saved_view"
+        | "get_custom_fields"
+        | "list_notes"
+        | "get_task_status" => "read",
         "update_document" | "create_taxonomy" | "add_alias" | "set_custom_field" | "add_note" => "write",
         "add_document" => "ingest",
         _ => return None,

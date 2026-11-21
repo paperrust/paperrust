@@ -12,26 +12,23 @@ use axum::extract::{Path, State};
 use axum::http::{Method, StatusCode};
 use axum::response::Response;
 use pl_core::AppState;
-use sea_query::{Alias, Expr, PostgresQueryBuilder, Query, SelectStatement};
 use pl_core::sqlbind::SqlxBinder;
+use sea_query::{Alias, Expr, PostgresQueryBuilder, Query, SelectStatement};
 use serde_json::{Map, Value, json};
 use sqlx::{PgPool, Row};
 
 use crate::authz::{
-    apply_set_permissions, check_object_perm, grantees, parse_owner, parse_set_permissions,
-    require_model_perm, user_can_change, visible,
+    apply_set_permissions, check_object_perm, grantees, parse_owner, parse_set_permissions, require_model_perm, user_can_change, visible,
 };
-use pl_authz::models::{ObjectModel, SAVED_VIEW};
-use pl_authz::owned::{ObjectGrantees, PermissionsSpec};
 use crate::fields::{
-    CharOpts, ChoiceOpts, Errors, F, IntOpts, bool_field, char_field, choice_int, choice_str,
-    int_field, json_field, parse_bool, py_str,
+    CharOpts, ChoiceOpts, Errors, F, IntOpts, bool_field, char_field, choice_int, choice_str, int_field, json_field, parse_bool, py_str,
 };
 use crate::query::{apply_ordering, ordering_terms};
 use crate::shim::{
-    ApiError, ApiResult, Ctx, finish, json_response, no_content, page_request, paginated,
-    parse_body, parse_pk, py_type_name, resolve_page,
+    ApiError, ApiResult, Ctx, finish, json_response, no_content, page_request, paginated, parse_body, parse_pk, py_type_name, resolve_page,
 };
+use pl_authz::models::{ObjectModel, SAVED_VIEW};
+use pl_authz::owned::{ObjectGrantees, PermissionsSpec};
 
 const OM: ObjectModel = SAVED_VIEW;
 const LABEL: &str = "SavedView";
@@ -159,10 +156,7 @@ fn from_row(r: &sqlx::postgres::PgRow) -> Result<View, sqlx::Error> {
         sort_reverse: r.try_get("sort_reverse")?,
         page_size: r.try_get("page_size")?,
         display_mode: r.try_get("display_mode")?,
-        display_fields: r
-            .try_get::<Option<sqlx::types::Json<Value>>, _>("display_fields")?
-            .map(|j| j.0)
-            .unwrap_or(Value::Null),
+        display_fields: r.try_get::<Option<sqlx::types::Json<Value>>, _>("display_fields")?.map(|j| j.0).unwrap_or(Value::Null),
         owner_id: r.try_get("owner_id")?,
     })
 }
@@ -190,9 +184,7 @@ async fn load_rules(db: &PgPool, ids: &[i64]) -> ApiResult<HashMap<i64, Vec<Valu
         let sv: i64 = r.try_get("sv")?;
         let rt: i64 = r.try_get("rule_type")?;
         let v: Option<String> = r.try_get("value")?;
-        out.entry(sv)
-            .or_default()
-            .push(json!({"rule_type": rt, "value": v}));
+        out.entry(sv).or_default().push(json!({"rule_type": rt, "value": v}));
     }
     Ok(out)
 }
@@ -205,31 +197,19 @@ struct LegacyVis {
 
 async fn load_legacy(db: &PgPool, uid: i64) -> ApiResult<LegacyVis> {
     let s: Option<Option<sqlx::types::Json<Value>>> =
-        sqlx::query_scalar("SELECT settings FROM documents_uisettings WHERE user_id = $1::int8")
-            .bind(uid)
-            .fetch_optional(db)
-            .await?;
-    let mut lv = LegacyVis {
-        dashboard: Vec::new(),
-        sidebar: Vec::new(),
-    };
+        sqlx::query_scalar("SELECT settings FROM documents_uisettings WHERE user_id = $1::int8").bind(uid).fetch_optional(db).await?;
+    let mut lv = LegacyVis { dashboard: Vec::new(), sidebar: Vec::new() };
     let Some(Some(sqlx::types::Json(Value::Object(settings)))) = s else {
         return Ok(lv);
     };
     if settings.is_empty() {
         return Ok(lv);
     }
-    let sv = settings
-        .get("saved_views")
-        .cloned()
-        .unwrap_or(Value::Object(Map::new()));
+    let sv = settings.get("saved_views").cloned().unwrap_or(Value::Object(Map::new()));
     let Value::Object(sv) = sv else {
         return Ok(lv);
     };
-    for (key, target) in [
-        ("dashboard_views_visible_ids", &mut lv.dashboard),
-        ("sidebar_views_visible_ids", &mut lv.sidebar),
-    ] {
+    for (key, target) in [("dashboard_views_visible_ids", &mut lv.dashboard), ("sidebar_views_visible_ids", &mut lv.sidebar)] {
         match sv.get(key) {
             None => {}
             Some(Value::Array(a)) => *target = a.clone(),
@@ -265,11 +245,7 @@ async fn ser_ctx(db: &PgPool, ctx: &Ctx, ids: &[i64]) -> ApiResult<SerCtx> {
         version: ctx.version,
         grantees: grantees(db, &OM, ids).await?,
         rules: load_rules(db, ids).await?,
-        legacy: if ctx.version < 10 {
-            Some(load_legacy(db, ctx.user.id).await?)
-        } else {
-            None
-        },
+        legacy: if ctx.version < 10 { Some(load_legacy(db, ctx.user.id).await?) } else { None },
     })
 }
 
@@ -280,26 +256,16 @@ fn to_json(ctx: &Ctx, sc: &SerCtx, v: &View) -> Value {
     m.insert("icon".into(), json!(v.icon));
     m.insert("sort_field".into(), json!(v.sort_field));
     m.insert("sort_reverse".into(), json!(v.sort_reverse));
-    m.insert(
-        "filter_rules".into(),
-        Value::Array(sc.rules.get(&v.id).cloned().unwrap_or_default()),
-    );
+    m.insert("filter_rules".into(), Value::Array(sc.rules.get(&v.id).cloned().unwrap_or_default()));
     m.insert("page_size".into(), json!(v.page_size));
     m.insert("display_mode".into(), json!(v.display_mode));
     m.insert("display_fields".into(), v.display_fields.clone());
     m.insert("owner".into(), json!(v.owner_id));
     let g = sc.grantees.get(&v.id);
     if sc.full_perms {
-        m.insert(
-            "permissions".into(),
-            g.map(ObjectGrantees::to_json)
-                .unwrap_or_else(|| ObjectGrantees::default().to_json()),
-        );
+        m.insert("permissions".into(), g.map(ObjectGrantees::to_json).unwrap_or_else(|| ObjectGrantees::default().to_json()));
     } else {
-        m.insert(
-            "user_can_change".into(),
-            json!(user_can_change(ctx, v.owner_id, g)),
-        );
+        m.insert("user_can_change".into(), json!(user_can_change(ctx, v.owner_id, g)));
     }
     if sc.version < 10 {
         let (d, s) = match &sc.legacy {
@@ -429,10 +395,13 @@ fn validate_rules(v: &Value) -> Result<Vec<(i64, Option<String>)>, Value> {
     let mut errs = serde_json::Map::new();
     for (idx, item) in items.iter().enumerate() {
         let Value::Object(m) = item else {
-            errs.insert(idx.to_string(), json!({"non_field_errors": [format!(
-                "Invalid data. Expected a dictionary, but got {}.",
-                py_type_name(item)
-            )]}));
+            errs.insert(
+                idx.to_string(),
+                json!({"non_field_errors": [format!(
+                    "Invalid data. Expected a dictionary, but got {}.",
+                    py_type_name(item)
+                )]}),
+            );
             continue;
         };
         let mut e = Errors::default();
@@ -453,18 +422,8 @@ fn validate_rules(v: &Value) -> Result<Vec<(i64, Option<String>)>, Value> {
                 }
             },
         };
-        let val = char_field(
-            m,
-            "value",
-            CharOpts {
-                required: false,
-                allow_null: true,
-                allow_blank: true,
-                max_length: Some(255),
-            },
-            false,
-            &mut e,
-        );
+        let val =
+            char_field(m, "value", CharOpts { required: false, allow_null: true, allow_blank: true, max_length: Some(255) }, false, &mut e);
         if e.is_empty() {
             let value = match val {
                 F::Val(v) => v,
@@ -487,30 +446,22 @@ async fn validate_display_fields(db: &PgPool, df: &Value) -> ApiResult<()> {
         Value::String(s) => s.chars().map(|c| Value::String(c.to_string())).collect(),
         _ => return Err(ApiError::ServerError),
     };
-    let invalid = |f: &Value| {
-        ApiError::bad_request(json!({"non_field_errors": [format!("Invalid field: {}", py_str(f))]}))
-    };
+    let invalid = |f: &Value| ApiError::bad_request(json!({"non_field_errors": [format!("Invalid field: {}", py_str(f))]}));
     for f in &elems {
         match f {
             Value::String(s) => {
                 if s.contains("custom_field_") {
                     // re.search(r"\d+", field)[0]; no match → TypeError (500)
-                    let digits: String = s
-                        .chars()
-                        .skip_while(|c| !c.is_ascii_digit())
-                        .take_while(char::is_ascii_digit)
-                        .collect();
+                    let digits: String = s.chars().skip_while(|c| !c.is_ascii_digit()).take_while(char::is_ascii_digit).collect();
                     if digits.is_empty() {
                         return Err(ApiError::ServerError);
                     }
                     let exists = match digits.parse::<i32>() {
                         Ok(id) => {
-                            sqlx::query_scalar::<_, bool>(
-                                "SELECT EXISTS (SELECT 1 FROM documents_customfield WHERE id = $1)",
-                            )
-                            .bind(id)
-                            .fetch_one(db)
-                            .await?
+                            sqlx::query_scalar::<_, bool>("SELECT EXISTS (SELECT 1 FROM documents_customfield WHERE id = $1)")
+                                .bind(id)
+                                .fetch_one(db)
+                                .await?
                         }
                         Err(_) => false,
                     };
@@ -539,12 +490,7 @@ async fn validate_display_fields(db: &PgPool, df: &Value) -> ApiResult<()> {
     Ok(())
 }
 
-async fn validate(
-    db: &PgPool,
-    ctx: &Ctx,
-    mut data: Map<String, Value>,
-    partial: bool,
-) -> ApiResult<Attrs> {
+async fn validate(db: &PgPool, ctx: &Ctx, mut data: Map<String, Value>, partial: bool) -> ApiResult<Attrs> {
     let mut attrs = Attrs::default();
     // v9: legacy visibility fields up front (to_internal_value)
     if ctx.version < 10 {
@@ -559,9 +505,7 @@ async fn validate(
                         }
                     }
                     None => {
-                        return Err(ApiError::bad_request(
-                            json!({ name: ["Must be a valid boolean."] }),
-                        ));
+                        return Err(ApiError::bad_request(json!({ name: ["Must be a valid boolean."] })));
                     }
                 }
             }
@@ -571,40 +515,21 @@ async fn validate(
     if let F::Val(Some(n)) = char_field(
         &data,
         "name",
-        CharOpts {
-            required: true,
-            allow_null: false,
-            allow_blank: false,
-            max_length: Some(128),
-        },
+        CharOpts { required: true, allow_null: false, allow_blank: false, max_length: Some(128) },
         partial,
         &mut errs,
     ) {
         attrs.name = Some(n);
     }
-    if let F::Val(Some(i)) = choice_str(
-        &data,
-        "icon",
-        ICONS,
-        ChoiceOpts {
-            required: false,
-            allow_null: false,
-            allow_blank: false,
-        },
-        partial,
-        &mut errs,
-    ) {
+    if let F::Val(Some(i)) =
+        choice_str(&data, "icon", ICONS, ChoiceOpts { required: false, allow_null: false, allow_blank: false }, partial, &mut errs)
+    {
         attrs.icon = Some(i);
     }
     if let F::Val(s) = char_field(
         &data,
         "sort_field",
-        CharOpts {
-            required: false,
-            allow_null: true,
-            allow_blank: true,
-            max_length: Some(128),
-        },
+        CharOpts { required: false, allow_null: true, allow_blank: true, max_length: Some(128) },
         partial,
         &mut errs,
     ) {
@@ -628,12 +553,7 @@ async fn validate(
     if let F::Val(p) = int_field(
         &data,
         "page_size",
-        IntOpts {
-            required: false,
-            allow_null: true,
-            min: Some(1),
-            max: Some(2_147_483_647),
-        },
+        IntOpts { required: false, allow_null: true, min: Some(1), max: Some(2_147_483_647) },
         partial,
         &mut errs,
     ) {
@@ -643,11 +563,7 @@ async fn validate(
         &data,
         "display_mode",
         DISPLAY_MODES,
-        ChoiceOpts {
-            required: false,
-            allow_null: true,
-            allow_blank: true,
-        },
+        ChoiceOpts { required: false, allow_null: true, allow_blank: true },
         partial,
         &mut errs,
     ) {
@@ -679,12 +595,7 @@ async fn validate(
 }
 
 /// `OwnedObjectSerializer.validate_unique_together`
-async fn unique_violation(
-    db: &PgPool,
-    name: &str,
-    owner: Option<i64>,
-    exclude: Option<i64>,
-) -> ApiResult<bool> {
+async fn unique_violation(db: &PgPool, name: &str, owner: Option<i64>, exclude: Option<i64>) -> ApiResult<bool> {
     Ok(sqlx::query_scalar(
         "SELECT EXISTS (SELECT 1 FROM documents_savedview WHERE name = $1 \
          AND owner_id IS NOT DISTINCT FROM $2::int8 AND id <> $3::int8)",
@@ -716,13 +627,7 @@ async fn insert_rules(db: &PgPool, view_id: i64, rules: &[(i64, Option<String>)]
 }
 
 /// `_update_legacy_visibility_preferences`
-async fn update_legacy(
-    db: &PgPool,
-    uid: i64,
-    view_id: i64,
-    dash: Option<bool>,
-    side: Option<bool>,
-) -> ApiResult<()> {
+async fn update_legacy(db: &PgPool, uid: i64, view_id: i64, dash: Option<bool>, side: Option<bool>) -> ApiResult<()> {
     if dash.is_none() && side.is_none() {
         return Ok(());
     }
@@ -735,10 +640,7 @@ async fn update_legacy(
     .execute(db)
     .await?;
     let cur: Option<sqlx::types::Json<Value>> =
-        sqlx::query_scalar("SELECT settings FROM documents_uisettings WHERE user_id = $1::int8")
-            .bind(uid)
-            .fetch_one(db)
-            .await?;
+        sqlx::query_scalar("SELECT settings FROM documents_uisettings WHERE user_id = $1::int8").bind(uid).fetch_one(db).await?;
     let mut settings = match cur.map(|j| j.0) {
         Some(Value::Object(m)) => m,
         _ => Map::new(),
@@ -755,10 +657,12 @@ async fn update_legacy(
                 for x in a {
                     // int(raw) for str(raw).isdigit()
                     let st = py_str(x);
-                    if !st.is_empty() && st.chars().all(|c| c.is_ascii_digit())
-                        && let Ok(n) = st.parse::<i64>() {
-                            s.insert(n);
-                        }
+                    if !st.is_empty()
+                        && st.chars().all(|c| c.is_ascii_digit())
+                        && let Ok(n) = st.parse::<i64>()
+                    {
+                        s.insert(n);
+                    }
                 }
             }
             Some(Value::String(st)) => {
@@ -770,10 +674,12 @@ async fn update_legacy(
             }
             Some(Value::Object(m)) => {
                 for k in m.keys() {
-                    if !k.is_empty() && k.chars().all(|c| c.is_ascii_digit())
-                        && let Ok(n) = k.parse::<i64>() {
-                            s.insert(n);
-                        }
+                    if !k.is_empty()
+                        && k.chars().all(|c| c.is_ascii_digit())
+                        && let Ok(n) = k.parse::<i64>()
+                    {
+                        s.insert(n);
+                    }
                 }
             }
             Some(_) => return Err(ApiError::ServerError),
@@ -796,14 +702,8 @@ async fn update_legacy(
             s.remove(&view_id);
         }
     }
-    svs.insert(
-        "dashboard_views_visible_ids".into(),
-        Value::Array(d.into_iter().map(Value::from).collect()),
-    );
-    svs.insert(
-        "sidebar_views_visible_ids".into(),
-        Value::Array(s.into_iter().map(Value::from).collect()),
-    );
+    svs.insert("dashboard_views_visible_ids".into(), Value::Array(d.into_iter().map(Value::from).collect()));
+    svs.insert("sidebar_views_visible_ids".into(), Value::Array(s.into_iter().map(Value::from).collect()));
     settings.insert("saved_views".into(), Value::Object(svs));
     sqlx::query("UPDATE documents_uisettings SET settings = $1 WHERE user_id = $2::int8")
         .bind(sqlx::types::Json(Value::Object(settings)))
@@ -814,11 +714,7 @@ async fn update_legacy(
 }
 
 fn json_or_null(v: &Value) -> sea_query::SimpleExpr {
-    if v.is_null() {
-        sea_query::Value::Json(None).into()
-    } else {
-        v.clone().into()
-    }
+    if v.is_null() { sea_query::Value::Json(None).into() } else { v.clone().into() }
 }
 
 // ---------------------------------------------------------------------------
@@ -837,11 +733,7 @@ async fn create_inner(db: &PgPool, ctx: &Ctx, body: &[u8]) -> ApiResult<Response
     let Some(name) = attrs.name.clone() else {
         return Err(ApiError::ServerError);
     };
-    let owner = if owner_in_request {
-        attrs.owner.unwrap_or(None)
-    } else {
-        Some(ctx.user.id)
-    };
+    let owner = if owner_in_request { attrs.owner.unwrap_or(None) } else { Some(ctx.user.id) };
     if unique_violation(db, &name, owner, None).await? {
         return Err(unique_error());
     }
@@ -861,10 +753,7 @@ async fn create_inner(db: &PgPool, ctx: &Ctx, body: &[u8]) -> ApiResult<Response
     cols.push(a("display_fields"));
     vals.push(json_or_null(attrs.display_fields.as_ref().unwrap_or(&Value::Null)));
     let mut iq = Query::insert();
-    iq.into_table(a("documents_savedview"))
-        .columns(cols)
-        .values_panic(vals)
-        .returning(Query::returning().expr(Expr::cust("id::int8")));
+    iq.into_table(a("documents_savedview")).columns(cols).values_panic(vals).returning(Query::returning().expr(Expr::cust("id::int8")));
     let (sql, values) = iq.build_sqlx(PostgresQueryBuilder);
     let id: i64 = sqlx::query_scalar_with(&sql, values).fetch_one(db).await?;
     if let Some(spec) = &attrs.set_permissions {
@@ -882,31 +771,15 @@ async fn create_inner(db: &PgPool, ctx: &Ctx, body: &[u8]) -> ApiResult<Response
 // update / partial_update
 // ---------------------------------------------------------------------------
 
-pub async fn update(
-    State(st): State<AppState>,
-    Path(pk): Path<String>,
-    ctx: Ctx,
-    body: Bytes,
-) -> Response {
+pub async fn update(State(st): State<AppState>, Path(pk): Path<String>, ctx: Ctx, body: Bytes) -> Response {
     finish(DETAIL_ALLOW, update_inner(&st.inner.db, &ctx, &pk, &body, false).await)
 }
 
-pub async fn partial_update(
-    State(st): State<AppState>,
-    Path(pk): Path<String>,
-    ctx: Ctx,
-    body: Bytes,
-) -> Response {
+pub async fn partial_update(State(st): State<AppState>, Path(pk): Path<String>, ctx: Ctx, body: Bytes) -> Response {
     finish(DETAIL_ALLOW, update_inner(&st.inner.db, &ctx, &pk, &body, true).await)
 }
 
-async fn update_inner(
-    db: &PgPool,
-    ctx: &Ctx,
-    pk: &str,
-    body: &[u8],
-    partial: bool,
-) -> ApiResult<Response> {
+async fn update_inner(db: &PgPool, ctx: &Ctx, pk: &str, body: &[u8], partial: bool) -> ApiResult<Response> {
     let method = if partial { Method::PATCH } else { Method::PUT };
     require_model_perm(ctx, &OM)?;
     let inst = get_object(db, ctx, &method, pk).await?;
@@ -916,9 +789,7 @@ async fn update_inner(
     let is_owner = inst.owner_id == Some(ctx.user.id);
     let is_unowned = inst.owner_id.is_none();
     let owner_changes = attrs.owner.is_some_and(|o| o != inst.owner_id);
-    if (owner_changes || attrs.set_permissions.is_some())
-        && !(ctx.user.is_superuser || is_owner || is_unowned)
-    {
+    if (owner_changes || attrs.set_permissions.is_some()) && !(ctx.user.is_superuser || is_owner || is_unowned) {
         return Err(ApiError::insufficient());
     }
     if let Some(spec) = &attrs.set_permissions {
@@ -971,20 +842,10 @@ async fn update_inner(
         sqlx::query_with(&sql, values).execute(db).await?;
     }
     if let Some(rules) = &attrs.filter_rules {
-        sqlx::query("DELETE FROM documents_savedviewfilterrule WHERE saved_view_id = $1::int8")
-            .bind(inst.id)
-            .execute(db)
-            .await?;
+        sqlx::query("DELETE FROM documents_savedviewfilterrule WHERE saved_view_id = $1::int8").bind(inst.id).execute(db).await?;
         insert_rules(db, inst.id, rules).await?;
     }
-    update_legacy(
-        db,
-        ctx.user.id,
-        inst.id,
-        attrs.show_on_dashboard,
-        attrs.show_in_sidebar,
-    )
-    .await?;
+    update_legacy(db, ctx.user.id, inst.id, attrs.show_on_dashboard, attrs.show_in_sidebar).await?;
     let v = reload(db, inst.id).await?;
     Ok(json_response(StatusCode::OK, &single_json(db, ctx, &v).await?))
 }
@@ -1001,14 +862,8 @@ async fn destroy_inner(db: &PgPool, ctx: &Ctx, pk: &str) -> ApiResult<Response> 
     require_model_perm(ctx, &OM)?;
     let v = get_object(db, ctx, &Method::DELETE, pk).await?;
     let mut tx = db.begin().await?;
-    sqlx::query("DELETE FROM documents_savedviewfilterrule WHERE saved_view_id = $1::int8")
-        .bind(v.id)
-        .execute(&mut *tx)
-        .await?;
-    sqlx::query("DELETE FROM documents_savedview WHERE id = $1::int8")
-        .bind(v.id)
-        .execute(&mut *tx)
-        .await?;
+    sqlx::query("DELETE FROM documents_savedviewfilterrule WHERE saved_view_id = $1::int8").bind(v.id).execute(&mut *tx).await?;
+    sqlx::query("DELETE FROM documents_savedview WHERE id = $1::int8").bind(v.id).execute(&mut *tx).await?;
     tx.commit().await?;
     Ok(no_content())
 }
@@ -1027,14 +882,8 @@ mod tests {
             validate_rules(&json!([{"rule_type": 99}, {"rule_type": 1}])),
             Err(json!({"0": {"rule_type": ["\"99\" is not a valid choice."]}}))
         );
-        assert_eq!(
-            validate_rules(&json!("x")),
-            Err(json!({"non_field_errors": ["Expected a list of items but got type \"str\"."]}))
-        );
-        assert_eq!(
-            validate_rules(&json!([{}])),
-            Err(json!({"0": {"rule_type": ["This field is required."]}}))
-        );
+        assert_eq!(validate_rules(&json!("x")), Err(json!({"non_field_errors": ["Expected a list of items but got type \"str\"."]})));
+        assert_eq!(validate_rules(&json!([{}])), Err(json!({"0": {"rule_type": ["This field is required."]}})));
         // W2 parity run 2026-11-08 (PUT /api/saved_views/<id>/ with two bad rules): dict, index keys
         assert_eq!(
             validate_rules(&json!([{"rule_type": 1}, {"rule_type": 99}, {"value": "x"}, 5])),

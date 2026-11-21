@@ -110,7 +110,9 @@ jobs:
       - name: Validate compose files (examples + NAS templates)
         run: |
           for f in docker/docker-compose.*.yml docker/nas/docker-compose.yml docker/nas/casaos/docker-compose.yml; do
-            echo "== $f"; AppID=paperrust PUID=1000 PGID=1000 TZ=UTC docker compose -f "$f" config --quiet
+            # smtp-intake is an add-on file: it is only valid together with a base file
+            case "$f" in *smtp-intake*) set -- -f docker/docker-compose.postgres.yml -f "$f" ;; *) set -- -f "$f" ;; esac
+            echo "== $f"; AppID=paperrust PUID=1000 PGID=1000 TZ=UTC docker compose "$@" config --quiet
           done
       - name: Unraid templates (well-formed XML)
         if: matrix.arch == 'amd64'

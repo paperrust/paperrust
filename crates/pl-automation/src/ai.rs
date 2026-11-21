@@ -48,7 +48,9 @@ mod imp {
                         .tags
                         .iter()
                         .find(|o| o.id == Some(condition.object_id))
-                        .or_else(|| v.tags.iter().max_by(|a, b| a.confidence.partial_cmp(&b.confidence).unwrap_or(std::cmp::Ordering::Equal)))
+                        .or_else(|| {
+                            v.tags.iter().max_by(|a, b| a.confidence.partial_cmp(&b.confidence).unwrap_or(std::cmp::Ordering::Equal))
+                        })
                         .cloned(),
                 };
                 Ok(AiJudgement { matched, value: op.as_ref().and_then(|o| o.value.clone()), confidence: op.map(|o| o.confidence) })

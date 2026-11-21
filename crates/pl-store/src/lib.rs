@@ -39,29 +39,20 @@ pub use auth::{AuthExt, principal};
 /// Own migrations (expand-only, via `pl_cli::migrate::paperrust_migrations`).
 pub mod migrations {
     /// L1: partial index of the document list (docs/contract/pl-docfilter.md "L1").
-    pub const DOCQUERY_INDEXES: (&str, &str) = (
-        "pl_store.0001_paperrust_docquery_indexes",
-        include_str!("../migrations/0001_paperrust_docquery_indexes.sql"),
-    );
+    pub const DOCQUERY_INDEXES: (&str, &str) =
+        ("pl_store.0001_paperrust_docquery_indexes", include_str!("../migrations/0001_paperrust_docquery_indexes.sql"));
     /// L3: trigram indexes for substring search over title/content (docs/contract/pl-docfilter.md
     /// "L3: trigram indexes").
-    pub const DOC_TRGM: (&str, &str) = (
-        "pl_store.0002_paperrust_doc_trgm",
-        include_str!("../migrations/0002_paperrust_doc_trgm.sql"),
-    );
+    pub const DOC_TRGM: (&str, &str) = ("pl_store.0002_paperrust_doc_trgm", include_str!("../migrations/0002_paperrust_doc_trgm.sql"));
     /// Selection data over large selections: partial index with the FK columns (docs/PERF-SCALE.md §12).
-    pub const DOC_LIVE_FK: (&str, &str) = (
-        "pl_store.0003_paperrust_doc_live_fk",
-        include_str!("../migrations/0003_paperrust_doc_live_fk.sql"),
-    );
+    pub const DOC_LIVE_FK: (&str, &str) =
+        ("pl_store.0003_paperrust_doc_live_fk", include_str!("../migrations/0003_paperrust_doc_live_fk.sql"));
     pub const ALL: &[(&str, &str)] = &[DOCQUERY_INDEXES, DOC_TRGM, DOC_LIVE_FK];
     /// Selection data "all" from the counters: deleted field values (docs/PERF-SCALE.md §13). Runs
     /// **after** the conversion stages ([`AFTER_STAGES`]), because from stage 3 the index belongs on
     /// `paperrust_field_value`.
-    pub const FIELD_VALUE_DELETED: (&str, &str) = (
-        "pl_store.0004_paperrust_field_value_deleted",
-        include_str!("../migrations/0004_paperrust_field_value_deleted.sql"),
-    );
+    pub const FIELD_VALUE_DELETED: (&str, &str) =
+        ("pl_store.0004_paperrust_field_value_deleted", include_str!("../migrations/0004_paperrust_field_value_deleted.sql"));
     /// Indexes on tables of the conversion stages (after `pl_store::datamodel::migrations()`).
     pub const AFTER_STAGES: &[(&str, &str)] = &[FIELD_VALUE_DELETED];
 }
@@ -131,13 +122,7 @@ impl Repo for Store {
         })
     }
 
-    fn batch<'a>(
-        &'a self,
-        p: &'a Principal,
-        kind: Kind,
-        uuids: &'a [Uuid],
-        include: DocInclude,
-    ) -> BoxFut<'a, (Vec<Object>, Vec<Uuid>)> {
+    fn batch<'a>(&'a self, p: &'a Principal, kind: Kind, uuids: &'a [Uuid], include: DocInclude) -> BoxFut<'a, (Vec<Object>, Vec<Uuid>)> {
         Box::pin(async move {
             if kind == Kind::Document {
                 return documents::batch(self, p, uuids, include).await;
@@ -146,13 +131,7 @@ impl Repo for Store {
         })
     }
 
-    fn by_legacy_ids<'a>(
-        &'a self,
-        p: &'a Principal,
-        kind: Kind,
-        ids: &'a [i64],
-        embed: bool,
-    ) -> BoxFut<'a, Vec<(i64, Option<Object>)>> {
+    fn by_legacy_ids<'a>(&'a self, p: &'a Principal, kind: Kind, ids: &'a [i64], embed: bool) -> BoxFut<'a, Vec<(i64, Option<Object>)>> {
         Box::pin(async move {
             if kind == Kind::Document {
                 return documents::by_legacy_ids(self, p, ids, embed).await;
@@ -185,14 +164,7 @@ impl Repo for Store {
         Box::pin(legacy::create(self, p, kind, w))
     }
 
-    fn update<'a>(
-        &'a self,
-        p: &'a Principal,
-        kind: Kind,
-        uuid: Uuid,
-        if_match: Option<i64>,
-        w: &'a ObjectWrite,
-    ) -> BoxFut<'a, Object> {
+    fn update<'a>(&'a self, p: &'a Principal, kind: Kind, uuid: Uuid, if_match: Option<i64>, w: &'a ObjectWrite) -> BoxFut<'a, Object> {
         Box::pin(legacy::update(self, p, kind, uuid, if_match, w))
     }
 
@@ -200,13 +172,7 @@ impl Repo for Store {
         Box::pin(legacy::delete(self, p, kind, uuid, if_match))
     }
 
-    fn patch_document<'a>(
-        &'a self,
-        p: &'a Principal,
-        uuid: Uuid,
-        if_match: Option<i64>,
-        patch: &'a DocumentPatch,
-    ) -> BoxFut<'a, Document> {
+    fn patch_document<'a>(&'a self, p: &'a Principal, uuid: Uuid, if_match: Option<i64>, patch: &'a DocumentPatch) -> BoxFut<'a, Document> {
         Box::pin(legacy::patch_document(self, p, uuid, if_match, patch))
     }
 

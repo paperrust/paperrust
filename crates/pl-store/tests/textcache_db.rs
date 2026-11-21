@@ -16,10 +16,10 @@
 
 use std::sync::Arc;
 
+use pl_core::sqlbind::SqlxBinder;
 use pl_domain::filter::{DocFilter, Pred, Sort, TextCol, TextLookup};
 use pl_store::docsql::{Builder, TextHit, Visibility};
 use sea_query::{PostgresQueryBuilder, SelectStatement};
-use pl_core::sqlbind::SqlxBinder;
 use sqlx::{PgConnection, Row};
 
 async fn ids(conn: &mut PgConnection, q: &SelectStatement) -> Vec<i64> {
@@ -128,7 +128,8 @@ async fn insert_copy(conn: &mut PgConnection, from: i64, content: &str, root: Op
         "INSERT INTO documents_document ({list}, content, checksum, root_document_id) \
          SELECT {list}, $2, md5(random()::text), $3 FROM documents_document WHERE id = $1 RETURNING id"
     );
-    let id: i32 = sqlx::query_scalar(&sql).bind(from as i32).bind(content).bind(root.map(|r| r as i32)).fetch_one(&mut *conn).await.expect("insert");
+    let id: i32 =
+        sqlx::query_scalar(&sql).bind(from as i32).bind(content).bind(root.map(|r| r as i32)).fetch_one(&mut *conn).await.expect("insert");
     i64::from(id)
 }
 
@@ -160,8 +161,11 @@ async fn hit_cache_equals_text_condition() {
 
     // special characters of the folding (ı → I, ſ → S): "invoice"/"steuer" match this document only via
     // the folded form – tests the build condition `textcache::scan_cond` (PERF-SCALE §14).
-    let special_old: String =
-        sqlx::query_scalar("SELECT content FROM documents_document WHERE id = $1").bind(live[2] as i32).fetch_one(&pool).await.expect("old");
+    let special_old: String = sqlx::query_scalar("SELECT content FROM documents_document WHERE id = $1")
+        .bind(live[2] as i32)
+        .fetch_one(&pool)
+        .await
+        .expect("old");
     sqlx::query("UPDATE documents_document SET content = $2 WHERE id = $1")
         .bind(live[2] as i32)
         .bind("Zahlung ınvoıce 2024, ſteuer und the reſt")
@@ -195,11 +199,29 @@ async fn hit_cache_equals_text_condition() {
         checked += compare(&mut tx, &vis, fold, &hits, lookup, v, "unverändert").await;
         // changes after the build (own transaction: xmin = own, newer transaction)
         let probe = format!("XX {} XX", v.to_uppercase());
-        sqlx::query("UPDATE documents_document SET content = $2 WHERE id = $1").bind(live[0] as i32).bind(&probe).execute(&mut *tx).await.expect("u1");
-        sqlx::query("UPDATE documents_document SET content = 'nichts passendes 0' , title = 'ohne' WHERE id = $1").bind(live[1] as i32).execute(&mut *tx).await.expect("u2");
-        sqlx::query("UPDATE documents_document SET title = $2 WHERE id = $1").bind(live[2] as i32).bind(&probe).execute(&mut *tx).await.expect("u3");
+        sqlx::query("UPDATE documents_document SET content = $2 WHERE id = $1")
+            .bind(live[0] as i32)
+            .bind(&probe)
+            .execute(&mut *tx)
+            .await
+            .expect("u1");
+        sqlx::query("UPDATE documents_document SET content = 'nichts passendes 0' , title = 'ohne' WHERE id = $1")
+            .bind(live[1] as i32)
+            .execute(&mut *tx)
+            .await
+            .expect("u2");
+        sqlx::query("UPDATE documents_document SET title = $2 WHERE id = $1")
+            .bind(live[2] as i32)
+            .bind(&probe)
+            .execute(&mut *tx)
+            .await
+            .expect("u3");
         sqlx::query("DELETE FROM documents_document_tags WHERE document_id = $1").bind(live[3] as i32).execute(&mut *tx).await.expect("d0");
-        sqlx::query("UPDATE documents_document SET deleted_at = now() WHERE id = $1").bind(live[4] as i32).execute(&mut *tx).await.expect("trash");
+        sqlx::query("UPDATE documents_document SET deleted_at = now() WHERE id = $1")
+            .bind(live[4] as i32)
+            .execute(&mut *tx)
+            .await
+            .expect("trash");
         let _new = insert_copy(&mut tx, live[5], &probe, None).await;
         let _ver = insert_copy(&mut tx, live[5], "Version ohne Treffer", Some(live[5])).await;
         let _ver2 = insert_copy(&mut tx, live[1], &probe, Some(live[1])).await;
@@ -219,13 +241,31 @@ async fn hit_cache_equals_text_condition() {
     // confirmed change from another transaction after the build
     let v = "invoice";
     let hits = build_hits(&pool, fold, TextLookup::IContains, v).await;
-    let old: String = sqlx::query_scalar("SELECT content FROM documents_document WHERE id = $1").bind(live[0] as i32).fetch_one(&pool).await.expect("old");
-    sqlx::query("UPDATE documents_document SET content = 'kein Treffer hier' WHERE id = $1").bind(live[0] as i32).execute(&pool).await.expect("commit");
+    let old: String = sqlx::query_scalar("SELECT content FROM documents_document WHERE id = $1")
+        .bind(live[0] as i32)
+        .fetch_one(&pool)
+        .await
+        .expect("old");
+    sqlx::query("UPDATE documents_document SET content = 'kein Treffer hier' WHERE id = $1")
+        .bind(live[0] as i32)
+        .execute(&pool)
+        .await
+        .expect("commit");
     let mut conn = pool.acquire().await.expect("conn");
     checked += compare(&mut conn, &vis, fold, &hits, TextLookup::IContains, v, "bestätigt").await;
     drop(conn);
-    sqlx::query("UPDATE documents_document SET content = $2 WHERE id = $1").bind(live[0] as i32).bind(old).execute(&pool).await.expect("restore");
-    sqlx::query("UPDATE documents_document SET content = $2 WHERE id = $1").bind(live[2] as i32).bind(special_old).execute(&pool).await.expect("restore special");
+    sqlx::query("UPDATE documents_document SET content = $2 WHERE id = $1")
+        .bind(live[0] as i32)
+        .bind(old)
+        .execute(&pool)
+        .await
+        .expect("restore");
+    sqlx::query("UPDATE documents_document SET content = $2 WHERE id = $1")
+        .bind(live[2] as i32)
+        .bind(special_old)
+        .execute(&pool)
+        .await
+        .expect("restore special");
     let _ = Arc::strong_count(&hits[0].set);
     println!("textcache: {checked} Vergleiche gleich");
 }

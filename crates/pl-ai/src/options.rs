@@ -163,7 +163,10 @@ mod tests {
         assert_eq!(o, AiOptions::default());
         assert!(!o.vision_enabled && !o.custom_fields_enabled);
         let env = |k: &str| (k == "PAPERRUST_AI_VISION_ENABLED").then(|| "yes".to_string());
-        let o = AiOptions::from_pairs(&env, &[("vision_model".into(), json!(" llava ")), ("unknown".into(), json!(1)), ("backfill_per_minute".into(), json!(1000))]);
+        let o = AiOptions::from_pairs(
+            &env,
+            &[("vision_model".into(), json!(" llava ")), ("unknown".into(), json!(1)), ("backfill_per_minute".into(), json!(1000))],
+        );
         assert!(o.vision_enabled);
         assert_eq!(o.vision_model, "llava");
         assert_eq!(o.backfill_per_minute, 120);
@@ -174,7 +177,10 @@ mod tests {
 
     #[test]
     fn validate_pairs() {
-        assert_eq!(AiOptions::validate_pair("tag_after", &json!({"action": "replace", "tag": " KI erledigt "})), Ok(json!({"action": "replace", "tag": "KI erledigt"})));
+        assert_eq!(
+            AiOptions::validate_pair("tag_after", &json!({"action": "replace", "tag": " KI erledigt "})),
+            Ok(json!({"action": "replace", "tag": "KI erledigt"}))
+        );
         assert_eq!(AiOptions::validate_pair("tag_after", &json!({"action": "replace", "tag": ""})), Ok(json!({"action": "remove"})));
         assert!(AiOptions::validate_pair("tag_after", &json!({"action": "explode"})).is_err());
         assert!(AiOptions::validate_pair("nope", &json!(1)).is_err());

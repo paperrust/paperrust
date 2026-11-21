@@ -173,7 +173,8 @@ impl Cond {
                 Ok(())
             }
             Cond::Any(_) | Cond::Not(_) => Err(DomainError::NotImplemented(
-                "\"any\"/\"not\" over arbitrary conditions are not supported yet; use the any/none lists of the reference conditions".into(),
+                "\"any\"/\"not\" over arbitrary conditions are not supported yet; use the any/none lists of the reference conditions"
+                    .into(),
             )),
             leaf => {
                 out.push(leaf);

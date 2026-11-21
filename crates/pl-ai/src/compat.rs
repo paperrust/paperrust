@@ -94,8 +94,7 @@ pub fn match_names_to_pool<T: Named + Clone>(names: &[Option<&str>], pool: &[T])
 
 /// upstream `extract_unmatched_names(names, matched_objects)`.
 pub fn extract_unmatched_names<T: Named>(names: &[&str], matched: &[T]) -> Vec<String> {
-    let matched_names: std::collections::HashSet<String> =
-        matched.iter().map(|o| py_normalize(o.name())).collect();
+    let matched_names: std::collections::HashSet<String> = matched.iter().map(|o| py_normalize(o.name())).collect();
     names.iter().filter(|n| !matched_names.contains(&py_normalize(n))).map(|n| n.to_string()).collect()
 }
 

@@ -16,19 +16,11 @@ use std::path::PathBuf;
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
     #[error("{var}: invalid value {value:?}: {reason}")]
-    Invalid {
-        var: &'static str,
-        value: String,
-        reason: String,
-    },
+    Invalid { var: &'static str, value: String, reason: String },
 }
 
 fn invalid(var: &'static str, value: &str, reason: impl Into<String>) -> ConfigError {
-    ConfigError::Invalid {
-        var,
-        value: value.to_owned(),
-        reason: reason.into(),
-    }
+    ConfigError::Invalid { var, value: value.to_owned(), reason: reason.into() }
 }
 
 /// The subset of Django settings the Rust middleware layer needs.
@@ -109,13 +101,10 @@ impl ServerConfig {
     pub fn from_lookup(raw: impl Fn(&str) -> Option<String>) -> Result<Self, ConfigError> {
         let get = |k: &str| pl_core::config::lookup(&raw, k);
         let bind_raw = get("PAPERRUST_BIND").unwrap_or_else(|| DEFAULT_BIND.to_owned());
-        let bind: SocketAddr = bind_raw.trim().parse().map_err(|_| {
-            invalid(
-                "PAPERRUST_BIND",
-                &bind_raw,
-                "expected IP:PORT, e.g. 127.0.0.1:8080 or [::1]:8080",
-            )
-        })?;
+        let bind: SocketAddr = bind_raw
+            .trim()
+            .parse()
+            .map_err(|_| invalid("PAPERRUST_BIND", &bind_raw, "expected IP:PORT, e.g. 127.0.0.1:8080 or [::1]:8080"))?;
 
         // PAPERRUST_DJANGO_URL / PAPERRUST_PROXY_* are ignored (no Django backend any more); a set
         // value only produces a warning at startup (pl_core::config::retired_warnings).
@@ -149,11 +138,7 @@ pub fn str_to_bool(value: &str) -> Option<bool> {
     }
 }
 
-fn bool_env(
-    get: &impl Fn(&str) -> Option<String>,
-    var: &'static str,
-    default: &str,
-) -> Result<bool, ConfigError> {
+fn bool_env(get: &impl Fn(&str) -> Option<String>, var: &'static str, default: &str) -> Result<bool, ConfigError> {
     let v = get(var).unwrap_or_else(|| default.to_owned());
     str_to_bool(&v).ok_or_else(|| invalid(var, &v, "expected yes/no, true/false, 1/0"))
 }
@@ -162,11 +147,7 @@ fn bool_env(
 /// default when unset *or empty*).
 fn list_env(get: &impl Fn(&str) -> Option<String>, var: &str, default: &[&str]) -> Vec<String> {
     match get(var) {
-        Some(v) if !v.is_empty() => v
-            .split(',')
-            .map(|s| s.trim().to_owned())
-            .filter(|s| !s.is_empty())
-            .collect(),
+        Some(v) if !v.is_empty() => v.split(',').map(|s| s.trim().to_owned()).filter(|s| !s.is_empty()).collect(),
         _ => default.iter().map(|s| (*s).to_owned()).collect(),
     }
 }
@@ -181,21 +162,13 @@ fn url_hostname(url: &str) -> Option<String> {
     } else {
         hostport.split(':').next().unwrap_or("")
     };
-    if host.is_empty() {
-        None
-    } else {
-        Some(host.to_lowercase())
-    }
+    if host.is_empty() { None } else { Some(host.to_lowercase()) }
 }
 
 fn django_settings(get: &impl Fn(&str) -> Option<String>) -> Result<DjangoSettings, ConfigError> {
     let debug = bool_env(get, "PAPERLESS_DEBUG", "NO")?;
 
-    let mut cors_allowed_origins = list_env(
-        get,
-        "PAPERLESS_CORS_ALLOWED_HOSTS",
-        &["http://localhost:8000"],
-    );
+    let mut cors_allowed_origins = list_env(get, "PAPERLESS_CORS_ALLOWED_HOSTS", &["http://localhost:8000"]);
     if debug {
         cors_allowed_origins.push("http://localhost:4200".into());
     }
@@ -203,21 +176,12 @@ fn django_settings(get: &impl Fn(&str) -> Option<String>) -> Result<DjangoSettin
     // upstream fix 00096e025 (#14735): `["*"]` only without PAPERLESS_ALLOWED_HOSTS and without
     // PAPERLESS_URL; URL hostname normalised (trailing dot, `*`/`.…` invalid, IPv6 in `[]`).
     let paperless_url = get("PAPERLESS_URL").filter(|u| !u.is_empty());
-    let mut allowed_hosts = pl_core::config::initial_allowed_hosts(
-        get("PAPERLESS_ALLOWED_HOSTS").as_deref(),
-        paperless_url.is_some(),
-    );
+    let mut allowed_hosts = pl_core::config::initial_allowed_hosts(get("PAPERLESS_ALLOWED_HOSTS").as_deref(), paperless_url.is_some());
 
     if let Some(url) = paperless_url {
         let host = url_hostname(&url)
             .and_then(|h| pl_core::config::allowed_host_from_url_hostname(&h))
-            .ok_or_else(|| {
-                invalid(
-                    "PAPERLESS_URL",
-                    &url,
-                    "has no valid hostname, expected a URL like https://example.com",
-                )
-            })?;
+            .ok_or_else(|| invalid("PAPERLESS_URL", &url, "has no valid hostname, expected a URL like https://example.com"))?;
         cors_allowed_origins.push(url.clone());
         allowed_hosts.push(host);
     }
@@ -242,10 +206,7 @@ mod tests {
     use std::collections::HashMap;
 
     fn cfg(vars: &[(&str, &str)]) -> Result<ServerConfig, ConfigError> {
-        let m: HashMap<String, String> = vars
-            .iter()
-            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
-            .collect();
+        let m: HashMap<String, String> = vars.iter().map(|(k, v)| ((*k).to_owned(), (*v).to_owned())).collect();
         ServerConfig::from_lookup(|k| m.get(k).cloned())
     }
 
@@ -256,10 +217,7 @@ mod tests {
         assert!(!c.stop_on_stdin_eof);
         assert!(!c.routes_file_required);
         assert_eq!(c.settings.allowed_hosts, vec!["*"]);
-        assert_eq!(
-            c.settings.cors_allowed_origins,
-            vec!["http://localhost:8000"]
-        );
+        assert_eq!(c.settings.cors_allowed_origins, vec!["http://localhost:8000"]);
         assert!(c.settings.enable_compression);
     }
 
@@ -305,18 +263,8 @@ mod tests {
             ("PAPERLESS_COOKIE_PREFIX", "pl_"),
         ])
         .unwrap();
-        assert_eq!(
-            c.settings.allowed_hosts,
-            vec!["a.example", "b.example", "localhost", "paper.example"]
-        );
-        assert_eq!(
-            c.settings.cors_allowed_origins,
-            vec![
-                "http://localhost:8000",
-                "http://localhost:4200",
-                "https://Paper.Example:8443"
-            ]
-        );
+        assert_eq!(c.settings.allowed_hosts, vec!["a.example", "b.example", "localhost", "paper.example"]);
+        assert_eq!(c.settings.cors_allowed_origins, vec!["http://localhost:8000", "http://localhost:4200", "https://Paper.Example:8443"]);
         assert_eq!(c.settings.language_cookie_name, "pl_django_language");
         assert!(cfg(&[("PAPERLESS_URL", "nohost")]).is_err());
         assert!(cfg(&[("PAPERLESS_ENABLE_COMPRESSION", "maybe")]).is_err());

@@ -26,7 +26,12 @@ pub struct LocationPlan {
 
 /// Plan for `doc_id` with `asn`; `None` = nothing to do. Creates the field if it is missing.
 /// `skip_fields`: fields that the caller sets itself in the same request (never overwrite).
-pub async fn plan(conn: &mut PgConnection, doc_id: i64, asn: i64, skip_fields: &[i64]) -> Result<Option<LocationPlan>, pl_labels::LabelError> {
+pub async fn plan(
+    conn: &mut PgConnection,
+    doc_id: i64,
+    asn: i64,
+    skip_fields: &[i64],
+) -> Result<Option<LocationPlan>, pl_labels::LabelError> {
     use pl_labels::ranges;
     let Some(t) = ranges::location_target(conn, asn).await? else { return Ok(None) };
     let Some(field_id) = ranges::ensure_location_field(conn, &t.field_name).await? else {

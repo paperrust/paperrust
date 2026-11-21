@@ -14,9 +14,9 @@ use axum::http::StatusCode;
 use axum::http::request::Parts;
 use axum::response::{IntoResponse, Response};
 use pl_authz::{AuthUser, User};
+use pl_core::sqlbind::SqlxBinder as _;
 use pl_core::{ApiError, AppState, Drf, RequestContext, ValidationErrors};
 use sea_query::{Expr, PostgresQueryBuilder, Query};
-use pl_core::sqlbind::SqlxBinder as _;
 use serde_json::{Map, Value, json};
 use sqlx::Row;
 
@@ -77,22 +77,19 @@ async fn profile_repr(state: &AppState, user_id: i64) -> HResult<Value> {
 }
 
 pub async fn get_profile(State(state): State<AppState>, req: Request) -> Response {
-    respond(async {
-        let (r, auth) = begin(&state, req).await?;
-        let _data = r.data().await?; // get_serializer(data=request.data)
-        let body = profile_repr(&state, auth.user().id).await?;
-        Ok(Drf::ok(body).into_response())
-    }
-    .await)
+    respond(
+        async {
+            let (r, auth) = begin(&state, req).await?;
+            let _data = r.data().await?; // get_serializer(data=request.data)
+            let body = profile_repr(&state, auth.user().id).await?;
+            Ok(Drf::ok(body).into_response())
+        }
+        .await,
+    )
 }
 
 pub fn user_attrs(u: &User) -> UserAttrs {
-    UserAttrs {
-        username: u.username.clone(),
-        first_name: u.first_name.clone(),
-        last_name: u.last_name.clone(),
-        email: u.email.clone(),
-    }
+    UserAttrs { username: u.username.clone(), first_name: u.first_name.clone(), last_name: u.last_name.clone(), email: u.email.clone() }
 }
 
 /// Validated `ProfileSerializer` data.
@@ -152,51 +149,53 @@ fn validate_profile(data: &Data, user: &User) -> Result<ProfileUpdate, ApiError>
 }
 
 pub async fn patch_profile(State(state): State<AppState>, req: Request) -> Response {
-    respond(async {
-        let (r, auth) = begin(&state, req).await?;
-        let data = r.data().await?;
-        let user = auth.user();
-        let upd = validate_profile(&data, user)?;
-        let mut q = Query::update();
-        q.table(db::a("auth_user")).and_where(Expr::col(db::a("id")).eq(user.id));
-        let mut any = false;
-        let mut password_changed = false;
-        if let Some(pw) = upd.password.filter(|p| has_real_password(p)) {
-            let encoded = tokio::task::spawn_blocking(move || pl_authz::hashers::make_password(&pw))
-                .await
-                .map_err(server_error)?;
-            q.value(db::a("password"), encoded);
-            any = true;
-            password_changed = true;
-        }
-        for (col, v) in [("email", upd.email), ("first_name", upd.first_name), ("last_name", upd.last_name)] {
-            if let Some(v) = v {
-                q.value(db::a(col), v);
+    respond(
+        async {
+            let (r, auth) = begin(&state, req).await?;
+            let data = r.data().await?;
+            let user = auth.user();
+            let upd = validate_profile(&data, user)?;
+            let mut q = Query::update();
+            q.table(db::a("auth_user")).and_where(Expr::col(db::a("id")).eq(user.id));
+            let mut any = false;
+            let mut password_changed = false;
+            if let Some(pw) = upd.password.filter(|p| has_real_password(p)) {
+                let encoded = tokio::task::spawn_blocking(move || pl_authz::hashers::make_password(&pw)).await.map_err(server_error)?;
+                q.value(db::a("password"), encoded);
                 any = true;
+                password_changed = true;
             }
+            for (col, v) in [("email", upd.email), ("first_name", upd.first_name), ("last_name", upd.last_name)] {
+                if let Some(v) = v {
+                    q.value(db::a(col), v);
+                    any = true;
+                }
+            }
+            if any {
+                let (sql, values) = q.build_sqlx(PostgresQueryBuilder);
+                sqlx::query_with(&sql, values).execute(state.db()).await?;
+            }
+            if password_changed {
+                // PaperRust: revoke device token (`prt_…`); DRF token stays as upstream
+                // (security review 2026-11-19 F13).
+                pl_authz::device::revoke_all_for_user(state.db(), user.id).await?;
+            }
+            let body = profile_repr(&state, user.id).await?;
+            Ok(Drf::ok(body).into_response())
         }
-        if any {
-            let (sql, values) = q.build_sqlx(PostgresQueryBuilder);
-            sqlx::query_with(&sql, values).execute(state.db()).await?;
-        }
-        if password_changed {
-            // PaperRust: revoke device token (`prt_…`); DRF token stays as upstream
-            // (security review 2026-11-19 F13).
-            pl_authz::device::revoke_all_for_user(state.db(), user.id).await?;
-        }
-        let body = profile_repr(&state, user.id).await?;
-        Ok(Drf::ok(body).into_response())
-    }
-    .await)
+        .await,
+    )
 }
 
 pub async fn generate_auth_token(State(state): State<AppState>, req: Request) -> Response {
-    respond(async {
-        let (_r, auth) = begin(&state, req).await?;
-        let key = db::regenerate_token(state.db(), auth.user().id).await?;
-        Ok(Drf::ok(Value::String(key)).into_response())
-    }
-    .await)
+    respond(
+        async {
+            let (_r, auth) = begin(&state, req).await?;
+            let key = db::regenerate_token(state.db(), auth.user().id).await?;
+            Ok(Drf::ok(Value::String(key)).into_response())
+        }
+        .await,
+    )
 }
 
 /// Django `IntegerField.get_prep_value` (`int(value)`); `Err` = ValueError/TypeError → 500.
@@ -209,118 +208,127 @@ fn py_int_pk(v: &Value) -> Result<Option<i64>, String> {
             .or_else(|| n.as_f64().filter(|f| f.is_finite()).map(|f| f.trunc() as i64))
             .map(Some)
             .ok_or_else(|| "int() overflow".to_string()),
-        Value::String(s) => s.trim().replace('_', "").parse::<i64>().map(Some).map_err(|_| format!("Field 'id' expected a number but got {s:?}.")),
+        Value::String(s) => {
+            s.trim().replace('_', "").parse::<i64>().map(Some).map_err(|_| format!("Field 'id' expected a number but got {s:?}."))
+        }
         _ => Err("TypeError: int() argument must be a string or a number".into()),
     }
 }
 
 pub async fn disconnect_social_account(State(state): State<AppState>, req: Request) -> Response {
-    respond(async {
-        let (r, auth) = begin(&state, req).await?;
-        let data = r.data().await?;
-        let raw = data.get("id").ok_or_else(|| server_error("KeyError: 'id'"))?;
-        let pk = py_int_pk(&raw).map_err(server_error)?;
-        let Some(pk) = pk else {
-            return Err(django_text(StatusCode::BAD_REQUEST, "Social account not found"));
-        };
-        let db = state.db();
-        let mut tx = db.begin().await?;
-        let (sql, values) = Query::select()
-            .expr_as(Expr::col(db::a("id")).cast_as(db::a("int8")), db::a("id"))
-            .from(db::a("socialaccount_socialaccount"))
-            .and_where(Expr::col(db::a("user_id")).eq(auth.user().id))
-            .and_where(Expr::col(db::a("id")).eq(pk))
-            .build_sqlx(PostgresQueryBuilder);
-        let Some(row) = sqlx::query_with(&sql, values).fetch_optional(&mut *tx).await? else {
-            return Err(django_text(StatusCode::BAD_REQUEST, "Social account not found"));
-        };
-        let account_id: i64 = row.try_get("id")?;
-        // Collector: SocialToken.account CASCADE, then the account itself
-        let (sql, values) = Query::delete()
-            .from_table(db::a("socialaccount_socialtoken"))
-            .and_where(Expr::col(db::a("account_id")).eq(account_id))
-            .build_sqlx(PostgresQueryBuilder);
-        sqlx::query_with(&sql, values).execute(&mut *tx).await?;
-        let (sql, values) = Query::delete()
-            .from_table(db::a("socialaccount_socialaccount"))
-            .and_where(Expr::col(db::a("id")).eq(account_id))
-            .build_sqlx(PostgresQueryBuilder);
-        sqlx::query_with(&sql, values).execute(&mut *tx).await?;
-        tx.commit().await?;
-        Ok(Drf::ok(json!(account_id)).into_response())
-    }
-    .await)
+    respond(
+        async {
+            let (r, auth) = begin(&state, req).await?;
+            let data = r.data().await?;
+            let raw = data.get("id").ok_or_else(|| server_error("KeyError: 'id'"))?;
+            let pk = py_int_pk(&raw).map_err(server_error)?;
+            let Some(pk) = pk else {
+                return Err(django_text(StatusCode::BAD_REQUEST, "Social account not found"));
+            };
+            let db = state.db();
+            let mut tx = db.begin().await?;
+            let (sql, values) = Query::select()
+                .expr_as(Expr::col(db::a("id")).cast_as(db::a("int8")), db::a("id"))
+                .from(db::a("socialaccount_socialaccount"))
+                .and_where(Expr::col(db::a("user_id")).eq(auth.user().id))
+                .and_where(Expr::col(db::a("id")).eq(pk))
+                .build_sqlx(PostgresQueryBuilder);
+            let Some(row) = sqlx::query_with(&sql, values).fetch_optional(&mut *tx).await? else {
+                return Err(django_text(StatusCode::BAD_REQUEST, "Social account not found"));
+            };
+            let account_id: i64 = row.try_get("id")?;
+            // Collector: SocialToken.account CASCADE, then the account itself
+            let (sql, values) = Query::delete()
+                .from_table(db::a("socialaccount_socialtoken"))
+                .and_where(Expr::col(db::a("account_id")).eq(account_id))
+                .build_sqlx(PostgresQueryBuilder);
+            sqlx::query_with(&sql, values).execute(&mut *tx).await?;
+            let (sql, values) = Query::delete()
+                .from_table(db::a("socialaccount_socialaccount"))
+                .and_where(Expr::col(db::a("id")).eq(account_id))
+                .build_sqlx(PostgresQueryBuilder);
+            sqlx::query_with(&sql, values).execute(&mut *tx).await?;
+            tx.commit().await?;
+            Ok(Drf::ok(json!(account_id)).into_response())
+        }
+        .await,
+    )
 }
 
 pub async fn totp_get(State(state): State<AppState>, req: Request) -> Response {
-    respond(async {
-        let (r, auth) = begin(&state, req).await?;
-        let u = auth.user();
-        // allauth `get_totp_secret(regenerate=True)`: the new secret is stored in the session
-        // (`request.session["mfa.totp.secret"]`), so SessionMiddleware saves it and sets the cookie.
-        let secret = totp::generate_totp_secret();
-        let set_cookie =
-            session::set_session_value(&state, &r.parts.headers, totp::SECRET_SESSION_KEY, Value::String(secret.clone()))
-                .await?;
-        let url = totp::build_totp_url(&totp::totp_label(&u.email, &u.username), &secret);
-        let svg = qr::build_svg(&url).map_err(|_| server_error("QR data overflow"))?;
-        let mut m = Map::new();
-        m.insert("url".into(), Value::String(url));
-        m.insert("qr_svg".into(), Value::String(svg));
-        m.insert("secret".into(), Value::String(secret));
-        let mut resp = Drf::ok(Value::Object(m)).into_response();
-        if let Ok(v) = axum::http::HeaderValue::from_str(&set_cookie) {
-            resp.headers_mut().append(axum::http::header::SET_COOKIE, v);
+    respond(
+        async {
+            let (r, auth) = begin(&state, req).await?;
+            let u = auth.user();
+            // allauth `get_totp_secret(regenerate=True)`: the new secret is stored in the session
+            // (`request.session["mfa.totp.secret"]`), so SessionMiddleware saves it and sets the cookie.
+            let secret = totp::generate_totp_secret();
+            let set_cookie =
+                session::set_session_value(&state, &r.parts.headers, totp::SECRET_SESSION_KEY, Value::String(secret.clone())).await?;
+            let url = totp::build_totp_url(&totp::totp_label(&u.email, &u.username), &secret);
+            let svg = qr::build_svg(&url).map_err(|_| server_error("QR data overflow"))?;
+            let mut m = Map::new();
+            m.insert("url".into(), Value::String(url));
+            m.insert("qr_svg".into(), Value::String(svg));
+            m.insert("secret".into(), Value::String(secret));
+            let mut resp = Drf::ok(Value::Object(m)).into_response();
+            if let Ok(v) = axum::http::HeaderValue::from_str(&set_cookie) {
+                resp.headers_mut().append(axum::http::header::SET_COOKIE, v);
+            }
+            Ok(resp)
         }
-        Ok(resp)
-    }
-    .await)
+        .await,
+    )
 }
 
 pub async fn totp_post(State(state): State<AppState>, req: Request) -> Response {
-    respond(async {
-        let (r, auth) = begin(&state, req).await?;
-        let data = r.data().await?;
-        let user_id = auth.user().id;
-        let secret = data.get("secret").ok_or_else(|| server_error("KeyError: 'secret'"))?;
-        let code = data.get("code").ok_or_else(|| server_error("KeyError: 'code'"))?;
-        let Value::String(secret) = secret else {
-            return Err(server_error("AttributeError: secret is not a str"));
-        };
-        let Value::String(code) = code else {
-            return Err(server_error("AttributeError: code is not a str"));
-        };
-        let valid = totp::validate_totp_code(&secret, &code).map_err(|_| server_error("binascii.Error: invalid base32 secret"))?;
-        let mut recovery: Value = Value::Null;
-        if valid {
-            let db = state.db();
-            db::insert_authenticator(db, user_id, "totp", json!({ "secret": secret }))
-                .await
-                .map_err(|e| if db::is_unique_violation(&e) { server_error("IntegrityError: TOTP exists") } else { HErr::from(e) })?;
-            // auto_generate_recovery_codes
-            let has_rc = !db::authenticators(db, user_id, Some("recovery_codes")).await?.is_empty();
-            if !has_rc {
-                let seed = totp::generate_recovery_seed();
-                let rc_data = json!({ "seed": seed, "used_mask": 0 });
-                db::insert_authenticator(db, user_id, "recovery_codes", rc_data.clone()).await?;
-                recovery = Value::Array(totp::unused_recovery_codes(&rc_data).into_iter().map(Value::String).collect());
+    respond(
+        async {
+            let (r, auth) = begin(&state, req).await?;
+            let data = r.data().await?;
+            let user_id = auth.user().id;
+            let secret = data.get("secret").ok_or_else(|| server_error("KeyError: 'secret'"))?;
+            let code = data.get("code").ok_or_else(|| server_error("KeyError: 'code'"))?;
+            let Value::String(secret) = secret else {
+                return Err(server_error("AttributeError: secret is not a str"));
+            };
+            let Value::String(code) = code else {
+                return Err(server_error("AttributeError: code is not a str"));
+            };
+            let valid = totp::validate_totp_code(&secret, &code).map_err(|_| server_error("binascii.Error: invalid base32 secret"))?;
+            let mut recovery: Value = Value::Null;
+            if valid {
+                let db = state.db();
+                db::insert_authenticator(db, user_id, "totp", json!({ "secret": secret }))
+                    .await
+                    .map_err(|e| if db::is_unique_violation(&e) { server_error("IntegrityError: TOTP exists") } else { HErr::from(e) })?;
+                // auto_generate_recovery_codes
+                let has_rc = !db::authenticators(db, user_id, Some("recovery_codes")).await?.is_empty();
+                if !has_rc {
+                    let seed = totp::generate_recovery_seed();
+                    let rc_data = json!({ "seed": seed, "used_mask": 0 });
+                    db::insert_authenticator(db, user_id, "recovery_codes", rc_data.clone()).await?;
+                    recovery = Value::Array(totp::unused_recovery_codes(&rc_data).into_iter().map(Value::String).collect());
+                }
             }
+            let mut m = Map::new();
+            m.insert("success".into(), Value::Bool(valid));
+            m.insert("recovery_codes".into(), recovery);
+            Ok(Drf::ok(Value::Object(m)).into_response())
         }
-        let mut m = Map::new();
-        m.insert("success".into(), Value::Bool(valid));
-        m.insert("recovery_codes".into(), recovery);
-        Ok(Drf::ok(Value::Object(m)).into_response())
-    }
-    .await)
+        .await,
+    )
 }
 
 pub async fn totp_delete(State(state): State<AppState>, req: Request) -> Response {
-    respond(async {
-        let (_r, auth) = begin(&state, req).await?;
-        let user_id = auth.user().id;
-        delete_totp_of(&state, user_id).await
-    }
-    .await)
+    respond(
+        async {
+            let (_r, auth) = begin(&state, req).await?;
+            let user_id = auth.user().id;
+            delete_totp_of(&state, user_id).await
+        }
+        .await,
+    )
 }
 
 /// Shared by `TOTPView.delete` and `UserViewSet.deactivate_totp`.

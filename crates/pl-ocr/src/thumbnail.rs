@@ -38,14 +38,7 @@ pub fn thumbnail_target(w: u32, h: u32, supersample: u32) -> (u32, u32) {
     let scale = (1.0 / f64::from(supersample.max(1)))
         .min(THUMBNAIL_MAX_WIDTH / f64::from(w.max(1)))
         .min(THUMBNAIL_MAX_HEIGHT / f64::from(h.max(1)));
-    if scale < 1.0 {
-        (
-            ((f64::from(w) * scale).round() as u32).max(1),
-            ((f64::from(h) * scale).round() as u32).max(1),
-        )
-    } else {
-        (w, h)
-    }
+    if scale < 1.0 { (((f64::from(w) * scale).round() as u32).max(1), ((f64::from(h) * scale).round() as u32).max(1)) } else { (w, h) }
 }
 
 /// Levels per color channel in the thumbnail (5 bit, like RGB555).
@@ -82,15 +75,9 @@ pub fn make_thumbnail_from_pdf(renderer: &dyn PdfRenderer, pdf: &Path, temp_dir:
     }
     let (dpi, ss) = compute_thumbnail_dpi(doc.page_size_pt(0).ok());
     let raster = doc.render(0, dpi * f64::from(ss), false)?;
-    let img = raster
-        .to_dynamic()
-        .ok_or_else(|| OcrError::Parse("Unable to encode thumbnail".into()))?;
+    let img = raster.to_dynamic().ok_or_else(|| OcrError::Parse("Unable to encode thumbnail".into()))?;
     let (tw, th) = thumbnail_target(raster.width, raster.height, ss);
-    let img = if (tw, th) != (raster.width, raster.height) {
-        img.resize_exact(tw, th, image::imageops::FilterType::Lanczos3)
-    } else {
-        img
-    };
+    let img = if (tw, th) != (raster.width, raster.height) { img.resize_exact(tw, th, image::imageops::FilterType::Lanczos3) } else { img };
     let buf = encode_webp(img.to_rgb8()).map_err(|e| OcrError::Parse(format!("Unable to encode thumbnail: {e}")))?;
     std::fs::create_dir_all(temp_dir)?;
     let out = temp_dir.join("convert.webp");
@@ -129,11 +116,7 @@ pub fn make_thumbnail_from_image(image_path: &Path, temp_dir: &Path) -> Result<P
         img.to_rgb8()
     };
     let (tw, th) = thumbnail_target(rgb.width(), rgb.height(), 1);
-    let rgb = if (tw, th) != rgb.dimensions() {
-        image::imageops::resize(&rgb, tw, th, image::imageops::FilterType::Lanczos3)
-    } else {
-        rgb
-    };
+    let rgb = if (tw, th) != rgb.dimensions() { image::imageops::resize(&rgb, tw, th, image::imageops::FilterType::Lanczos3) } else { rgb };
     let buf = encode_webp(rgb).map_err(|e| fail(&e))?;
     std::fs::create_dir_all(temp_dir)?;
     let out = temp_dir.join("convert.webp");
@@ -151,7 +134,8 @@ mod tests {
     fn image_without_archive_has_image_thumbnail() {
         let dir = std::env::temp_dir().join(format!("pl-ocr-thumb-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        let rgb = image::DynamicImage::ImageRgb8(image::RgbImage::from_fn(1000, 1400, |x, y| image::Rgb([(x % 256) as u8, (y % 256) as u8, 90])));
+        let rgb =
+            image::DynamicImage::ImageRgb8(image::RgbImage::from_fn(1000, 1400, |x, y| image::Rgb([(x % 256) as u8, (y % 256) as u8, 90])));
         let rgba = image::DynamicImage::ImageRgba8(image::RgbaImage::from_fn(300, 200, |x, _| image::Rgba([0, 0, 0, (x % 256) as u8])));
         let cases: &[(&str, &image::DynamicImage, image::ImageFormat, (u32, u32))] = &[
             ("simple.jpg", &rgb, image::ImageFormat::Jpeg, (500, 700)),

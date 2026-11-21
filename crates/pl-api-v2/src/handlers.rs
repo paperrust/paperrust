@@ -77,12 +77,7 @@ pub async fn put_ui_settings(v2: V2, Caller(p): Caller, V2Json(b): V2Json<UiSett
 
 // ------------------------------------------------------------------------------ Objekte
 
-pub async fn list_objects(
-    v2: V2,
-    kind: Kind,
-    Caller(p): Caller,
-    q: HashMap<String, String>,
-) -> V2Result<Response> {
+pub async fn list_objects(v2: V2, kind: Kind, Caller(p): Caller, q: HashMap<String, String>) -> V2Result<Response> {
     let req = ListRequest {
         cursor: q.get("cursor").cloned(),
         limit: parse_limit(q.get("limit"))?,
@@ -109,14 +104,7 @@ pub async fn create_object(v2: V2, kind: Kind, Caller(p): Caller, w: ObjectWrite
     Ok(json_with_rev(StatusCode::CREATED, &o, Some(rev)))
 }
 
-pub async fn update_object(
-    v2: V2,
-    kind: Kind,
-    Caller(p): Caller,
-    uuid: String,
-    headers: HeaderMap,
-    w: ObjectWrite,
-) -> V2Result<Response> {
+pub async fn update_object(v2: V2, kind: Kind, Caller(p): Caller, uuid: String, headers: HeaderMap, w: ObjectWrite) -> V2Result<Response> {
     let uuid = parse_uuid(&uuid)?;
     let o = v2.repo.update(&p, kind, uuid, if_match(&headers)?, &w).await?;
     let rev = o.meta().rev;
@@ -205,12 +193,7 @@ pub struct NoteBody {
     note: String,
 }
 
-pub async fn add_note(
-    v2: V2,
-    Caller(p): Caller,
-    Path(uuid): Path<String>,
-    V2Json(b): V2Json<NoteBody>,
-) -> V2Result<Response> {
+pub async fn add_note(v2: V2, Caller(p): Caller, Path(uuid): Path<String>, V2Json(b): V2Json<NoteBody>) -> V2Result<Response> {
     let items = v2.repo.add_note(&p, parse_uuid(&uuid)?, &b.note).await?;
     Ok(json_with_rev(StatusCode::CREATED, &json!({ "items": items }), None))
 }

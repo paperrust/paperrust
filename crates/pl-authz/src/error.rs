@@ -58,13 +58,8 @@ impl AuthError {
     /// HTTP status like DRF.
     pub fn status(&self) -> StatusCode {
         match self {
-            Self::NotAuthenticated { www_authenticate }
-            | Self::AuthenticationFailed { www_authenticate, .. } => {
-                if www_authenticate.is_some() {
-                    StatusCode::UNAUTHORIZED
-                } else {
-                    StatusCode::FORBIDDEN
-                }
+            Self::NotAuthenticated { www_authenticate } | Self::AuthenticationFailed { www_authenticate, .. } => {
+                if www_authenticate.is_some() { StatusCode::UNAUTHORIZED } else { StatusCode::FORBIDDEN }
             }
             Self::PermissionDenied { .. } => StatusCode::FORBIDDEN,
             Self::NotFound { .. } => StatusCode::NOT_FOUND,
@@ -78,9 +73,7 @@ impl AuthError {
     pub fn detail(&self) -> String {
         match self {
             Self::NotAuthenticated { .. } => NOT_AUTHENTICATED.into(),
-            Self::AuthenticationFailed { detail, .. }
-            | Self::PermissionDenied { detail }
-            | Self::NotFound { detail } => detail.clone(),
+            Self::AuthenticationFailed { detail, .. } | Self::PermissionDenied { detail } | Self::NotFound { detail } => detail.clone(),
             Self::MethodNotAllowed { method } => format!("Method \"{method}\" not allowed."),
             Self::Internal { .. } => "A server error occurred.".into(),
             Self::Unavailable { .. } => pl_core::dbconn::DB_UNAVAILABLE_DETAIL.into(),
@@ -90,8 +83,9 @@ impl AuthError {
     /// Value of the `WWW-Authenticate` header, if any.
     pub fn www_authenticate(&self) -> Option<&str> {
         match self {
-            Self::NotAuthenticated { www_authenticate }
-            | Self::AuthenticationFailed { www_authenticate, .. } => www_authenticate.as_deref(),
+            Self::NotAuthenticated { www_authenticate } | Self::AuthenticationFailed { www_authenticate, .. } => {
+                www_authenticate.as_deref()
+            }
             _ => None,
         }
     }
@@ -117,13 +111,9 @@ impl IntoResponse for AuthError {
         }
         let body = serde_json::json!({ "detail": self.detail() }).to_string();
         let mut resp = (self.status(), body).into_response();
-        resp.headers_mut()
-            .insert(header::CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        resp.headers_mut().insert(header::CONTENT_TYPE, HeaderValue::from_static("application/json"));
         if matches!(self, Self::Unavailable { .. }) {
-            resp.headers_mut().insert(
-                header::RETRY_AFTER,
-                HeaderValue::from_static(pl_core::dbconn::DB_UNAVAILABLE_RETRY_AFTER),
-            );
+            resp.headers_mut().insert(header::RETRY_AFTER, HeaderValue::from_static(pl_core::dbconn::DB_UNAVAILABLE_RETRY_AFTER));
         }
         if let Some(w) = self.www_authenticate()
             && let Ok(v) = HeaderValue::from_str(w)

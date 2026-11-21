@@ -34,17 +34,11 @@ const EXCEPTIONS: &[(&str, &str)] = &[
     ("PAPERRUST_RELAY_TEST_DATABASE_URL", "Test"),
     ("PAPERRUST_ROLES_TEST_DATABASE_URL", "Test"),
     ("PAPERRUST_SYNC_TEST_DATABASE_URL", "Test"),
-    (
-        "PAPERRUST_SETTINGS_TEST_DATABASE_URL",
-        "Test (dieses Crate)",
-    ),
+    ("PAPERRUST_SETTINGS_TEST_DATABASE_URL", "Test (dieses Crate)"),
     ("PAPERRUST_W15_DATABASE_URL", "Test"),
     ("PAPERRUST_TEST_DATABASE_URL", "Test (pl-queue maintenance)"),
     ("PAPERRUST_TEST_FONT", "Test (pl-ocr preprocess_e2e)"),
-    (
-        "PAPERRUST_SECRET_KEY_FILE",
-        "Beispiel der `*_FILE`-Variante (pl-core `plan_file_env`, gilt für jede Einstellung)",
-    ),
+    ("PAPERRUST_SECRET_KEY_FILE", "Beispiel der `*_FILE`-Variante (pl-core `plan_file_env`, gilt für jede Einstellung)"),
     ("PAPERRUST_FIX1_SERVER", "Test (pl-documents-write lock_order_db)"),
     ("PAPERRUST_FIX2_SERVER", "Test (pl-documents-write concurrency_db)"),
     ("PAPERRUST_BULK_EQ_MEDIA", "Test (pl-consumer bulk_equal)"),
@@ -55,43 +49,16 @@ const EXCEPTIONS: &[(&str, &str)] = &[
     ("PAPERRUST_SCAN_TEST_ADMIN_URL", "Test (pl-scan api_db)"),
     ("PAPERRUST_GUARD_TEST_DATABASE_URL", "Test (pl-guard guard_db/backup_roundtrip)"),
     ("PAPERRUST_GUARD_TEST_TARGET_DATABASE_URL", "Test (pl-guard backup_roundtrip)"),
-    (
-        "PAPERRUST_DESKTOP_E2E_OPEN_LOG",
-        "Test-Haken der Desktop-Hülle (app-2b-e2e.mjs, docs/DESKTOP.md)",
-    ),
-    (
-        "PAPERRUST_DESKTOP_LOGIN_TOKEN",
-        "intern: Anmeldeschlüssel je Start, nur vom Desktop-Supervisor gesetzt (docs/DESKTOP.md §25)",
-    ),
-    (
-        "PAPERRUST_DESKTOP_OWNER",
-        "intern: lokaler Eigentümer, nur vom Desktop-Supervisor gesetzt (docs/DESKTOP.md §25)",
-    ),
-    (
-        "PAPERRUST_RESTART_SUPERVISED",
-        "intern: Aufseher meldet Exit-75-Neustart (§2.5 Nr. 7)",
-    ),
-    (
-        "PAPERRUST_SUPERVISOR_MANAGED_KEYS",
-        "intern: vom Supervisor gesetzte Schlüssel (§2.6)",
-    ),
-    (
-        "PAPERRUST_SUPERVISOR_CONTROL",
-        "intern: run-Ordner des Supervisors (§2.6, WP7)",
-    ),
+    ("PAPERRUST_DESKTOP_E2E_OPEN_LOG", "Test-Haken der Desktop-Hülle (app-2b-e2e.mjs, docs/DESKTOP.md)"),
+    ("PAPERRUST_DESKTOP_LOGIN_TOKEN", "intern: Anmeldeschlüssel je Start, nur vom Desktop-Supervisor gesetzt (docs/DESKTOP.md §25)"),
+    ("PAPERRUST_DESKTOP_OWNER", "intern: lokaler Eigentümer, nur vom Desktop-Supervisor gesetzt (docs/DESKTOP.md §25)"),
+    ("PAPERRUST_RESTART_SUPERVISED", "intern: Aufseher meldet Exit-75-Neustart (§2.5 Nr. 7)"),
+    ("PAPERRUST_SUPERVISOR_MANAGED_KEYS", "intern: vom Supervisor gesetzte Schlüssel (§2.6)"),
+    ("PAPERRUST_SUPERVISOR_CONTROL", "intern: run-Ordner des Supervisors (§2.6, WP7)"),
     ("PAPERRUST_X", "Beispielname in Doku-Kommentaren/Tests"),
-    (
-        "PAPERRUST_ZZ_OV_FILE",
-        "Test (pl-core live_overlay_precedence)",
-    ),
-    (
-        "PAPERRUST_ZZ_OV_GLOBAL",
-        "Test (pl-core live_overlay_precedence)",
-    ),
-    (
-        "PAPERRUST_DB",
-        "Präfix (starts_with) in pl-dbmigrate/src/switch.rs, kein eigener Name",
-    ),
+    ("PAPERRUST_ZZ_OV_FILE", "Test (pl-core live_overlay_precedence)"),
+    ("PAPERRUST_ZZ_OV_GLOBAL", "Test (pl-core live_overlay_precedence)"),
+    ("PAPERRUST_DB", "Präfix (starts_with) in pl-dbmigrate/src/switch.rs, kein eigener Name"),
 ];
 
 fn covered(name: &str) -> bool {
@@ -106,9 +73,7 @@ fn rs_files(dir: &Path, out: &mut Vec<PathBuf>) {
         let p = e.path();
         let name = e.file_name().to_string_lossy().to_string();
         if p.is_dir() {
-            if matches!(name.as_str(), "target" | "node_modules" | ".git" | "gen")
-                || name.starts_with("target")
-            {
+            if matches!(name.as_str(), "target" | "node_modules" | ".git" | "gen") || name.starts_with("target") {
                 continue;
             }
             rs_files(&p, out);
@@ -121,13 +86,7 @@ fn rs_files(dir: &Path, out: &mut Vec<PathBuf>) {
 /// Count from docs/SETTINGS.md §1.19 (`| A – GUI live | 143 | 45 |` …).
 fn doc_counts() -> ([usize; 5], usize, usize) {
     let doc = std::fs::read_to_string(repo().join("docs/SETTINGS.md")).expect("docs/SETTINGS.md");
-    let sec = doc
-        .split("### 1.19 Zählung")
-        .nth(1)
-        .expect("§1.19")
-        .split("\n## ")
-        .next()
-        .unwrap();
+    let sec = doc.split("### 1.19 Zählung").nth(1).expect("§1.19").split("\n## ").next().unwrap();
     let mut c = [0usize; 5];
     let (mut total, mut ac) = (0, 0);
     for line in sec.lines() {
@@ -169,12 +128,7 @@ fn inventory_complete() {
         if let Some(def) = d.default {
             // Default values pass their own validation (path/empty values excluded)
             if !def.is_empty() && !matches!(d.ty, Ty::Path) {
-                assert!(
-                    value::parse(d, def).is_ok(),
-                    "Standard von {} ungültig: {def:?} {:?}",
-                    d.key,
-                    value::parse(d, def)
-                );
+                assert!(value::parse(d, def).is_ok(), "Standard von {} ungültig: {def:?} {:?}", d.key, value::parse(d, def));
             }
         }
         assert!(!d.help.is_empty(), "{}", d.key);
@@ -182,41 +136,20 @@ fn inventory_complete() {
     // 2. Count = documentation §1.19 (automatically generated, reconciled with the documentation)
     let (c, ac) = counts();
     let (dc, dtotal, dac) = doc_counts();
-    eprintln!(
-        "Zählung: A {} · B {} · C {} · D {} · X {} (gesamt {}), AC {ac}",
-        c[0],
-        c[1],
-        c[2],
-        c[3],
-        c[4],
-        SCHEMA.len()
-    );
-    assert_eq!(
-        c, dc,
-        "Zählung je Klasse weicht von docs/SETTINGS.md §1.19 ab"
-    );
+    eprintln!("Zählung: A {} · B {} · C {} · D {} · X {} (gesamt {}), AC {ac}", c[0], c[1], c[2], c[3], c[4], SCHEMA.len());
+    assert_eq!(c, dc, "Zählung je Klasse weicht von docs/SETTINGS.md §1.19 ab");
     assert_eq!(SCHEMA.len(), dtotal);
     assert_eq!(ac, dac);
     assert_eq!(ac, 45);
     // 3. every own setting (pl_core::config::OWN_SETTINGS)
-    let missing: Vec<&str> = OWN_SETTINGS
-        .iter()
-        .map(|s| s.name)
-        .filter(|n| !covered(n))
-        .collect();
-    assert!(
-        missing.is_empty(),
-        "OWN_SETTINGS ohne Schema-Eintrag: {missing:?}"
-    );
+    let missing: Vec<&str> = OWN_SETTINGS.iter().map(|s| s.name).filter(|n| !covered(n)).collect();
+    assert!(missing.is_empty(), "OWN_SETTINGS ohne Schema-Eintrag: {missing:?}");
     // 4. every PAPERLESS_* from upstream/src/paperless/settings
     let re_up = regex::Regex::new(r"PAPERLESS_[A-Z0-9_]*[A-Z0-9]").unwrap();
     let dir = repo().join("upstream/src/paperless/settings");
     let mut n_up = 0;
     let mut missing = BTreeSet::new();
-    for e in std::fs::read_dir(&dir)
-        .expect("upstream/src/paperless/settings")
-        .flatten()
-    {
+    for e in std::fs::read_dir(&dir).expect("upstream/src/paperless/settings").flatten() {
         if e.path().extension().is_some_and(|x| x == "py") {
             let s = std::fs::read_to_string(e.path()).unwrap();
             for m in re_up.find_iter(&s) {
@@ -228,10 +161,7 @@ fn inventory_complete() {
         }
     }
     assert!(n_up > 150, "upstream-Einstellungen nicht gefunden ({n_up})");
-    assert!(
-        missing.is_empty(),
-        "upstream-Einstellungen ohne Schema-Eintrag: {missing:?}"
-    );
+    assert!(missing.is_empty(), "upstream-Einstellungen ohne Schema-Eintrag: {missing:?}");
     // 5. every PAPERRUST_* as a complete string literal in the Rust source
     let re_rs = regex::Regex::new(r#""(PAPERRUST_[A-Z0-9_]*[A-Z0-9])""#).unwrap();
     let mut files = Vec::new();
@@ -244,18 +174,11 @@ fn inventory_complete() {
         };
         for m in re_rs.captures_iter(&s) {
             if !covered(&m[1]) {
-                missing.insert(format!(
-                    "{} ({})",
-                    &m[1],
-                    f.strip_prefix(repo()).unwrap_or(f).display()
-                ));
+                missing.insert(format!("{} ({})", &m[1], f.strip_prefix(repo()).unwrap_or(f).display()));
             }
         }
     }
-    assert!(
-        missing.is_empty(),
-        "PAPERRUST_* ohne Schema-Eintrag oder Ausnahme: {missing:#?}"
-    );
+    assert!(missing.is_empty(), "PAPERRUST_* ohne Schema-Eintrag oder Ausnahme: {missing:#?}");
 }
 
 /// Env path (startup) and GUI path (JSON → canonical string → DB row → snapshot) yield
@@ -281,38 +204,19 @@ fn parse_parity() {
     let mut kinds = BTreeSet::new();
     for (key, raw) in samples {
         let def = find(key).unwrap();
-        kinds.insert(
-            format!("{:?}", def.ty)
-                .split([' ', '{', '('])
-                .next()
-                .unwrap()
-                .to_string(),
-        );
+        kinds.insert(format!("{:?}", def.ty).split([' ', '{', '(']).next().unwrap().to_string());
         // Startup path
-        let start = parse_from_env(def, &Env::from_pairs([(*key, *raw)]))
-            .unwrap()
-            .unwrap();
+        let start = parse_from_env(def, &Env::from_pairs([(*key, *raw)])).unwrap().unwrap();
         // GUI path
         let json = value::to_json(def, raw);
         let canonical = value::from_json(def, &json).unwrap();
         let mut layers = Layers::new(Env::from_pairs([("UNRELATED", "1")]));
-        layers.db.insert(
-            def.key.into(),
-            DbEntry {
-                value: DbValue::Plain(canonical),
-                rev: 1,
-                updated_at: None,
-                updated_by: None,
-            },
-        );
+        layers.db.insert(def.key.into(), DbEntry { value: DbValue::Plain(canonical), rev: 1, updated_at: None, updated_by: None });
         let snap = Settings::build(&layers, 1, None);
         let gui = parse_from_env(def, snap.env()).unwrap().unwrap();
         assert_eq!(start, gui, "{key}");
     }
-    for k in [
-        "Bool", "OnOff", "Int", "Float", "Str", "List", "Json", "Choice", "Path", "Url", "Cron",
-        "TimeZone",
-    ] {
+    for k in ["Bool", "OnOff", "Int", "Float", "Str", "List", "Json", "Choice", "Path", "Url", "Cron", "TimeZone"] {
         assert!(kinds.contains(k), "Typ {k} nicht abgedeckt: {kinds:?}");
     }
 }

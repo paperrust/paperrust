@@ -18,11 +18,7 @@ impl FilterErrors {
         self.0.insert(name.to_string(), json!([msg]));
     }
     pub fn into_result(self) -> ApiResult<()> {
-        if self.0.is_empty() {
-            Ok(())
-        } else {
-            Err(ApiError::bad_request(Value::Object(self.0)))
-        }
+        if self.0.is_empty() { Ok(()) } else { Err(ApiError::bad_request(Value::Object(self.0))) }
     }
 }
 
@@ -30,9 +26,7 @@ impl FilterErrors {
 pub fn parse_number(s: &str) -> Option<i64> {
     let s = s.trim();
     static RE: std::sync::OnceLock<Option<regex::Regex>> = std::sync::OnceLock::new();
-    let re = RE
-        .get_or_init(|| regex::Regex::new(r"^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$").ok())
-        .as_ref()?;
+    let re = RE.get_or_init(|| regex::Regex::new(r"^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$").ok()).as_ref()?;
     if !re.is_match(s) {
         return None;
     }
@@ -74,16 +68,8 @@ pub fn id_filters(q: &mut SelectStatement, ctx: &Ctx, col: &str, errs: &mut Filt
             errs.add("id__in", "Enter a number.");
         } else {
             // i64 literals (no user text), since sea-query is built here without `postgres-array`
-            let list = ids
-                .iter()
-                .map(i64::to_string)
-                .collect::<Vec<_>>()
-                .join(", ");
-            q.and_where(Expr::cust(if list.is_empty() {
-                "FALSE".to_string()
-            } else {
-                format!("{col} IN ({list})")
-            }));
+            let list = ids.iter().map(i64::to_string).collect::<Vec<_>>().join(", ");
+            q.and_where(Expr::cust(if list.is_empty() { "FALSE".to_string() } else { format!("{col} IN ({list})") }));
         }
     }
 }
@@ -101,29 +87,16 @@ pub fn char_filters(q: &mut SelectStatement, ctx: &Ctx, field: &str, col: &str) 
             "icontains" => ("LIKE", format!("%{}%", like_escape(v))),
             _ => ("=", v.to_string()),
         };
-        q.and_where(Expr::cust_with_values(
-            format!("UPPER({col}::text) {op} UPPER($1)"),
-            [pat],
-        ));
+        q.and_where(Expr::cust_with_values(format!("UPPER({col}::text) {op} UPPER($1)"), [pat]));
     }
 }
 
-
 /// DATETIME_KWARGS for a DateTimeField field.
-pub fn datetime_filters(
-    q: &mut SelectStatement,
-    ctx: &Ctx,
-    field: &str,
-    col: &str,
-    errs: &mut FilterErrors,
-) {
+pub fn datetime_filters(q: &mut SelectStatement, ctx: &Ctx, field: &str, col: &str, errs: &mut FilterErrors) {
     let zone = tz();
     let tz = zone.name();
     let local = format!("({col} AT TIME ZONE '{tz}')");
-    for lookup in [
-        "year", "month", "day", "date__gt", "date__gte", "gt", "gte", "date__lt", "date__lte",
-        "lt", "lte",
-    ] {
+    for lookup in ["year", "month", "day", "date__gt", "date__gte", "gt", "gte", "date__lt", "date__lte", "lt", "lte"] {
         let name = format!("{field}__{lookup}");
         let Some(v) = ctx.param(&name).filter(|v| !v.is_empty()) else {
             continue;
@@ -131,20 +104,14 @@ pub fn datetime_filters(
         match lookup {
             "year" | "month" | "day" => match parse_number(v) {
                 Some(n) => {
-                    q.and_where(Expr::cust_with_values(
-                        format!("EXTRACT({} FROM {local}) = $1", lookup.to_uppercase()),
-                        [n],
-                    ));
+                    q.and_where(Expr::cust_with_values(format!("EXTRACT({} FROM {local}) = $1", lookup.to_uppercase()), [n]));
                 }
                 None => errs.add(&name, "Enter a number."),
             },
             l if l.starts_with("date__") => match pl_core::datetime::parse_date_input(v, ctx.rc.language) {
                 Ok(Some(d)) => {
                     let op = op_for(&l[6..]);
-                    q.and_where(Expr::cust_with_values(
-                        format!("({local})::date {op} $1"),
-                        [d],
-                    ));
+                    q.and_where(Expr::cust_with_values(format!("({local})::date {op} $1"), [d]));
                 }
                 Ok(None) => {}
                 Err(m) => errs.add(&name, &m),
@@ -188,21 +155,10 @@ pub fn ordering_terms(ctx: &Ctx, valid: &[&str]) -> Option<Vec<(String, bool)>> 
 }
 
 /// ORDER BY from terms; `col_for` returns the SQL expression per field name.
-pub fn apply_ordering(
-    q: &mut SelectStatement,
-    terms: &[(String, bool)],
-    col_for: impl Fn(&str) -> String,
-) {
+pub fn apply_ordering(q: &mut SelectStatement, terms: &[(String, bool)], col_for: impl Fn(&str) -> String) {
     for (name, desc) in terms {
         let e: SimpleExpr = Expr::cust(col_for(name));
-        q.order_by_expr(
-            e,
-            if *desc {
-                sea_query::Order::Desc
-            } else {
-                sea_query::Order::Asc
-            },
-        );
+        q.order_by_expr(e, if *desc { sea_query::Order::Desc } else { sea_query::Order::Asc });
     }
 }
 
@@ -223,5 +179,4 @@ mod tests {
     fn like() {
         assert_eq!(like_escape("50%_a\\"), "50\\%\\_a\\\\");
     }
-
 }

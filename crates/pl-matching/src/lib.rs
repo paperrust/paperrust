@@ -23,6 +23,6 @@ pub use dates::{DateParserConfig, RegexDateParser};
 pub use matching::{Classifier, MatchDocument, Matchable, matches};
 pub use regex_compat::{safe_regex_search, validate_regex_pattern};
 pub use workflow::{
-    ConsumableDocument, DocumentSource, ExistingDocument, WorkflowTrigger, consumable_document_matches_workflow,
-    document_matches_workflow, existing_document_matches_workflow, prefilter_matches,
+    ConsumableDocument, DocumentSource, ExistingDocument, WorkflowTrigger, consumable_document_matches_workflow, document_matches_workflow,
+    existing_document_matches_workflow, prefilter_matches,
 };

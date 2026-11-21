@@ -121,10 +121,7 @@ pub fn parse_kwargs(kwargs: &serde_json::Map<String, serde_json::Value>) -> Resu
         .iter()
         .map(|v| v.as_i64().ok_or_else(|| "document_ids must be integers".to_string()))
         .collect::<Result<Vec<i64>, String>>()?;
-    let workflow_id = kwargs
-        .get("workflow_id")
-        .and_then(serde_json::Value::as_i64)
-        .ok_or_else(|| "workflow_id missing".to_string())?;
+    let workflow_id = kwargs.get("workflow_id").and_then(serde_json::Value::as_i64).ok_or_else(|| "workflow_id missing".to_string())?;
     let filter_documents = match kwargs.get("filter_documents") {
         None | Some(serde_json::Value::Null) => true,
         Some(serde_json::Value::Bool(b)) => *b,
@@ -145,10 +142,7 @@ mod tests {
     #[test]
     fn kwargs_defaults_and_errors() {
         assert_eq!(parse_kwargs(&kw(json!({"document_ids": [3, 4], "workflow_id": 5}))), Ok((vec![3, 4], 5, true)));
-        assert_eq!(
-            parse_kwargs(&kw(json!({"document_ids": [], "workflow_id": 5, "filter_documents": false}))),
-            Ok((vec![], 5, false))
-        );
+        assert_eq!(parse_kwargs(&kw(json!({"document_ids": [], "workflow_id": 5, "filter_documents": false}))), Ok((vec![], 5, false)));
         assert!(parse_kwargs(&kw(json!({"workflow_id": 5}))).is_err());
         assert!(parse_kwargs(&kw(json!({"document_ids": ["x"], "workflow_id": 5}))).is_err());
         assert!(parse_kwargs(&kw(json!({"document_ids": [1], "workflow_id": 5, "filter_documents": "no"}))).is_err());

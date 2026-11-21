@@ -16,23 +16,13 @@ pub struct XAttr {
 
 #[derive(Debug, Clone)]
 pub enum XEvent {
-    Start {
-        ns: Option<String>,
-        local: String,
-        attrs: Vec<XAttr>,
-    },
-    End {
-        ns: Option<String>,
-        local: String,
-    },
+    Start { ns: Option<String>, local: String, attrs: Vec<XAttr> },
+    End { ns: Option<String>, local: String },
     Text(String),
 }
 
 pub fn attr<'a>(attrs: &'a [XAttr], ns: Option<&str>, local: &str) -> Option<&'a str> {
-    attrs
-        .iter()
-        .find(|a| a.local == local && a.ns.as_deref() == ns)
-        .map(|a| a.value.as_str())
+    attrs.iter().find(|a| a.local == local && a.ns.as_deref() == ns).map(|a| a.value.as_str())
 }
 
 /// Streaming reader. `max_depth` limits nesting, `max_events` the number of events.
@@ -103,10 +93,7 @@ impl<'a> XmlStream<'a> {
                 d.check()?;
             }
             self.buf.clear();
-            let (res, ev) = self
-                .reader
-                .read_resolved_event_into(&mut self.buf)
-                .map_err(|e| ParseError::Invalid(format!("XML: {e}")))?;
+            let (res, ev) = self.reader.read_resolved_event_into(&mut self.buf).map_err(|e| ParseError::Invalid(format!("XML: {e}")))?;
             let ns = Self::resolve(res);
             let empty_ev = matches!(ev, Event::Empty(_));
             match ev {
@@ -125,17 +112,10 @@ impl<'a> XmlStream<'a> {
                             .normalized_value(quick_xml::XmlVersion::Implicit1_0)
                             .map(|c| c.into_owned())
                             .unwrap_or_else(|_| String::from_utf8_lossy(&a.value).into_owned());
-                        attrs.push(XAttr {
-                            ns: ans,
-                            local: String::from_utf8_lossy(l.as_ref()).into_owned(),
-                            value,
-                        });
+                        attrs.push(XAttr { ns: ans, local: String::from_utf8_lossy(l.as_ref()).into_owned(), value });
                     }
                     if empty {
-                        self.pending_end = Some(XEvent::End {
-                            ns: ns.clone(),
-                            local: local.clone(),
-                        });
+                        self.pending_end = Some(XEvent::End { ns: ns.clone(), local: local.clone() });
                     } else {
                         self.depth += 1;
                         if self.depth > self.max_depth {
@@ -150,10 +130,7 @@ impl<'a> XmlStream<'a> {
                     return Ok(Some(XEvent::End { ns, local }));
                 }
                 Event::Text(t) => {
-                    let s = t
-                        .xml10_content()
-                        .map(|c| c.into_owned())
-                        .unwrap_or_else(|_| String::from_utf8_lossy(t.as_ref()).into_owned());
+                    let s = t.xml10_content().map(|c| c.into_owned()).unwrap_or_else(|_| String::from_utf8_lossy(t.as_ref()).into_owned());
                     if !s.is_empty() {
                         return Ok(Some(XEvent::Text(s)));
                     }
@@ -208,9 +185,7 @@ impl Elem {
         if self.is(ns, local) {
             return Some(self);
         }
-        self.children
-            .iter()
-            .find_map(|c| c.find_descendant(ns, local))
+        self.children.iter().find_map(|c| c.find_descendant(ns, local))
     }
 }
 
@@ -227,13 +202,7 @@ pub fn parse_dom(data: &[u8], max_depth: usize, max_nodes: usize) -> Result<Elem
                 if nodes > max_nodes {
                     return Err(ParseError::LimitExceeded("too many XML nodes".into()));
                 }
-                stack.push(Elem {
-                    ns,
-                    local,
-                    attrs,
-                    text: None,
-                    children: Vec::new(),
-                });
+                stack.push(Elem { ns, local, attrs, text: None, children: Vec::new() });
             }
             XEvent::End { .. } => {
                 if let Some(done) = stack.pop() {
@@ -269,12 +238,7 @@ mod tests {
 
     #[test]
     fn dom_text_and_entities() {
-        let d = parse_dom(
-            br#"<a xmlns="urn:x" xmlns:p="urn:p" p:k="v&amp;w"> t&lt;1 <b/>tail</a>"#,
-            10,
-            100,
-        )
-        .unwrap();
+        let d = parse_dom(br#"<a xmlns="urn:x" xmlns:p="urn:p" p:k="v&amp;w"> t&lt;1 <b/>tail</a>"#, 10, 100).unwrap();
         assert_eq!(d.ns.as_deref(), Some("urn:x"));
         assert_eq!(d.text.as_deref(), Some(" t<1 "));
         assert_eq!(d.attrs[0].ns.as_deref(), Some("urn:p"));
@@ -285,9 +249,6 @@ mod tests {
     #[test]
     fn depth_limit() {
         let deep = "<a>".repeat(50) + &"</a>".repeat(50);
-        assert!(matches!(
-            parse_dom(deep.as_bytes(), 20, 1000),
-            Err(ParseError::LimitExceeded(_))
-        ));
+        assert!(matches!(parse_dom(deep.as_bytes(), 20, 1000), Err(ParseError::LimitExceeded(_))));
     }
 }

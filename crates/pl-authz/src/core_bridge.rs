@@ -31,16 +31,12 @@ impl AuthConfig {
 impl From<AuthError> for ApiError {
     fn from(e: AuthError) -> Self {
         match e {
-            AuthError::NotAuthenticated { www_authenticate } => {
-                ApiError::not_authenticated(www_authenticate.as_deref())
-            }
+            AuthError::NotAuthenticated { www_authenticate } => ApiError::not_authenticated(www_authenticate.as_deref()),
             AuthError::AuthenticationFailed { detail, www_authenticate } => {
                 ApiError::authentication_failed(Some(&detail), www_authenticate.as_deref())
             }
             AuthError::PermissionDenied { detail } => ApiError::permission_denied_msg(detail),
-            AuthError::NotFound { detail } => {
-                ApiError::with_detail(axum::http::StatusCode::NOT_FOUND, detail)
-            }
+            AuthError::NotFound { detail } => ApiError::with_detail(axum::http::StatusCode::NOT_FOUND, detail),
             AuthError::MethodNotAllowed { method } => ApiError::method_not_allowed(&method),
             AuthError::Internal { message } => ApiError::internal(message),
             AuthError::Unavailable { message } => {

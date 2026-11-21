@@ -69,15 +69,16 @@ pub fn serialize(kind: Kind, row: &ObjectRow, ctx: &SerCtx) -> Value {
         m.insert("document_count".into(), json!(c));
     }
     if kind == Kind::Correspondent
-        && let Some(lc) = &row.last_correspondence {
-            m.insert(
-                "last_correspondence".into(),
-                match lc {
-                    Some(d) => json!(d.format("%Y-%m-%d").to_string()),
-                    None => Value::Null,
-                },
-            );
-        }
+        && let Some(lc) = &row.last_correspondence
+    {
+        m.insert(
+            "last_correspondence".into(),
+            match lc {
+                Some(d) => json!(d.format("%Y-%m-%d").to_string()),
+                None => Value::Null,
+            },
+        );
+    }
     m.insert("owner".into(), json!(row.owner_id));
     if ctx.full_perms {
         let p = ctx.grantees.get(&row.id).cloned().unwrap_or_default();
@@ -139,14 +140,38 @@ mod tests {
 
     #[test]
     fn correspondent_field_order() {
-        let row = ObjectRow { id: 1, name: "Bank AG".into(), matching_algorithm: 1, is_insensitive: true, document_count: Some(3), last_correspondence: Some(None), owner_id: Some(5), ..Default::default() };
+        let row = ObjectRow {
+            id: 1,
+            name: "Bank AG".into(),
+            matching_algorithm: 1,
+            is_insensitive: true,
+            document_count: Some(3),
+            last_correspondence: Some(None),
+            owner_id: Some(5),
+            ..Default::default()
+        };
         let g = HashMap::new();
-        let batch: HashMap<i64, Grantees> = [(1, Grantees { change: pl_authz::owned::Grantees { users: vec![], groups: vec![7] }, ..Default::default() })].into();
+        let batch: HashMap<i64, Grantees> =
+            [(1, Grantees { change: pl_authz::owned::Grantees { users: vec![], groups: vec![7] }, ..Default::default() })].into();
         let u = user();
         let ctx = SerCtx { user: &u, full_perms: false, change: ChangeSource::Batch(&batch), grantees: &g, children: None };
         let v = serialize(Kind::Correspondent, &row, &ctx);
         let keys: Vec<&String> = v.as_object().unwrap().keys().collect();
-        assert_eq!(keys, ["id", "slug", "name", "match", "matching_algorithm", "is_insensitive", "document_count", "last_correspondence", "owner", "user_can_change"]);
+        assert_eq!(
+            keys,
+            [
+                "id",
+                "slug",
+                "name",
+                "match",
+                "matching_algorithm",
+                "is_insensitive",
+                "document_count",
+                "last_correspondence",
+                "owner",
+                "user_can_change"
+            ]
+        );
         assert_eq!(v["slug"], "bank-ag");
         assert_eq!(v["user_can_change"], true);
         assert_eq!(v["last_correspondence"], Value::Null);
@@ -161,13 +186,34 @@ mod tests {
             ..Default::default()
         };
         let children: HashMap<i64, Vec<ObjectRow>> = [(1, vec![tag(2, Some(1))])].into();
-        let g: HashMap<i64, Grantees> = [(1, Grantees::default()), (2, Grantees { view: pl_authz::owned::Grantees { users: vec![3], groups: vec![] }, ..Default::default() })].into();
+        let g: HashMap<i64, Grantees> = [
+            (1, Grantees::default()),
+            (2, Grantees { view: pl_authz::owned::Grantees { users: vec![3], groups: vec![] }, ..Default::default() }),
+        ]
+        .into();
         let u = user();
         let empty = HashSet::new();
         let ctx = SerCtx { user: &u, full_perms: true, change: ChangeSource::PerObject(&empty), grantees: &g, children: Some(&children) };
         let v = serialize(Kind::Tag, &tag(1, None), &ctx);
         let keys: Vec<&String> = v.as_object().unwrap().keys().collect();
-        assert_eq!(keys, ["id", "slug", "name", "color", "text_color", "match", "matching_algorithm", "is_insensitive", "is_inbox_tag", "owner", "permissions", "parent", "children"]);
+        assert_eq!(
+            keys,
+            [
+                "id",
+                "slug",
+                "name",
+                "color",
+                "text_color",
+                "match",
+                "matching_algorithm",
+                "is_insensitive",
+                "is_inbox_tag",
+                "owner",
+                "permissions",
+                "parent",
+                "children"
+            ]
+        );
         assert_eq!(v["children"][0]["id"], 2);
         assert_eq!(v["children"][0]["permissions"]["view"]["users"], json!([3]));
         assert_eq!(v["text_color"], "#ffffff");

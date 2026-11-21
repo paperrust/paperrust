@@ -19,18 +19,12 @@ use tokio::sync::{Mutex, watch};
 
 /// Values of the keys `keys` in a snapshot (comparison "has anything changed?").
 pub fn values_of(s: &Settings, keys: &[&str]) -> Vec<Option<String>> {
-    keys.iter()
-        .map(|k| s.value(k).map(str::to_string))
-        .collect()
+    keys.iter().map(|k| s.value(k).map(str::to_string)).collect()
 }
 
 /// All crontab keys (scheduler, effect W).
 pub fn cron_keys() -> Vec<&'static str> {
-    pl_settings::SCHEMA
-        .iter()
-        .filter(|d| matches!(d.ty, pl_settings::schema::Ty::Cron))
-        .map(|d| d.key)
-        .collect()
+    pl_settings::SCHEMA.iter().filter(|d| matches!(d.ty, pl_settings::schema::Ty::Cron)).map(|d| d.key).collect()
 }
 
 /// Keys of the folder watcher.
@@ -67,23 +61,14 @@ pub const SYNC_KEYS: &[&str] = &[
 ];
 
 /// Start function of a subsystem: receives its own stop signal.
-pub type Start =
-    Box<dyn Fn(watch::Receiver<bool>) -> Result<BoxFuture<'static, ()>, String> + Send + Sync>;
+pub type Start = Box<dyn Fn(watch::Receiver<bool>) -> Result<BoxFuture<'static, ()>, String> + Send + Sync>;
 
 /// Runs a subsystem and restarts it as soon as one of the `keys` changes. Without a
 /// [`SettingsHandle`] (no DB access) once as before.
-pub async fn restartable(
-    state: AppState,
-    name: &'static str,
-    keys: Vec<&'static str>,
-    start: Start,
-    mut stop: watch::Receiver<bool>,
-) {
+pub async fn restartable(state: AppState, name: &'static str, keys: Vec<&'static str>, start: Start, mut stop: watch::Receiver<bool>) {
     let mut sub = state.service::<SettingsHandle>().map(|h| h.subscribe());
     loop {
-        let current = sub
-            .as_mut()
-            .map(|s| values_of(&s.borrow_and_update(), &keys));
+        let current = sub.as_mut().map(|s| values_of(&s.borrow_and_update(), &keys));
         let (child_tx, child_rx) = watch::channel(false);
         let mut task = match start(child_rx) {
             Ok(f) => Some(tokio::spawn(f)),
@@ -132,8 +117,7 @@ pub async fn restartable(
 }
 
 /// Builds the ingestion building blocks (see `worker::build_consumer`).
-pub type BuildConsumer =
-    Arc<dyn Fn() -> BoxFuture<'static, Result<pl_consumer::Consumer, String>> + Send + Sync>;
+pub type BuildConsumer = Arc<dyn Fn() -> BoxFuture<'static, Result<pl_consumer::Consumer, String>> + Send + Sync>;
 
 /// `consume_file` with settings from the next document on.
 pub struct LiveConsume {
@@ -148,20 +132,12 @@ type ConsumeKey = (i64, String);
 impl LiveConsume {
     pub fn new(state: AppState, initial: Arc<pl_consumer::Consumer>, build: BuildConsumer) -> Self {
         let h: Arc<dyn TaskHandler> = Arc::new(pl_consumer::task::handler(initial));
-        Self {
-            state,
-            build,
-            current: Mutex::new((None, h)),
-        }
+        Self { state, build, current: Mutex::new((None, h)) }
     }
 
     /// (settings state, checksum of the AC row).
     async fn key(&self) -> Option<ConsumeKey> {
-        let rev = self
-            .state
-            .service::<SettingsHandle>()
-            .map(|h| h.load().rev)
-            .unwrap_or(0);
+        let rev = self.state.service::<SettingsHandle>().map(|h| h.load().rev).unwrap_or(0);
         let ac: Option<String> = sqlx::query_scalar(
             "SELECT md5(coalesce((SELECT to_jsonb(c)::text FROM paperless_applicationconfiguration c ORDER BY id LIMIT 1), ''))",
         )
@@ -250,23 +226,11 @@ mod tests {
     #[tokio::test]
     async fn restartable_restarts_on_relevant_change() {
         use pl_settings::layer::{DbEntry, DbValue, Layers};
-        let cfg = pl_core::Config::from_env_map(pl_core::config::Env::from_pairs([(
-            "PAPERLESS_SECRET_KEY",
-            "k",
-        )]))
-        .unwrap();
-        let state = AppState::with_pool(
-            cfg,
-            sqlx::postgres::PgPoolOptions::new()
-                .connect_lazy("postgres://x@127.0.0.1:1/x")
-                .unwrap(),
-        )
-        .unwrap();
+        let cfg = pl_core::Config::from_env_map(pl_core::config::Env::from_pairs([("PAPERLESS_SECRET_KEY", "k")])).unwrap();
+        let state =
+            AppState::with_pool(cfg, sqlx::postgres::PgPoolOptions::new().connect_lazy("postgres://x@127.0.0.1:1/x").unwrap()).unwrap();
         let env = pl_core::config::Env::from_pairs([("X", "1")]);
-        let h = SettingsHandle::without_db(
-            env.clone(),
-            pl_settings::crypto::SecretBox::from_secret_key("k"),
-        );
+        let h = SettingsHandle::without_db(env.clone(), pl_settings::crypto::SecretBox::from_secret_key("k"));
         state.set_service(h.clone());
         let starts = Arc::new(AtomicUsize::new(0));
         let s2 = starts.clone();
@@ -281,15 +245,7 @@ mod tests {
         let snap = |rev: i64, kv: &[(&str, &str)]| {
             let mut l = Layers::new(env.clone());
             for (k, v) in kv {
-                l.db.insert(
-                    (*k).into(),
-                    DbEntry {
-                        value: DbValue::Plain((*v).into()),
-                        rev,
-                        updated_at: None,
-                        updated_by: None,
-                    },
-                );
+                l.db.insert((*k).into(), DbEntry { value: DbValue::Plain((*v).into()), rev, updated_at: None, updated_by: None });
             }
             pl_settings::Settings::build(&l, rev, Some(h.boot()))
         };
@@ -311,37 +267,19 @@ mod tests {
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         assert_eq!(starts.load(Ordering::SeqCst), 1);
         // crontab: restart
-        h.replace(snap(
-            2,
-            &[
-                ("PAPERLESS_EMAIL_HOST", "x"),
-                ("PAPERLESS_TRAIN_TASK_CRON", "1 2 * * *"),
-            ],
-        ));
+        h.replace(snap(2, &[("PAPERLESS_EMAIL_HOST", "x"), ("PAPERLESS_TRAIN_TASK_CRON", "1 2 * * *")]));
         assert!(wait(2).await, "scheduler not restarted");
         tx.send(true).unwrap();
-        tokio::time::timeout(std::time::Duration::from_secs(2), j)
-            .await
-            .unwrap()
-            .unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(2), j).await.unwrap().unwrap();
         assert_eq!(starts.load(Ordering::SeqCst), 2);
     }
 
     /// Without a settings holder: start once, end on stop.
     #[tokio::test]
     async fn restartable_runs_once_without_handle() {
-        let cfg = pl_core::Config::from_env_map(pl_core::config::Env::from_pairs([(
-            "PAPERLESS_SECRET_KEY",
-            "k",
-        )]))
-        .unwrap();
-        let state = AppState::with_pool(
-            cfg,
-            sqlx::postgres::PgPoolOptions::new()
-                .connect_lazy("postgres://x@127.0.0.1:1/x")
-                .unwrap(),
-        )
-        .unwrap();
+        let cfg = pl_core::Config::from_env_map(pl_core::config::Env::from_pairs([("PAPERLESS_SECRET_KEY", "k")])).unwrap();
+        let state =
+            AppState::with_pool(cfg, sqlx::postgres::PgPoolOptions::new().connect_lazy("postgres://x@127.0.0.1:1/x").unwrap()).unwrap();
         let starts = Arc::new(AtomicUsize::new(0));
         let s2 = starts.clone();
         let start: Start = Box::new(move |mut rx: watch::Receiver<bool>| {
@@ -354,10 +292,7 @@ mod tests {
         let j = tokio::spawn(restartable(state, "test", vec![], start, rx));
         tokio::task::yield_now().await;
         tx.send(true).unwrap();
-        tokio::time::timeout(std::time::Duration::from_secs(2), j)
-            .await
-            .unwrap()
-            .unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(2), j).await.unwrap().unwrap();
         assert_eq!(starts.load(Ordering::SeqCst), 1);
     }
 }

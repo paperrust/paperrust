@@ -3,8 +3,8 @@
 //! signal) are expressed via `MatchDocument::effective_content` / `match_*` helpers.
 
 use pl_matching::matching::{
-    Classifier, MATCH_ALL, MATCH_ANY, MATCH_AUTO, MATCH_FUZZY, MATCH_LITERAL, MATCH_NONE, MATCH_REGEX, MatchDocument,
-    Matchable, match_correspondents, match_tags, matches, split_match_python,
+    Classifier, MATCH_ALL, MATCH_ANY, MATCH_AUTO, MATCH_FUZZY, MATCH_LITERAL, MATCH_NONE, MATCH_REGEX, MatchDocument, Matchable,
+    match_correspondents, match_tags, matches, split_match_python,
 };
 
 const CLASSES: [&str; 3] = ["Tag", "Correspondent", "DocumentType"];
@@ -404,7 +404,11 @@ impl Classifier for FakeClassifier {
 
 #[test]
 fn auto_matching_uses_classifier_only_for_auto_objects() {
-    let cs = vec![named(1, "Correspondent", "x", MATCH_AUTO), named(2, "Correspondent", "x", MATCH_AUTO), named(3, "Correspondent", "x", MATCH_NONE)];
+    let cs = vec![
+        named(1, "Correspondent", "x", MATCH_AUTO),
+        named(2, "Correspondent", "x", MATCH_AUTO),
+        named(3, "Correspondent", "x", MATCH_NONE),
+    ];
     let got = match_correspondents(&doc_with_keyword(), &cs, Some(&FakeClassifier)).unwrap();
     assert_eq!(got.iter().map(|t| t.id).collect::<Vec<_>>(), vec![2]);
     let tags = vec![named(3, "Tag", "x", MATCH_ANY), named(3, "Tag", "x", MATCH_AUTO)];

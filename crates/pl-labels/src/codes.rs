@@ -113,9 +113,7 @@ pub fn encode(kind: CodeType, content: &str) -> Result<Symbol> {
         CodeType::DataMatrix => {
             rxing::datamatrix::DataMatrixWriter.encode_with_hints(content, &rxing::BarcodeFormat::DATA_MATRIX, 0, 0, &hints)
         }
-        CodeType::Code128 => {
-            rxing::oned::Code128Writer.encode_with_hints(content, &rxing::BarcodeFormat::CODE_128, 0, 0, &hints)
-        }
+        CodeType::Code128 => rxing::oned::Code128Writer.encode_with_hints(content, &rxing::BarcodeFormat::CODE_128, 0, 0, &hints),
     }
     .map_err(|e| LabelError::Invalid("content".into(), format!("Cannot encode {content:?} as {}: {e}", kind.as_str())))?;
     let (w, h) = (m.getWidth(), m.getHeight());

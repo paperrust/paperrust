@@ -256,13 +256,8 @@ impl<'a> Ttf<'a> {
         let mut hhea = self.table(b"hhea")?.to_vec();
         hhea.get_mut(10..12)?.copy_from_slice(&adv_max.to_be_bytes());
         hhea.get_mut(34..36)?.copy_from_slice(&self.num_glyphs.to_be_bytes());
-        let mut out_tables: Vec<([u8; 4], Vec<u8>)> = vec![
-            (*b"glyf", new_glyf),
-            (*b"head", head),
-            (*b"hhea", hhea),
-            (*b"hmtx", hmtx),
-            (*b"loca", loca),
-        ];
+        let mut out_tables: Vec<([u8; 4], Vec<u8>)> =
+            vec![(*b"glyf", new_glyf), (*b"head", head), (*b"hhea", hhea), (*b"hmtx", hmtx), (*b"loca", loca)];
         for tag in [b"cmap", b"cvt ", b"fpgm", b"gasp", b"maxp", b"name", b"OS/2", b"post", b"prep"] {
             if let Some(t) = self.table(tag) {
                 out_tables.push((*tag, t.to_vec()));

@@ -42,7 +42,9 @@ fn has_drive(part: &str) -> bool {
 /// `Path.resolve()`) inside `root` (`validate_path_in_root`).
 pub fn target_in(root: &Path, rel: &str, what: &str) -> CliResult<PathBuf> {
     if !is_safe_relative(rel) {
-        return Err(CliError::Command(format!("Refusing to import {what} with unsafe path \"{rel}\" (must be relative, without \"..\" or a drive)")));
+        return Err(CliError::Command(format!(
+            "Refusing to import {what} with unsafe path \"{rel}\" (must be relative, without \"..\" or a drive)"
+        )));
     }
     let target = root.join(rel);
     pl_templating::validate_path_in_root(&target, root).map_err(|e| CliError::Command(format!("Refusing to import {what}: {e}")))?;
@@ -54,7 +56,9 @@ pub fn target_in(root: &Path, rel: &str, what: &str) -> CliResult<PathBuf> {
 /// upstream text); a path that was only checked lexically is never returned
 /// (security review final K-N3: previously `Ok(p)` for a missing file).
 pub fn source_in(dir: &Path, rel: &str) -> CliResult<Option<PathBuf>> {
-    let refuse = || CliError::Command(format!("The manifest file refers to \"{rel}\" which is outside of the source directory or not a regular file."));
+    let refuse = || {
+        CliError::Command(format!("The manifest file refers to \"{rel}\" which is outside of the source directory or not a regular file."))
+    };
     if !is_safe_relative(rel) {
         return Err(refuse());
     }
@@ -77,7 +81,8 @@ pub fn source_in(dir: &Path, rel: &str) -> CliResult<Option<PathBuf>> {
 /// [`source_in`] for a file that must exist (copying): if it is missing, the same
 /// `FileNotFoundError` as when copying in upstream.
 pub fn existing_source_in(dir: &Path, rel: &str) -> CliResult<PathBuf> {
-    source_in(dir, rel)?.ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, format!("No such file or directory: '{rel}'")).into())
+    source_in(dir, rel)?
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, format!("No such file or directory: '{rel}'")).into())
 }
 
 /// Archive name → path under `root` (directory export): normal components only.
@@ -109,7 +114,20 @@ mod tests {
         for ok in ["0000001.pdf", "2024/Firma/Titel.pdf", "a/./b.pdf", "a..b.pdf", "..x/y", "ACME Corp\\2019\\Letter (edited).pdf"] {
             assert!(is_safe_relative(ok), "{ok}");
         }
-        for bad in ["", "/etc/passwd", "../x", "a/../../x", "a\\..\\x", "..\\x", "\\foo", "\\\\srv\\share", "C:\\foo", "C:foo", "a\0b", "//srv/share"] {
+        for bad in [
+            "",
+            "/etc/passwd",
+            "../x",
+            "a/../../x",
+            "a\\..\\x",
+            "..\\x",
+            "\\foo",
+            "\\\\srv\\share",
+            "C:\\foo",
+            "C:foo",
+            "a\0b",
+            "//srv/share",
+        ] {
             assert!(!is_safe_relative(bad), "{bad}");
         }
     }

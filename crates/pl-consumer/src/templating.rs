@@ -5,9 +5,7 @@
 //           mutations.py@v3.4.2 (parse_w_workflow_placeholders arguments)
 
 use chrono::NaiveDate;
-use pl_templating::{
-    CustomFieldInstance, CustomFieldValue, DocumentContext, NamedRef, OwnerRef, SelectOption, StoragePathRef, TagRef,
-};
+use pl_templating::{CustomFieldInstance, CustomFieldValue, DocumentContext, NamedRef, OwnerRef, SelectOption, StoragePathRef, TagRef};
 use sea_query::{Expr, Order, Query};
 use serde_json::Value;
 use sqlx::{PgConnection, Row};
@@ -137,9 +135,10 @@ async fn fill(conn: &mut PgConnection, d: &DocRow, c: &mut DocumentContext) -> R
         }
     }
     if let Some(o) = d.owner_id
-        && let Some(username) = db::username(conn, o).await? {
-            c.owner = Some(OwnerRef { id: o, username });
-        }
+        && let Some(username) = db::username(conn, o).await?
+    {
+        c.owner = Some(OwnerRef { id: o, username });
+    }
     c.tags = db::document_tags(conn, d.id).await?.into_iter().map(|(id, name)| TagRef { id: Some(id), name }).collect();
     c.custom_fields = custom_field_instances(conn, d.id).await?;
     Ok(())
@@ -150,10 +149,11 @@ pub async fn document_context(conn: &mut PgConnection, d: &DocRow) -> Result<Doc
     let mut c = base_context(d);
     fill(conn, d, &mut c).await?;
     if let Some(root_id) = d.root_document_id
-        && let Some(root) = db::load_document(conn, root_id).await? {
-            let mut rc = base_context(&root);
-            fill(conn, &root, &mut rc).await?;
-            c.root_document = Some(Box::new(rc));
-        }
+        && let Some(root) = db::load_document(conn, root_id).await?
+    {
+        let mut rc = base_context(&root);
+        fill(conn, &root, &mut rc).await?;
+        c.root_document = Some(Box::new(rc));
+    }
     Ok(c)
 }

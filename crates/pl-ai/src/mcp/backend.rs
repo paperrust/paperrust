@@ -165,7 +165,6 @@ pub struct CreateSpec {
     pub extra: Option<String>,
 }
 
-
 /// Audit entry (table `paperrust_ai_audit`).
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct AuditEntry {

@@ -112,7 +112,13 @@ async fn fixture(pool: &PgPool) -> Fixture {
          GROUP BY t.tag_id HAVING count(*) BETWEEN 5 AND 120 ORDER BY count(*) DESC, t.tag_id LIMIT 1",
     )
     .await;
-    let tag_y = scalar_i64(pool, &format!("SELECT id::bigint FROM documents_tag WHERE id <> {tag_x} AND tn_parent_id IS NULL AND NOT is_inbox_tag ORDER BY id LIMIT 1")).await;
+    let tag_y = scalar_i64(
+        pool,
+        &format!(
+            "SELECT id::bigint FROM documents_tag WHERE id <> {tag_x} AND tn_parent_id IS NULL AND NOT is_inbox_tag ORDER BY id LIMIT 1"
+        ),
+    )
+    .await;
     let corr = scalar_i64(pool, "SELECT id::bigint FROM documents_correspondent WHERE owner_id IS NULL ORDER BY id LIMIT 1").await;
     Fixture { tag_x, tag_y, corr }
 }
@@ -143,11 +149,25 @@ async fn automation_end_to_end() {
     assert_eq!(call(&r, "POST", "/workflows", ALICE, Some(workflow_body("x", &f))).await.0, StatusCode::FORBIDDEN);
 
     // --- Validation like /api/workflows/ (DRF errors under fields)
-    let (s, b) = call(&r, "POST", "/workflows", ADMIN, Some(json!({"name": "bad", "order": 0, "enabled": true, "triggers": [{"type": 99}], "actions": []}))).await;
+    let (s, b) = call(
+        &r,
+        "POST",
+        "/workflows",
+        ADMIN,
+        Some(json!({"name": "bad", "order": 0, "enabled": true, "triggers": [{"type": 99}], "actions": []})),
+    )
+    .await;
     assert_eq!(s, StatusCode::BAD_REQUEST, "{b}");
     assert!(b["error"]["fields"]["triggers"].is_object(), "{b}");
-    let (s, b) = call(&r, "POST", "/workflows", ADMIN, Some(json!({"name": "bad2", "order": 0, "enabled": true,
-        "triggers": [{"type": 3}], "actions": [], "else_actions": [{"type": 77}]}))).await;
+    let (s, b) = call(
+        &r,
+        "POST",
+        "/workflows",
+        ADMIN,
+        Some(json!({"name": "bad2", "order": 0, "enabled": true,
+        "triggers": [{"type": 3}], "actions": [], "else_actions": [{"type": 77}]})),
+    )
+    .await;
     assert_eq!(s, StatusCode::BAD_REQUEST, "{b}");
     assert!(b["error"]["fields"]["else_actions"].is_object(), "{b}");
     // nothing half-saved
@@ -187,7 +207,11 @@ async fn automation_end_to_end() {
     assert_eq!(scalar_i64(&pool, &format!("SELECT count(*) FROM paperrust_workflow_run WHERE workflow_id = {wf_id}")).await, 0);
     let main_id = main_doc["id"].as_i64().unwrap();
     let else_id = else_doc["id"].as_i64().unwrap();
-    let corr_now: Option<i32> = sqlx::query_scalar("SELECT correspondent_id FROM documents_document WHERE id = $1").bind(main_id as i32).fetch_one(&pool).await.unwrap();
+    let corr_now: Option<i32> = sqlx::query_scalar("SELECT correspondent_id FROM documents_document WHERE id = $1")
+        .bind(main_id as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
     assert_eq!(main_doc["before"]["correspondent"]["id"].as_i64(), corr_now.map(i64::from));
 
     // --- Equality dry run ↔ real execution (same core, same state afterwards)
@@ -248,16 +272,26 @@ async fn automation_end_to_end() {
 
     // --- AI condition (without AI integration: saved, ignored and flagged)
     let dt = scalar_i64(&pool, "SELECT id::bigint FROM documents_documenttype ORDER BY id LIMIT 1").await;
-    let (s, b) = call(&r, "PATCH", &format!("/workflows/{wf_id}"), ADMIN, Some(json!({"ai_condition": {"field": "document_type", "object_id": dt, "min_confidence": 0.8}}))).await;
+    let (s, b) = call(
+        &r,
+        "PATCH",
+        &format!("/workflows/{wf_id}"),
+        ADMIN,
+        Some(json!({"ai_condition": {"field": "document_type", "object_id": dt, "min_confidence": 0.8}})),
+    )
+    .await;
     assert_eq!(s, StatusCode::OK, "{b}");
     assert_eq!(b["ai_condition"]["min_confidence"], 0.8);
     assert_eq!(b["summary"]["ai_condition"]["active"], false);
     assert_eq!(b["summary"]["ai_condition"]["inactive_reason"], "ai_unavailable");
     assert_eq!(b["else_actions"][0]["id"], else_action, "PATCH without else_actions keeps them");
-    let (s, b) = call(&r, "PATCH", &format!("/workflows/{wf_id}"), ADMIN, Some(json!({"ai_condition": {"field": "title", "object_id": 1}}))).await;
+    let (s, b) =
+        call(&r, "PATCH", &format!("/workflows/{wf_id}"), ADMIN, Some(json!({"ai_condition": {"field": "title", "object_id": 1}}))).await;
     assert_eq!(s, StatusCode::BAD_REQUEST, "{b}");
     assert!(b["error"]["fields"]["ai_condition"].is_array());
-    let (s, b) = call(&r, "PATCH", &format!("/workflows/{wf_id}"), ADMIN, Some(json!({"ai_condition": {"field": "tags", "object_id": 999999}}))).await;
+    let (s, b) =
+        call(&r, "PATCH", &format!("/workflows/{wf_id}"), ADMIN, Some(json!({"ai_condition": {"field": "tags", "object_id": 999999}})))
+            .await;
     assert_eq!(s, StatusCode::BAD_REQUEST, "{b}");
     let (s, dr) = call(&r, "POST", "/dry-run", ADMIN, Some(json!({"workflow_id": wf_id, "document_ids": [main_id, else_id]}))).await;
     assert_eq!(s, StatusCode::OK, "{dr}");
@@ -273,7 +307,8 @@ async fn automation_end_to_end() {
     let main_action = b["workflow"]["actions"][0]["id"].as_i64().unwrap();
     let mut hijack = workflow_body("Auto test", &f);
     hijack["actions"][0]["id"] = json!(main_action);
-    hijack["else_actions"] = json!([{"id": else_action, "type": 1, "assign_tags": [f.tag_y]}, {"id": main_action, "type": 1, "assign_tags": [f.tag_y]}]);
+    hijack["else_actions"] =
+        json!([{"id": else_action, "type": 1, "assign_tags": [f.tag_y]}, {"id": main_action, "type": 1, "assign_tags": [f.tag_y]}]);
     let (s, b) = call(&r, "PUT", &format!("/workflows/{wf_id}"), ADMIN, Some(hijack)).await;
     assert_eq!(s, StatusCode::OK, "{b}");
     assert_eq!(b["workflow"]["actions"][0]["id"], main_action);
@@ -306,8 +341,14 @@ async fn automation_end_to_end() {
     assert_eq!(s, StatusCode::BAD_REQUEST);
 
     // --- apply retroactively: without queue 503, without permissions 403
-    assert_eq!(call(&r, "POST", &format!("/workflows/{wf_id}/apply"), ADMIN, Some(json!({"document_ids": [main_id]}))).await.0, StatusCode::SERVICE_UNAVAILABLE);
-    assert_eq!(call(&r, "POST", &format!("/workflows/{wf_id}/apply"), CAROL, Some(json!({"document_ids": [main_id]}))).await.0, StatusCode::FORBIDDEN);
+    assert_eq!(
+        call(&r, "POST", &format!("/workflows/{wf_id}/apply"), ADMIN, Some(json!({"document_ids": [main_id]}))).await.0,
+        StatusCode::SERVICE_UNAVAILABLE
+    );
+    assert_eq!(
+        call(&r, "POST", &format!("/workflows/{wf_id}/apply"), CAROL, Some(json!({"document_ids": [main_id]}))).await.0,
+        StatusCode::FORBIDDEN
+    );
 
     // --- Way back: else branch as inverted workflow
     let (s, ex) = call(&r, "GET", "/export-ngx", ADMIN, None).await;
@@ -327,7 +368,13 @@ async fn automation_end_to_end() {
     assert_eq!(s, StatusCode::OK, "{sg}");
     assert_eq!(sg["cached"], false);
     let want = format!("correspondent_document_type:{}:{dt}", f.corr);
-    let hit = sg["items"].as_array().unwrap().iter().find(|i| i["key"] == want.as_str()).cloned().unwrap_or_else(|| panic!("{want} missing in {sg}"));
+    let hit = sg["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|i| i["key"] == want.as_str())
+        .cloned()
+        .unwrap_or_else(|| panic!("{want} missing in {sg}"));
     assert_eq!(hit["matches"], hit["total"]);
     assert_eq!(hit["share"], 1.0);
     assert!(hit["to"]["name"].is_string());
@@ -344,7 +391,10 @@ async fn automation_end_to_end() {
         let (s, b) = call(&r, "POST", "/workflows", ADMIN, Some(wfd)).await;
         assert_eq!(s, StatusCode::CREATED, "{b}");
     }
-    assert_eq!(call(&r, "POST", "/suggestions/draft", ADMIN, Some(json!({"key": "correspondent_tag:999999:1"}))).await.0, StatusCode::BAD_REQUEST);
+    assert_eq!(
+        call(&r, "POST", "/suggestions/draft", ADMIN, Some(json!({"key": "correspondent_tag:999999:1"}))).await.0,
+        StatusCode::BAD_REQUEST
+    );
     assert_eq!(call(&r, "GET", "/suggestions", CAROL, None).await.0, StatusCode::FORBIDDEN);
 
     // --- Mail as trigger (rule + workflow together)
@@ -376,7 +426,8 @@ async fn automation_end_to_end() {
     .await;
     assert_eq!(s, StatusCode::BAD_REQUEST, "{b}");
     assert!(b["error"]["fields"]["workflows"]["0"].is_object(), "{b}");
-    let name: String = sqlx::query_scalar("SELECT name FROM paperless_mail_mailrule WHERE id = $1").bind(rule_id as i32).fetch_one(&pool).await.unwrap();
+    let name: String =
+        sqlx::query_scalar("SELECT name FROM paperless_mail_mailrule WHERE id = $1").bind(rule_id as i32).fetch_one(&pool).await.unwrap();
     assert_eq!(name, "Mail flow rule");
     assert_eq!(call(&r, "GET", &format!("/mail-flows/{rule_id}"), CAROL, None).await.0, StatusCode::FORBIDDEN);
 
@@ -413,7 +464,11 @@ impl pl_consumer::workflow_ext::AiJudge for FakeJudge {
     fn enabled(&self) -> futures::future::BoxFuture<'_, bool> {
         Box::pin(async { true })
     }
-    fn judge<'a>(&'a self, _d: i64, _c: &'a pl_consumer::workflow_ext::AiConditionDef) -> futures::future::BoxFuture<'a, Result<pl_consumer::workflow_ext::AiJudgement, String>> {
+    fn judge<'a>(
+        &'a self,
+        _d: i64,
+        _c: &'a pl_consumer::workflow_ext::AiConditionDef,
+    ) -> futures::future::BoxFuture<'a, Result<pl_consumer::workflow_ext::AiJudgement, String>> {
         let m = self.0;
         Box::pin(async move { Ok(pl_consumer::workflow_ext::AiJudgement { matched: m, value: Some("X".into()), confidence: Some(0.95) }) })
     }
@@ -431,7 +486,11 @@ async fn ai_condition_in_real_core() {
     let (s, b) = call(&r, "POST", "/workflows", ADMIN, Some(body)).await;
     assert_eq!(s, StatusCode::CREATED, "{b}");
     let wf_id = b["workflow"]["id"].as_i64().unwrap();
-    let doc = scalar_i64(&pool, &format!("SELECT document_id::bigint FROM documents_document_tags WHERE tag_id = {} ORDER BY document_id LIMIT 1", f.tag_x)).await;
+    let doc = scalar_i64(
+        &pool,
+        &format!("SELECT document_id::bigint FROM documents_document_tags WHERE tag_id = {} ORDER BY document_id LIMIT 1", f.tag_x),
+    )
+    .await;
     let mut conn = pool.acquire().await.unwrap();
     let wf = pl_consumer::workflows::workflow_by_id(&mut conn, wf_id).await.unwrap().unwrap();
     let audit = pl_consumer::audit::AuditLog { enabled: false, actor_id: None };
@@ -448,7 +507,9 @@ async fn ai_condition_in_real_core() {
     // Defer: nothing executed, one run to be caught up
     pl_consumer::workflow_ext::install_ai_judge(Some(Arc::new(FakeJudge(true))));
     let mut d = load_doc(&mut conn, doc).await;
-    let out = pl_consumer::workflows::run_workflow_as(&mut conn, &run(pl_consumer::workflow_ext::AiMode::Defer), &mut d, &wf, false, 3).await.unwrap();
+    let out = pl_consumer::workflows::run_workflow_as(&mut conn, &run(pl_consumer::workflow_ext::AiMode::Defer), &mut d, &wf, false, 3)
+        .await
+        .unwrap();
     assert_eq!(out.deferred.len(), 1);
     assert!(out.runs.is_empty());
     let kw = pl_consumer::workflows::deferred_kwargs(&out.deferred[0]);
@@ -456,13 +517,17 @@ async fn ai_condition_in_real_core() {
     // Inline, AI says no → else branch
     pl_consumer::workflow_ext::install_ai_judge(Some(Arc::new(FakeJudge(false))));
     let mut d = load_doc(&mut conn, doc).await;
-    let out = pl_consumer::workflows::run_workflow_as(&mut conn, &run(pl_consumer::workflow_ext::AiMode::Inline), &mut d, &wf, false, 3).await.unwrap();
+    let out = pl_consumer::workflows::run_workflow_as(&mut conn, &run(pl_consumer::workflow_ext::AiMode::Inline), &mut d, &wf, false, 3)
+        .await
+        .unwrap();
     assert_eq!(out.runs[0].branch, Some(pl_consumer::workflow_ext::Branch::Else));
     assert_eq!(out.runs[0].code, "ai_not_met_else");
     // Inline, AI says yes → main branch
     pl_consumer::workflow_ext::install_ai_judge(Some(Arc::new(FakeJudge(true))));
     let mut d = load_doc(&mut conn, doc).await;
-    let out = pl_consumer::workflows::run_workflow_as(&mut conn, &run(pl_consumer::workflow_ext::AiMode::Inline), &mut d, &wf, false, 3).await.unwrap();
+    let out = pl_consumer::workflows::run_workflow_as(&mut conn, &run(pl_consumer::workflow_ext::AiMode::Inline), &mut d, &wf, false, 3)
+        .await
+        .unwrap();
     assert_eq!(out.runs[0].branch, Some(pl_consumer::workflow_ext::Branch::Main));
     assert_eq!(out.runs[0].code, "ai_met");
     pl_consumer::workflow_ext::install_ai_judge(None);
@@ -483,7 +548,11 @@ async fn api_update_path_uses_same_decision() {
     let (s, b) = call(&r, "POST", "/workflows", ADMIN, Some(workflow_body("API path", &f))).await;
     assert_eq!(s, StatusCode::CREATED, "{b}");
     let wf_id = b["workflow"]["id"].as_i64().unwrap();
-    let with_x = scalar_i64(&pool, &format!("SELECT document_id::bigint FROM documents_document_tags WHERE tag_id = {} ORDER BY document_id LIMIT 1", f.tag_x)).await;
+    let with_x = scalar_i64(
+        &pool,
+        &format!("SELECT document_id::bigint FROM documents_document_tags WHERE tag_id = {} ORDER BY document_id LIMIT 1", f.tag_x),
+    )
+    .await;
     let without_x = scalar_i64(
         &pool,
         &format!(
@@ -499,7 +568,14 @@ async fn api_update_path_uses_same_decision() {
     ]))
     .unwrap();
     let media = pl_documents_write::files::MediaCfg::from_config(&cfg);
-    let ctx = pl_documents_write::auditlog::LogCtx { enabled: false, actor_id: None, actor_email: None, remote_addr: None, remote_port: None, cid: None };
+    let ctx = pl_documents_write::auditlog::LogCtx {
+        enabled: false,
+        actor_id: None,
+        actor_email: None,
+        remote_addr: None,
+        remote_port: None,
+        cid: None,
+    };
     let mut conn = pool.acquire().await.unwrap();
     let mut tx = sqlx::Connection::begin(&mut *conn).await.unwrap();
     let o = pl_documents_write::workflows::run_updated(&mut tx, &ctx, &media, chrono_tz::UTC, with_x).await.unwrap();
@@ -510,7 +586,11 @@ async fn api_update_path_uses_same_decision() {
     let o = pl_documents_write::workflows::run_updated(&mut tx, &ctx, &media, chrono_tz::UTC, without_x).await.unwrap();
     let mine: Vec<_> = o.runs.iter().filter(|r| r.workflow_id == wf_id).collect();
     assert_eq!(mine[0].branch, Some(pl_consumer::workflow_ext::Branch::Else));
-    let logged: i64 = sqlx::query_scalar("SELECT count(*) FROM paperrust_workflow_run WHERE workflow_id = $1").bind(wf_id as i32).fetch_one(&mut *tx).await.unwrap();
+    let logged: i64 = sqlx::query_scalar("SELECT count(*) FROM paperrust_workflow_run WHERE workflow_id = $1")
+        .bind(wf_id as i32)
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
     assert_eq!(logged, 2);
     // AI condition + AI switched on → catch up in the API path instead of asking the model in the request
     let dt = scalar_i64(&pool, "SELECT id::bigint FROM documents_documenttype ORDER BY id LIMIT 1").await;

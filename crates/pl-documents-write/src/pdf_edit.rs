@@ -78,11 +78,17 @@ impl PdfMethod {
             Self::Merge => &["metadata_document_id", "delete_originals", "archive_fallback", "source_mode", "user", "trigger_source"],
             Self::Split => &["pages", "delete_originals", "source_mode", "user", "trigger_source"],
             Self::DeletePages => &["pages", "source_mode", "user", "trigger_source"],
-            Self::EditPdf => &[
-                "operations", "delete_original", "update_document", "include_metadata", "source_mode", "user", "trigger_source",
-            ],
+            Self::EditPdf => {
+                &["operations", "delete_original", "update_document", "include_metadata", "source_mode", "user", "trigger_source"]
+            }
             Self::RemovePassword => &[
-                "password", "update_document", "delete_original", "include_metadata", "source_mode", "user", "trigger_source",
+                "password",
+                "update_document",
+                "delete_original",
+                "include_metadata",
+                "source_mode",
+                "user",
+                "trigger_source",
                 "source_paths_by_id",
             ],
         }
@@ -97,11 +103,27 @@ impl PdfMethod {
 /// Validated parameters (raw values, where upstream uses them unvalidated by truthiness).
 #[derive(Clone, Debug)]
 pub enum PdfParams {
-    Rotate { degrees: i64 },
-    Merge { metadata_document_id: Option<Value>, delete_originals: bool, archive_fallback: bool },
-    Split { pages: Vec<Vec<i64>>, delete_originals: bool },
-    DeletePages { pages: Vec<i64> },
-    EditPdf { operations: Vec<PageOperation>, delete_original: bool, update_document: bool, include_metadata: bool },
+    Rotate {
+        degrees: i64,
+    },
+    Merge {
+        metadata_document_id: Option<Value>,
+        delete_originals: bool,
+        archive_fallback: bool,
+    },
+    Split {
+        pages: Vec<Vec<i64>>,
+        delete_originals: bool,
+    },
+    DeletePages {
+        pages: Vec<i64>,
+    },
+    EditPdf {
+        operations: Vec<PageOperation>,
+        delete_original: bool,
+        update_document: bool,
+        include_metadata: bool,
+    },
     RemovePassword {
         password: String,
         update_document: bool,
@@ -117,17 +139,12 @@ impl PdfParams {
     pub fn needs(&self) -> OperationNeeds {
         match self {
             Self::Rotate { .. } | Self::DeletePages { .. } => OperationNeeds { ownership: true, ..Default::default() },
-            Self::Merge { delete_originals, .. } | Self::Split { delete_originals, .. } => OperationNeeds {
-                ownership: *delete_originals,
-                add_document: true,
-                delete_document: *delete_originals,
-            },
-            Self::EditPdf { delete_original, update_document, .. }
-            | Self::RemovePassword { delete_original, update_document, .. } => OperationNeeds {
-                ownership: true,
-                add_document: !*update_document,
-                delete_document: *delete_original && !*update_document,
-            },
+            Self::Merge { delete_originals, .. } | Self::Split { delete_originals, .. } => {
+                OperationNeeds { ownership: *delete_originals, add_document: true, delete_document: *delete_originals }
+            }
+            Self::EditPdf { delete_original, update_document, .. } | Self::RemovePassword { delete_original, update_document, .. } => {
+                OperationNeeds { ownership: true, add_document: !*update_document, delete_document: *delete_original && !*update_document }
+            }
         }
     }
 }
@@ -176,10 +193,7 @@ fn validate_operation(v: &Value) -> Result<PageOperation, Value> {
         Value::Null => return Err(drf::msg(drf::NULL)),
         Value::Object(m) => m,
         other => {
-            return Err(drf::non_field(format!(
-                "Invalid data. Expected a dictionary, but got {}.",
-                drf::py_type_name(other)
-            )));
+            return Err(drf::non_field(format!("Invalid data. Expected a dictionary, but got {}.", drf::py_type_name(other))));
         }
     };
     let mut errors = Errors::default();
@@ -209,10 +223,7 @@ pub fn validate_operations(v: &Value) -> Result<Vec<PageOperation>, Value> {
         Value::Null => return Err(drf::msg(drf::NULL)),
         Value::Array(items) => items,
         other => {
-            return Err(drf::msg(format!(
-                "Expected a list of items but got type \"{}\".",
-                drf::py_type_name(other)
-            )));
+            return Err(drf::msg(format!("Expected a list of items but got type \"{}\".", drf::py_type_name(other))));
         }
     };
     if items.is_empty() {
@@ -509,11 +520,8 @@ pub async fn bulk_edit_pdf(
         trigger: if from_webui { pl_core::tasks::trigger_source::WEB_UI } else { pl_core::tasks::trigger_source::API_UPLOAD },
         mode,
     };
-    let result = if kwargs_ok {
-        ex.run(&ids, &params).await
-    } else {
-        Err(format!("{}() got an unexpected keyword argument", method_name(method)))
-    };
+    let result =
+        if kwargs_ok { ex.run(&ids, &params).await } else { Err(format!("{}() got an unexpected keyword argument", method_name(method))) };
     match result {
         Ok(()) => Ok(crate::views::ok_result()),
         Err(e) => {
@@ -816,7 +824,13 @@ impl Exec {
     }
 
     /// `bulk_edit.merge`
-    async fn merge(&self, doc_ids: &[i64], metadata_document_id: Option<&Value>, delete_originals: bool, archive_fallback: bool) -> ExecResult {
+    async fn merge(
+        &self,
+        doc_ids: &[i64],
+        metadata_document_id: Option<&Value>,
+        delete_originals: bool,
+        archive_fallback: bool,
+    ) -> ExecResult {
         tracing::info!(target: LOG, "Attempting to merge {} documents into a single document.", doc_ids.len());
         let mut conn = self.pool.acquire().await.map_err(db)?;
         let docs = live_docs(&mut conn, doc_ids).await?;
@@ -915,10 +929,8 @@ impl Exec {
         let pair = resolve_pair(&mut conn, &doc, self.mode).await?;
         drop(conn);
         let r: ExecResult = async {
-            let file_names: Vec<String> = pages
-                .iter()
-                .map(|p| names::split(doc.id, p.first().copied().unwrap_or(0), p.last().copied().unwrap_or(0)))
-                .collect();
+            let file_names: Vec<String> =
+                pages.iter().map(|p| names::split(doc.id, p.first().copied().unwrap_or(0), p.last().copied().unwrap_or(0))).collect();
             let outputs: Vec<Vec<PageSpec>> = pages.iter().map(|p| p.iter().map(|n| PageSpec::new(*n)).collect()).collect();
             let (src, scratch) = (self.media.checked_source_path(&pair.source)?, self.scratch.clone());
             let files = blocking(move || pops::build_pdfs(&src, &outputs, |i| pbulk::scratch_path(&scratch, &file_names[i]))).await?;
@@ -1008,7 +1020,8 @@ impl Exec {
                 self.apply_async(self.consume_sig(file, Some(root), &o)?, Vec::new(), Vec::new()).await
             } else {
                 let files =
-                    blocking(move || pops::build_pdfs(&src, &specs, |i| pbulk::scratch_path(&scratch, &names::edit_part(root, i + 1)))).await?;
+                    blocking(move || pops::build_pdfs(&src, &specs, |i| pbulk::scratch_path(&scratch, &names::edit_part(root, i + 1))))
+                        .await?;
                 let mut o = self.metadata_overrides(&pair.root, include_metadata).await?;
                 if !delete_original {
                     o.skip_asn_if_exists = true;
@@ -1091,10 +1104,7 @@ impl Exec {
 /// document ids is an error.
 pub async fn restore_asn_task(pool: &PgPool, args: &[Value], kwargs: &Map<String, Value>) -> Result<(), (String, String)> {
     let Some(backup) = kwargs.get("backup").or_else(|| args.first()) else {
-        return Err((
-            "TypeError".into(),
-            "restore_archive_serial_numbers_task() missing 1 required positional argument: 'backup'".into(),
-        ));
+        return Err(("TypeError".into(), "restore_archive_serial_numbers_task() missing 1 required positional argument: 'backup'".into()));
     };
     let Value::Object(m) = backup else {
         return Err(("AttributeError".into(), format!("'{}' object has no attribute 'items'", drf::py_type_name(backup))));
@@ -1198,9 +1208,7 @@ mod tests {
         // without DB: error before any query
         let pool = PgPool::connect_lazy("postgres://x:y@127.0.0.1:1/none").unwrap();
         let req = json!({"id": "t", "task": "documents.tasks.consume_file", "args": [], "kwargs": {}, "group": null, "retries": 0});
-        let e = restore_asn_task(&pool, &[req, json!({"exc_type": "X"}), Value::Null, json!({"4": 1004})], &Map::new())
-            .await
-            .unwrap_err();
+        let e = restore_asn_task(&pool, &[req, json!({"exc_type": "X"}), Value::Null, json!({"4": 1004})], &Map::new()).await.unwrap_err();
         assert_eq!(e.0, "AttributeError");
         let e = restore_asn_task(&pool, &[], &Map::new()).await.unwrap_err();
         assert_eq!(e.0, "TypeError");

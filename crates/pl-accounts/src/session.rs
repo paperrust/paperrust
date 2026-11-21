@@ -158,9 +158,7 @@ impl Session {
         }
         let name = &s.session_cookie_name;
         if self.cookie_sent && self.is_empty() {
-            return Ok(Some(format!(
-                "{name}=\"\"; expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; Path=/; SameSite=Lax"
-            )));
+            return Ok(Some(format!("{name}=\"\"; expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; Path=/; SameSite=Lax")));
         }
         if !self.modified || self.is_empty() || status >= 500 {
             return Ok(None);
@@ -203,10 +201,7 @@ impl Session {
         Ok(Some(if self.expire_at_browser_close(s) {
             format!("{name}={key}; HttpOnly; Path=/; SameSite=Lax")
         } else {
-            format!(
-                "{name}={key}; expires={}; HttpOnly; Max-Age={age}; Path=/; SameSite=Lax",
-                http_date(now + Duration::seconds(age))
-            )
+            format!("{name}={key}; expires={}; HttpOnly; Max-Age={age}; Path=/; SameSite=Lax", http_date(now + Duration::seconds(age)))
         }))
     }
 

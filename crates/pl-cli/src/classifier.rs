@@ -51,9 +51,7 @@ pub async fn train_classifier(c: &Ctx, notify: &mut dyn FnMut(&str)) -> CliResul
         return Ok(NO_AUTO);
     }
     let key = c.cfg.secret_key.as_bytes().to_vec();
-    let mut model = pl_classifier::load_classifier(&path, &key, false)
-        .map_err(|e| CliError::Other(e.to_string()))?
-        .unwrap_or_default();
+    let mut model = pl_classifier::load_classifier(&path, &key, false).map_err(|e| CliError::Other(e.to_string()))?.unwrap_or_default();
     let docs = training_docs(pool).await?;
     let language = pl_classifier::Language::from_ocr_language(&c.cfg.ocr_language);
     let handle = tokio::runtime::Handle::current();
@@ -74,10 +72,8 @@ pub async fn train_classifier(c: &Ctx, notify: &mut dyn FnMut(&str)) -> CliResul
         }
         chunk.iter().map(|id| map.remove(id)).collect()
     };
-    let trained = tokio::task::block_in_place(|| {
-        model.train(docs, language, fetch, &pl_classifier::TrainOptions::default(), Some(notify))
-    })
-    .map_err(|e| CliError::Other(e.to_string()))?;
+    let trained = tokio::task::block_in_place(|| model.train(docs, language, fetch, &pl_classifier::TrainOptions::default(), Some(notify)))
+        .map_err(|e| CliError::Other(e.to_string()))?;
     if trained {
         tracing::info!(target: "paperless.tasks", "Saving updated classifier model to {}...", path.display());
         if let Some(dir) = path.parent() {

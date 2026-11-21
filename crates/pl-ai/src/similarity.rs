@@ -108,7 +108,13 @@ pub fn token_set_ratio(a_tokens: &[String], b_tokens: &[String]) -> f64 {
     let diff_b: Vec<&str> = sb.difference(&sa).copied().collect();
     let s = inter.join(" ");
     let join = |base: &str, rest: &[&str]| {
-        if base.is_empty() { rest.join(" ") } else if rest.is_empty() { base.to_string() } else { format!("{base} {}", rest.join(" ")) }
+        if base.is_empty() {
+            rest.join(" ")
+        } else if rest.is_empty() {
+            base.to_string()
+        } else {
+            format!("{base} {}", rest.join(" "))
+        }
     };
     let ta = join(&s, &diff_a);
     let tb = join(&s, &diff_b);
@@ -130,9 +136,7 @@ pub fn token_containment(a_tokens: &[String], b_tokens: &[String]) -> f64 {
         .iter()
         .filter(|t| {
             long.iter().any(|l| {
-                l == *t
-                    || (t.chars().count() >= 4 && l.starts_with(t.as_str()))
-                    || (l.chars().count() >= 4 && t.starts_with(l.as_str()))
+                l == *t || (t.chars().count() >= 4 && l.starts_with(t.as_str())) || (l.chars().count() >= 4 && t.starts_with(l.as_str()))
             })
         })
         .count();

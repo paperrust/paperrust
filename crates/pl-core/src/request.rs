@@ -16,8 +16,8 @@ use axum::http::header::HOST;
 use axum::http::request::Parts;
 use axum::http::{HeaderMap, Method};
 
-use crate::version::{negotiate, Negotiation};
-use crate::{urlenc, ApiError, ApiVersion, AppState, Config, QueryParams};
+use crate::version::{Negotiation, negotiate};
+use crate::{ApiError, ApiVersion, AppState, Config, QueryParams, urlenc};
 
 /// Scheme of the incoming request as the server sees it (without proxy headers)
 /// (`wsgi.url_scheme` / ASGI `scope["scheme"]`). `pl-server` sets this extension when it
@@ -77,13 +77,8 @@ impl RequestContext {
             path = format!("{}/{}", sn.trim_end_matches('/'), path.strip_prefix('/').unwrap_or(&path));
         }
         let scheme = request_scheme(&parts.headers, config, parts.extensions.get::<ServerScheme>().map(|s| s.0));
-        let host = request_host(
-            &parts.headers,
-            config,
-            uri.authority().map(|a| a.as_str()),
-            parts.extensions.get::<ServerAddr>(),
-            &scheme,
-        )?;
+        let host =
+            request_host(&parts.headers, config, uri.authority().map(|a| a.as_str()), parts.extensions.get::<ServerAddr>(), &scheme)?;
         let negotiation = negotiate(&parts.headers, &query)?;
         let language = language_from_request(&parts.headers, &config.language_cookie_name);
         Ok(Self {
@@ -263,10 +258,8 @@ mod tests {
         let h = [("host", "internal"), ("x-forwarded-host", "public.example"), ("x-forwarded-proto", "https")];
         let c = ctx("/api/", &h, &cfg).unwrap();
         assert_eq!(c.scheme_host(), "http://internal");
-        let cfg = config(&[
-            ("PAPERLESS_USE_X_FORWARD_HOST", "true"),
-            ("PAPERLESS_PROXY_SSL_HEADER", r#"["HTTP_X_FORWARDED_PROTO", "https"]"#),
-        ]);
+        let cfg =
+            config(&[("PAPERLESS_USE_X_FORWARD_HOST", "true"), ("PAPERLESS_PROXY_SSL_HEADER", r#"["HTTP_X_FORWARDED_PROTO", "https"]"#)]);
         let c = ctx("/api/", &h, &cfg).unwrap();
         assert_eq!(c.scheme_host(), "https://public.example");
     }

@@ -7,10 +7,7 @@
 
 use std::path::Path;
 
-use tantivy::schema::{
-    DateOptions, IndexRecordOption, JsonObjectOptions, NumericOptions, Schema, TextFieldIndexing,
-    TextOptions,
-};
+use tantivy::schema::{DateOptions, IndexRecordOption, JsonObjectOptions, NumericOptions, Schema, TextFieldIndexing, TextOptions};
 
 use crate::tokenizer::{BIGRAM_ANALYZER, PAPERLESS_TEXT, SIMPLE_ANALYZER, SIMPLE_SEARCH_ANALYZER};
 
@@ -39,21 +36,8 @@ pub struct FieldDescriptor {
     pub tokenizer: Option<&'static str>,
 }
 
-const fn d(
-    name: &'static str,
-    kind: Kind,
-    stored: bool,
-    fast: bool,
-    tokenizer: Option<&'static str>,
-) -> FieldDescriptor {
-    FieldDescriptor {
-        name,
-        kind,
-        stored,
-        indexed: true,
-        fast,
-        tokenizer,
-    }
+const fn d(name: &'static str, kind: Kind, stored: bool, fast: bool, tokenizer: Option<&'static str>) -> FieldDescriptor {
+    FieldDescriptor { name, kind, stored, indexed: true, fast, tokenizer }
 }
 
 /// `field_descriptors()`: every field in declaration order (on-disk contract).
@@ -103,11 +87,8 @@ fn text_options(desc: &FieldDescriptor) -> TextOptions {
     // tantivy-py schemabuilder: index_option "position" =
     // WithFreqsAndPositions; fast -> set_fast(Some(tokenizer)) unless "raw".
     let tok = desc.tokenizer.unwrap_or("default");
-    let mut opts = TextOptions::default().set_indexing_options(
-        TextFieldIndexing::default()
-            .set_tokenizer(tok)
-            .set_index_option(IndexRecordOption::WithFreqsAndPositions),
-    );
+    let mut opts = TextOptions::default()
+        .set_indexing_options(TextFieldIndexing::default().set_tokenizer(tok).set_index_option(IndexRecordOption::WithFreqsAndPositions));
     if desc.stored {
         opts = opts.set_stored();
     }
@@ -128,9 +109,7 @@ pub fn build_schema() -> Schema {
             Kind::Json => {
                 let tok = desc.tokenizer.unwrap_or("default");
                 let mut opts = JsonObjectOptions::default().set_indexing_options(
-                    TextFieldIndexing::default()
-                        .set_tokenizer(tok)
-                        .set_index_option(IndexRecordOption::WithFreqsAndPositions),
+                    TextFieldIndexing::default().set_tokenizer(tok).set_index_option(IndexRecordOption::WithFreqsAndPositions),
                 );
                 if desc.stored {
                     opts = opts.set_stored();
@@ -249,20 +228,10 @@ mod tests {
     #[test]
     fn settings_check() {
         let dir = tempfile::tempdir().unwrap();
-        assert!(matches!(
-            check_index_dir(dir.path(), Some("en")),
-            IndexState::SettingsMismatch(_)
-        ));
-        std::fs::write(
-            dir.path().join(SETTINGS_FILE),
-            r#"{"schema_version": 4, "language": "en", "schema_fingerprint": "x"}"#,
-        )
-        .unwrap();
+        assert!(matches!(check_index_dir(dir.path(), Some("en")), IndexState::SettingsMismatch(_)));
+        std::fs::write(dir.path().join(SETTINGS_FILE), r#"{"schema_version": 4, "language": "en", "schema_fingerprint": "x"}"#).unwrap();
         assert_eq!(check_index_dir(dir.path(), Some("en")), IndexState::Ok);
-        assert!(matches!(
-            check_index_dir(dir.path(), None),
-            IndexState::SettingsMismatch(_)
-        ));
+        assert!(matches!(check_index_dir(dir.path(), None), IndexState::SettingsMismatch(_)));
         std::fs::write(dir.path().join(REBUILD_MARKER), "").unwrap();
         assert_eq!(check_index_dir(dir.path(), Some("en")), IndexState::Rebuilding);
     }

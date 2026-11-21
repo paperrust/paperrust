@@ -3,8 +3,8 @@
 //! upstream: rest_framework 3.18.3 (parsers.JSONParser, views.exception_handler)
 
 use axum::extract::FromRequestParts;
-use axum::http::request::Parts;
 use axum::http::StatusCode;
+use axum::http::request::Parts;
 use axum::response::{IntoResponse, Response};
 use pl_authz::authn::AuthMethod;
 use pl_authz::{AuthError, AuthUser};
@@ -85,12 +85,7 @@ impl<S: Send + Sync> FromRequestParts<S> for ClientAddr {
     type Rejection = std::convert::Infallible;
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        Ok(ClientAddr(
-            parts
-                .extensions
-                .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
-                .map(|c| c.0.ip().to_string()),
-        ))
+        Ok(ClientAddr(parts.extensions.get::<axum::extract::ConnectInfo<std::net::SocketAddr>>().map(|c| c.0.ip().to_string())))
     }
 }
 
@@ -134,11 +129,8 @@ impl AuditMeta {
 
 /// Minimal multipart reader for text fields (file parts are ignored by these serializers).
 fn multipart_text_fields(content_type: &str, body: &[u8]) -> Result<Vec<(String, String)>, ApiError> {
-    let Some(boundary) = content_type
-        .split(';')
-        .map(str::trim)
-        .find_map(|p| p.strip_prefix("boundary="))
-        .map(|b| b.trim_matches('"').to_string())
+    let Some(boundary) =
+        content_type.split(';').map(str::trim).find_map(|p| p.strip_prefix("boundary=")).map(|b| b.trim_matches('"').to_string())
     else {
         return Err(ApiError::parse_error(Some("Multipart form parse error - Invalid boundary in multipart: None")));
     };

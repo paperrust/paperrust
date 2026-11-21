@@ -27,9 +27,7 @@ pub use writer::{Indexer, IndexerConfig, RebuildOptions, RebuildStats, WriteBatc
 /// Own migrations (expand-only, via `pl_cli::migrate::paperrust_migrations`).
 pub mod migrations {
     /// L3: consistency of the search index for permissions/trash (docs/contract/pl-search.md "L3").
-    pub const SEARCH_DIRTY: (&str, &str) = (
-        "pl_indexer.0001_paperrust_search_dirty",
-        include_str!("../migrations/0001_paperrust_search_dirty.sql"),
-    );
+    pub const SEARCH_DIRTY: (&str, &str) =
+        ("pl_indexer.0001_paperrust_search_dirty", include_str!("../migrations/0001_paperrust_search_dirty.sql"));
     pub const ALL: &[(&str, &str)] = &[SEARCH_DIRTY];
 }

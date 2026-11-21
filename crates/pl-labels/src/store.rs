@@ -179,7 +179,10 @@ pub async fn reserve(pool: &PgPool, job: &Resolved, user_id: Option<i64>, allow_
 
 /// History, newest first.
 pub async fn list(pool: &PgPool, limit: i64) -> Result<Vec<PrintedRange>> {
-    let rows = sqlx::query(&format!("{RANGE_SELECT} ORDER BY p.created DESC, p.id DESC LIMIT $1")).bind(limit.clamp(1, 500)).fetch_all(pool).await?;
+    let rows = sqlx::query(&format!("{RANGE_SELECT} ORDER BY p.created DESC, p.id DESC LIMIT $1"))
+        .bind(limit.clamp(1, 500))
+        .fetch_all(pool)
+        .await?;
     rows.iter().map(range_of).collect()
 }
 

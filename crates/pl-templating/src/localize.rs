@@ -73,8 +73,7 @@ pub fn load_locale(identifier: &str) -> Option<LocaleData> {
     if !parts.is_empty() {
         let p = parts[0];
         let first = p.chars().next();
-        if (p.len() == 4 && first.is_some_and(|c| c.is_ascii_digit()))
-            || (p.chars().count() >= 5 && first.is_some_and(char::is_alphabetic))
+        if (p.len() == 4 && first.is_some_and(|c| c.is_ascii_digit())) || (p.chars().count() >= 5 && first.is_some_and(char::is_alphabetic))
         {
             key.push('_');
             key.push_str(&parts.remove(parts.len() - 1).to_uppercase());
@@ -199,11 +198,7 @@ fn tokenize(pattern: &str) -> Vec<Tok> {
 
 fn pad(v: i64, n: usize) -> String {
     // '%0*d' % (n, v)
-    if v < 0 {
-        format!("-{:0>w$}", -v, w = n.saturating_sub(1))
-    } else {
-        format!("{v:0>n$}")
-    }
+    if v < 0 { format!("-{:0>w$}", -v, w = n.saturating_sub(1)) } else { format!("{v:0>n$}") }
 }
 
 fn width3(num: usize) -> usize {
@@ -243,14 +238,13 @@ impl Fmt<'_> {
                 week = self.week_number(prev.ordinal() as i64, Some(self.weekday(prev)));
             }
         } else if week > 52
-            && let Some(next) = NaiveDate::from_ymd_opt(d.year() + 1, 1, 1) {
-                let wd = self.weekday(next);
-                if self.week_number(1, Some(wd)) == 1
-                    && 32 - (wd - self.loc.first_week_day).rem_euclid(7) <= d.day() as i64
-                {
-                    week = 1;
-                }
+            && let Some(next) = NaiveDate::from_ymd_opt(d.year() + 1, 1, 1)
+        {
+            let wd = self.weekday(next);
+            if self.week_number(1, Some(wd)) == 1 && 32 - (wd - self.loc.first_week_day).rem_euclid(7) <= d.day() as i64 {
+                week = 1;
             }
+        }
         week
     }
 
@@ -288,11 +282,7 @@ impl Fmt<'_> {
                     }
                 }
                 let s = pad(value, num);
-                if num == 2 {
-                    s.chars().rev().take(2).collect::<Vec<_>>().into_iter().rev().collect()
-                } else {
-                    s
-                }
+                if num == 2 { s.chars().rev().take(2).collect::<Vec<_>>().into_iter().rev().collect() } else { s }
             }
             'Q' | 'q' => {
                 let q = (d.month0() / 3) as usize;
@@ -389,11 +379,7 @@ impl Fmt<'_> {
                 match c {
                     'z' | 'v' | 'V' => {
                         // Zone names: only UTC is named like Babel (see Known differences)
-                        if off.local_minus_utc() == 0 && num <= 3 {
-                            "UTC".into()
-                        } else {
-                            self.gmt(off, "long", false)
-                        }
+                        if off.local_minus_utc() == 0 && num <= 3 { "UTC".into() } else { self.gmt(off, "long", false) }
                     }
                     'Z' => self.gmt(off, width, num == 5),
                     'O' => {
@@ -423,12 +409,10 @@ impl Fmt<'_> {
         for t in &toks {
             if let Tok::Field(c, n) = t
                 && let Some(allowed) = allowed_lengths(*c)
-                    && !allowed.contains(n) {
-                        return Err(format!(
-                            "Invalid length for field: {}",
-                            crate::pystr::py_str_repr(&c.to_string().repeat(*n))
-                        ));
-                    }
+                && !allowed.contains(n)
+            {
+                return Err(format!("Invalid length for field: {}", crate::pystr::py_str_repr(&c.to_string().repeat(*n))));
+            }
         }
         let mut out = String::new();
         for t in toks {
@@ -467,11 +451,7 @@ pub fn format_localized(value: DateValue, format: &str, loc: &LocaleData) -> Res
                 Some(i) => {
                     let time = fmt.apply(loc.f(TIME_FORMATS + i))?;
                     let date = Fmt { v: DateValue::Date(value.date()), loc }.apply(loc.f(DATE_FORMATS + i))?;
-                    Ok(loc
-                        .f(DATETIME_FORMATS + i)
-                        .replace('\'', "")
-                        .replace("{0}", &time)
-                        .replace("{1}", &date))
+                    Ok(loc.f(DATETIME_FORMATS + i).replace('\'', "").replace("{0}", &time).replace("{1}", &date))
                 }
                 None => fmt.apply(format),
             }

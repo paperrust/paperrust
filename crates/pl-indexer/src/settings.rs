@@ -34,15 +34,7 @@ pub fn descriptors_json() -> String {
                 Some(t) => format!("\"{t}\""),
                 None => "null".to_string(),
             };
-            format!(
-                "[\"{}\", \"{}\", {}, {}, {}, {}]",
-                d.name,
-                kind_name(d.kind),
-                b(d.stored),
-                b(d.indexed),
-                b(d.fast),
-                tok
-            )
+            format!("[\"{}\", \"{}\", {}, {}, {}, {}]", d.name, kind_name(d.kind), b(d.stored), b(d.indexed), b(d.fast), tok)
         })
         .collect();
     format!("[{}]", items.join(", "))
@@ -82,10 +74,7 @@ pub fn sentinels_json(language: Option<&str>) -> String {
         Some(l) => py_json_str(l),
         None => "null".to_string(),
     };
-    format!(
-        "{{\"schema_version\": {SCHEMA_VERSION}, \"language\": {lang}, \"schema_fingerprint\": \"{}\"}}",
-        schema_fingerprint()
-    )
+    format!("{{\"schema_version\": {SCHEMA_VERSION}, \"language\": {lang}, \"schema_fingerprint\": \"{}\"}}", schema_fingerprint())
 }
 
 /// `_write_sentinels(index_dir)`.
@@ -109,10 +98,7 @@ pub fn settings_mismatch(index_dir: &Path, language: Option<&str>) -> bool {
         return true;
     };
     // `!= SCHEMA_VERSION`: Python compares int 4 == 4.0 as equal.
-    let version_ok = obj
-        .get("schema_version")
-        .and_then(|v| v.as_f64())
-        .is_some_and(|v| v == SCHEMA_VERSION as f64)
+    let version_ok = obj.get("schema_version").and_then(|v| v.as_f64()).is_some_and(|v| v == SCHEMA_VERSION as f64)
         && !matches!(obj.get("schema_version"), Some(serde_json::Value::Bool(_)));
     if !version_ok {
         tracing::info!("Search index schema version mismatch - rebuilding.");
@@ -128,10 +114,7 @@ pub fn settings_mismatch(index_dir: &Path, language: Option<&str>) -> bool {
         tracing::info!("Search index language changed - rebuilding.");
         return true;
     }
-    let fp_ok = obj
-        .get("schema_fingerprint")
-        .and_then(|v| v.as_str())
-        .is_some_and(|fp| fp == schema_fingerprint());
+    let fp_ok = obj.get("schema_fingerprint").and_then(|v| v.as_str()).is_some_and(|fp| fp == schema_fingerprint());
     if !fp_ok {
         tracing::info!("Search index schema fingerprint mismatch - rebuilding.");
         return true;
@@ -212,9 +195,7 @@ pub fn open_or_rebuild_index(index_dir: &Path, language: Option<&str>) -> Result
     match Index::open_in_dir(index_dir) {
         Ok(_) => Ok(OpenOutcome::Opened),
         Err(e) => {
-            tracing::error!(
-                "Search index is corrupted or incomplete - rebuilding from scratch: {e}"
-            );
+            tracing::error!("Search index is corrupted or incomplete - rebuilding from scratch: {e}");
             wipe_index(index_dir)?;
             open_or_create(index_dir, language)?;
             write_sentinels(index_dir, language)?;
@@ -226,10 +207,7 @@ pub fn open_or_rebuild_index(index_dir: &Path, language: Option<&str>) -> Result
 
 /// `rebuild_in_progress`: touch the marker; the caller removes it only on success.
 pub fn touch_rebuild_marker(index_dir: &Path) -> Result<()> {
-    std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(index_dir.join(REBUILD_MARKER))?;
+    std::fs::OpenOptions::new().create(true).append(true).open(index_dir.join(REBUILD_MARKER))?;
     Ok(())
 }
 
@@ -247,13 +225,15 @@ mod tests {
 
     /// Fingerprint stamped by upstream into reference/data/data/index/.index_settings.json
     /// (read-only copy of the value; the reference index is never opened for writing).
-    const REFERENCE_FINGERPRINT: &str = "cac16f9170382fd53b4ac9d854878783811c87c772ee23363692a2e3bf639b0f2959b4e978fae617830b43df24ca07dfee8d2f9f77eb7943e20c90b3a764a469";
+    const REFERENCE_FINGERPRINT: &str =
+        "cac16f9170382fd53b4ac9d854878783811c87c772ee23363692a2e3bf639b0f2959b4e978fae617830b43df24ca07dfee8d2f9f77eb7943e20c90b3a764a469";
 
     #[test]
     fn fingerprint_matches_upstream() {
-        assert!(descriptors_json().starts_with(
-            "[[\"id\", \"u64\", true, true, true, null], [\"title\", \"text\", true, true, false, \"paperless_text\"]"
-        ));
+        assert!(
+            descriptors_json()
+                .starts_with("[[\"id\", \"u64\", true, true, true, null], [\"title\", \"text\", true, true, false, \"paperless_text\"]")
+        );
         assert_eq!(schema_fingerprint(), REFERENCE_FINGERPRINT);
     }
 
@@ -263,12 +243,7 @@ mod tests {
         assert!(settings_mismatch(dir.path(), Some("en")));
         write_sentinels(dir.path(), Some("en")).unwrap();
         let raw = std::fs::read_to_string(dir.path().join(SETTINGS_FILE)).unwrap();
-        assert_eq!(
-            raw,
-            format!(
-                "{{\"schema_version\": 4, \"language\": \"en\", \"schema_fingerprint\": \"{REFERENCE_FINGERPRINT}\"}}"
-            )
-        );
+        assert_eq!(raw, format!("{{\"schema_version\": 4, \"language\": \"en\", \"schema_fingerprint\": \"{REFERENCE_FINGERPRINT}\"}}"));
         assert!(!settings_mismatch(dir.path(), Some("en")));
         assert!(settings_mismatch(dir.path(), Some("de")));
         assert!(settings_mismatch(dir.path(), None));
@@ -285,21 +260,12 @@ mod tests {
     fn open_or_rebuild_recreates_on_mismatch() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("junk.txt"), "x").unwrap();
-        assert_eq!(
-            open_or_rebuild_index(dir.path(), Some("en")).unwrap(),
-            OpenOutcome::RecreatedSettings
-        );
+        assert_eq!(open_or_rebuild_index(dir.path(), Some("en")).unwrap(), OpenOutcome::RecreatedSettings);
         assert!(!dir.path().join("junk.txt").exists());
         assert!(dir.path().join("meta.json").exists());
-        assert_eq!(
-            open_or_rebuild_index(dir.path(), Some("en")).unwrap(),
-            OpenOutcome::Opened
-        );
+        assert_eq!(open_or_rebuild_index(dir.path(), Some("en")).unwrap(), OpenOutcome::Opened);
         let missing = dir.path().join("nope");
-        assert_eq!(
-            open_or_rebuild_index(&missing, Some("en")).unwrap(),
-            OpenOutcome::Missing
-        );
+        assert_eq!(open_or_rebuild_index(&missing, Some("en")).unwrap(), OpenOutcome::Missing);
     }
 
     /// Jetson check B1: switch from ngx 2.x (Whoosh files, no settings file). If the

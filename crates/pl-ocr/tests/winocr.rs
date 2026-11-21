@@ -79,7 +79,9 @@ mod win {
             let hs: Vec<_> = (0..6)
                 .map(|t| {
                     let (w, rs, lang) = (&w, &rs, &lang);
-                    s.spawn(move || rs.iter().map(|r| w.recognize_raster(r, Path::new(&format!("unused-{t}.tif")), &req(lang)).unwrap()).collect())
+                    s.spawn(move || {
+                        rs.iter().map(|r| w.recognize_raster(r, Path::new(&format!("unused-{t}.tif")), &req(lang)).unwrap()).collect()
+                    })
                 })
                 .collect();
             hs.into_iter().map(|h| h.join().unwrap()).collect()

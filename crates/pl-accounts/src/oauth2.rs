@@ -34,8 +34,7 @@ pub const GITEA: &str = "gitea";
 const DISCORD_API: &str = "https://discord.com/api";
 
 /// `user_properties` of the Microsoft Graph adapter (`$select`).
-const MS_USER_PROPERTIES: &str =
-    "businessPhones,displayName,givenName,id,jobTitle,mail,mobilePhone,officeLocation,preferredLanguage,surname,userPrincipalName,mailNickname,companyName";
+const MS_USER_PROPERTIES: &str = "businessPhones,displayName,givenName,id,jobTitle,mail,mobilePhone,officeLocation,preferredLanguage,surname,userPrincipalName,mailNickname,companyName";
 
 /// Setting `PROVIDERS[<provider>][key]` as text.
 fn provider_str(ctx: &Ctx, provider: &str, key: &str) -> Option<String> {
@@ -82,7 +81,8 @@ fn gitea_web_url(setting: Option<String>) -> String {
 }
 
 fn gitlab_url(ctx: &Ctx, app: &App, path: &str) -> String {
-    let base = app_str(app, "gitlab_url").or_else(|| provider_str(ctx, GITLAB, "GITLAB_URL")).unwrap_or_else(|| "https://gitlab.com".into());
+    let base =
+        app_str(app, "gitlab_url").or_else(|| provider_str(ctx, GITLAB, "GITLAB_URL")).unwrap_or_else(|| "https://gitlab.com".into());
     format!("{base}{path}")
 }
 
@@ -95,7 +95,8 @@ fn microsoft_tenant_url(ctx: &Ctx, app: &App, path: &str) -> String {
 }
 
 fn nextcloud_url(ctx: &Ctx, app: &App, path: &str) -> String {
-    let server = app_str(app, "server").or_else(|| provider_str(ctx, NEXTCLOUD, "SERVER")).unwrap_or_else(|| "https://nextcloud.example.org".into());
+    let server =
+        app_str(app, "server").or_else(|| provider_str(ctx, NEXTCLOUD, "SERVER")).unwrap_or_else(|| "https://nextcloud.example.org".into());
     format!("{server}{path}")
 }
 
@@ -182,7 +183,11 @@ pub async fn fetch_profile(ctx: &mut Ctx, app: &App, token: &str, response: &Map
                 let claims = oidc::decode_id_token(&raw, &issuer, &app.client_id, now)?;
                 if let Some((key, timeout)) = oidc::jti_key(&claims, now) {
                     let t = if timeout > 0.0 { timeout as u64 } else { 0 };
-                    let added = if t == 0 { false } else { ctx.cache.add(&key, crate::cache::PICKLED_TRUE, t).await.map_err(|e| OidcError::Internal(e.0))? };
+                    let added = if t == 0 {
+                        false
+                    } else {
+                        ctx.cache.add(&key, crate::cache::PICKLED_TRUE, t).await.map_err(|e| OidcError::Internal(e.0))?
+                    };
                     if !added {
                         return Err(OidcError::OAuth2("Invalid id_token".into()));
                     }
@@ -250,7 +255,11 @@ fn gitlab_check_errors(status: u16, body: &[u8]) -> Result<Value, OidcError> {
     let data: Value = serde_json::from_slice(body).map_err(|_| OidcError::OAuth2("Invalid JSON from GitLab API".into()))?;
     let has_error = data.as_object().is_some_and(|o| o.contains_key("error"));
     if status >= 400 || has_error {
-        let err = data.get("error").filter(|v| social::py_truthy(v)).map(|v| v.as_str().map(str::to_string).unwrap_or_else(|| v.to_string())).unwrap_or_else(|| status.to_string());
+        let err = data
+            .get("error")
+            .filter(|v| social::py_truthy(v))
+            .map(|v| v.as_str().map(str::to_string).unwrap_or_else(|| v.to_string()))
+            .unwrap_or_else(|| status.to_string());
         return Err(OidcError::OAuth2(format!("GitLab error: {err}")));
     }
     if !data.as_object().is_some_and(|o| o.contains_key("id")) {
@@ -349,7 +358,12 @@ pub fn extract(provider: &str, data: &Map<String, Value>) -> Result<Extracted, S
         }
         MICROSOFT => {
             e.uid = py_str(key("id")?);
-            e.email = data.get("mail").filter(|v| social::py_truthy(v)).or_else(|| data.get("userPrincipalName")).filter(|v| !v.is_null()).map(py_str);
+            e.email = data
+                .get("mail")
+                .filter(|v| social::py_truthy(v))
+                .or_else(|| data.get("userPrincipalName"))
+                .filter(|v| !v.is_null())
+                .map(py_str);
             e.username = opt(data, "mailNickname");
             e.last_name = opt(data, "surname");
             e.first_name = opt(data, "givenName");
@@ -409,7 +423,9 @@ mod tests {
 
     #[test]
     fn github_fields() {
-        let d = obj(json!({"id": 583231, "login": "octocat", "name": "The Octocat", "email": null, "emails": [{"email": "o@example.invalid", "primary": true, "verified": true}]}));
+        let d = obj(
+            json!({"id": 583231, "login": "octocat", "name": "The Octocat", "email": null, "emails": [{"email": "o@example.invalid", "primary": true, "verified": true}]}),
+        );
         let e = extract(GITHUB, &d).unwrap();
         assert_eq!(e.uid, "583231");
         assert_eq!(e.username.as_deref(), Some("octocat"));
@@ -461,7 +477,8 @@ mod tests {
         let e = extract(DISCORD, &obj(json!({"id": 2, "username": "u", "email": "u@example.invalid"}))).unwrap();
         assert!(e.addresses.is_empty());
         // Gitea: `name` from data["name"]; `full_name` is not read
-        let e = extract(GITEA, &obj(json!({"id": 3, "login": "gt", "full_name": "Full", "name": "G T", "email": "g@example.invalid"}))).unwrap();
+        let e = extract(GITEA, &obj(json!({"id": 3, "login": "gt", "full_name": "Full", "name": "G T", "email": "g@example.invalid"})))
+            .unwrap();
         assert_eq!((e.uid.as_str(), e.username.as_deref(), e.name.as_deref()), ("3", Some("gt"), Some("G T")));
         let e = extract(GITEA, &obj(json!({"id": 3, "login": "gt", "full_name": "Full"}))).unwrap();
         assert_eq!(e.name, None);

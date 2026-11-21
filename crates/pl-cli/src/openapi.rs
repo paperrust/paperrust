@@ -35,7 +35,13 @@ const ALLOWED_VERSIONS: &[&str] = &["9", "10"];
 
 pub fn routes() -> Vec<ApiRoute> {
     vec![
-        ApiRoute::new("schema.get", Method::GET, "/api/schema/", "src/paperless/urls.py::SpectacularAPIView", drf_view(get(schema), ALLOW_READ_ONLY)),
+        ApiRoute::new(
+            "schema.get",
+            Method::GET,
+            "/api/schema/",
+            "src/paperless/urls.py::SpectacularAPIView",
+            drf_view(get(schema), ALLOW_READ_ONLY),
+        ),
         ApiRoute::new("schema.swagger_ui", Method::GET, "/api/schema/view/", "src/paperless/urls.py::SpectacularSwaggerView", get(swagger)),
         ApiRoute::new(
             "static.swagger_ui_dist",
@@ -307,7 +313,9 @@ async fn schema(headers: HeaderMap, Query(q): Query<Vec<(String, String)>>, auth
     let accept = headers.get(header::ACCEPT).and_then(|v| v.to_str().ok());
     let (kind, accepted) = match negotiate(accept, format) {
         Ok(x) => x,
-        Err(NegotiationError::NotFound) => return respond(StatusCode::NOT_FOUND, Kind::Yaml, error_body(Kind::Yaml, "Not found.", "not_found")),
+        Err(NegotiationError::NotFound) => {
+            return respond(StatusCode::NOT_FOUND, Kind::Yaml, error_body(Kind::Yaml, "Not found.", "not_found"));
+        }
         Err(NegotiationError::NotAcceptable) => {
             return respond(
                 StatusCode::NOT_ACCEPTABLE,
@@ -361,7 +369,12 @@ fn quote_plus(s: &str) -> String {
 }
 
 /// GET `/api/schema/view/`.
-async fn swagger(State(st): State<AppState>, headers: HeaderMap, Query(q): Query<Vec<(String, String)>>, auth: Result<MaybeUser, AuthError>) -> Response {
+async fn swagger(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Query(q): Query<Vec<(String, String)>>,
+    auth: Result<MaybeUser, AuthError>,
+) -> Response {
     let allow = HeaderValue::from_static(ALLOW_READ_ONLY);
     // APIView.initial: content negotiation and versioning come before authentication.
     let format = q.iter().rev().find(|(k, _)| k == "format").map(|(_, v)| v.as_str());
@@ -391,7 +404,11 @@ async fn swagger(State(st): State<AppState>, headers: HeaderMap, Query(q): Query
     let secret = pl_authz::csrf::cookie(&cookies, &cfg.csrf_cookie_name)
         .filter(|c| pl_authz::csrf::check_token_format(c).is_ok())
         .map(|c| {
-            if c.len() == pl_authz::csrf::CSRF_TOKEN_LENGTH { pl_authz::csrf::unmask_cipher_token(c).unwrap_or_default() } else { c.to_string() }
+            if c.len() == pl_authz::csrf::CSRF_TOKEN_LENGTH {
+                pl_authz::csrf::unmask_cipher_token(c).unwrap_or_default()
+            } else {
+                c.to_string()
+            }
         })
         .filter(|s| s.len() == pl_authz::csrf::CSRF_SECRET_LENGTH)
         .unwrap_or_else(|| pl_authz::hashers::get_random_string(pl_authz::csrf::CSRF_SECRET_LENGTH));

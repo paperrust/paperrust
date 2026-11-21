@@ -36,10 +36,9 @@ macro_rules! profiles {
 
 /// All 55 profiles (sorted like `os.listdir` on Windows).
 const PROFILES: &[(&str, &str)] = profiles!(
-    "af", "ar", "bg", "bn", "ca", "cs", "cy", "da", "de", "el", "en", "es", "et", "fa", "fi", "fr", "gu", "he",
-    "hi", "hr", "hu", "id", "it", "ja", "kn", "ko", "lt", "lv", "mk", "ml", "mr", "ne", "nl", "no", "pa", "pl",
-    "pt", "ro", "ru", "sk", "sl", "so", "sq", "sv", "sw", "ta", "te", "th", "tl", "tr", "uk", "ur", "vi",
-    "zh-cn", "zh-tw",
+    "af", "ar", "bg", "bn", "ca", "cs", "cy", "da", "de", "el", "en", "es", "et", "fa", "fi", "fr", "gu", "he", "hi", "hr", "hu", "id",
+    "it", "ja", "kn", "ko", "lt", "lv", "mk", "ml", "mr", "ne", "nl", "no", "pa", "pl", "pt", "ro", "ru", "sk", "sl", "so", "sq", "sv",
+    "sw", "ta", "te", "th", "tl", "tr", "uk", "ur", "vi", "zh-cn", "zh-tw",
 );
 
 const MESSAGES: &str = include_str!("../data/langdetect/messages.properties");
@@ -172,10 +171,8 @@ fn build_factory() -> Option<Factory> {
     }
     let to_normalize_vi: Vec<char> = get("TO_NORMALIZE_VI_CHARS").chars().collect();
     let dmark_class: Vec<char> = get("DMARK_CLASS").chars().collect();
-    let normalized_vi = ["0300", "0301", "0303", "0309", "0323"]
-        .iter()
-        .map(|s| get(&format!("NORMALIZED_VI_CHARS_{s}")).chars().collect())
-        .collect();
+    let normalized_vi =
+        ["0300", "0301", "0303", "0309", "0323"].iter().map(|s| get(&format!("NORMALIZED_VI_CHARS_{s}")).chars().collect()).collect();
     let vi_re = Regex::new(&format!("([{}])([{}])", regex_class(&to_normalize_vi), regex_class(&dmark_class))).ok()?;
     let langsize = PROFILES.len();
     let mut langlist = Vec::with_capacity(langsize);
@@ -299,12 +296,7 @@ impl Factory {
                 let ai = a.and_then(|a| self.to_normalize_vi.iter().position(|x| *x == a));
                 let di = d.and_then(|d| self.dmark_class.iter().position(|x| *x == d));
                 match (ai, di) {
-                    (Some(ai), Some(di)) => self
-                        .normalized_vi
-                        .get(di)
-                        .and_then(|s| s.get(ai))
-                        .map(|c| c.to_string())
-                        .unwrap_or_default(),
+                    (Some(ai), Some(di)) => self.normalized_vi.get(di).and_then(|s| s.get(ai)).map(|c| c.to_string()).unwrap_or_default(),
                     _ => c[0].to_string(),
                 }
             })
@@ -339,11 +331,7 @@ impl Factory {
                 non_latin += 1;
             }
         }
-        if latin * 2 < non_latin {
-            text.into_iter().filter(|ch| !('A'..='z').contains(ch)).collect()
-        } else {
-            text
-        }
+        if latin * 2 < non_latin { text.into_iter().filter(|ch| !('A'..='z').contains(ch)).collect() } else { text }
     }
 
     /// `Detector._extract_ngrams()`.

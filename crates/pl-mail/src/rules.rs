@@ -126,9 +126,7 @@ async fn get_object(db: &PgPool, user: &MailUser, method: &Method, raw_pk: &str)
     if !visible.contains(&pk) {
         return Err(ApiError::not_found_model(MAIL_RULE.object_name));
     }
-    let row = fetch(db, pk)
-        .await?
-        .ok_or_else(|| ApiError::not_found_model(MAIL_RULE.object_name))?;
+    let row = fetch(db, pk).await?.ok_or_else(|| ApiError::not_found_model(MAIL_RULE.object_name))?;
     let ct = perms::content_type_id(db, MAIL_RULE).await?;
     perms::check_object_permission(db, user, method, MAIL_RULE, ct, row.id, row.owner_id).await?;
     Ok(row)
@@ -309,10 +307,7 @@ pub async fn validate(
                     Got::Skip
                 } else {
                     let owner: Option<(Option<i32>,)> =
-                        sqlx::query_as("SELECT owner_id FROM paperless_mail_mailaccount WHERE id = $1")
-                            .bind(id)
-                            .fetch_optional(db)
-                            .await?;
+                        sqlx::query_as("SELECT owner_id FROM paperless_mail_mailaccount WHERE id = $1").bind(id).fetch_optional(db).await?;
                     let ct = perms::content_type_id(db, MAIL_ACCOUNT).await?;
                     let owner = owner.and_then(|o| o.0);
                     if !perms::has_perms_owner_aware(db, user, "change_mailaccount", ct, id, owner).await? {
@@ -343,9 +338,7 @@ pub async fn validate(
     let action_parameter = field(&mut e, data, "action_parameter", OPTIONAL_NULL, partial, Some(String::new()), |v| {
         drf::char_field(v, drf::CharOpts { allow_blank: false, max_length: None })
     });
-    let assign_title_from = nn(field(&mut e, data, "assign_title_from", OPTIONAL, partial, None, |v| {
-        drf::choice_field(v, &[1, 2, 3])
-    }));
+    let assign_title_from = nn(field(&mut e, data, "assign_title_from", OPTIONAL, partial, None, |v| drf::choice_field(v, &[1, 2, 3])));
     // assign_tags: ManyRelatedField(TagsField)
     let assign_tags = match drf::empty_values::<Vec<i32>>(raw(data, "assign_tags"), OPTIONAL, partial, None) {
         Err(fe) => {
@@ -370,20 +363,15 @@ pub async fn validate(
             }
         },
     };
-    let assign_correspondent_from = nn(field(&mut e, data, "assign_correspondent_from", OPTIONAL, partial, None, |v| {
-        drf::choice_field(v, &[1, 2, 3, 4])
-    }));
+    let assign_correspondent_from =
+        nn(field(&mut e, data, "assign_correspondent_from", OPTIONAL, partial, None, |v| drf::choice_field(v, &[1, 2, 3, 4])));
     let assign_correspondent = fk_field(db, &mut e, data, "assign_correspondent", "documents_correspondent", partial).await;
     let assign_document_type = fk_field(db, &mut e, data, "assign_document_type", "documents_documenttype", partial).await;
     let assign_owner_from_rule = nn(field(&mut e, data, "assign_owner_from_rule", OPTIONAL, partial, None, drf::boolean_field));
     let order = nn(field(&mut e, data, "order", OPTIONAL, partial, None, |v| drf::integer_field(v, None, None)));
     let attachment_type = nn(field(&mut e, data, "attachment_type", OPTIONAL, partial, None, |v| drf::choice_field(v, &[1, 2])));
-    let consumption_scope = nn(field(&mut e, data, "consumption_scope", OPTIONAL, partial, None, |v| {
-        drf::choice_field(v, &[1, 2, 3])
-    }));
-    let pdf_layout = nn(field(&mut e, data, "pdf_layout", OPTIONAL, partial, None, |v| {
-        drf::choice_field(v, &[0, 1, 2, 3, 4])
-    }));
+    let consumption_scope = nn(field(&mut e, data, "consumption_scope", OPTIONAL, partial, None, |v| drf::choice_field(v, &[1, 2, 3])));
+    let pdf_layout = nn(field(&mut e, data, "pdf_layout", OPTIONAL, partial, None, |v| drf::choice_field(v, &[0, 1, 2, 3, 4])));
     // owner: default=None (UniqueConstraint name/owner), allow_null
     let owner = match drf::empty_values::<i32>(drf::raw_related(data, "owner"), OPTIONAL_NULL, partial, None) {
         Err(fe) => {
@@ -391,7 +379,11 @@ pub async fn validate(
             Got::Skip
         }
         Ok(Err(Got::Skip)) => {
-            if partial { Got::Skip } else { Got::Set(None) }
+            if partial {
+                Got::Skip
+            } else {
+                Got::Set(None)
+            }
         }
         Ok(Err(g)) => g,
         Ok(Ok(v)) => match perms::resolve_user_pk(db, v).await {
@@ -412,12 +404,24 @@ pub async fn validate(
     // run_validators: UniqueTogetherValidator(name, owner)
     let (u_name, u_owner) = match instance {
         None => (
-            match &name { Got::Set(n) => Some(n.clone()), Got::Skip => None },
-            match &owner { Got::Set(o) => *o, Got::Skip => None },
+            match &name {
+                Got::Set(n) => Some(n.clone()),
+                Got::Skip => None,
+            },
+            match &owner {
+                Got::Set(o) => *o,
+                Got::Skip => None,
+            },
         ),
         Some(inst) => (
-            Some(match &name { Got::Set(n) => n.clone(), Got::Skip => inst.name.clone() }),
-            match &owner { Got::Set(o) => *o, Got::Skip => inst.owner_id },
+            Some(match &name {
+                Got::Set(n) => n.clone(),
+                Got::Skip => inst.name.clone(),
+            }),
+            match &owner {
+                Got::Set(o) => *o,
+                Got::Skip => inst.owner_id,
+            },
         ),
     };
     let checked: Vec<Option<()>> = match instance {
@@ -491,10 +495,18 @@ fn unique_together_error() -> ApiError {
 
 /// Applies validated data to a row (ModelSerializer.update/create).
 fn apply(row: &mut RuleRow, inp: &RuleInput) -> ApiResult<()> {
-    if let Got::Set(v) = &inp.name { row.name = v.clone(); }
-    if let Got::Set(v) = inp.account { row.account_id = v; }
-    if let Got::Set(v) = inp.enabled { row.enabled = v; }
-    if let Got::Set(v) = &inp.folder { row.folder = v.clone(); }
+    if let Got::Set(v) = &inp.name {
+        row.name = v.clone();
+    }
+    if let Got::Set(v) = inp.account {
+        row.account_id = v;
+    }
+    if let Got::Set(v) = inp.enabled {
+        row.enabled = v;
+    }
+    if let Got::Set(v) = &inp.folder {
+        row.folder = v.clone();
+    }
     let targets = [
         &mut row.filter_from,
         &mut row.filter_to,
@@ -508,20 +520,48 @@ fn apply(row: &mut RuleRow, inp: &RuleInput) -> ApiResult<()> {
             *t = v.clone();
         }
     }
-    if let Got::Set(v) = inp.maximum_age { row.maximum_age = v; }
-    if let Got::Set(v) = inp.action { row.action = v; }
-    if let Got::Set(v) = &inp.action_parameter { row.action_parameter = v.clone(); }
-    if let Got::Set(v) = inp.assign_title_from { row.assign_title_from = v; }
-    if let Got::Set(v) = inp.assign_correspondent_from { row.assign_correspondent_from = v; }
-    if let Got::Set(v) = inp.assign_correspondent { row.assign_correspondent_id = v; }
-    if let Got::Set(v) = inp.assign_document_type { row.assign_document_type_id = v; }
-    if let Got::Set(v) = inp.assign_owner_from_rule { row.assign_owner_from_rule = v; }
-    if let Got::Set(v) = inp.order { row.order = order_i16(v)?; }
-    if let Got::Set(v) = inp.attachment_type { row.attachment_type = v; }
-    if let Got::Set(v) = inp.consumption_scope { row.consumption_scope = v; }
-    if let Got::Set(v) = inp.pdf_layout { row.pdf_layout = v; }
-    if let Got::Set(v) = inp.owner { row.owner_id = v; }
-    if let Got::Set(v) = inp.stop_processing { row.stop_processing = v; }
+    if let Got::Set(v) = inp.maximum_age {
+        row.maximum_age = v;
+    }
+    if let Got::Set(v) = inp.action {
+        row.action = v;
+    }
+    if let Got::Set(v) = &inp.action_parameter {
+        row.action_parameter = v.clone();
+    }
+    if let Got::Set(v) = inp.assign_title_from {
+        row.assign_title_from = v;
+    }
+    if let Got::Set(v) = inp.assign_correspondent_from {
+        row.assign_correspondent_from = v;
+    }
+    if let Got::Set(v) = inp.assign_correspondent {
+        row.assign_correspondent_id = v;
+    }
+    if let Got::Set(v) = inp.assign_document_type {
+        row.assign_document_type_id = v;
+    }
+    if let Got::Set(v) = inp.assign_owner_from_rule {
+        row.assign_owner_from_rule = v;
+    }
+    if let Got::Set(v) = inp.order {
+        row.order = order_i16(v)?;
+    }
+    if let Got::Set(v) = inp.attachment_type {
+        row.attachment_type = v;
+    }
+    if let Got::Set(v) = inp.consumption_scope {
+        row.consumption_scope = v;
+    }
+    if let Got::Set(v) = inp.pdf_layout {
+        row.pdf_layout = v;
+    }
+    if let Got::Set(v) = inp.owner {
+        row.owner_id = v;
+    }
+    if let Got::Set(v) = inp.stop_processing {
+        row.stop_processing = v;
+    }
     Ok(())
 }
 
@@ -687,12 +727,7 @@ pub async fn save_in(
                 }
             }
             apply(&mut row, &inp)?;
-            let sets = WRITE_COLS
-                .split(", ")
-                .enumerate()
-                .map(|(i, c)| format!("{} = ${}", c.trim(), i + 2))
-                .collect::<Vec<_>>()
-                .join(", ");
+            let sets = WRITE_COLS.split(", ").enumerate().map(|(i, c)| format!("{} = ${}", c.trim(), i + 2)).collect::<Vec<_>>().join(", ");
             let sql = format!("UPDATE paperless_mail_mailrule SET {sets} WHERE id = $1");
             bind_row!(sqlx::query(&sql).bind(row.id), row).execute(&mut **tx).await?;
             if let Got::Set(tags) = &inp.assign_tags {
@@ -712,23 +747,17 @@ async fn list(State(st): State<AppState>, info: ReqInfo, user: MailUser) -> ApiR
     let ct = perms::content_type_id(db, MAIL_RULE).await?;
     let (cond, binds) = crate::util::visible_where(&user, "r", MAIL_RULE, 1);
     let count_sql = format!("SELECT COUNT(*) FROM paperless_mail_mailrule r WHERE {cond}");
-    let count: (i64,) = crate::util::bind_vis(sqlx::query_as(&count_sql), &user, binds, MAIL_RULE, ct)
-        .fetch_one(db)
-        .await?;
+    let count: (i64,) = crate::util::bind_vis(sqlx::query_as(&count_sql), &user, binds, MAIL_RULE, ct).fetch_one(db).await?;
     let page = listing::paginate(&info, count.0)?;
     let sql = format!(
         "SELECT {COLS} FROM paperless_mail_mailrule r WHERE {cond} ORDER BY r.\"order\" ASC LIMIT {} OFFSET {}",
         page.size,
         page.offset()
     );
-    let rows: Vec<RuleRow> = crate::util::bind_vis(sqlx::query_as(&sql), &user, binds, MAIL_RULE, ct)
-        .fetch_all(db)
-        .await?;
+    let rows: Vec<RuleRow> = crate::util::bind_vis(sqlx::query_as(&sql), &user, binds, MAIL_RULE, ct).fetch_all(db).await?;
     let all_ids = if info.api_version < 10 {
         let sql = format!("SELECT r.id FROM paperless_mail_mailrule r WHERE {cond} ORDER BY r.\"order\" ASC");
-        let ids: Vec<(i32,)> = crate::util::bind_vis(sqlx::query_as(&sql), &user, binds, MAIL_RULE, ct)
-            .fetch_all(db)
-            .await?;
+        let ids: Vec<(i32,)> = crate::util::bind_vis(sqlx::query_as(&sql), &user, binds, MAIL_RULE, ct).fetch_all(db).await?;
         Some(ids.into_iter().map(|r| r.0).collect())
     } else {
         None
@@ -737,10 +766,7 @@ async fn list(State(st): State<AppState>, info: ReqInfo, user: MailUser) -> ApiR
     let ids: Vec<i32> = rows.iter().map(|r| r.id).collect();
     let pf = PermFields::load(db, &user, MAIL_RULE, info.full_perms(), &objs).await?;
     let tags = tags_for(db, &ids).await?;
-    let results = rows
-        .iter()
-        .map(|r| represent(r, tags.get(&r.id).map(Vec::as_slice).unwrap_or(&[]), &pf))
-        .collect();
+    let results = rows.iter().map(|r| represent(r, tags.get(&r.id).map(Vec::as_slice).unwrap_or(&[]), &pf)).collect();
     Ok(json_response(StatusCode::OK, &listing::paginated(&info, &page, results, all_ids)))
 }
 
@@ -762,7 +788,15 @@ async fn create(State(st): State<AppState>, info: ReqInfo, user: MailUser, heade
     Ok(json_response(StatusCode::CREATED, &represent_one(db, &user, &info, &row).await?))
 }
 
-async fn update_impl(st: AppState, info: ReqInfo, user: MailUser, id: String, headers: HeaderMap, body: Bytes, method: Method) -> ApiResult<Response> {
+async fn update_impl(
+    st: AppState,
+    info: ReqInfo,
+    user: MailUser,
+    id: String,
+    headers: HeaderMap,
+    body: Bytes,
+    method: Method,
+) -> ApiResult<Response> {
     let db = &st.inner.db;
     let partial = method == Method::PATCH;
     perms::require_model_perm(db, &user, &method, MAIL_RULE).await?;
@@ -775,11 +809,25 @@ async fn update_impl(st: AppState, info: ReqInfo, user: MailUser, id: String, he
     Ok(json_response(StatusCode::OK, &represent_one(db, &user, &info, &row).await?))
 }
 
-async fn update(State(st): State<AppState>, info: ReqInfo, user: MailUser, Path(id): Path<String>, headers: HeaderMap, body: Bytes) -> ApiResult<Response> {
+async fn update(
+    State(st): State<AppState>,
+    info: ReqInfo,
+    user: MailUser,
+    Path(id): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> ApiResult<Response> {
     update_impl(st, info, user, id, headers, body, Method::PUT).await
 }
 
-async fn partial_update(State(st): State<AppState>, info: ReqInfo, user: MailUser, Path(id): Path<String>, headers: HeaderMap, body: Bytes) -> ApiResult<Response> {
+async fn partial_update(
+    State(st): State<AppState>,
+    info: ReqInfo,
+    user: MailUser,
+    Path(id): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> ApiResult<Response> {
     update_impl(st, info, user, id, headers, body, Method::PATCH).await
 }
 
@@ -819,15 +867,51 @@ pub async fn delete_rule_cascade(conn: &mut sqlx::PgConnection, rule_id: i32) ->
 pub fn routes() -> Vec<pl_core::ApiRoute> {
     use axum::routing::{delete, get, patch, post, put};
     use pl_core::ApiRoute;
-    use pl_core::route::{drf_view, ALLOW_MODEL_DETAIL, ALLOW_MODEL_LIST};
+    use pl_core::route::{ALLOW_MODEL_DETAIL, ALLOW_MODEL_LIST, drf_view};
     const SRC: &str = "src/paperless_mail/views.py::MailRuleViewSet";
     vec![
-        ApiRoute { id: "mail_rules.list", method: Method::GET, path: "/api/mail_rules/", upstream: SRC, handler: drf_view(get(list), ALLOW_MODEL_LIST) },
-        ApiRoute { id: "mail_rules.create", method: Method::POST, path: "/api/mail_rules/", upstream: SRC, handler: drf_view(post(create), ALLOW_MODEL_LIST) },
-        ApiRoute { id: "mail_rules.retrieve", method: Method::GET, path: "/api/mail_rules/{id}/", upstream: SRC, handler: drf_view(get(retrieve), ALLOW_MODEL_DETAIL) },
-        ApiRoute { id: "mail_rules.update", method: Method::PUT, path: "/api/mail_rules/{id}/", upstream: SRC, handler: drf_view(put(update), ALLOW_MODEL_DETAIL) },
-        ApiRoute { id: "mail_rules.partial_update", method: Method::PATCH, path: "/api/mail_rules/{id}/", upstream: SRC, handler: drf_view(patch(partial_update), ALLOW_MODEL_DETAIL) },
-        ApiRoute { id: "mail_rules.destroy", method: Method::DELETE, path: "/api/mail_rules/{id}/", upstream: SRC, handler: drf_view(delete(destroy), ALLOW_MODEL_DETAIL) },
+        ApiRoute {
+            id: "mail_rules.list",
+            method: Method::GET,
+            path: "/api/mail_rules/",
+            upstream: SRC,
+            handler: drf_view(get(list), ALLOW_MODEL_LIST),
+        },
+        ApiRoute {
+            id: "mail_rules.create",
+            method: Method::POST,
+            path: "/api/mail_rules/",
+            upstream: SRC,
+            handler: drf_view(post(create), ALLOW_MODEL_LIST),
+        },
+        ApiRoute {
+            id: "mail_rules.retrieve",
+            method: Method::GET,
+            path: "/api/mail_rules/{id}/",
+            upstream: SRC,
+            handler: drf_view(get(retrieve), ALLOW_MODEL_DETAIL),
+        },
+        ApiRoute {
+            id: "mail_rules.update",
+            method: Method::PUT,
+            path: "/api/mail_rules/{id}/",
+            upstream: SRC,
+            handler: drf_view(put(update), ALLOW_MODEL_DETAIL),
+        },
+        ApiRoute {
+            id: "mail_rules.partial_update",
+            method: Method::PATCH,
+            path: "/api/mail_rules/{id}/",
+            upstream: SRC,
+            handler: drf_view(patch(partial_update), ALLOW_MODEL_DETAIL),
+        },
+        ApiRoute {
+            id: "mail_rules.destroy",
+            method: Method::DELETE,
+            path: "/api/mail_rules/{id}/",
+            upstream: SRC,
+            handler: drf_view(delete(destroy), ALLOW_MODEL_DETAIL),
+        },
     ]
 }
 
@@ -842,10 +926,7 @@ mod tests {
             .iter()
             .position(|s| s.starts_with("UPDATE documents_workflowtrigger SET filter_mailrule_id = NULL"))
             .expect("SET NULL on workflowtrigger");
-        let del = RULE_DELETE_SQL
-            .iter()
-            .position(|s| s.starts_with("DELETE FROM paperless_mail_mailrule WHERE"))
-            .expect("rule delete");
+        let del = RULE_DELETE_SQL.iter().position(|s| s.starts_with("DELETE FROM paperless_mail_mailrule WHERE")).expect("rule delete");
         assert!(upd < del);
         assert_eq!(del, RULE_DELETE_SQL.len() - 1);
     }

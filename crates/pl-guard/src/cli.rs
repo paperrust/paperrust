@@ -239,4 +239,3 @@ pub async fn backup_command(args: &[String], pool: &PgPool, media_root: &Path, d
         Err(e) => Outcome::Err(e),
     }
 }
-

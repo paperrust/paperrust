@@ -74,18 +74,8 @@ pub fn header_str(headers: &HeaderMap, name: &HeaderName) -> Option<String> {
 }
 
 impl RequestInfo {
-    pub fn capture(
-        method: &Method,
-        path: &str,
-        headers: &HeaderMap,
-        settings: &DjangoSettings,
-    ) -> Self {
-        let cookie = headers
-            .get_all(header::COOKIE)
-            .iter()
-            .filter_map(|v| v.to_str().ok())
-            .collect::<Vec<_>>()
-            .join("; ");
+    pub fn capture(method: &Method, path: &str, headers: &HeaderMap, settings: &DjangoSettings) -> Self {
+        let cookie = headers.get_all(header::COOKIE).iter().filter_map(|v| v.to_str().ok()).collect::<Vec<_>>().join("; ");
         let lang_cookie = locale::cookie_value(&cookie, &settings.language_cookie_name);
         let accept_language = header_str(headers, &header::ACCEPT_LANGUAGE).unwrap_or_default();
         Self {
@@ -99,8 +89,7 @@ impl RequestInfo {
 }
 
 #[allow(clippy::expect_used)]
-static CC_DELIM_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\s*,\s*").expect("static regex"));
+static CC_DELIM_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\s*,\s*").expect("static regex"));
 
 /// `django.utils.cache.patch_vary_headers`
 pub fn patch_vary_headers(headers: &mut HeaderMap, new: &[&str]) {
@@ -115,11 +104,7 @@ pub fn patch_vary_headers(headers: &mut HeaderMap, new: &[&str]) {
             vary.push((*h).to_owned());
         }
     }
-    let value = if vary.iter().any(|h| h == "*") {
-        "*".to_owned()
-    } else {
-        vary.join(", ")
-    };
+    let value = if vary.iter().any(|h| h == "*") { "*".to_owned() } else { vary.join(", ") };
     if let Ok(v) = HeaderValue::from_str(&value) {
         headers.insert(header::VARY, v);
     }
@@ -134,18 +119,12 @@ fn set_default(headers: &mut HeaderMap, name: &'static str, value: &'static str)
 
 /// Python `urllib.parse.urlsplit(origin)` -> (scheme, netloc); `None` = ValueError.
 fn urlsplit_scheme_netloc(url: &str) -> Option<(String, String)> {
-    let url: String = url
-        .trim_matches(|c: char| c <= ' ')
-        .chars()
-        .filter(|c| !matches!(c, '\t' | '\r' | '\n'))
-        .collect();
+    let url: String = url.trim_matches(|c: char| c <= ' ').chars().filter(|c| !matches!(c, '\t' | '\r' | '\n')).collect();
     let (scheme, rest) = match url.find(':') {
         Some(i)
             if i > 0
                 && url[..i].starts_with(|c: char| c.is_ascii_alphabetic())
-                && url[..i]
-                    .chars()
-                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.')) =>
+                && url[..i].chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.')) =>
         {
             (url[..i].to_lowercase(), url[i + 1..].to_owned())
         }
@@ -172,24 +151,16 @@ fn add_cors_headers(headers: &mut HeaderMap, info: &RequestInfo, s: &DjangoSetti
         return;
     };
     let allowed = (origin == "null" && s.cors_allowed_origins.iter().any(|o| o == "null"))
-        || s.cors_allowed_origins.iter().any(|o| {
-            urlsplit_scheme_netloc(o).is_some_and(|(sc, nl)| sc == scheme && nl == netloc)
-        });
+        || s.cors_allowed_origins.iter().any(|o| urlsplit_scheme_netloc(o).is_some_and(|(sc, nl)| sc == scheme && nl == netloc));
     if !allowed {
         return;
     }
     let Ok(origin_value) = HeaderValue::from_str(origin) else {
         return;
     };
-    headers.insert(
-        HeaderName::from_static("access-control-allow-origin"),
-        origin_value,
-    );
+    headers.insert(HeaderName::from_static("access-control-allow-origin"), origin_value);
     if s.cors_allow_credentials {
-        headers.insert(
-            HeaderName::from_static("access-control-allow-credentials"),
-            HeaderValue::from_static("true"),
-        );
+        headers.insert(HeaderName::from_static("access-control-allow-credentials"), HeaderValue::from_static("true"));
     }
     if !s.cors_expose_headers.is_empty()
         && let Ok(v) = HeaderValue::from_str(&s.cors_expose_headers.join(", "))
@@ -200,18 +171,13 @@ fn add_cors_headers(headers: &mut HeaderMap, info: &RequestInfo, s: &DjangoSetti
         // corsheaders.defaults: CORS_ALLOW_HEADERS / CORS_ALLOW_METHODS
         headers.insert(
             HeaderName::from_static("access-control-allow-headers"),
-            HeaderValue::from_static(
-                "accept, authorization, content-type, user-agent, x-csrftoken, x-requested-with",
-            ),
+            HeaderValue::from_static("accept, authorization, content-type, user-agent, x-csrftoken, x-requested-with"),
         );
         headers.insert(
             HeaderName::from_static("access-control-allow-methods"),
             HeaderValue::from_static("DELETE, GET, OPTIONS, PATCH, POST, PUT"),
         );
-        headers.insert(
-            HeaderName::from_static("access-control-max-age"),
-            HeaderValue::from_static("86400"),
-        );
+        headers.insert(HeaderName::from_static("access-control-max-age"), HeaderValue::from_static("86400"));
     }
 }
 
@@ -236,14 +202,8 @@ pub fn finish_headers(resp: &mut Response, info: &RequestInfo, s: &DjangoSetting
     }
     // ApiVersionMiddleware
     if authenticated {
-        h.insert(
-            HeaderName::from_static("x-api-version"),
-            HeaderValue::from_static(API_VERSION_LATEST),
-        );
-        h.insert(
-            HeaderName::from_static("x-version"),
-            HeaderValue::from_static(PAPERLESS_VERSION),
-        );
+        h.insert(HeaderName::from_static("x-api-version"), HeaderValue::from_static(API_VERSION_LATEST));
+        h.insert(HeaderName::from_static("x-version"), HeaderValue::from_static(PAPERLESS_VERSION));
     }
     // LocaleMiddleware
     patch_vary_headers(h, &["Accept-Language"]);
@@ -268,23 +228,14 @@ fn security_headers(h: &mut HeaderMap) {
 }
 
 #[allow(clippy::expect_used)]
-static HOST_VALIDATION_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^([a-z0-9.-]+|\[[a-f0-9]*:[a-f0-9.:]+\])(?::([0-9]+))?$").expect("static regex")
-});
+static HOST_VALIDATION_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^([a-z0-9.-]+|\[[a-f0-9]*:[a-f0-9.:]+\])(?::([0-9]+))?$").expect("static regex"));
 
 /// `split_domain_port` -> lowercased domain without trailing dot; "" if invalid.
 pub fn split_domain(host: &str) -> String {
     let lower = host.to_lowercase();
     match HOST_VALIDATION_RE.captures(&lower) {
-        Some(c) => c
-            .get(1)
-            .map(|m| {
-                m.as_str()
-                    .strip_suffix('.')
-                    .unwrap_or(m.as_str())
-                    .to_owned()
-            })
-            .unwrap_or_default(),
+        Some(c) => c.get(1).map(|m| m.as_str().strip_suffix('.').unwrap_or(m.as_str()).to_owned()).unwrap_or_default(),
         None => String::new(),
     }
 }
@@ -312,10 +263,7 @@ pub fn host_allowed(headers: &HeaderMap, s: &DjangoSettings) -> bool {
         allowed = vec![".localhost".into(), "127.0.0.1".into(), "[::1]".into()];
     }
     let domain = split_domain(&raw);
-    !domain.is_empty()
-        && allowed
-            .iter()
-            .any(|p| p == "*" || is_same_domain(&domain, p))
+    !domain.is_empty() && allowed.iter().any(|p| p == "*" || is_same_domain(&domain, p))
 }
 
 #[cfg(test)]
@@ -353,10 +301,7 @@ mod tests {
 
     #[test]
     fn urlsplit() {
-        assert_eq!(
-            urlsplit_scheme_netloc("HTTP://localhost:8000/x"),
-            Some(("http".into(), "localhost:8000".into()))
-        );
+        assert_eq!(urlsplit_scheme_netloc("HTTP://localhost:8000/x"), Some(("http".into(), "localhost:8000".into())));
         assert_eq!(urlsplit_scheme_netloc("http://[::1"), None);
     }
 }

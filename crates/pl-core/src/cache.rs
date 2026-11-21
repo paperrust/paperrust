@@ -32,8 +32,8 @@ use std::time::{Duration, Instant};
 
 use sqlx::{PgPool, Row};
 
-use crate::config::Config;
 use crate::ApiError;
+use crate::config::Config;
 
 /// Former Redis cache (`django.core.cache.backends.redis.RedisCache`): is read as
 /// [`Backend::Postgres`] (whoever set it wanted a shared cache).
@@ -773,13 +773,7 @@ impl<'a> DjangoCache<'a> {
 
     /// Compare and set (atomic). `expected = None` = key must not exist.
     /// `timeout`: like [`set`](Self::set), but `Some(0)`/`None` = without expiry.
-    pub async fn compare_and_set(
-        &self,
-        key: &str,
-        expected: Option<&[u8]>,
-        new: &[u8],
-        timeout: Option<u64>,
-    ) -> Result<bool, ApiError> {
+    pub async fn compare_and_set(&self, key: &str, expected: Option<&[u8]>, new: &[u8], timeout: Option<u64>) -> Result<bool, ApiError> {
         let full = self.key(key);
         let timeout = timeout.filter(|t| *t > 0);
         match self.backend_for(&full).await? {

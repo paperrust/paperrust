@@ -37,9 +37,10 @@ const MAX_BACKTRACK_LIMIT: usize = 5_000_000_000;
 /// `settings.MATCH_REGEX_TIMEOUT_SECONDS` (`get_float_from_env(..., 0.1)`); invalid -> 0.1,
 /// zero or negative -> no wall-clock limit (only the backtrack budget).
 pub fn timeout_seconds() -> f64 {
-    let raw = ["PAPERRUST_MATCH_REGEX_TIMEOUT_SECONDS", "PAPERLESS_MATCH_REGEX_TIMEOUT_SECONDS", "PAPERLESS_RS_MATCH_REGEX_TIMEOUT_SECONDS"]
-        .iter()
-        .find_map(|k| pl_envlive::var(k));
+    let raw =
+        ["PAPERRUST_MATCH_REGEX_TIMEOUT_SECONDS", "PAPERLESS_MATCH_REGEX_TIMEOUT_SECONDS", "PAPERLESS_RS_MATCH_REGEX_TIMEOUT_SECONDS"]
+            .iter()
+            .find_map(|k| pl_envlive::var(k));
     match raw.map(|v| v.trim().parse::<f64>()) {
         Some(Ok(v)) if v.is_finite() && v > 0.0 => v,
         Some(Ok(_)) => 0.0,
@@ -242,11 +243,7 @@ enum Run<T> {
 
 /// `compiled.search(text, timeout=...)`: inline for linear patterns, otherwise on a helper thread
 /// with a wall-clock limit. `Err` from fancy-regex (budget exhausted) counts as timeout.
-fn run_bounded<T: Send + 'static>(
-    c: &std::sync::Arc<Compiled>,
-    text: &str,
-    f: fn(&fancy_regex::Regex, &str) -> Result<T, ()>,
-) -> Run<T> {
+fn run_bounded<T: Send + 'static>(c: &std::sync::Arc<Compiled>, text: &str, f: fn(&fancy_regex::Regex, &str) -> Result<T, ()>) -> Run<T> {
     let timeout = timeout_seconds();
     if c.linear || timeout <= 0.0 {
         return match f(&c.re, text) {

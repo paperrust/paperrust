@@ -214,9 +214,7 @@ fn choice(env_key: &str, value: Option<String>, choices: &[&str], default: &str)
 impl OcrSettings {
     /// Reads the settings like `paperless/settings/__init__.py` from an environment.
     pub fn from_env<F: Fn(&str) -> Option<String>>(get: F) -> Result<Self, OcrError> {
-        let int_opt = |k: &str| -> Result<Option<i64>, OcrError> {
-            get(k).map(|v| py_int(k, &v)).transpose()
-        };
+        let int_opt = |k: &str| -> Result<Option<i64>, OcrError> { get(k).map(|v| py_int(k, &v)).transpose() };
         let bool_env = |k: &str, d: &str| str_to_bool(&get(k).unwrap_or_else(|| d.into()));
         let d = OcrSettings::default();
 
@@ -226,23 +224,14 @@ impl OcrSettings {
             Some("skip") | Some("skip_noarchive") => "auto".to_string(),
             _ => choice("PAPERLESS_OCR_MODE", raw_mode, &["auto", "force", "redo", "off"], "auto")?,
         };
-        let afg = choice(
-            "PAPERLESS_ARCHIVE_FILE_GENERATION",
-            get("PAPERLESS_ARCHIVE_FILE_GENERATION"),
-            &["auto", "always", "never"],
-            "auto",
-        )?;
+        let afg =
+            choice("PAPERLESS_ARCHIVE_FILE_GENERATION", get("PAPERLESS_ARCHIVE_FILE_GENERATION"), &["auto", "always", "never"], "auto")?;
         let task_workers = int_opt("PAPERLESS_TASK_WORKERS")?.unwrap_or(1);
         let threads = match int_opt("PAPERLESS_THREADS_PER_WORKER")? {
             Some(t) => t,
             None => default_threads_per_worker(task_workers, available_cores()),
         };
-        let remote_mode = choice(
-            "PAPERLESS_REMOTE_OCR_MODE",
-            get("PAPERLESS_REMOTE_OCR_MODE"),
-            &["always", "workflow_only"],
-            "always",
-        )?;
+        let remote_mode = choice("PAPERLESS_REMOTE_OCR_MODE", get("PAPERLESS_REMOTE_OCR_MODE"), &["always", "workflow_only"], "always")?;
         Ok(Self {
             ocr_pages: int_opt("PAPERLESS_OCR_PAGES")?,
             ocr_language: get("PAPERLESS_OCR_LANGUAGE").unwrap_or(d.ocr_language),
@@ -258,8 +247,7 @@ impl OcrSettings {
                 None => 12.0,
             },
             ocr_max_image_pixels: int_opt("PAPERLESS_OCR_MAX_IMAGE_PIXELS")?,
-            ocr_color_conversion_strategy: get("PAPERLESS_OCR_COLOR_CONVERSION_STRATEGY")
-                .unwrap_or(d.ocr_color_conversion_strategy),
+            ocr_color_conversion_strategy: get("PAPERLESS_OCR_COLOR_CONVERSION_STRATEGY").unwrap_or(d.ocr_color_conversion_strategy),
             ocr_user_args: get("PAPERLESS_OCR_USER_ARGS"),
             max_image_pixels: int_opt("PAPERLESS_MAX_IMAGE_PIXELS")?,
             threads_per_worker: threads,
@@ -267,10 +255,7 @@ impl OcrSettings {
             remote_ocr_api_key: get("PAPERLESS_REMOTE_OCR_API_KEY"),
             remote_ocr_endpoint: get("PAPERLESS_REMOTE_OCR_ENDPOINT"),
             remote_ocr_mode: RemoteOcrMode::parse(&remote_mode)?,
-            remote_ocr_allow_internal_endpoints: bool_env(
-                "PAPERLESS_REMOTE_OCR_ALLOW_INTERNAL_ENDPOINTS",
-                "true",
-            )?,
+            remote_ocr_allow_internal_endpoints: bool_env("PAPERLESS_REMOTE_OCR_ALLOW_INTERNAL_ENDPOINTS", "true")?,
         })
     }
 
@@ -350,9 +335,7 @@ impl OcrConfig {
             None => OutputType::parse(&s.ocr_output_type)?,
         };
         let pages = app.pages.filter(|p| *p != 0).or(s.ocr_pages);
-        let language = nonempty(&app.language)
-            .map(str::to_string)
-            .unwrap_or_else(|| s.ocr_language.clone());
+        let language = nonempty(&app.language).map(str::to_string).unwrap_or_else(|| s.ocr_language.clone());
         let mode = match nonempty(&app.mode) {
             Some(v) => Mode::parse(v)?,
             None => s.ocr_mode,
@@ -369,22 +352,17 @@ impl OcrConfig {
         let deskew = app.deskew.unwrap_or(s.ocr_deskew);
         let rotate = app.rotate_pages.unwrap_or(s.ocr_rotate_pages);
         // `or`: 0.0 in the DB falls back to the environment (upstream behavior).
-        let rotate_threshold = app
-            .rotate_pages_threshold
-            .filter(|t| *t != 0.0)
-            .unwrap_or(s.ocr_rotate_pages_threshold);
-        let max_image_pixel = app
-            .max_image_pixels
-            .filter(|p| *p != 0.0)
-            .or(s.ocr_max_image_pixels.map(|v| v as f64));
+        let rotate_threshold = app.rotate_pages_threshold.filter(|t| *t != 0.0).unwrap_or(s.ocr_rotate_pages_threshold);
+        let max_image_pixel = app.max_image_pixels.filter(|p| *p != 0.0).or(s.ocr_max_image_pixels.map(|v| v as f64));
         let color_conversion_strategy = match nonempty(&app.color_conversion_strategy) {
             Some(v) => ColorConversion::parse(v)?,
             None => ColorConversion::parse(&s.ocr_color_conversion_strategy)?,
         };
         let user_args = match &app.user_args {
             Some(v) if py_truthy(v) => Some(v.clone()),
-            _ => s.ocr_user_args.as_ref().map(|raw| serde_json::from_str::<serde_json::Value>(raw)
-                        .unwrap_or_else(|_| serde_json::Value::Object(Default::default()))),
+            _ => s.ocr_user_args.as_ref().map(|raw| {
+                serde_json::from_str::<serde_json::Value>(raw).unwrap_or_else(|_| serde_json::Value::Object(Default::default()))
+            }),
         };
         Ok(Self {
             output_type,
@@ -448,9 +426,7 @@ pub struct RemoteOcrConfig {
 
 impl RemoteOcrConfig {
     pub fn new(s: &OcrSettings, app: &AppConfigOverrides) -> Result<Self, OcrError> {
-        let pick = |a: &Option<String>, b: &Option<String>| {
-            nonempty(a).map(str::to_string).or_else(|| b.clone())
-        };
+        let pick = |a: &Option<String>, b: &Option<String>| nonempty(a).map(str::to_string).or_else(|| b.clone());
         Ok(Self {
             engine: pick(&app.remote_ocr_engine, &s.remote_ocr_engine),
             api_key: pick(&app.remote_ocr_api_key, &s.remote_ocr_api_key),
@@ -478,10 +454,7 @@ impl RemoteOcrConfig {
         if !self.engine_is_valid() {
             return None;
         }
-        REMOTE_SUPPORTED_MIME_TYPES
-            .iter()
-            .any(|(m, _)| *m == mime_type)
-            .then_some(20)
+        REMOTE_SUPPORTED_MIME_TYPES.iter().any(|(m, _)| *m == mime_type).then_some(20)
     }
 }
 
@@ -502,8 +475,7 @@ mod tests {
     use std::collections::HashMap;
 
     fn env(pairs: &[(&str, &str)]) -> impl Fn(&str) -> Option<String> {
-        let m: HashMap<String, String> =
-            pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect();
+        let m: HashMap<String, String> = pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect();
         move |k| m.get(k).cloned()
     }
 
@@ -579,11 +551,7 @@ mod tests {
 
     #[test]
     fn remote_config() {
-        let s = OcrSettings {
-            remote_ocr_engine: Some("azureai".into()),
-            remote_ocr_api_key: Some("k".into()),
-            ..Default::default()
-        };
+        let s = OcrSettings { remote_ocr_engine: Some("azureai".into()), remote_ocr_api_key: Some("k".into()), ..Default::default() };
         let c = RemoteOcrConfig::new(&s, &AppConfigOverrides::default()).unwrap();
         assert!(!c.engine_is_valid());
         let app = AppConfigOverrides { remote_ocr_endpoint: Some("https://x.invalid".into()), ..Default::default() };

@@ -172,89 +172,49 @@ impl DesktopConfig {
     }
 
     pub fn parse(text: &str, path: &Path) -> Result<Self> {
-        let cfg: Self = toml::from_str(text).map_err(|e| DesktopError::Config {
-            path: path.display().to_string(),
-            msg: e.to_string(),
-        })?;
+        let cfg: Self = toml::from_str(text).map_err(|e| DesktopError::Config { path: path.display().to_string(), msg: e.to_string() })?;
         cfg.validate(path)?;
         Ok(cfg)
     }
 
     fn validate(&self, path: &Path) -> Result<()> {
-        let bad = |msg: &str| {
-            Err(DesktopError::Config {
-                path: path.display().to_string(),
-                msg: msg.into(),
-            })
-        };
+        let bad = |msg: &str| Err(DesktopError::Config { path: path.display().to_string(), msg: msg.into() });
         if self.version != CONFIG_VERSION {
-            return bad(&format!(
-                "unbekannte Version {} (erwartet {CONFIG_VERSION})",
-                self.version
-            ));
+            return bad(&format!("unbekannte Version {} (erwartet {CONFIG_VERSION})", self.version));
         }
-        let ident_ok = |s: &str| {
-            !s.is_empty()
-                && s.len() <= 63
-                && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
-        };
-        if !ident_ok(&self.database.user)
-            || !ident_ok(&self.database.name)
-            || !ident_ok(&self.database.app_user)
-        {
+        let ident_ok = |s: &str| !s.is_empty() && s.len() <= 63 && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
+        if !ident_ok(&self.database.user) || !ident_ok(&self.database.name) || !ident_ok(&self.database.app_user) {
             return bad("database.user/app_user/name: nur [A-Za-z0-9_], 1–63 Zeichen");
         }
         if self.database.app_user == self.database.user {
             return bad("database.app_user muss sich von database.user (Superuser) unterscheiden");
         }
         if !self.database.app_password.is_empty()
-            && (self.database.app_password.len() < 16
-                || !self
-                    .database
-                    .app_password
-                    .chars()
-                    .all(|c| c.is_ascii_alphanumeric()))
+            && (self.database.app_password.len() < 16 || !self.database.app_password.chars().all(|c| c.is_ascii_alphanumeric()))
         {
             return bad("database.app_password: mindestens 16 Zeichen [A-Za-z0-9]");
         }
-        if self.database.password.len() < 16
-            || !self
-                .database
-                .password
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric())
-        {
+        if self.database.password.len() < 16 || !self.database.password.chars().all(|c| c.is_ascii_alphanumeric()) {
             return bad("database.password: mindestens 16 Zeichen [A-Za-z0-9]");
         }
         if self.server.secret_key.len() < 32 || self.server.secret_key == "change-me" {
             return bad("server.secret_key: mindestens 32 Zeichen");
         }
         let lan = self.server.lan_address.trim();
-        if !lan.is_empty()
-            && (lan.len() > 253
-                || !lan
-                    .chars()
-                    .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-'))
-        {
-            return bad(
-                "server.lan_address: IPv4-Adresse oder Rechnername (ohne Port), z. B. 192.168.1.20",
-            );
+        if !lan.is_empty() && (lan.len() > 253 || !lan.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')) {
+            return bad("server.lan_address: IPv4-Adresse oder Rechnername (ohne Port), z. B. 192.168.1.20");
         }
         if !matches!(self.database.locale_provider.as_str(), "builtin" | "icu") {
             return bad("database.locale_provider: builtin oder icu");
         }
-        if self.database.port == 0
-            || self.server.port == 0
-            || self.database.port == self.server.port
-        {
+        if self.database.port == 0 || self.server.port == 0 || self.database.port == self.server.port {
             return bad("Ports müssen gesetzt und verschieden sein");
         }
         Ok(())
     }
 
     pub fn to_toml(&self) -> Result<String> {
-        toml::to_string_pretty(self)
-            .map_err(|e| DesktopError::Other(format!("desktop.toml serialisieren: {e}")))
+        toml::to_string_pretty(self).map_err(|e| DesktopError::Other(format!("desktop.toml serialisieren: {e}")))
     }
 
     /// Loads `path`; if the file is missing, a new one is created and saved.
@@ -275,8 +235,7 @@ impl DesktopConfig {
     pub fn save(&self, path: &Path) -> Result<()> {
         let text = self.to_toml()?;
         let tmp = path.with_extension("toml.tmp");
-        write_private(&tmp, text.as_bytes())
-            .map_err(io_err(format!("{} schreiben", tmp.display())))?;
+        write_private(&tmp, text.as_bytes()).map_err(io_err(format!("{} schreiben", tmp.display())))?;
         std::fs::rename(&tmp, path).map_err(io_err(format!("{} ersetzen", path.display())))
     }
 }
@@ -308,12 +267,7 @@ mod tests {
         assert_ne!(a.database.password, b.database.password);
         assert_ne!(a.server.secret_key, b.server.secret_key);
         assert_eq!(a.server.secret_key.len(), 64);
-        assert!(
-            a.database
-                .password
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric())
-        );
+        assert!(a.database.password.chars().all(|c| c.is_ascii_alphanumeric()));
     }
 
     #[test]
@@ -360,13 +314,7 @@ mod tests {
         assert!(check(&|c| c.database.app_password = "kurz".into()));
         assert!(check(&|c| c.database.app_user = "x'y".into()));
         // Configuration from before D-N3 (without app_*): valid, password empty → supervisor creates it
-        let old: String = base
-            .to_toml()
-            .unwrap()
-            .lines()
-            .filter(|l| !l.starts_with("app_"))
-            .collect::<Vec<_>>()
-            .join("\n");
+        let old: String = base.to_toml().unwrap().lines().filter(|l| !l.starts_with("app_")).collect::<Vec<_>>().join("\n");
         let parsed = DesktopConfig::parse(&old, Path::new("d")).unwrap();
         assert_eq!(parsed.database.app_user, "paperless");
         assert!(parsed.database.app_password.is_empty());
@@ -382,32 +330,20 @@ mod tests {
         let base = DesktopConfig::generate();
         assert!(!base.server.lan_sharing && base.server.lan_address.is_empty());
         // Configuration without the new keys (older version): valid, sharing off
-        let old: String = base
-            .to_toml()
-            .unwrap()
-            .lines()
-            .filter(|l| !l.starts_with("lan_"))
-            .collect::<Vec<_>>()
-            .join(
-                "
+        let old: String = base.to_toml().unwrap().lines().filter(|l| !l.starts_with("lan_")).collect::<Vec<_>>().join(
+            "
 ",
-            );
+        );
         let parsed = DesktopConfig::parse(&old, Path::new("d")).unwrap();
         assert!(!parsed.server.lan_sharing);
         let mut on = base.clone();
         on.server.lan_sharing = true;
         on.server.lan_address = "192.168.1.20".into();
-        assert_eq!(
-            DesktopConfig::parse(&on.to_toml().unwrap(), Path::new("d")).unwrap(),
-            on
-        );
+        assert_eq!(DesktopConfig::parse(&on.to_toml().unwrap(), Path::new("d")).unwrap(), on);
         for bad in ["192.168.1.20:8000", "http://x", "a b", "x/y"] {
             let mut c = base.clone();
             c.server.lan_address = bad.into();
-            assert!(
-                DesktopConfig::parse(&c.to_toml().unwrap(), Path::new("d")).is_err(),
-                "{bad}"
-            );
+            assert!(DesktopConfig::parse(&c.to_toml().unwrap(), Path::new("d")).is_err(), "{bad}");
         }
     }
 }

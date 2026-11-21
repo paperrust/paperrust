@@ -48,17 +48,13 @@ impl From<sqlx::Error> for TaskFailure {
 pub fn bundle_id_arg(args: &[Value], kwargs: &Map<String, Value>) -> Result<i64, TaskFailure> {
     let v = kwargs.get("bundle_id").or_else(|| args.first());
     match v {
-        None => Err(TaskFailure::new(
-            "TypeError",
-            "build_share_link_bundle() missing 1 required positional argument: 'bundle_id'",
-        )),
-        Some(Value::Number(n)) => n
-            .as_i64()
-            .ok_or_else(|| TaskFailure::new("ValueError", format!("Field 'id' expected a number but got {n}."))),
-        Some(Value::String(s)) => s
-            .trim()
-            .parse::<i64>()
-            .map_err(|_| TaskFailure::new("ValueError", format!("Field 'id' expected a number but got '{s}'."))),
+        None => Err(TaskFailure::new("TypeError", "build_share_link_bundle() missing 1 required positional argument: 'bundle_id'")),
+        Some(Value::Number(n)) => {
+            n.as_i64().ok_or_else(|| TaskFailure::new("ValueError", format!("Field 'id' expected a number but got {n}.")))
+        }
+        Some(Value::String(s)) => {
+            s.trim().parse::<i64>().map_err(|_| TaskFailure::new("ValueError", format!("Field 'id' expected a number but got '{s}'.")))
+        }
         Some(other) => Err(TaskFailure::new("TypeError", format!("Field 'id' expected a number but got {other}."))),
     }
 }
@@ -67,12 +63,8 @@ pub fn bundle_id_arg(args: &[Value], kwargs: &Map<String, Value>) -> Result<i64,
 fn io_failure(e: &std::io::Error, path: &Path) -> TaskFailure {
     let p = path.display();
     match e.kind() {
-        std::io::ErrorKind::NotFound => {
-            TaskFailure::new("FileNotFoundError", format!("[Errno 2] No such file or directory: '{p}'"))
-        }
-        std::io::ErrorKind::PermissionDenied => {
-            TaskFailure::new("PermissionError", format!("[Errno 13] Permission denied: '{p}'"))
-        }
+        std::io::ErrorKind::NotFound => TaskFailure::new("FileNotFoundError", format!("[Errno 2] No such file or directory: '{p}'")),
+        std::io::ErrorKind::PermissionDenied => TaskFailure::new("PermissionError", format!("[Errno 13] Permission denied: '{p}'")),
         _ => TaskFailure::new("OSError", e.to_string()),
     }
 }
@@ -110,11 +102,7 @@ async fn plan(cx: Ctx<'_>, docs: &[DocRow], archive_strategy: bool) -> Result<Ve
 
 /// ZIP in `tmp_path` schreiben (ZIP_DEFLATED).
 fn write_zip(planned: &[Planned], tmp_path: &Path, tz: chrono_tz::Tz) -> Result<(), TaskFailure> {
-    let file = std::fs::OpenOptions::new()
-        .write(true)
-        .truncate(true)
-        .open(tmp_path)
-        .map_err(|e| io_failure(&e, tmp_path))?;
+    let file = std::fs::OpenOptions::new().write(true).truncate(true).open(tmp_path).map_err(|e| io_failure(&e, tmp_path))?;
     let mut z = ZipWriter::new(file, Method::Deflated, tz);
     for p in planned {
         z.write_file(&p.src, &p.name).map_err(|e| io_failure(&e, &p.src))?;

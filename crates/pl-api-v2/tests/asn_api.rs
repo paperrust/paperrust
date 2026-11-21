@@ -54,7 +54,12 @@ async fn user(pool: &sqlx::PgPool, name: &str, su: bool, active: bool, perms: &[
         .await
         .unwrap();
     }
-    sqlx::query("INSERT INTO authtoken_token (key, created, user_id) VALUES ($1, now(), $2)").bind(token).bind(id).execute(pool).await.unwrap();
+    sqlx::query("INSERT INTO authtoken_token (key, created, user_id) VALUES ($1, now(), $2)")
+        .bind(token)
+        .bind(id)
+        .execute(pool)
+        .await
+        .unwrap();
 }
 
 async fn setup() -> (Router, sqlx::PgPool) {
@@ -163,10 +168,12 @@ async fn asn_api_end_to_end() {
     // --- preview over existing numbers: collisions ---
     let pv = call(&r, "POST", "/asn/preview", EDITOR, Some(json!({"preset": "avery-4780", "start": 1190, "count": 20}))).await;
     let pvj = pv.json();
-    let existing: Vec<i64> = sqlx::query_scalar("SELECT archive_serial_number::bigint FROM documents_document WHERE archive_serial_number BETWEEN 1190 AND 1209 ORDER BY 1")
-        .fetch_all(&pool)
-        .await
-        .unwrap();
+    let existing: Vec<i64> = sqlx::query_scalar(
+        "SELECT archive_serial_number::bigint FROM documents_document WHERE archive_serial_number BETWEEN 1190 AND 1209 ORDER BY 1",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
     assert!(!existing.is_empty());
     assert_eq!(pvj["collisions"]["documents_total"], existing.len(), "incl. trash");
     assert_eq!(pvj["collisions"]["documents"], json!(existing));
@@ -227,8 +234,16 @@ async fn asn_api_end_to_end() {
     assert_eq!(items[0]["used"], 0);
 
     // "used" counts documents that now have a number from the range
-    let doc: i64 = sqlx::query_scalar("SELECT id::bigint FROM documents_document WHERE archive_serial_number IS NULL ORDER BY id LIMIT 1").fetch_one(&pool).await.unwrap();
-    sqlx::query("UPDATE documents_document SET archive_serial_number = $1 WHERE id = $2").bind(first as i32).bind(doc as i32).execute(&pool).await.unwrap();
+    let doc: i64 = sqlx::query_scalar("SELECT id::bigint FROM documents_document WHERE archive_serial_number IS NULL ORDER BY id LIMIT 1")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE documents_document SET archive_serial_number = $1 WHERE id = $2")
+        .bind(first as i32)
+        .bind(doc as i32)
+        .execute(&pool)
+        .await
+        .unwrap();
     let h = call(&r, "GET", "/asn/printed", EDITOR, None).await.json();
     assert_eq!(h["items"][0]["used"], 1);
 

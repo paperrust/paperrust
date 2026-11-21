@@ -25,8 +25,7 @@ pub fn visible(ctx: &Ctx, model: &ObjectModel, alias: &str) -> Condition {
 /// `permitted_document_ids(user)` as SQL text (values safely inlined by sea-query), for
 /// embedding into `Expr::cust` fragments.
 pub fn permitted_document_ids_sql(ctx: &Ctx) -> String {
-    permitted_document_ids(Some(ctx.authz_user()), "view_document", false)
-        .to_string(PostgresQueryBuilder)
+    permitted_document_ids(Some(ctx.authz_user()), "view_document", false).to_string(PostgresQueryBuilder)
 }
 
 /// `alias.id IN permitted_document_ids(user)` as a condition on the document row itself (alias of
@@ -78,24 +77,12 @@ pub fn require_model_perm(ctx: &Ctx, model: &ObjectModel) -> ApiResult<()> {
 }
 
 /// `PaperlessObjectPermissions.has_object_permission` (request method).
-pub async fn check_object_perm(
-    db: &PgPool,
-    ctx: &Ctx,
-    model: &ObjectModel,
-    id: i64,
-    owner_id: Option<i64>,
-) -> ApiResult<()> {
-    ctx.auth
-        .check_object_perms(db, model, ObjRef { id, owner_id })
-        .await?;
+pub async fn check_object_perm(db: &PgPool, ctx: &Ctx, model: &ObjectModel, id: i64, owner_id: Option<i64>) -> ApiResult<()> {
+    ctx.auth.check_object_perms(db, model, ObjRef { id, owner_id }).await?;
     Ok(())
 }
 
-pub async fn grantees(
-    db: &PgPool,
-    model: &ObjectModel,
-    ids: &[i64],
-) -> ApiResult<HashMap<i64, ObjectGrantees>> {
+pub async fn grantees(db: &PgPool, model: &ObjectModel, ids: &[i64]) -> ApiResult<HashMap<i64, ObjectGrantees>> {
     Ok(owned::get_permission_grantees(db, model, ids).await?)
 }
 
@@ -104,10 +91,7 @@ pub fn user_can_change(ctx: &Ctx, owner_id: Option<i64>, g: Option<&ObjectGrante
 }
 
 /// `SetPermissionsSerializer` + `validate_set_permissions`; `Err(v)` = field error value.
-pub async fn parse_set_permissions(
-    db: &PgPool,
-    v: &Value,
-) -> ApiResult<Result<PermissionsSpec, Value>> {
+pub async fn parse_set_permissions(db: &PgPool, v: &Value) -> ApiResult<Result<PermissionsSpec, Value>> {
     let raw = match owned::parse_set_permissions(v) {
         Ok(r) => r,
         Err(e) => return Ok(Err(e.0)),
@@ -116,12 +100,7 @@ pub async fn parse_set_permissions(
 }
 
 /// `set_permissions_for_objects(permissions, model, [pk], merge=False)`
-pub async fn apply_set_permissions(
-    db: &PgPool,
-    model: &ObjectModel,
-    id: i64,
-    spec: &PermissionsSpec,
-) -> ApiResult<()> {
+pub async fn apply_set_permissions(db: &PgPool, model: &ObjectModel, id: i64, spec: &PermissionsSpec) -> ApiResult<()> {
     let mut conn = db.acquire().await?;
     owned::set_permissions_for_objects(&mut conn, spec, model, &[id], false).await?;
     Ok(())
@@ -150,9 +129,6 @@ pub async fn can_share_document(db: &PgPool, ctx: &Ctx, doc_id: i64) -> ApiResul
     let Some(row) = row else {
         return Err(ApiError::ServerError);
     };
-    let obj = ObjRef {
-        id: row.try_get("auth_id")?,
-        owner_id: row.try_get("owner")?,
-    };
+    let obj = ObjRef { id: row.try_get("auth_id")?, owner_id: row.try_get("owner")? };
     Ok(has_perms_owner_aware(db, Some(ctx.authz_user()), "view_document", &DOCUMENT, obj).await?)
 }

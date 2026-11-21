@@ -18,13 +18,7 @@ pub fn resolve(p: &Path) -> PathBuf {
     if let Ok(c) = std::fs::canonicalize(p) {
         return strip_verbatim(c);
     }
-    if p.is_absolute() {
-        p.to_path_buf()
-    } else {
-        std::env::current_dir()
-            .map(|d| d.join(p))
-            .unwrap_or_else(|_| p.to_path_buf())
-    }
+    if p.is_absolute() { p.to_path_buf() } else { std::env::current_dir().map(|d| d.join(p)).unwrap_or_else(|_| p.to_path_buf()) }
 }
 
 /// On Windows `canonicalize` yields `\\?\C:\...`; keep paths comparable with joined ones.

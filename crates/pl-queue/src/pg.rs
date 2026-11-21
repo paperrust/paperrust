@@ -186,7 +186,13 @@ impl PgQueue {
     /// replaces Celery's `transaction.on_commit` pattern). Tracked tasks get their
     /// `PaperlessTask` (`get_or_create`, `pending`). Enqueueing the same `task_id` again is a
     /// no-op (idempotent).
-    pub async fn enqueue_in(&self, conn: &mut PgConnection, task_name: &str, kwargs: Map<String, Value>, opts: EnqueueOptions) -> Result<Uuid, QueueError> {
+    pub async fn enqueue_in(
+        &self,
+        conn: &mut PgConnection,
+        task_name: &str,
+        kwargs: Map<String, Value>,
+        opts: EnqueueOptions,
+    ) -> Result<Uuid, QueueError> {
         self.enqueue_member(conn, task_name, kwargs, opts, Membership::default(), Utc::now()).await
     }
 
@@ -248,7 +254,14 @@ impl PgQueue {
 
     /// Claim jobs (at most `limit`), oldest/most important first. `task_names`: only these
     /// tasks (those the worker can execute); `None` = all.
-    pub async fn claim(&self, worker: &str, queues: &[String], task_names: Option<&[String]>, limit: i64, visibility_secs: f64) -> Result<Vec<Job>, QueueError> {
+    pub async fn claim(
+        &self,
+        worker: &str,
+        queues: &[String],
+        task_names: Option<&[String]>,
+        limit: i64,
+        visibility_secs: f64,
+    ) -> Result<Vec<Job>, QueueError> {
         if limit <= 0 {
             return Ok(Vec::new());
         }
@@ -307,7 +320,14 @@ impl PgQueue {
     }
 
     /// Fencing update: set the state of a running job. `false` = lease lost.
-    async fn finish_row(conn: &mut PgConnection, job: &Job, state: &str, result: Option<&Value>, error: Option<&Value>, now: DateTime<Utc>) -> Result<bool, QueueError> {
+    async fn finish_row(
+        conn: &mut PgConnection,
+        job: &Job,
+        state: &str,
+        result: Option<&Value>,
+        error: Option<&Value>,
+        now: DateTime<Utc>,
+    ) -> Result<bool, QueueError> {
         let n = sqlx::query(
             "UPDATE paperrust_task_queue SET state = $1, result = $2, error = $3, finished_at = $4, locked_by = NULL, locked_until = NULL \
              WHERE id = $5 AND attempts = $7 AND ((state = 'running' AND locked_by = $6) OR state = 'queued')",
@@ -487,7 +507,14 @@ impl PgQueue {
     }
 
     /// Group/chord part finished (`failure = None` → success). Under the group's row lock.
-    async fn group_part_done(&self, conn: &mut PgConnection, group_id: &str, job: &Job, failure: Option<&Failure>, now: DateTime<Utc>) -> Result<(), QueueError> {
+    async fn group_part_done(
+        &self,
+        conn: &mut PgConnection,
+        group_id: &str,
+        job: &Job,
+        failure: Option<&Failure>,
+        now: DateTime<Utc>,
+    ) -> Result<(), QueueError> {
         let failed_inc = i32::from(failure.is_some());
         let Some(row) = sqlx::query(
             "UPDATE paperrust_task_group SET completed = completed + $1, failed = failed + $2 \
@@ -517,7 +544,11 @@ impl PgQueue {
         if completed + failed < total {
             return Ok(());
         }
-        sqlx::query("UPDATE paperrust_task_group SET finished_at = $1 WHERE group_id = $2").bind(now).bind(group_id).execute(&mut *conn).await?;
+        sqlx::query("UPDATE paperrust_task_group SET finished_at = $1 WHERE group_id = $2")
+            .bind(now)
+            .bind(group_id)
+            .execute(&mut *conn)
+            .await?;
         let Some(body) = body else { return Ok(()) };
         if failed == 0 {
             let results: Vec<Value> = sqlx::query("SELECT result FROM paperrust_task_queue WHERE group_id = $1 ORDER BY group_index")
@@ -532,7 +563,14 @@ impl PgQueue {
         } else if let Some(eb) = &on_error {
             // ChordError → errbacks of the body once per chord.
             let f = Failure::new("ChordError", format!("{failed} of {total} header tasks failed"));
-            let pseudo = Job { task_id: group_id.to_string(), task_name: body.task.clone(), args: body.args.clone(), kwargs: body.kwargs.clone(), group_id: None, ..job.clone() };
+            let pseudo = Job {
+                task_id: group_id.to_string(),
+                task_name: body.task.clone(),
+                args: body.args.clone(),
+                kwargs: body.kwargs.clone(),
+                group_id: None,
+                ..job.clone()
+            };
             let (kw, opts) = with_args(eb, errback_args(&pseudo, &f));
             self.enqueue_member(conn, &eb.task, kw, opts, Membership::default(), now).await?;
         }
@@ -661,7 +699,12 @@ impl PgQueue {
 }
 
 impl TaskQueue for PgQueue {
-    fn enqueue<'a>(&'a self, task_name: &'a str, kwargs: Map<String, Value>, opts: EnqueueOptions) -> BoxFuture<'a, Result<Uuid, QueueError>> {
+    fn enqueue<'a>(
+        &'a self,
+        task_name: &'a str,
+        kwargs: Map<String, Value>,
+        opts: EnqueueOptions,
+    ) -> BoxFuture<'a, Result<Uuid, QueueError>> {
         Box::pin(async move {
             let mut tx = self.pool.begin().await?;
             let id = self.enqueue_in(&mut tx, task_name, kwargs, opts).await?;
@@ -682,7 +725,12 @@ impl TaskQueue for PgQueue {
         Box::pin(self.create_group(header, None, None))
     }
 
-    fn enqueue_chord(&self, header: Vec<Signature>, body: Signature, on_error: Option<Signature>) -> BoxFuture<'_, Result<Uuid, QueueError>> {
+    fn enqueue_chord(
+        &self,
+        header: Vec<Signature>,
+        body: Signature,
+        on_error: Option<Signature>,
+    ) -> BoxFuture<'_, Result<Uuid, QueueError>> {
         Box::pin(self.create_group(header, Some(body), on_error))
     }
 }

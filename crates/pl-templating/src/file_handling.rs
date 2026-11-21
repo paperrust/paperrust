@@ -6,12 +6,12 @@
 
 use std::path::{Component, Path, PathBuf};
 
+use crate::Options;
 use crate::context::DocumentContext;
 use crate::convert::convert_format_str_to_template_format;
 use crate::error::{TemplateError, UnsafeFilePathError};
 use crate::filepath::{is_safe_relative_path, validate_filepath_template_and_render};
 use crate::pystr::{name_suffix, path_join, path_name, path_parent, path_stem, path_str};
-use crate::Options;
 
 /// `Document.MAX_STORED_FILENAME_LENGTH` (length of the columns `filename`/`archive_filename`).
 pub const MAX_STORED_FILENAME_LENGTH: usize = 1024;
@@ -100,11 +100,7 @@ pub fn generate_filename(doc: &DocumentContext, gopt: GenerateOptions, opts: &Op
             let directory = path_parent(&base);
             let base_filename = path_name(&base);
             let final_filename = format!("{base_filename}{version_suffix}{counter_str}{filetype_str}");
-            if directory != "." {
-                path_join(&directory, &final_filename)
-            } else {
-                final_filename
-            }
+            if directory != "." { path_join(&directory, &final_filename) } else { final_filename }
         }
         None => format!("{:07}{version_suffix}{counter_str}{filetype_str}", context_doc.pk),
     })
@@ -136,18 +132,17 @@ pub fn generate_unique_filename(
 
     // If generating archive filenames, try to make a name that is similar to
     // the original filename first.
-    if archive_filename
-        && let Some(fname) = doc.filename.as_deref().filter(|s| !s.is_empty()) {
-            let parent = path_parent(&base_filename);
-            let simple_pdf_name = if parent != "." {
-                path_join(&parent, &format!("{}.pdf", path_stem(fname)))
-            } else {
-                path_str(&format!("{}.pdf", path_stem(fname)))
-            };
-            if same_path(&simple_pdf_name, old_filename) || !exists(&simple_pdf_name) {
-                return Ok(simple_pdf_name);
-            }
+    if archive_filename && let Some(fname) = doc.filename.as_deref().filter(|s| !s.is_empty()) {
+        let parent = path_parent(&base_filename);
+        let simple_pdf_name = if parent != "." {
+            path_join(&parent, &format!("{}.pdf", path_stem(fname)))
+        } else {
+            path_str(&format!("{}.pdf", path_stem(fname)))
+        };
+        if same_path(&simple_pdf_name, old_filename) || !exists(&simple_pdf_name) {
+            return Ok(simple_pdf_name);
         }
+    }
 
     let file_extension = if archive_filename { ".pdf" } else { doc.file_type.as_str() };
     let base_name = path_name(&base_filename).to_string();
@@ -157,11 +152,7 @@ pub fn generate_unique_filename(
     loop {
         let new_filename = if counter != 0 {
             let name = format!("{filename_stem}_{counter:02}{file_extension}");
-            if parent != "." {
-                path_join(&parent, &name)
-            } else {
-                name
-            }
+            if parent != "." { path_join(&parent, &name) } else { name }
         } else {
             base_filename.clone()
         };

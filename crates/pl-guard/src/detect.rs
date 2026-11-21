@@ -20,7 +20,9 @@ pub enum Area {
 /// Area and path relative to the area (with `/`), e.g. `("2024/Rechnung.pdf")`.
 pub fn area(rel: &str) -> (Area, &str) {
     let rel = rel.trim_start_matches('/');
-    for (prefix, a) in [("documents/originals/", Area::Originals), ("documents/archive/", Area::Archive), ("documents/thumbnails/", Area::Thumbnails)] {
+    for (prefix, a) in
+        [("documents/originals/", Area::Originals), ("documents/archive/", Area::Archive), ("documents/thumbnails/", Area::Thumbnails)]
+    {
         if let Some(rest) = rel.strip_prefix(prefix) {
             return (a, rest);
         }
@@ -30,23 +32,102 @@ pub fn area(rel: &str) -> (Area, &str) {
 
 /// Extensions of known ransomware programs and generic "encrypted" extensions.
 pub const SUSPICIOUS_EXTENSIONS: &[&str] = &[
-    "locked", "lock", "encrypted", "enc", "crypt", "crypted", "crypto", "cry", "crypz", "cryp1", "locky", "zepto", "odin", "thor", "aesir", "zzzzz",
-    "cerber", "cerber2", "cerber3", "wnry", "wncry", "wcry", "wncryt", "ryk", "ryuk", "conti", "lockbit", "akira", "blackcat", "alphv", "royal",
-    "basta", "hive", "clop", "phobos", "dharma", "stop", "djvu", "makop", "medusa", "rhysida", "play", "ransom", "pay", "paym", "payms", "kraken",
-    "crab", "gdcb", "krab", "micro", "ecc", "ezz", "exx", "xyz", "vvv", "ttt", "abc", "aaa", "zzz", "xxx", "r5a", "rdm", "rrk", "encr", "enciphered",
+    "locked",
+    "lock",
+    "encrypted",
+    "enc",
+    "crypt",
+    "crypted",
+    "crypto",
+    "cry",
+    "crypz",
+    "cryp1",
+    "locky",
+    "zepto",
+    "odin",
+    "thor",
+    "aesir",
+    "zzzzz",
+    "cerber",
+    "cerber2",
+    "cerber3",
+    "wnry",
+    "wncry",
+    "wcry",
+    "wncryt",
+    "ryk",
+    "ryuk",
+    "conti",
+    "lockbit",
+    "akira",
+    "blackcat",
+    "alphv",
+    "royal",
+    "basta",
+    "hive",
+    "clop",
+    "phobos",
+    "dharma",
+    "stop",
+    "djvu",
+    "makop",
+    "medusa",
+    "rhysida",
+    "play",
+    "ransom",
+    "pay",
+    "paym",
+    "payms",
+    "kraken",
+    "crab",
+    "gdcb",
+    "krab",
+    "micro",
+    "ecc",
+    "ezz",
+    "exx",
+    "xyz",
+    "vvv",
+    "ttt",
+    "abc",
+    "aaa",
+    "zzz",
+    "xxx",
+    "r5a",
+    "rdm",
+    "rrk",
+    "encr",
+    "enciphered",
 ];
 
 /// Known names of ransom notes (lower case, substring suffices).
 const RANSOM_NOTE_MARKERS: &[&str] = &[
-    "readme_decrypt", "decrypt_instruction", "how_to_decrypt", "how-to-decrypt", "how_to_restore", "restore_files", "restore-my-files", "recover_files",
-    "your_files", "help_decrypt", "_readme.txt", "!readme", "read_me_now", "ransom", "decrypt-files", "files_encrypted", "!!!_read", "#decrypt",
+    "readme_decrypt",
+    "decrypt_instruction",
+    "how_to_decrypt",
+    "how-to-decrypt",
+    "how_to_restore",
+    "restore_files",
+    "restore-my-files",
+    "recover_files",
+    "your_files",
+    "help_decrypt",
+    "_readme.txt",
+    "!readme",
+    "read_me_now",
+    "ransom",
+    "decrypt-files",
+    "files_encrypted",
+    "!!!_read",
+    "#decrypt",
 ];
 
 /// Allowed extensions per area (lower case). Originals: everything PaperRust can ingest.
 const ORIGINAL_EXTENSIONS: &[&str] = &[
-    "pdf", "png", "jpg", "jpeg", "jpe", "jfif", "tif", "tiff", "gif", "webp", "bmp", "heic", "heif", "avif", "jxl", "txt", "text", "csv", "md", "eml",
-    "msg", "html", "htm", "xml", "json", "doc", "docx", "docm", "dot", "dotx", "odt", "ott", "ods", "ots", "odp", "otp", "odg", "xls", "xlsx", "xlsm",
-    "ppt", "pptx", "pptm", "rtf", "wpd", "pages", "numbers", "key", "epub", "zip", "ps", "eps", "svg", "dcm", "pdfa",
+    "pdf", "png", "jpg", "jpeg", "jpe", "jfif", "tif", "tiff", "gif", "webp", "bmp", "heic", "heif", "avif", "jxl", "txt", "text", "csv",
+    "md", "eml", "msg", "html", "htm", "xml", "json", "doc", "docx", "docm", "dot", "dotx", "odt", "ott", "ods", "ots", "odp", "otp",
+    "odg", "xls", "xlsx", "xlsm", "ppt", "pptx", "pptm", "rtf", "wpd", "pages", "numbers", "key", "epub", "zip", "ps", "eps", "svg", "dcm",
+    "pdfa",
 ];
 const ARCHIVE_EXTENSIONS: &[&str] = &["pdf"];
 const THUMBNAIL_EXTENSIONS: &[&str] = &["webp", "png", "jpg", "jpeg"];
@@ -96,11 +177,7 @@ pub fn check_name(a: Area, rel_in_area: &str, extra: &[String]) -> NameVerdict {
         Area::Thumbnails => THUMBNAIL_EXTENSIONS,
         Area::Other => return NameVerdict::Ok,
     };
-    if allowed.contains(&ext.as_str()) {
-        NameVerdict::Ok
-    } else {
-        NameVerdict::UnknownExtension(ext)
-    }
+    if allowed.contains(&ext.as_str()) { NameVerdict::Ok } else { NameVerdict::UnknownExtension(ext) }
 }
 
 /// Shannon entropy in bits per byte (0..=8).
@@ -113,10 +190,14 @@ pub fn entropy(buf: &[u8]) -> f64 {
         counts[b as usize] += 1;
     }
     let n = buf.len() as f64;
-    counts.iter().filter(|&&c| c > 0).map(|&c| {
-        let p = c as f64 / n;
-        -p * p.log2()
-    }).sum()
+    counts
+        .iter()
+        .filter(|&&c| c > 0)
+        .map(|&c| {
+            let p = c as f64 / n;
+            -p * p.log2()
+        })
+        .sum()
 }
 
 /// Result of the content check.
@@ -124,9 +205,14 @@ pub fn entropy(buf: &[u8]) -> f64 {
 pub enum ContentVerdict {
     Ok,
     /// Header does not match the extension (e.g. `.pdf` without `%PDF`).
-    BadMagic { expected: &'static str, entropy: f64 },
+    BadMagic {
+        expected: &'static str,
+        entropy: f64,
+    },
     /// Header does not match and content looks random (encrypted).
-    Encrypted { entropy: f64 },
+    Encrypted {
+        entropy: f64,
+    },
 }
 
 impl ContentVerdict {
@@ -149,8 +235,8 @@ fn magic_ok(ext: &str, head: &[u8]) -> Option<(bool, &'static str)> {
         "webp" => (head.len() >= 12 && &head[..4] == b"RIFF" && &head[8..12] == b"WEBP", "WEBP"),
         "tif" | "tiff" => (starts(b"II*\0") || starts(b"MM\0*") || starts(b"II+\0") || starts(b"MM\0+"), "TIFF"),
         "bmp" => (starts(b"BM"), "BMP"),
-        "docx" | "docm" | "dotx" | "xlsx" | "xlsm" | "pptx" | "pptm" | "odt" | "ott" | "ods" | "ots" | "odp" | "otp" | "odg" | "epub" | "zip" | "pages"
-        | "numbers" | "key" => (starts(b"PK\x03\x04") || starts(b"PK\x05\x06"), "ZIP"),
+        "docx" | "docm" | "dotx" | "xlsx" | "xlsm" | "pptx" | "pptm" | "odt" | "ott" | "ods" | "ots" | "odp" | "otp" | "odg" | "epub"
+        | "zip" | "pages" | "numbers" | "key" => (starts(b"PK\x03\x04") || starts(b"PK\x05\x06"), "ZIP"),
         "doc" | "xls" | "ppt" | "msg" | "dot" => (starts(&[0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]), "OLE"),
         "rtf" => (starts(b"{\\rtf"), "RTF"),
         _ => return None,
@@ -185,7 +271,11 @@ pub fn check_content(name: &str, head: &[u8]) -> ContentVerdict {
             if e >= ENTROPY_ENCRYPTED && head.len() >= 1024 { ContentVerdict::Encrypted { entropy: e } } else { ContentVerdict::Ok }
         }
         None => {
-            if e >= 7.9 && head.len() >= 4096 { ContentVerdict::Encrypted { entropy: e } } else { ContentVerdict::Ok }
+            if e >= 7.9 && head.len() >= 4096 {
+                ContentVerdict::Encrypted { entropy: e }
+            } else {
+                ContentVerdict::Ok
+            }
         }
     }
 }

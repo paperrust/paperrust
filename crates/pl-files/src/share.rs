@@ -29,11 +29,7 @@ fn active_language(headers: &HeaderMap, language_cookie_name: &str) -> &'static 
 }
 
 /// GET /share/{slug}[/]
-pub async fn shared_link(
-    State(state): State<AppState>,
-    Path(slug): Path<String>,
-    headers: HeaderMap,
-) -> Response {
+pub async fn shared_link(State(state): State<AppState>, Path(slug): Path<String>, headers: HeaderMap) -> Response {
     if !is_slug(&slug) {
         // No URL pattern matches upstream -> Django 404 page.
         return compat::django_404();
@@ -60,16 +56,12 @@ async fn inner(state: &AppState, slug: &str, headers: &HeaderMap) -> Result<Resp
         };
         let context = resolve::root_of(db, &doc).await?;
         let use_archive = link.file_version == "archive" && doc.has_archive_version();
-        return Ok(
-            match docfile::serve_file(cx, &doc, &context, use_archive, "inline", false).await {
-                Ok(r) => r,
-                Err(ServeError::NotFound) => {
-                    compat::redirect(&format!("{login}?sharelink_notfound=1"))
-                }
-                Err(ServeError::Db(e)) => return Err(e),
-                Err(ServeError::Io(e)) => compat::internal("shared link io", e),
-            },
-        );
+        return Ok(match docfile::serve_file(cx, &doc, &context, use_archive, "inline", false).await {
+            Ok(r) => r,
+            Err(ServeError::NotFound) => compat::redirect(&format!("{login}?sharelink_notfound=1")),
+            Err(ServeError::Db(e)) => return Err(e),
+            Err(ServeError::Io(e)) => compat::internal("shared link io", e),
+        });
     }
 
     let Some(bundle) = db::share_link_bundle(db, slug).await? else {

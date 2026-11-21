@@ -176,11 +176,7 @@ pub fn consumable_document_matches_workflow(doc: &ConsumableDocument, trigger: &
     let mut reason = String::new();
 
     if !trigger.sources.is_empty() && !trigger.sources.contains(&(doc.source as i64)) {
-        let names: Vec<&str> = trigger
-            .sources
-            .iter()
-            .map(|s| DocumentSource::from_i64(*s).map_or("?", DocumentSource::name))
-            .collect();
+        let names: Vec<&str> = trigger.sources.iter().map(|s| DocumentSource::from_i64(*s).map_or("?", DocumentSource::name)).collect();
         reason = format!("Document source {} not in {}", doc.source.name(), py_str_list(&names));
         trigger_matched = false;
     }
@@ -226,10 +222,7 @@ pub fn existing_document_matches_workflow(
         if !matches(&trigger.as_matchable(), &md)? {
             return Ok((
                 false,
-                Some(format!(
-                    "Document content matching settings for algorithm '{}' did not match",
-                    trigger.matching_algorithm
-                )),
+                Some(format!("Document content matching settings for algorithm '{}' did not match", trigger.matching_algorithm)),
             ));
         }
     }
@@ -240,15 +233,10 @@ pub fn existing_document_matches_workflow(
     if !trigger.filter_has_tags.is_empty() && !trigger.filter_has_tags.iter().any(|t| doc_tags.contains(&t.id)) {
         return Ok((
             false,
-            Some(format!(
-                "Document tags {doc_tags_repr} do not include {}",
-                py_list_repr_names(&trigger.filter_has_tags, "Tag")
-            )),
+            Some(format!("Document tags {doc_tags_repr} do not include {}", py_list_repr_names(&trigger.filter_has_tags, "Tag"))),
         ));
     }
-    if !trigger.filter_has_all_tags.is_empty()
-        && !trigger.filter_has_all_tags.iter().all(|t| doc_tags.contains(&t.id))
-    {
+    if !trigger.filter_has_all_tags.is_empty() && !trigger.filter_has_all_tags.iter().all(|t| doc_tags.contains(&t.id)) {
         return Ok((
             false,
             Some(format!(
@@ -257,8 +245,7 @@ pub fn existing_document_matches_workflow(
             )),
         ));
     }
-    if !trigger.filter_has_not_tags.is_empty() && trigger.filter_has_not_tags.iter().any(|t| doc_tags.contains(&t.id))
-    {
+    if !trigger.filter_has_not_tags.is_empty() && trigger.filter_has_not_tags.iter().any(|t| doc_tags.contains(&t.id)) {
         return Ok((
             false,
             Some(format!(
@@ -270,9 +257,7 @@ pub fn existing_document_matches_workflow(
 
     // correspondent
     let cid = doc.correspondent.as_ref().map(|c| c.id);
-    if !trigger.filter_has_any_correspondents.is_empty()
-        && !cid.is_some_and(|c| ids(&trigger.filter_has_any_correspondents).contains(&c))
-    {
+    if !trigger.filter_has_any_correspondents.is_empty() && !cid.is_some_and(|c| ids(&trigger.filter_has_any_correspondents).contains(&c)) {
         return Ok((
             false,
             Some(format!(
@@ -284,14 +269,7 @@ pub fn existing_document_matches_workflow(
     }
     if let Some(fc) = &trigger.filter_has_correspondent {
         if cid != Some(fc.id) {
-            return Ok((
-                false,
-                Some(format!(
-                    "Document correspondent {} does not match {}",
-                    opt_name(&doc.correspondent),
-                    fc.name
-                )),
-            ));
+            return Ok((false, Some(format!("Document correspondent {} does not match {}", opt_name(&doc.correspondent), fc.name))));
         }
     }
     if let Some(c) = cid.filter(|c| *c != 0) {
@@ -309,9 +287,7 @@ pub fn existing_document_matches_workflow(
 
     // document type
     let did = doc.document_type.as_ref().map(|c| c.id);
-    if !trigger.filter_has_any_document_types.is_empty()
-        && !did.is_some_and(|c| ids(&trigger.filter_has_any_document_types).contains(&c))
-    {
+    if !trigger.filter_has_any_document_types.is_empty() && !did.is_some_and(|c| ids(&trigger.filter_has_any_document_types).contains(&c)) {
         return Ok((
             false,
             Some(format!(
@@ -323,10 +299,7 @@ pub fn existing_document_matches_workflow(
     }
     if let Some(ft) = &trigger.filter_has_document_type {
         if did != Some(ft.id) {
-            return Ok((
-                false,
-                Some(format!("Document doc type {} does not match {}", opt_name(&doc.document_type), ft.name)),
-            ));
+            return Ok((false, Some(format!("Document doc type {} does not match {}", opt_name(&doc.document_type), ft.name))));
         }
     }
     if let Some(d) = did.filter(|d| *d != 0) {
@@ -344,9 +317,7 @@ pub fn existing_document_matches_workflow(
 
     // storage path
     let sid = doc.storage_path.as_ref().map(|c| c.id);
-    if !trigger.filter_has_any_storage_paths.is_empty()
-        && !sid.is_some_and(|c| ids(&trigger.filter_has_any_storage_paths).contains(&c))
-    {
+    if !trigger.filter_has_any_storage_paths.is_empty() && !sid.is_some_and(|c| ids(&trigger.filter_has_any_storage_paths).contains(&c)) {
         return Ok((
             false,
             Some(format!(
@@ -358,10 +329,7 @@ pub fn existing_document_matches_workflow(
     }
     if let Some(fs) = &trigger.filter_has_storage_path {
         if sid != Some(fs.id) {
-            return Ok((
-                false,
-                Some(format!("Document storage path {} does not match {}", opt_name(&doc.storage_path), fs.name)),
-            ));
+            return Ok((false, Some(format!("Document storage path {} does not match {}", opt_name(&doc.storage_path), fs.name))));
         }
     }
     if let Some(s) = sid.filter(|s| *s != 0) {
@@ -386,10 +354,7 @@ pub fn existing_document_matches_workflow(
         match result {
             Err(_) => return Ok((false, Some("Invalid custom field query configuration".into()))),
             Ok(false) => {
-                return Ok((
-                    false,
-                    Some("Document custom fields do not match the configured custom field query".into()),
-                ));
+                return Ok((false, Some("Document custom fields do not match the configured custom field query".into())));
             }
             Ok(true) => {}
         }
@@ -412,17 +377,12 @@ pub fn filename_prefilter_regex(filter_filename: &str) -> String {
 }
 
 /// In-memory equivalent of `prefilter_documents_by_workflowtrigger` for one document.
-pub fn prefilter_matches(
-    doc: &ExistingDocument,
-    trigger: &WorkflowTrigger,
-    custom_fields: Option<&dyn CustomFieldQueryEvaluator>,
-) -> bool {
+pub fn prefilter_matches(doc: &ExistingDocument, trigger: &WorkflowTrigger, custom_fields: Option<&dyn CustomFieldQueryEvaluator>) -> bool {
     let doc_tags = ids(&doc.tags);
     if !trigger.filter_has_tags.is_empty() && !trigger.filter_has_tags.iter().any(|t| doc_tags.contains(&t.id)) {
         return false;
     }
-    if !trigger.filter_has_all_tags.is_empty() && !trigger.filter_has_all_tags.iter().all(|t| doc_tags.contains(&t.id))
-    {
+    if !trigger.filter_has_all_tags.is_empty() && !trigger.filter_has_all_tags.iter().all(|t| doc_tags.contains(&t.id)) {
         return false;
     }
     if trigger.filter_has_not_tags.iter().any(|t| doc_tags.contains(&t.id)) {
@@ -525,8 +485,9 @@ pub fn document_matches_workflow(
                     WorkflowDocument::Existing(_) => return Err(WorkflowMatchError::WrongDocumentKind),
                 },
                 TRIGGER_DOCUMENT_ADDED | TRIGGER_DOCUMENT_UPDATED | TRIGGER_SCHEDULED | TRIGGER_MANUAL => match &document {
-                    WorkflowDocument::Existing(d) => existing_document_matches_workflow(d, trigger, custom_fields)
-                        .map_err(WorkflowMatchError::Matching)?,
+                    WorkflowDocument::Existing(d) => {
+                        existing_document_matches_workflow(d, trigger, custom_fields).map_err(WorkflowMatchError::Matching)?
+                    }
                     WorkflowDocument::Consumable(_) => return Err(WorkflowMatchError::WrongDocumentKind),
                 },
                 other => return Err(WorkflowMatchError::UnsupportedTriggerType(other)),

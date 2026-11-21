@@ -175,7 +175,8 @@ async fn http_receiver(status: u16) -> (u16, Arc<Mutex<Vec<HttpReq>>>) {
                 }
                 reqs.lock().unwrap().push(HttpReq { head, body });
                 let extra = if status == 302 { "Location: http://169.254.169.254/\r\n" } else { "" };
-                let _ = s.write_all(format!("HTTP/1.1 {status} X\r\n{extra}Content-Length: 0\r\nConnection: close\r\n\r\n").as_bytes()).await;
+                let _ =
+                    s.write_all(format!("HTTP/1.1 {status} X\r\n{extra}Content-Length: 0\r\nConnection: close\r\n\r\n").as_bytes()).await;
             });
         }
     });
@@ -349,7 +350,8 @@ async fn webhook_retries_until_receiver_is_back() {
     let port = probe.local_addr().unwrap().port();
     drop(probe);
     let s = wh_settings(true);
-    let req = WebhookRequest { url: format!("http://127.0.0.1:{port}/late"), data: json!({"a": 1}), headers: vec![], file: None, as_json: true };
+    let req =
+        WebhookRequest { url: format!("http://127.0.0.1:{port}/late"), data: json!({"a": 1}), headers: vec![], file: None, as_json: true };
     assert!(matches!(webhook::send_webhook(&req, &s).await, Err(WebhookError::Connect(ref m)) if webhook::connect_retryable(m)));
     // start the receiver only after 1.5 s (same port)
     let hits = Arc::new(Mutex::new(0usize));
@@ -375,4 +377,3 @@ async fn webhook_retries_until_receiver_is_back() {
     assert!(ok, "webhook must arrive once the receiver is back");
     assert!(*hits.lock().unwrap() >= 1);
 }
-

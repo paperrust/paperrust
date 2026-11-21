@@ -211,16 +211,14 @@ impl AiConfig {
         let ai_enabled = str_to_bool(env.get("PAPERLESS_AI_ENABLED").map(String::as_str).unwrap_or("NO"))?;
         let emb = match env.get("PAPERLESS_AI_LLM_EMBEDDING_BACKEND") {
             None => None,
-            Some(v) => Some(EmbeddingBackend::parse(v).ok_or_else(|| {
-                ConfigError(format!("Invalid value '{v}' for PAPERRUST_AI_LLM_EMBEDDING_BACKEND"))
-            })?),
+            Some(v) => Some(
+                EmbeddingBackend::parse(v)
+                    .ok_or_else(|| ConfigError(format!("Invalid value '{v}' for PAPERRUST_AI_LLM_EMBEDDING_BACKEND")))?,
+            ),
         };
         let backend = match env.get("PAPERLESS_AI_LLM_BACKEND") {
             None => None,
-            Some(v) => Some(
-                LlmBackend::parse(v)
-                    .ok_or_else(|| ConfigError(format!("Invalid value '{v}' for PAPERRUST_AI_LLM_BACKEND")))?,
-            ),
+            Some(v) => Some(LlmBackend::parse(v).ok_or_else(|| ConfigError(format!("Invalid value '{v}' for PAPERRUST_AI_LLM_BACKEND")))?),
         };
         let extra = match env.get("PAPERLESS_AI_LLM_EXTRA_PARAMS") {
             None => serde_json::Map::new(),
@@ -229,16 +227,14 @@ impl AiConfig {
                 _ => return Err(ConfigError("PAPERRUST_AI_LLM_EXTRA_PARAMS must be a JSON object".into())),
             },
         };
-        let allow_internal =
-            str_to_bool(env.get("PAPERLESS_AI_LLM_ALLOW_INTERNAL_ENDPOINTS").map(String::as_str).unwrap_or("true"))?;
+        let allow_internal = str_to_bool(env.get("PAPERLESS_AI_LLM_ALLOW_INTERNAL_ENDPOINTS").map(String::as_str).unwrap_or("true"))?;
 
         let mut rs = RsAiConfig::default();
         if let Some(v) = env.get("PAPERRUST_AI_MCP_ENABLED") {
             rs.mcp_enabled = str_to_bool(v)?;
         }
         rs.mcp_rate_limit_per_minute = int_env(env, "PAPERRUST_AI_MCP_RATE_LIMIT", rs.mcp_rate_limit_per_minute)?;
-        rs.mcp_max_creates_per_hour =
-            int_env(env, "PAPERRUST_AI_MCP_MAX_CREATES_PER_HOUR", rs.mcp_max_creates_per_hour)?;
+        rs.mcp_max_creates_per_hour = int_env(env, "PAPERRUST_AI_MCP_MAX_CREATES_PER_HOUR", rs.mcp_max_creates_per_hour)?;
         if let Some(v) = env.get("PAPERRUST_AI_MCP_ALLOWED_ORIGINS") {
             rs.mcp_allowed_origins = v.split(',').map(|x| x.trim().to_string()).filter(|x| !x.is_empty()).collect();
         }
@@ -275,8 +271,7 @@ impl AiConfig {
         }
         rs.auto_trigger_tag = s("PAPERRUST_AI_AUTO_TRIGGER_TAG").filter(|x| !x.is_empty());
         rs.auto_max_new_objects = int_env(env, "PAPERRUST_AI_AUTO_MAX_NEW_OBJECTS", rs.auto_max_new_objects)?;
-        rs.auto_max_documents_per_run =
-            int_env(env, "PAPERRUST_AI_AUTO_MAX_DOCUMENTS_PER_RUN", rs.auto_max_documents_per_run)?;
+        rs.auto_max_documents_per_run = int_env(env, "PAPERRUST_AI_AUTO_MAX_DOCUMENTS_PER_RUN", rs.auto_max_documents_per_run)?;
 
         Ok(Self {
             ai_enabled,
@@ -369,7 +364,11 @@ mod tests {
 
     #[test]
     fn mcp_groups() {
-        let c = AiConfig::from_env_map(&env(&[("PAPERRUST_AI_MCP_TOOL_GROUPS", " Read, ingest ,"), ("PAPERRUST_AI_MCP_ALLOW_URL_FETCH", "yes")])).unwrap();
+        let c = AiConfig::from_env_map(&env(&[
+            ("PAPERRUST_AI_MCP_TOOL_GROUPS", " Read, ingest ,"),
+            ("PAPERRUST_AI_MCP_ALLOW_URL_FETCH", "yes"),
+        ]))
+        .unwrap();
         assert_eq!(c.rs.mcp_tool_groups, vec!["read".to_string(), "ingest".to_string()]);
         assert!(c.rs.mcp_allow_url_fetch);
         assert!(AiConfig::from_env_map(&env(&[("PAPERRUST_AI_MCP_TOOL_GROUPS", "read,admin")])).is_err());
@@ -392,7 +391,8 @@ mod tests {
             ("PAPERLESS_AI_LLM_EMBEDDING_BACKEND", "ollama"),
         ]))
         .unwrap();
-        let row = AppConfigRow { ai_enabled: Some(false), llm_model: Some(String::new()), llm_context_size: Some(4096), ..Default::default() };
+        let row =
+            AppConfigRow { ai_enabled: Some(false), llm_model: Some(String::new()), llm_context_size: Some(4096), ..Default::default() };
         let e = c.with_app_config(&row);
         assert!(!e.ai_enabled);
         assert_eq!(e.llm_model.as_deref(), Some("env-model"));

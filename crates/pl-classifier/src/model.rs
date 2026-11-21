@@ -61,10 +61,7 @@ pub struct TrainOptions {
 
 impl Default for TrainOptions {
     fn default() -> Self {
-        TrainOptions {
-            kind: ModelKind::Mlp,
-            mlp: MlpParams::default(),
-        }
+        TrainOptions { kind: ModelKind::Mlp, mlp: MlpParams::default() }
     }
 }
 
@@ -151,9 +148,7 @@ pub struct Prediction {
 pub type Notify<'a> = &'a mut dyn FnMut(&str);
 
 fn le_i32(v: i64) -> Result<[u8; 4], ClassifierError> {
-    i32::try_from(v)
-        .map(i32::to_le_bytes)
-        .map_err(|_| ClassifierError::LabelOutOfRange(v))
+    i32::try_from(v).map(i32::to_le_bytes).map_err(|_| ClassifierError::LabelOutOfRange(v))
 }
 
 /// upstream train(): sha256 over every label as 4-byte little-endian signed int, per document in
@@ -183,34 +178,22 @@ fn balanced_weights(class_of_row: &[usize], n_classes: usize) -> Vec<f32> {
     }
     let n = class_of_row.len() as f64;
     let present = counts.iter().filter(|&&c| c > 0).count() as f64;
-    class_of_row
-        .iter()
-        .map(|&c| (n / (present * counts[c] as f64)) as f32)
-        .collect()
+    class_of_row.iter().map(|&c| (n / (present * counts[c] as f64)) as f32).collect()
 }
 
 fn fit_single(x: &Csr, labels: &[i64], balanced: bool, opts: &TrainOptions) -> SingleLabel {
     let mut classes: Vec<i64> = labels.to_vec();
     classes.sort_unstable();
     classes.dedup();
-    let cls: Vec<usize> = labels
-        .iter()
-        .map(|l| classes.binary_search(l).unwrap_or(0))
-        .collect();
+    let cls: Vec<usize> = labels.iter().map(|l| classes.binary_search(l).unwrap_or(0)).collect();
     let k = classes.len();
-    let sw = if balanced {
-        Some(balanced_weights(&cls, k))
-    } else {
-        None
-    };
+    let sw = if balanced { Some(balanced_weights(&cls, k)) } else { None };
     let est = match opts.kind {
         ModelKind::NaiveBayes => {
             if k == 1 {
                 Estimator::Constant
             } else {
-                Estimator::NaiveBayes {
-                    models: vec![Nb::fit(x, &cls, k, sw.as_deref(), 1.0)],
-                }
+                Estimator::NaiveBayes { models: vec![Nb::fit(x, &cls, k, sw.as_deref(), 1.0)] }
             }
         }
         ModelKind::Mlp | ModelKind::Linear => {
@@ -221,13 +204,7 @@ fn fit_single(x: &Csr, labels: &[i64], balanced: bool, opts: &TrainOptions) -> S
             // sklearn LabelBinarizer: 1 class -> one zero column, 2 classes -> one 0/1 column,
             // more -> one-hot with softmax output
             let (n_out, out, y): (usize, OutAct, Vec<f32>) = if k <= 2 {
-                (
-                    1,
-                    OutAct::Logistic,
-                    cls.iter()
-                        .map(|&c| if k == 2 && c == 1 { 1.0 } else { 0.0 })
-                        .collect(),
-                )
+                (1, OutAct::Logistic, cls.iter().map(|&c| if k == 2 && c == 1 { 1.0 } else { 0.0 }).collect())
             } else {
                 let mut y = vec![0f32; cls.len() * k];
                 for (i, &c) in cls.iter().enumerate() {
@@ -253,9 +230,7 @@ fn fit_multilabel(x: &Csr, y: &[f32], k: usize, opts: &TrainOptions) -> Estimato
             let n = x.n_rows();
             let models = (0..k)
                 .map(|j| {
-                    let cls: Vec<usize> = (0..n)
-                        .map(|i| if y[i * k + j] > 0.5 { 1 } else { 0 })
-                        .collect();
+                    let cls: Vec<usize> = (0..n).map(|i| if y[i * k + j] > 0.5 { 1 } else { 0 }).collect();
                     Nb::fit(x, &cls, 2, None, 1.0)
                 })
                 .collect();
@@ -277,18 +252,12 @@ impl SingleLabel {
     pub fn predict_proba(&self, row: &[(u32, f32)]) -> Vec<f64> {
         match &self.est {
             Estimator::Constant => vec![1.0],
-            Estimator::NaiveBayes { models } => models
-                .first()
-                .map_or_else(|| vec![1.0], |m| m.predict_proba(row)),
+            Estimator::NaiveBayes { models } => models.first().map_or_else(|| vec![1.0], |m| m.predict_proba(row)),
             Estimator::Mlp(m) => {
                 let o = m.output(row);
                 if m.out == OutAct::Logistic {
                     let p = o.first().copied().unwrap_or(0.0) as f64;
-                    if self.classes.len() == 1 {
-                        vec![1.0 - p]
-                    } else {
-                        vec![1.0 - p, p]
-                    }
+                    if self.classes.len() == 1 { vec![1.0 - p] } else { vec![1.0 - p, p] }
                 } else {
                     o.into_iter().map(f64::from).collect()
                 }
@@ -322,10 +291,7 @@ impl TagModel {
     fn outputs(&self, row: &[(u32, f32)]) -> Vec<f64> {
         match &self.est {
             Estimator::Constant => vec![],
-            Estimator::NaiveBayes { models } => models
-                .iter()
-                .map(|m| m.predict_proba(row).get(1).copied().unwrap_or(0.0))
-                .collect(),
+            Estimator::NaiveBayes { models } => models.iter().map(|m| m.predict_proba(row).get(1).copied().unwrap_or(0.0)).collect(),
             Estimator::Mlp(m) => m.output(row).into_iter().map(f64::from).collect(),
         }
     }
@@ -335,21 +301,12 @@ impl TagModel {
         match &self.binarizer {
             TagBinarizer::MultiLabel { classes } => {
                 let o = self.outputs(row);
-                classes
-                    .iter()
-                    .zip(o)
-                    .filter(|(_, p)| *p > 0.5)
-                    .map(|(c, _)| *c)
-                    .collect()
+                classes.iter().zip(o).filter(|(_, p)| *p > 0.5).map(|(c, _)| *c).collect()
             }
             TagBinarizer::Label { classes } => {
                 if classes.len() == 1 {
                     // single class: always predicted (sklearn single-class inverse_transform)
-                    return if classes[0] != -1 {
-                        vec![classes[0]]
-                    } else {
-                        vec![]
-                    };
+                    return if classes[0] != -1 { vec![classes[0]] } else { vec![] };
                 }
                 let p = self.outputs(row).first().copied().unwrap_or(0.0);
                 let c = if p > 0.5 { classes[1] } else { classes[0] };
@@ -385,16 +342,11 @@ impl DocumentClassifier {
         if docs.is_empty() {
             return Err(ClassifierError::NoTrainingData);
         }
-        notify(&format!(
-            "Gathering data from {} document(s)...",
-            docs.len()
-        ));
+        notify(&format!("Gathering data from {} document(s)...", docs.len()));
         let hash = training_hash(&docs)?;
         let hash_hex = hex(&hash);
         let latest = docs.iter().map(|d| d.modified_us).max().unwrap_or(i64::MIN);
-        if self.last_doc_change_us.is_some_and(|t| t >= latest)
-            && self.last_auto_type_hash.as_deref() == Some(&hash_hex)
-        {
+        if self.last_doc_change_us.is_some_and(|t| t >= latest) && self.last_auto_type_hash.as_deref() == Some(&hash_hex) {
             return Ok(false);
         }
 
@@ -423,9 +375,7 @@ impl DocumentClassifier {
                 failed = Some(ClassifierError::ContentMismatch);
                 got.resize(chunk.len(), None);
             }
-            got.into_iter()
-                .map(|c| preprocess_content(c.as_deref().unwrap_or(""), language))
-                .collect::<Vec<_>>()
+            got.into_iter().map(|c| preprocess_content(c.as_deref().unwrap_or(""), language)).collect::<Vec<_>>()
         });
         let x = vectorizer.fit_transform(stream)?;
         if let Some(e) = failed {
@@ -444,18 +394,11 @@ impl DocumentClassifier {
         let tag_plan = if num_tags > 0 {
             notify(&format!("Training tags classifier ({num_tags} tag(s))..."));
             Some(if num_tags == 1 {
-                let labels: Vec<i64> = docs
-                    .iter()
-                    .map(|d| if d.tags.len() == 1 { d.tags[0] } else { -1 })
-                    .collect();
+                let labels: Vec<i64> = docs.iter().map(|d| if d.tags.len() == 1 { d.tags[0] } else { -1 }).collect();
                 let mut classes = labels.clone();
                 classes.sort_unstable();
                 classes.dedup();
-                if classes.len() == 1 {
-                    TagPlan::Constant(classes)
-                } else {
-                    TagPlan::Single(classes, labels)
-                }
+                if classes.len() == 1 { TagPlan::Constant(classes) } else { TagPlan::Single(classes, labels) }
             } else {
                 let k = num_tags;
                 let mut y = vec![0f32; docs.len() * k];
@@ -483,39 +426,29 @@ impl DocumentClassifier {
             format!("Training correspondent classifier ({num_correspondents} correspondent(s))..."),
             &|d| d.correspondent,
         );
-        let type_labels = single_labels(
-            num_document_types,
-            format!("Training document type classifier ({num_document_types} type(s))..."),
-            &|d| d.document_type,
-        );
-        let path_labels = single_labels(
-            num_storage_paths,
-            format!("Training storage path classifier ({num_storage_paths} path(s))..."),
-            &|d| d.storage_path,
-        );
+        let type_labels =
+            single_labels(num_document_types, format!("Training document type classifier ({num_document_types} type(s))..."), &|d| {
+                d.document_type
+            });
+        let path_labels =
+            single_labels(num_storage_paths, format!("Training storage path classifier ({num_storage_paths} path(s))..."), &|d| {
+                d.storage_path
+            });
         let x = &x;
         let (tags, correspondent, document_type, storage_path) = std::thread::scope(|s| {
             let tags = s.spawn(move || {
                 tag_plan.map(|plan| match plan {
-                    TagPlan::Constant(classes) => TagModel {
-                        binarizer: TagBinarizer::Label { classes },
-                        est: Estimator::Constant,
-                    },
-                    TagPlan::Single(classes, labels) => TagModel {
-                        binarizer: TagBinarizer::Label { classes },
-                        est: fit_single(x, &labels, false, opts).est,
-                    },
+                    TagPlan::Constant(classes) => TagModel { binarizer: TagBinarizer::Label { classes }, est: Estimator::Constant },
+                    TagPlan::Single(classes, labels) => {
+                        TagModel { binarizer: TagBinarizer::Label { classes }, est: fit_single(x, &labels, false, opts).est }
+                    }
                     TagPlan::Multi(y) => TagModel {
-                        binarizer: TagBinarizer::MultiLabel {
-                            classes: tag_set.clone(),
-                        },
+                        binarizer: TagBinarizer::MultiLabel { classes: tag_set.clone() },
                         est: fit_multilabel(x, &y, num_tags, opts),
                     },
                 })
             });
-            let fit = |labels: Option<Vec<i64>>| {
-                s.spawn(move || labels.map(|l| fit_single(x, &l, true, opts)))
-            };
+            let fit = |labels: Option<Vec<i64>>| s.spawn(move || labels.map(|l| fit_single(x, &l, true, opts)));
             let (c, t, p) = (fit(corr_labels), fit(type_labels), fit(path_labels));
             (join(tags), join(c), join(t), join(p))
         });
@@ -567,23 +500,10 @@ impl DocumentClassifier {
             return Prediction::default();
         };
         Prediction {
-            correspondent: self
-                .correspondent
-                .as_ref()
-                .and_then(|m| m.predict(&row, threshold)),
-            document_type: self
-                .document_type
-                .as_ref()
-                .and_then(|m| m.predict(&row, threshold)),
-            storage_path: self
-                .storage_path
-                .as_ref()
-                .and_then(|m| m.predict(&row, threshold)),
-            tags: self
-                .tags
-                .as_ref()
-                .map(|m| m.predict(&row))
-                .unwrap_or_default(),
+            correspondent: self.correspondent.as_ref().and_then(|m| m.predict(&row, threshold)),
+            document_type: self.document_type.as_ref().and_then(|m| m.predict(&row, threshold)),
+            storage_path: self.storage_path.as_ref().and_then(|m| m.predict(&row, threshold)),
+            tags: self.tags.as_ref().map(|m| m.predict(&row)).unwrap_or_default(),
         }
     }
 
@@ -595,8 +515,7 @@ impl DocumentClassifier {
     /// Serialized file content: HMAC-SHA256(key, payload) || payload, payload = MAGIC || JSON.
     pub fn to_bytes(&self, key: &[u8]) -> Result<Vec<u8>, ClassifierError> {
         let mut payload = MAGIC.to_vec();
-        serde_json::to_writer(&mut payload, self)
-            .map_err(|e| ClassifierError::Corrupt(e.to_string()))?;
+        serde_json::to_writer(&mut payload, self).map_err(|e| ClassifierError::Corrupt(e.to_string()))?;
         let mut mac = Self::mac(key);
         mac.update(&payload);
         let mut out = mac.finalize().into_bytes().to_vec();
@@ -611,23 +530,18 @@ impl DocumentClassifier {
         let (sig, payload) = raw.split_at(HMAC_SIZE);
         let mut mac = Self::mac(key);
         mac.update(payload);
-        mac.verify_slice(sig)
-            .map_err(|_| ClassifierError::Corrupt("signature mismatch".into()))?;
-        let json = payload
-            .strip_prefix(MAGIC)
-            .ok_or_else(|| ClassifierError::Corrupt("bad magic".into()))?;
+        mac.verify_slice(sig).map_err(|_| ClassifierError::Corrupt("signature mismatch".into()))?;
+        let json = payload.strip_prefix(MAGIC).ok_or_else(|| ClassifierError::Corrupt("bad magic".into()))?;
         // read the version first so a newer/older layout is reported as incompatible
         #[derive(Deserialize)]
         struct V {
             format_version: u32,
         }
-        let v: V =
-            serde_json::from_slice(json).map_err(|e| ClassifierError::Corrupt(e.to_string()))?;
+        let v: V = serde_json::from_slice(json).map_err(|e| ClassifierError::Corrupt(e.to_string()))?;
         if v.format_version != FORMAT_VERSION {
             return Err(ClassifierError::IncompatibleVersion(v.format_version));
         }
-        let mut c: DocumentClassifier =
-            serde_json::from_slice(json).map_err(|e| ClassifierError::Corrupt(e.to_string()))?;
+        let mut c: DocumentClassifier = serde_json::from_slice(json).map_err(|e| ClassifierError::Corrupt(e.to_string()))?;
         if let Some(v) = c.vectorizer.as_mut() {
             v.rebuild_index();
         }
@@ -639,10 +553,7 @@ impl DocumentClassifier {
     pub fn save(&self, path: &Path, key: &[u8]) -> Result<(), ClassifierError> {
         let bytes = self.to_bytes(key)?;
         let mut tmp: PathBuf = path.to_path_buf();
-        let name = format!(
-            "{}.part",
-            path.file_name().and_then(|n| n.to_str()).unwrap_or("model")
-        );
+        let name = format!("{}.part", path.file_name().and_then(|n| n.to_str()).unwrap_or("model"));
         tmp.set_file_name(name);
         let res = std::fs::write(&tmp, &bytes).and_then(|_| std::fs::rename(&tmp, path));
         if res.is_err() {
@@ -667,40 +578,30 @@ pub struct Predictor<'a> {
 
 impl Predictor<'_> {
     pub fn predict_correspondent(&self, content: &str) -> Option<i64> {
-        self.classifier
-            .predict_correspondent(content, self.threshold)
+        self.classifier.predict_correspondent(content, self.threshold)
     }
     pub fn predict_document_type(&self, content: &str) -> Option<i64> {
-        self.classifier
-            .predict_document_type(content, self.threshold)
+        self.classifier.predict_document_type(content, self.threshold)
     }
     pub fn predict_tags(&self, content: &str) -> Vec<i64> {
         self.classifier.predict_tags(content)
     }
     pub fn predict_storage_path(&self, content: &str) -> Option<i64> {
-        self.classifier
-            .predict_storage_path(content, self.threshold)
+        self.classifier.predict_storage_path(content, self.threshold)
     }
 }
 
 /// upstream `load_classifier(raise_exception=...)`: `Ok(None)` if the file does not exist; on an
 /// incompatible version or a corrupt file the file is deleted (so it gets re-trained) and
 /// `Ok(None)` returned, or the error if `raise_exception`. IO errors keep the file.
-pub fn load_classifier(
-    path: &Path,
-    key: &[u8],
-    raise_exception: bool,
-) -> Result<Option<DocumentClassifier>, ClassifierError> {
+pub fn load_classifier(path: &Path, key: &[u8], raise_exception: bool) -> Result<Option<DocumentClassifier>, ClassifierError> {
     if !path.is_file() {
         return Ok(None);
     }
     match DocumentClassifier::load(path, key) {
         Ok(c) => Ok(Some(c)),
         Err(e) => {
-            if matches!(
-                e,
-                ClassifierError::IncompatibleVersion(_) | ClassifierError::Corrupt(_)
-            ) {
+            if matches!(e, ClassifierError::IncompatibleVersion(_) | ClassifierError::Corrupt(_)) {
                 let _ = std::fs::remove_file(path);
             }
             if raise_exception { Err(e) } else { Ok(None) }
@@ -713,14 +614,7 @@ mod tests {
     use super::*;
 
     fn doc(pk: i64, c: Option<i64>, t: Option<i64>, tags: &[i64]) -> TrainingDoc {
-        TrainingDoc {
-            pk,
-            modified_us: pk * 1000,
-            correspondent: c,
-            document_type: t,
-            storage_path: None,
-            tags: tags.to_vec(),
-        }
+        TrainingDoc { pk, modified_us: pk * 1000, correspondent: c, document_type: t, storage_path: None, tags: tags.to_vec() }
     }
 
     fn contents(pks: &[i64]) -> Vec<Option<String>> {
@@ -739,12 +633,7 @@ mod tests {
         (1..=60)
             .map(|pk| {
                 let k = pk % 3;
-                doc(
-                    pk,
-                    Some(10 + k),
-                    if k == 0 { None } else { Some(20 + k) },
-                    if k == 1 { &[5, 6] } else { &[6] },
-                )
+                doc(pk, Some(10 + k), if k == 0 { None } else { Some(20 + k) }, if k == 1 { &[5, 6] } else { &[6] })
             })
             .collect()
     }
@@ -759,9 +648,7 @@ mod tests {
             let mut c = DocumentClassifier::new();
             let mut seen: Vec<String> = Vec::new();
             let mut note = |m: &str| seen.push(m.to_string());
-            assert!(c
-                .train(corpus(), Some(Language::English), contents, &TrainOptions::default(), Some(&mut note))
-                .unwrap());
+            assert!(c.train(corpus(), Some(Language::English), contents, &TrainOptions::default(), Some(&mut note)).unwrap());
             bytes.push(c.to_bytes(b"k").unwrap());
             msgs.push(seen);
         }
@@ -775,50 +662,28 @@ mod tests {
     fn train_predict_save_load_and_no_retrain() {
         for kind in [ModelKind::Mlp, ModelKind::Linear, ModelKind::NaiveBayes] {
             let mut c = DocumentClassifier::new();
-            let opts = TrainOptions {
-                kind,
-                ..Default::default()
-            };
-            assert!(
-                c.train(corpus(), Some(Language::English), contents, &opts, None)
-                    .unwrap()
-            );
+            let opts = TrainOptions { kind, ..Default::default() };
+            assert!(c.train(corpus(), Some(Language::English), contents, &opts, None).unwrap());
             let p = c.predict_all("payslip salary income", 0.3);
             assert_eq!(p.correspondent, Some(11), "{kind:?}");
             assert_eq!(p.document_type, Some(21), "{kind:?}");
             assert_eq!(p.tags, vec![5, 6], "{kind:?}");
-            assert_eq!(
-                c.predict_document_type("electricity meter tariff", 0.3),
-                None,
-                "{kind:?}"
-            );
+            assert_eq!(c.predict_document_type("electricity meter tariff", 0.3), None, "{kind:?}");
             assert_eq!(c.predict_storage_path("x", 0.3), None);
             // unchanged -> no retrain
-            assert!(
-                !c.train(corpus(), Some(Language::English), contents, &opts, None)
-                    .unwrap()
-            );
+            assert!(!c.train(corpus(), Some(Language::English), contents, &opts, None).unwrap());
             let mut changed = corpus();
             changed[0].modified_us += 10_000_000;
-            assert!(
-                c.train(changed, Some(Language::English), contents, &opts, None)
-                    .unwrap()
-            );
+            assert!(c.train(changed, Some(Language::English), contents, &opts, None).unwrap());
 
-            let dir = std::env::temp_dir().join(format!(
-                "pl-classifier-test-{kind:?}-{}",
-                std::process::id()
-            ));
+            let dir = std::env::temp_dir().join(format!("pl-classifier-test-{kind:?}-{}", std::process::id()));
             std::fs::create_dir_all(&dir).unwrap();
             let f = dir.join("model.bin");
             c.save(&f, b"secret").unwrap();
             let l = load_classifier(&f, b"secret", true).unwrap().unwrap();
             assert_eq!(l.predict_all("payslip salary income", 0.3), p);
             // wrong key -> corrupt -> deleted
-            assert!(matches!(
-                load_classifier(&f, b"other", true),
-                Err(ClassifierError::Corrupt(_))
-            ));
+            assert!(matches!(load_classifier(&f, b"other", true), Err(ClassifierError::Corrupt(_))));
             assert!(!f.exists());
             assert!(load_classifier(&f, b"secret", false).unwrap().is_none());
             let _ = std::fs::remove_dir_all(&dir);
@@ -830,70 +695,38 @@ mod tests {
         let mut c = DocumentClassifier::new();
         c.format_version = FORMAT_VERSION + 1;
         let b = c.to_bytes(b"k").unwrap();
-        assert!(matches!(
-            DocumentClassifier::from_bytes(&b, b"k"),
-            Err(ClassifierError::IncompatibleVersion(_))
-        ));
-        assert!(matches!(
-            DocumentClassifier::from_bytes(&b[..20], b"k"),
-            Err(ClassifierError::Corrupt(_))
-        ));
+        assert!(matches!(DocumentClassifier::from_bytes(&b, b"k"), Err(ClassifierError::IncompatibleVersion(_))));
+        assert!(matches!(DocumentClassifier::from_bytes(&b[..20], b"k"), Err(ClassifierError::Corrupt(_))));
         let mut t = b.clone();
         let last = t.len() - 1;
         t[last] ^= 1;
-        assert!(matches!(
-            DocumentClassifier::from_bytes(&t, b"k"),
-            Err(ClassifierError::Corrupt(_))
-        ));
+        assert!(matches!(DocumentClassifier::from_bytes(&t, b"k"), Err(ClassifierError::Corrupt(_))));
     }
 
     #[test]
     fn no_training_data() {
         let mut c = DocumentClassifier::new();
-        assert!(matches!(
-            c.train(vec![], None, contents, &TrainOptions::default(), None),
-            Err(ClassifierError::NoTrainingData)
-        ));
+        assert!(matches!(c.train(vec![], None, contents, &TrainOptions::default(), None), Err(ClassifierError::NoTrainingData)));
     }
 
     #[test]
     fn single_class_and_single_tag_cases() {
         // upstream test_one_correspondent_predict / test_one_tag_predict(_unassigned)
         for kind in [ModelKind::Mlp, ModelKind::NaiveBayes] {
-            let opts = TrainOptions {
-                kind,
-                ..Default::default()
-            };
+            let opts = TrainOptions { kind, ..Default::default() };
             let docs: Vec<TrainingDoc> = (1..=4).map(|pk| doc(pk, Some(7), None, &[3])).collect();
             let mut c = DocumentClassifier::new();
             c.train(docs, None, contents, &opts, None).unwrap();
-            assert_eq!(
-                c.predict_correspondent("anything at all", 0.3),
-                Some(7),
-                "{kind:?}"
-            );
+            assert_eq!(c.predict_correspondent("anything at all", 0.3), Some(7), "{kind:?}");
             assert_eq!(c.predict_tags("anything at all"), vec![3], "{kind:?}");
             assert!(c.document_type.is_none());
             // one tag on some documents: binary
-            let docs: Vec<TrainingDoc> = (1..=30)
-                .map(|pk| doc(pk, None, None, if pk % 3 == 1 { &[3] } else { &[] }))
-                .collect();
+            let docs: Vec<TrainingDoc> = (1..=30).map(|pk| doc(pk, None, None, if pk % 3 == 1 { &[3] } else { &[] })).collect();
             let mut c = DocumentClassifier::new();
             c.train(docs, None, contents, &opts, None).unwrap();
-            assert!(matches!(
-                c.tags.as_ref().unwrap().binarizer,
-                TagBinarizer::Label { .. }
-            ));
-            assert_eq!(
-                c.predict_tags("salary payslip employer"),
-                vec![3],
-                "{kind:?}"
-            );
-            assert_eq!(
-                c.predict_tags("insurance policy premium"),
-                Vec::<i64>::new(),
-                "{kind:?}"
-            );
+            assert!(matches!(c.tags.as_ref().unwrap().binarizer, TagBinarizer::Label { .. }));
+            assert_eq!(c.predict_tags("salary payslip employer"), vec![3], "{kind:?}");
+            assert_eq!(c.predict_tags("insurance policy premium"), Vec::<i64>::new(), "{kind:?}");
             assert!(c.correspondent.is_none());
         }
     }
@@ -901,23 +734,11 @@ mod tests {
     #[test]
     fn threshold_semantics() {
         // upstream test_predict_with_threshold
-        let m = SingleLabel {
-            classes: vec![-1, 3],
-            est: Estimator::Constant,
-        };
+        let m = SingleLabel { classes: vec![-1, 3], est: Estimator::Constant };
         assert_eq!(m.predict(&[], 0.0), None); // constant -> class index 0 = -1
-        let nb = |p0: f32| Nb {
-            n_features: 1,
-            n_classes: 2,
-            class_log_prior: vec![p0.ln(), (1.0 - p0).ln()],
-            feature_log_prob: vec![0.0, 0.0],
-        };
-        let mk = |p0| SingleLabel {
-            classes: vec![-1, 3],
-            est: Estimator::NaiveBayes {
-                models: vec![nb(p0)],
-            },
-        };
+        let nb =
+            |p0: f32| Nb { n_features: 1, n_classes: 2, class_log_prior: vec![p0.ln(), (1.0 - p0).ln()], feature_log_prob: vec![0.0, 0.0] };
+        let mk = |p0| SingleLabel { classes: vec![-1, 3], est: Estimator::NaiveBayes { models: vec![nb(p0)] } };
         assert_eq!(mk(0.1).predict(&[], 0.6), Some(3));
         assert_eq!(mk(0.45).predict(&[], 0.6), None);
         assert_eq!(mk(0.99).predict(&[], 0.0), None);
@@ -948,9 +769,6 @@ mod tests {
             storage_path: None,
             tags: vec![],
         }];
-        assert!(matches!(
-            training_hash(&big),
-            Err(ClassifierError::LabelOutOfRange(_))
-        ));
+        assert!(matches!(training_hash(&big), Err(ClassifierError::LabelOutOfRange(_))));
     }
 }

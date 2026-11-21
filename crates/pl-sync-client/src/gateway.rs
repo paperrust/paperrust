@@ -310,12 +310,8 @@ impl Gateway {
     }
 
     async fn forward(&self, req: &GwRequest) -> crate::Result<GwResponse> {
-        let headers: Vec<(String, String)> = req
-            .headers
-            .iter()
-            .filter(|(k, _)| FORWARD_HEADERS.iter().any(|f| f.eq_ignore_ascii_case(k)))
-            .cloned()
-            .collect();
+        let headers: Vec<(String, String)> =
+            req.headers.iter().filter(|(k, _)| FORWARD_HEADERS.iter().any(|f| f.eq_ignore_ascii_case(k))).cloned().collect();
         let mut pq = req.path.trim_start_matches('/').to_string();
         if let Some(q) = query_without_source(req.query.as_deref()) {
             pq.push('?');
@@ -455,8 +451,10 @@ impl Gateway {
         let method = req.method.to_ascii_uppercase();
         let ok = |v: Value| Ok(GwResponse::json(200, &v, "local"));
         let read_only = method == "GET" || method == "HEAD";
-        let include: Vec<String> =
-            params.get("include").map(|s| s.split(',').map(|x| x.trim().to_string()).filter(|x| !x.is_empty()).collect()).unwrap_or_default();
+        let include: Vec<String> = params
+            .get("include")
+            .map(|s| s.split(',').map(|x| x.trim().to_string()).filter(|x| !x.is_empty()).collect())
+            .unwrap_or_default();
         match (method.as_str(), seg.as_slice()) {
             ("GET", [] | ["server"]) => {
                 let row = r.remote().await?.unwrap_or_default();
@@ -486,8 +484,11 @@ impl Gateway {
                 ok(query::query_documents(r, &q).await?)
             }
             ("POST", ["documents", "query"]) => {
-                let q: DocQuery = serde_json::from_slice(&req.body)
-                    .map_err(|e| Error::Api { status: 400, code: "invalid".into(), message: e.to_string() })?;
+                let q: DocQuery = serde_json::from_slice(&req.body).map_err(|e| Error::Api {
+                    status: 400,
+                    code: "invalid".into(),
+                    message: e.to_string(),
+                })?;
                 ok(query::query_documents(r, &q).await?)
             }
             ("GET", ["documents", uuid]) => {
@@ -503,8 +504,11 @@ impl Gateway {
             }
             ("GET" | "HEAD", ["documents", uuid, "files", variant]) => self.local_file(req, uuid, variant).await,
             ("POST", ["objects", "batch"]) => {
-                let b: BatchBody = serde_json::from_slice(&req.body)
-                    .map_err(|e| Error::Api { status: 400, code: "invalid".into(), message: e.to_string() })?;
+                let b: BatchBody = serde_json::from_slice(&req.body).map_err(|e| Error::Api {
+                    status: 400,
+                    code: "invalid".into(),
+                    message: e.to_string(),
+                })?;
                 let mut items = Vec::new();
                 let mut missing = Vec::new();
                 let content = b.include.iter().any(|i| i == "content");

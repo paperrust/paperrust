@@ -62,7 +62,9 @@ pub async fn command(pool: &PgPool, argv: &[String]) -> Result<String, ManageErr
             }
             let state = match (s.enabled, s.triggers == s.expected_triggers) {
                 (true, true) => "enabled".to_string(),
-                (true, false) => format!("enabled, but {} of {} triggers present (run `manage sync enable`)", s.triggers, s.expected_triggers),
+                (true, false) => {
+                    format!("enabled, but {} of {} triggers present (run `manage sync enable`)", s.triggers, s.expected_triggers)
+                }
                 (false, _) => "disabled".to_string(),
             };
             Ok(format!(
@@ -116,11 +118,7 @@ pub async fn command(pool: &PgPool, argv: &[String]) -> Result<String, ManageErr
                 return Err(SyncError::NotInstalled.into());
             }
             let r = crate::sequence_once(pool, SyncConfig::from_env().batch).await?;
-            Ok(if r.busy {
-                "another sequencer is running\n".to_string()
-            } else {
-                format!("sequenced {} pending entries\n", r.pending)
-            })
+            Ok(if r.busy { "another sequencer is running\n".to_string() } else { format!("sequenced {} pending entries\n", r.pending) })
         }
         "retention" => {
             unknown(&["--days"])?;

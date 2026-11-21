@@ -42,7 +42,11 @@ pub enum Target {
 pub fn target_for(strategy: ColorConversion, pdfa: bool) -> Target {
     match strategy {
         ColorConversion::LeaveColorUnchanged => {
-            if pdfa { Target::CmykToRgb } else { Target::Keep }
+            if pdfa {
+                Target::CmykToRgb
+            } else {
+                Target::Keep
+            }
         }
         ColorConversion::Rgb => Target::Rgb,
         ColorConversion::Gray => Target::Gray,
@@ -104,18 +108,15 @@ fn wanted(src: &ColorSpace, t: Target) -> Option<ColorSpace> {
 /// Convert the color table of Indexed.
 fn convert_lookup(lookup: &[u8], base: &ColorSpace, to: &ColorSpace) -> Option<Vec<u8>> {
     let n = usize::from(base.components());
-    let p = Pixels { width: (lookup.len() / n.max(1)) as u32, height: 1, bpc: 8, cs: base.device()?, data: lookup.to_vec(), was_jpeg: false };
+    let p =
+        Pixels { width: (lookup.len() / n.max(1)) as u32, height: 1, bpc: 8, cs: base.device()?, data: lookup.to_vec(), was_jpeg: false };
     let mut p = p;
     p.data.truncate(p.width as usize * n);
     Some(pdfimage::convert(&p, to)?.data)
 }
 
 fn final_cs(doc: &mut Document, profiles: &mut Profiles, dev: &ColorSpace, t: Target) -> Object {
-    if t == Target::Icc {
-        profiles.get(doc, dev.components())
-    } else {
-        dev.to_object()
-    }
+    if t == Target::Icc { profiles.get(doc, dev.components()) } else { dev.to_object() }
 }
 
 /// Convert images. `masks`: images used as SMask/Mask stay unchanged.
@@ -284,10 +285,18 @@ pub fn rewrite_content(content: &[u8], t: Target, cs_names: &HashMap<Vec<u8>, Cu
                     "rg" | "RG" => Cur::Rgb,
                     _ => Cur::Cmyk,
                 };
-                if is_stroke { stroke = cur } else { fill = cur }
+                if is_stroke {
+                    stroke = cur
+                } else {
+                    fill = cur
+                }
                 match (vector_target(cur, t), nums(&op.operands).and_then(|v| to_rgb(cur, &v))) {
                     (Some(to), Some(rgb)) => {
-                        if is_stroke { stroke = to } else { fill = to }
+                        if is_stroke {
+                            stroke = to
+                        } else {
+                            fill = to
+                        }
                         Some(color_ops(to, is_stroke, rgb))
                     }
                     _ => None,
@@ -307,11 +316,19 @@ pub fn rewrite_content(content: &[u8], t: Target, cs_names: &HashMap<Vec<u8>, Cu
                     .unwrap_or(Cur::Other);
                 match vector_target(cur, t) {
                     Some(to) => {
-                        if is_stroke { stroke = to } else { fill = to }
+                        if is_stroke {
+                            stroke = to
+                        } else {
+                            fill = to
+                        }
                         Some(Operation::new(s, vec![Object::Name(cs_name(to).to_vec())]))
                     }
                     None => {
-                        if is_stroke { stroke = cur } else { fill = cur }
+                        if is_stroke {
+                            stroke = cur
+                        } else {
+                            fill = cur
+                        }
                         None
                     }
                 }
@@ -352,10 +369,8 @@ pub fn rewrite_content(content: &[u8], t: Target, cs_names: &HashMap<Vec<u8>, Cu
 /// Names from `/Resources /ColorSpace` that point to a device color space.
 fn resource_cs_names(doc: &Document, res: Option<&Dictionary>) -> HashMap<Vec<u8>, Cur> {
     let mut m = HashMap::new();
-    let Some(d) = res
-        .and_then(|r| r.get(b"ColorSpace").ok())
-        .and_then(|o| doc.dereference(o).ok().map(|(_, o)| o))
-        .and_then(|o| o.as_dict().ok())
+    let Some(d) =
+        res.and_then(|r| r.get(b"ColorSpace").ok()).and_then(|o| doc.dereference(o).ok().map(|(_, o)| o)).and_then(|o| o.as_dict().ok())
     else {
         return m;
     };

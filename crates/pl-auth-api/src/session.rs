@@ -36,9 +36,9 @@ fn random_key() -> String {
 pub fn expiry_age(data: &Map<String, Value>, cookie_age: i64, now: DateTime<Utc>) -> i64 {
     match data.get("_session_expiry") {
         Some(Value::Number(n)) => n.as_i64().unwrap_or(cookie_age),
-        Some(Value::String(iso)) => DateTime::parse_from_rfc3339(iso)
-            .map(|d| (d.with_timezone(&Utc) - now).num_seconds().max(0))
-            .unwrap_or(cookie_age),
+        Some(Value::String(iso)) => {
+            DateTime::parse_from_rfc3339(iso).map(|d| (d.with_timezone(&Utc) - now).num_seconds().max(0)).unwrap_or(cookie_age)
+        }
         _ => cookie_age,
     }
 }
@@ -65,11 +65,10 @@ async fn load(db: &PgPool, secret: &str, key: &str) -> Result<Option<Map<String,
     if key.chars().count() < 8 || key.contains('\0') {
         return Ok(None);
     }
-    let row: Option<(String,)> =
-        sqlx::query_as("SELECT session_data FROM django_session WHERE session_key = $1 AND expire_date > now()")
-            .bind(key)
-            .fetch_optional(db)
-            .await?;
+    let row: Option<(String,)> = sqlx::query_as("SELECT session_data FROM django_session WHERE session_key = $1 AND expire_date > now()")
+        .bind(key)
+        .fetch_optional(db)
+        .await?;
     Ok(row.map(|(d,)| pl_authz::signing::decode_session(&d, secret)))
 }
 
@@ -77,12 +76,7 @@ async fn load(db: &PgPool, secret: &str, key: &str) -> Result<Option<Map<String,
 /// (a new session when there is none or it is unknown/expired), saved like
 /// `SessionMiddleware.process_response` for a successful response. Returns the
 /// `Set-Cookie` header value.
-pub async fn set_session_value(
-    state: &AppState,
-    headers: &HeaderMap,
-    key: &str,
-    value: Value,
-) -> HResult<String> {
+pub async fn set_session_value(state: &AppState, headers: &HeaderMap, key: &str, value: Value) -> HResult<String> {
     // SESSION_COOKIE_AGE live (docs/SETTINGS.md WP4b); restart-only keys keep their start value.
     let cfg = state.live_config();
     let db = state.db();
@@ -131,11 +125,7 @@ pub async fn set_session_value(
         },
     };
     // cached_db: `cache.delete(cache_key)` (lokal: Prozess-Cache; `PAPERRUST_CACHE=postgres`: gemeinsame Tabelle)
-    state
-        .cache()
-        .delete(&format!("{CACHE_KEY_PREFIX}{saved_key}"))
-        .await
-        .map_err(|e| server_error(format!("session cache: {e:?}")))?;
+    state.cache().delete(&format!("{CACHE_KEY_PREFIX}{saved_key}")).await.map_err(|e| server_error(format!("session cache: {e:?}")))?;
     let at_close = expire_at_browser_close(&data, cfg.session_expire_at_browser_close);
     Ok(session_cookie(&cfg.session_cookie_name, &saved_key, age, at_close, now))
 }

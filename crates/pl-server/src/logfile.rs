@@ -61,8 +61,7 @@ impl LogFile {
 }
 
 fn is_logger_or_child(target: &str, logger: &str) -> bool {
-    target == logger
-        || (target.starts_with(logger) && target.as_bytes().get(logger.len()) == Some(&b'.'))
+    target == logger || (target.starts_with(logger) && target.as_bytes().get(logger.len()) == Some(&b'.'))
 }
 
 /// Which file a record of logger `target` at `level` goes to (upstream `LOGGING["loggers"]`).
@@ -107,11 +106,7 @@ impl LogFileConfig {
     /// `PAPERLESS_LOGROTATE_MAX_SIZE` / `PAPERLESS_LOGROTATE_MAX_BACKUPS` (invalid → default).
     pub fn from_core(core: &pl_core::Config) -> Self {
         let max_bytes = core.env.int("PAPERLESS_LOGROTATE_MAX_SIZE").ok().flatten();
-        let backups = core
-            .env
-            .int("PAPERLESS_LOGROTATE_MAX_BACKUPS")
-            .ok()
-            .flatten();
+        let backups = core.env.int("PAPERLESS_LOGROTATE_MAX_BACKUPS").ok().flatten();
         LogFileConfig {
             dir: core.logging_dir.clone(),
             max_bytes: max_bytes.map_or(DEFAULT_MAX_SIZE, |v| u64::try_from(v).unwrap_or(0)),
@@ -144,10 +139,7 @@ impl Rotating {
                 self.rollover();
             }
         }
-        let mut f = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&self.path)?;
+        let mut f = OpenOptions::new().create(true).append(true).open(&self.path)?;
         f.write_all(line)
     }
 
@@ -181,17 +173,8 @@ impl LogFilesLayer {
     /// `paperrust.log` and `mail.log`.
     pub fn new(cfg: &LogFileConfig) -> std::io::Result<Self> {
         fs::create_dir_all(&cfg.dir)?;
-        let file = |f: LogFile| Rotating {
-            path: cfg.dir.join(f.file_name()),
-            max_bytes: cfg.max_bytes,
-            backups: cfg.backups,
-        };
-        let layer = LogFilesLayer {
-            main: file(LogFile::Main),
-            mail: file(LogFile::Mail),
-            time_zone: cfg.time_zone,
-            lock: Mutex::new(()),
-        };
+        let file = |f: LogFile| Rotating { path: cfg.dir.join(f.file_name()), max_bytes: cfg.max_bytes, backups: cfg.backups };
+        let layer = LogFilesLayer { main: file(LogFile::Main), mail: file(LogFile::Mail), time_zone: cfg.time_zone, lock: Mutex::new(()) };
         for f in [&layer.main, &layer.mail] {
             OpenOptions::new().create(true).append(true).open(&f.path)?;
         }
@@ -266,8 +249,7 @@ where
                     write!(w, "{}", span.name())?;
                 }
                 let ext = span.extensions();
-                if let Some(f) =
-                    ext.get::<tracing_subscriber::fmt::FormattedFields<N>>()
+                if let Some(f) = ext.get::<tracing_subscriber::fmt::FormattedFields<N>>()
                     && !f.is_empty()
                 {
                     write!(w, "{{{f}}}")?;
@@ -291,17 +273,8 @@ where
 }
 
 /// Formats one record: `[asctime] [LEVEL] [name] message key=value…\n`.
-pub fn format_record(
-    asctime: &str,
-    level: &Level,
-    name: &str,
-    message: &str,
-    fields: &str,
-) -> String {
-    format!(
-        "[{asctime}] [{}] [{name}] {message}{fields}\n",
-        level_name(level)
-    )
+pub fn format_record(asctime: &str, level: &Level, name: &str, message: &str, fields: &str) -> String {
+    format!("[{asctime}] [{}] [{name}] {message}{fields}\n", level_name(level))
 }
 
 #[derive(Default)]
@@ -336,20 +309,11 @@ impl<S: Subscriber> Layer<S> for LogFilesLayer {
         };
         let mut fields = Fields::default();
         event.record(&mut fields);
-        let line = format_record(
-            &self.asctime(),
-            meta.level(),
-            &display_logger(meta.target()),
-            &fields.message,
-            &fields.rest,
-        );
+        let line = format_record(&self.asctime(), meta.level(), &display_logger(meta.target()), &fields.message, &fields.rest);
         let _guard = self.lock.lock().unwrap_or_else(|e| e.into_inner());
         if let Err(e) = self.file(file).write(line.as_bytes()) {
             // Never log from inside the logger (recursion); stderr like Python's handleError.
-            eprintln!(
-                "--- Logging error --- {}: {e}",
-                self.file(file).path.display()
-            );
+            eprintln!("--- Logging error --- {}: {e}", self.file(file).path.display());
         }
     }
 }
@@ -364,9 +328,7 @@ pub fn filter() -> tracing_subscriber::filter::FilterFn<impl Fn(&tracing::Metada
 /// configuration does not load (the caller reports that error itself) or the directory cannot
 /// be created (warned on stderr).
 pub fn from_env() -> Option<LogFilesLayer> {
-    if pl_core::config::var("PAPERRUST_LOG_FILES").and_then(|v| pl_core::config::str_to_bool(&v))
-        == Some(false)
-    {
+    if pl_core::config::var("PAPERRUST_LOG_FILES").and_then(|v| pl_core::config::str_to_bool(&v)) == Some(false) {
         return None;
     }
     let core = pl_core::Config::from_env().ok()?;
@@ -374,10 +336,7 @@ pub fn from_env() -> Option<LogFilesLayer> {
     match LogFilesLayer::new(&cfg) {
         Ok(l) => Some(l),
         Err(e) => {
-            eprintln!(
-                "paperrust: log files in {} disabled: {e}",
-                cfg.dir.display()
-            );
+            eprintln!("paperrust: log files in {} disabled: {e}", cfg.dir.display());
             None
         }
     }
@@ -385,11 +344,7 @@ pub fn from_env() -> Option<LogFilesLayer> {
 
 /// Lines of `dir/<name>` (test helper and diagnostics).
 pub fn read_lines(dir: &Path, name: &str) -> Vec<String> {
-    fs::read_to_string(dir.join(name))
-        .unwrap_or_default()
-        .lines()
-        .map(str::to_string)
-        .collect()
+    fs::read_to_string(dir.join(name)).unwrap_or_default().lines().map(str::to_string).collect()
 }
 
 #[cfg(test)]
@@ -398,24 +353,12 @@ mod tests {
 
     #[test]
     fn routing_like_upstream_loggers() {
-        assert_eq!(
-            route("paperless.consumer", &Level::DEBUG),
-            Some(LogFile::Main)
-        );
+        assert_eq!(route("paperless.consumer", &Level::DEBUG), Some(LogFile::Main));
         assert_eq!(route("paperless", &Level::TRACE), Some(LogFile::Main));
-        assert_eq!(
-            route("paperless.mail.tasks", &Level::INFO),
-            Some(LogFile::Main)
-        );
+        assert_eq!(route("paperless.mail.tasks", &Level::INFO), Some(LogFile::Main));
         assert_eq!(route("paperless_mail", &Level::DEBUG), Some(LogFile::Mail));
-        assert_eq!(
-            route("paperless_mail.mail", &Level::INFO),
-            Some(LogFile::Mail)
-        );
-        assert_eq!(
-            route("paperless_ai.client", &Level::INFO),
-            Some(LogFile::Main)
-        );
+        assert_eq!(route("paperless_mail.mail", &Level::INFO), Some(LogFile::Mail));
+        assert_eq!(route("paperless_ai.client", &Level::INFO), Some(LogFile::Main));
         assert_eq!(route("ocrmypdf", &Level::INFO), Some(LogFile::Main));
         assert_eq!(route("ocrmypdf._exec", &Level::DEBUG), None);
         assert_eq!(route("celery.worker", &Level::INFO), None);
@@ -427,11 +370,7 @@ mod tests {
     #[test]
     fn rotation_like_rotating_file_handler() {
         let dir = tempfile::tempdir().unwrap();
-        let r = Rotating {
-            path: dir.path().join("paperrust.log"),
-            max_bytes: 20,
-            backups: 2,
-        };
+        let r = Rotating { path: dir.path().join("paperrust.log"), max_bytes: 20, backups: 2 };
         for i in 0..5 {
             r.write(format!("line {i} 123456\n").as_bytes()).unwrap(); // 14 bytes each
         }
@@ -440,11 +379,7 @@ mod tests {
         assert_eq!(read_lines(dir.path(), "paperrust.log.2"), ["line 2 123456"]);
         assert!(!dir.path().join("paperrust.log.3").exists());
         // backupCount 0: never rotates
-        let r = Rotating {
-            path: dir.path().join("mail.log"),
-            max_bytes: 20,
-            backups: 0,
-        };
+        let r = Rotating { path: dir.path().join("mail.log"), max_bytes: 20, backups: 0 };
         for _ in 0..3 {
             r.write(b"0123456789abcdef\n").unwrap();
         }
@@ -464,13 +399,7 @@ mod tests {
     #[test]
     fn format_matches_verbose_formatter() {
         assert_eq!(
-            format_record(
-                "2026-11-09 10:00:00,123",
-                &Level::WARN,
-                "paperless.consumer",
-                "hi",
-                " doc=1"
-            ),
+            format_record("2026-11-09 10:00:00,123", &Level::WARN, "paperless.consumer", "hi", " doc=1"),
             "[2026-11-09 10:00:00,123] [WARNING] [paperless.consumer] hi doc=1\n"
         );
     }

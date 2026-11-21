@@ -58,53 +58,29 @@ pub enum RoutesError {
     #[error("route id {0:?} is registered more than once")]
     DuplicateId(String),
     #[error("route {method} {path} is registered twice (ids {first:?} and {second:?})")]
-    DuplicateRoute {
-        method: String,
-        path: String,
-        first: String,
-        second: String,
-    },
-    #[error(
-        "routes {first:?} ({first_path}) and {second:?} ({second_path}) use the same path with different parameter names"
-    )]
-    ParamNameConflict {
-        first: String,
-        first_path: String,
-        second: String,
-        second_path: String,
-    },
+    DuplicateRoute { method: String, path: String, first: String, second: String },
+    #[error("routes {first:?} ({first_path}) and {second:?} ({second_path}) use the same path with different parameter names")]
+    ParamNameConflict { first: String, first_path: String, second: String, second_path: String },
     #[error("route {id:?}: invalid path {path:?} ({reason})")]
-    InvalidPath {
-        id: String,
-        path: String,
-        reason: &'static str,
-    },
+    InvalidPath { id: String, path: String, reason: &'static str },
     #[error("cannot mount path {path:?}: {reason}")]
     Mount { path: String, reason: String },
 }
 
 /// Parse the contents of `routes.toml`.
 pub fn parse_routes_toml(text: &str) -> Result<BTreeMap<String, Backend>, RoutesError> {
-    toml::from_str::<RoutesFile>(text)
-        .map(|f| f.routes)
-        .map_err(|e| RoutesError::Parse(e.to_string()))
+    toml::from_str::<RoutesFile>(text).map(|f| f.routes).map_err(|e| RoutesError::Parse(e.to_string()))
 }
 
 /// Read `routes.toml`; a missing file is only fine when it was not requested explicitly.
-pub fn load_routes_file(
-    path: &std::path::Path,
-    required: bool,
-) -> Result<BTreeMap<String, Backend>, RoutesError> {
+pub fn load_routes_file(path: &std::path::Path, required: bool) -> Result<BTreeMap<String, Backend>, RoutesError> {
     match std::fs::read_to_string(path) {
         Ok(t) => parse_routes_toml(&t),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound && !required => {
             tracing::debug!(path = %path.display(), "routes.toml not found: every route is on");
             Ok(BTreeMap::new())
         }
-        Err(e) => Err(RoutesError::Read {
-            path: path.display().to_string(),
-            error: e.to_string(),
-        }),
+        Err(e) => Err(RoutesError::Read { path: path.display().to_string(), error: e.to_string() }),
     }
 }
 
@@ -119,12 +95,7 @@ pub struct RouteInfo {
 
 impl From<&ApiRoute> for RouteInfo {
     fn from(r: &ApiRoute) -> Self {
-        Self {
-            id: r.id,
-            method: r.method.clone(),
-            path: r.path,
-            upstream: r.upstream,
-        }
+        Self { id: r.id, method: r.method.clone(), path: r.path, upstream: r.upstream }
     }
 }
 
@@ -157,11 +128,7 @@ fn normalize(path: &str) -> String {
 }
 
 fn validate_path(r: &ApiRoute) -> Result<(), RoutesError> {
-    let err = |reason| RoutesError::InvalidPath {
-        id: r.id.to_owned(),
-        path: r.path.to_owned(),
-        reason,
-    };
+    let err = |reason| RoutesError::InvalidPath { id: r.id.to_owned(), path: r.path.to_owned(), reason };
     if !r.path.starts_with('/') {
         return Err(err("must start with '/'"));
     }
@@ -175,20 +142,13 @@ fn validate_path(r: &ApiRoute) -> Result<(), RoutesError> {
 }
 
 /// Validate all routes against each other and against `routes.toml`, keep the active ones.
-pub fn plan(
-    all: Vec<ApiRoute>,
-    config: &BTreeMap<String, Backend>,
-) -> Result<MountPlan, RoutesError> {
+pub fn plan(all: Vec<ApiRoute>, config: &BTreeMap<String, Backend>) -> Result<MountPlan, RoutesError> {
     let mut ids = HashSet::new();
     let mut by_method_path: HashMap<(Method, String), &'static str> = HashMap::new();
     let mut spelling: HashMap<String, (&'static str, &'static str)> = HashMap::new();
     for r in &all {
         if r.id.is_empty() {
-            return Err(RoutesError::InvalidPath {
-                id: String::new(),
-                path: r.path.to_owned(),
-                reason: "empty route id",
-            });
+            return Err(RoutesError::InvalidPath { id: String::new(), path: r.path.to_owned(), reason: "empty route id" });
         }
         if !ids.insert(r.id) {
             return Err(RoutesError::DuplicateId(r.id.to_owned()));
@@ -218,11 +178,7 @@ pub fn plan(
             }
         }
     }
-    let unknown: Vec<String> = config
-        .keys()
-        .filter(|k| !ids.contains(k.as_str()))
-        .cloned()
-        .collect();
+    let unknown: Vec<String> = config.keys().filter(|k| !ids.contains(k.as_str())).cloned().collect();
     if !unknown.is_empty() {
         return Err(RoutesError::UnknownIds(unknown));
     }
@@ -235,10 +191,7 @@ pub fn plan(
         );
     }
     let total = all.len();
-    let active = all
-        .into_iter()
-        .filter(|r| config.get(r.id) != Some(&Backend::Off))
-        .collect();
+    let active = all.into_iter().filter(|r| config.get(r.id) != Some(&Backend::Off)).collect();
     Ok(MountPlan { active, total })
 }
 
@@ -269,12 +222,10 @@ async fn method_not_allowed(state: AppState, allow: &str, meta: &serde_json::Val
     let (mut parts, _body) = req.into_parts();
     let mut resp = match pl_authz::AuthUser::from_request_parts(&mut parts, &state).await {
         Err(e) => e.into_response(),
-        Ok(_) if parts.method == Method::OPTIONS => {
-            match pl_core::RequestContext::from_request_parts(&mut parts, &state).await {
-                Ok(ctx) => pl_core::Drf::ok(meta).indent(ctx.negotiation.indent).into_response(),
-                Err(e) => e.into_response(),
-            }
-        }
+        Ok(_) if parts.method == Method::OPTIONS => match pl_core::RequestContext::from_request_parts(&mut parts, &state).await {
+            Ok(ctx) => pl_core::Drf::ok(meta).indent(ctx.negotiation.indent).into_response(),
+            Err(e) => e.into_response(),
+        },
         Ok(_) => pl_core::ApiError::method_not_allowed(parts.method.as_str()).into_response(),
     };
     pl_core::route::apply_drf_view_headers(resp.headers_mut(), allow);
@@ -324,10 +275,7 @@ pub fn build_router(plan: MountPlan) -> Result<Router<AppState>, RoutesError> {
                     streaming: crate::upload::STREAMING_ROUTES.contains(&r.id),
                     allow: drf_405.then(|| std::sync::Arc::<str>::from(allow.as_str())),
                 };
-                mr = mr.merge(
-                    r.handler
-                        .layer(axum::middleware::from_fn_with_state(gate, crate::body::gate)),
-                );
+                mr = mr.merge(r.handler.layer(axum::middleware::from_fn_with_state(gate, crate::body::gate)));
             }
             if drf_405 {
                 let allow = allow.clone();
@@ -341,17 +289,10 @@ pub fn build_router(plan: MountPlan) -> Result<Router<AppState>, RoutesError> {
                 mr.fallback(not_found_fallback)
             }
         }))
-        .map_err(|p| RoutesError::Mount {
-            path: path.to_owned(),
-            reason: format!("handlers overlap: {}", panic_text(p)),
-        })?;
+        .map_err(|p| RoutesError::Mount { path: path.to_owned(), reason: format!("handlers overlap: {}", panic_text(p)) })?;
         let r = std::mem::take(&mut router);
-        router = catch_unwind(AssertUnwindSafe(move || r.route(path, merged))).map_err(|p| {
-            RoutesError::Mount {
-                path: path.to_owned(),
-                reason: panic_text(p),
-            }
-        })?;
+        router = catch_unwind(AssertUnwindSafe(move || r.route(path, merged)))
+            .map_err(|p| RoutesError::Mount { path: path.to_owned(), reason: panic_text(p) })?;
     }
     if ui.index {
         // `ui.index`: Django's catch-all `re_path(r".*", IndexView)` for paths without a route.

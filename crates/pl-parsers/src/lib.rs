@@ -44,18 +44,8 @@ pub struct MetadataEntry {
 }
 
 impl MetadataEntry {
-    pub fn new(
-        namespace: impl Into<String>,
-        prefix: impl Into<String>,
-        key: impl Into<String>,
-        value: impl Into<String>,
-    ) -> Self {
-        Self {
-            namespace: namespace.into(),
-            prefix: prefix.into(),
-            key: key.into(),
-            value: value.into(),
-        }
+    pub fn new(namespace: impl Into<String>, prefix: impl Into<String>, key: impl Into<String>, value: impl Into<String>) -> Self {
+        Self { namespace: namespace.into(), prefix: prefix.into(), key: key.into(), value: value.into() }
     }
 }
 
@@ -109,13 +99,7 @@ pub struct ParseContext {
 
 impl Default for ParseContext {
     fn default() -> Self {
-        Self {
-            mailrule_id: None,
-            mail_pdf_layout: None,
-            work_dir: None,
-            time_zone: chrono_tz::UTC,
-            limits: Limits::default(),
-        }
+        Self { mailrule_id: None, mail_pdf_layout: None, work_dir: None, time_zone: chrono_tz::UTC, limits: Limits::default() }
     }
 }
 
@@ -148,12 +132,7 @@ pub trait DocumentParser: Send + Sync {
     fn parse(&self, path: &Path, mime_type: &str, ctx: &ParseContext) -> Result<ParsedDocument>;
     fn page_count(&self, path: &Path, mime_type: &str, ctx: &ParseContext) -> Option<u32>;
     /// Must not fail (upstream: "Implementations must not raise").
-    fn extract_metadata(
-        &self,
-        path: &Path,
-        mime_type: &str,
-        ctx: &ParseContext,
-    ) -> Vec<MetadataEntry>;
+    fn extract_metadata(&self, path: &Path, mime_type: &str, ctx: &ParseContext) -> Vec<MetadataEntry>;
     /// Thumbnail (WebP). Not part of this crate (needs renderer/font) → `Unsupported`.
     fn thumbnail(&self, _path: &Path, _mime_type: &str, _ctx: &ParseContext) -> Result<PathBuf> {
         Err(ParseError::Unsupported("thumbnail generation".into()))
@@ -164,11 +143,7 @@ pub trait DocumentParser: Send + Sync {
 pub(crate) fn read_limited(path: &Path, limits: &Limits) -> Result<Vec<u8>> {
     let meta = std::fs::metadata(path)?;
     if meta.len() > limits.max_file_size {
-        return Err(ParseError::LimitExceeded(format!(
-            "file size {} > {}",
-            meta.len(),
-            limits.max_file_size
-        )));
+        return Err(ParseError::LimitExceeded(format!("file size {} > {}", meta.len(), limits.max_file_size)));
     }
     Ok(std::fs::read(path)?)
 }

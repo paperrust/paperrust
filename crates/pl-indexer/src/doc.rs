@@ -62,10 +62,7 @@ impl PyDoc {
     }
     /// `add_json(field, {k: v, ...})`; keys must be given sorted.
     fn add_json(&mut self, field: &str, sorted: Vec<(&str, serde_json::Value)>) {
-        let obj: Vec<(String, OwnedValue)> = sorted
-            .into_iter()
-            .map(|(k, v)| (k.to_string(), OwnedValue::from(v)))
-            .collect();
+        let obj: Vec<(String, OwnedValue)> = sorted.into_iter().map(|(k, v)| (k.to_string(), OwnedValue::from(v))).collect();
         self.add(field, OwnedValue::Object(obj));
     }
 }
@@ -143,10 +140,7 @@ pub fn build_tantivy_doc(schema: &Schema, rec: &DocumentRecord) -> Result<Tantiv
             Some(u) => serde_json::Value::String(normalize_search_text(u)),
             None => serde_json::Value::Null,
         };
-        doc.add_json(
-            "notes",
-            vec![("note", serde_json::Value::String(note_text.clone())), ("user", user)],
-        );
+        doc.add_json("notes", vec![("note", serde_json::Value::String(note_text.clone())), ("user", user)]);
         note_texts.push(note_text);
     }
     if !note_texts.is_empty() {
@@ -229,8 +223,7 @@ pub fn build_tantivy_doc(schema: &Schema, rec: &DocumentRecord) -> Result<Tantiv
         doc.add_text("autocomplete_word", w);
     }
 
-    TantivyDocument::convert_named_doc(schema, NamedFieldDocument(doc.0))
-        .map_err(|e| IndexerError::InvalidValue(e.to_string()))
+    TantivyDocument::convert_named_doc(schema, NamedFieldDocument(doc.0)).map_err(|e| IndexerError::InvalidValue(e.to_string()))
 }
 
 /// `datetime(created.year, created.month, created.day, tzinfo=UTC)`.
@@ -291,18 +284,12 @@ pub(crate) mod tests {
         assert_eq!(json["barcodes"], serde_json::json!([{"format": "QRCode", "value": "ASN0001"}]));
         assert_eq!(json["created"], serde_json::json!(["2024-03-01T00:00:00Z"]));
         // field values are in field-NAME order (BTreeMap), like tantivy-py
-        let names: Vec<String> = doc
-            .iter_fields_and_values()
-            .map(|(f, _)| schema.get_field_name(f).to_string())
-            .collect();
+        let names: Vec<String> = doc.iter_fields_and_values().map(|(f, _)| schema.get_field_name(f).to_string()).collect();
         let mut sorted = names.clone();
         sorted.sort();
         assert_eq!(names, sorted);
         // the second note's text looks like RFC 3339 -> stored as a date inside the JSON
-        let notes: Vec<_> = doc
-            .get_all(schema.get_field("notes").unwrap())
-            .map(OwnedValue::from)
-            .collect();
+        let notes: Vec<_> = doc.get_all(schema.get_field("notes").unwrap()).map(OwnedValue::from).collect();
         match &notes[1] {
             OwnedValue::Object(kv) => {
                 assert_eq!(kv[0].0, "note");
@@ -320,10 +307,7 @@ pub(crate) mod tests {
         r.owner_id = Some(0);
         let doc = build_tantivy_doc(&schema, &r).unwrap();
         assert_eq!(doc.get_all(schema.get_field("owner_id").unwrap()).count(), 0);
-        let bigram: Vec<_> = doc
-            .get_all(schema.get_field("bigram_title").unwrap())
-            .map(OwnedValue::from)
-            .collect();
+        let bigram: Vec<_> = doc.get_all(schema.get_field("bigram_title").unwrap()).map(OwnedValue::from).collect();
         assert_eq!(bigram, vec![OwnedValue::Str("東京".into())]);
         assert_eq!(doc.get_all(schema.get_field("bigram_content").unwrap()).count(), 0);
     }

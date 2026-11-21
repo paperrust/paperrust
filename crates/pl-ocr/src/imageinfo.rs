@@ -18,15 +18,7 @@ use std::path::Path;
 use crate::OcrError;
 
 /// Image types that the Tesseract parser accepts (`is_image`).
-pub const IMAGE_MIME_TYPES: &[&str] = &[
-    "image/png",
-    "image/jpeg",
-    "image/tiff",
-    "image/bmp",
-    "image/gif",
-    "image/webp",
-    "image/heic",
-];
+pub const IMAGE_MIME_TYPES: &[&str] = &["image/png", "image/jpeg", "image/tiff", "image/bmp", "image/gif", "image/webp", "image/heic"];
 
 /// `RasterisedDocumentParser._SUPPORTED_MIME_TYPES` (order as upstream).
 pub const SUPPORTED_MIME_TYPES: &[(&str, &str)] = &[
@@ -100,9 +92,7 @@ impl ImageInfo {
             )));
         }
         if pixels > limit {
-            tracing::warn!(
-                "Image size ({pixels} pixels) exceeds limit of {limit} pixels, could be decompression bomb DOS attack."
-            );
+            tracing::warn!("Image size ({pixels} pixels) exceeds limit of {limit} pixels, could be decompression bomb DOS attack.");
         }
         Ok(())
     }
@@ -170,15 +160,8 @@ fn le32(d: &[u8], o: usize) -> Option<u32> {
 
 fn probe_png(d: &[u8]) -> Option<ImageInfo> {
     let mut pos = 8;
-    let mut info = ImageInfo {
-        format: ImageFormat::Png,
-        width: 0,
-        height: 0,
-        dpi: None,
-        has_alpha: false,
-        mode: "RGB",
-        exif_orientation: None,
-    };
+    let mut info =
+        ImageInfo { format: ImageFormat::Png, width: 0, height: 0, dpi: None, has_alpha: false, mode: "RGB", exif_orientation: None };
     let mut seen_ihdr = false;
     while pos + 8 <= d.len() {
         let len = be32(d, pos)? as usize;
@@ -329,7 +312,11 @@ fn probe_tiff(d: &[u8]) -> Option<ImageInfo> {
             _ => ("L", false),
         },
         0 | 1 => {
-            if ifd.bps.first() == Some(&1) { ("1", false) } else { ("L", false) }
+            if ifd.bps.first() == Some(&1) {
+                ("1", false)
+            } else {
+                ("L", false)
+            }
         }
         3 => ("P", false),
         5 => ("CMYK", false),
@@ -427,9 +414,10 @@ fn probe_jpeg(d: &[u8]) -> Option<ImageInfo> {
         },
     };
     if orientation.is_none()
-        && let Some(t) = exif {
-            orientation = tiff_first_ifd(t).and_then(|i| i.get(274)).map(|v| v as u16);
-        }
+        && let Some(t) = exif
+    {
+        orientation = tiff_first_ifd(t).and_then(|i| i.get(274)).map(|v| v as u16);
+    }
     Some(ImageInfo {
         format: ImageFormat::Jpeg,
         width,
@@ -638,16 +626,17 @@ fn probe_heic(d: &[u8]) -> Option<ImageInfo> {
         Some((_, idx)) => idx.iter().filter_map(|i| i.checked_sub(1).and_then(|i| props.get(i))).collect(),
         None => props.iter().collect(),
     };
-    let (mut w, mut h) = primary_props
-        .iter()
-        .find(|(t, _)| *t == b"ispe")
-        .and_then(|(_, b)| Some((be32(b, 4)?, be32(b, 8)?)))?;
+    let (mut w, mut h) = primary_props.iter().find(|(t, _)| *t == b"ispe").and_then(|(_, b)| Some((be32(b, 4)?, be32(b, 8)?)))?;
     for (t, b) in &primary_props {
         if *t == b"clap"
             && let (Some(wn), Some(wd), Some(hn), Some(hd)) = (be32(b, 0), be32(b, 4), be32(b, 8), be32(b, 12))
-                && wd != 0 && hd != 0 && wn / wd > 0 && hn / hd > 0 {
-                    (w, h) = (wn / wd, hn / hd);
-                }
+            && wd != 0
+            && hd != 0
+            && wn / wd > 0
+            && hn / hd > 0
+        {
+            (w, h) = (wn / wd, hn / hd);
+        }
     }
     for (t, b) in &primary_props {
         if *t == b"irot" && b.first().is_some_and(|r| r & 1 == 1) {
@@ -728,10 +717,7 @@ mod tests {
         };
         assert!(i.decompression_bomb_check(Some(600_000)).is_ok());
         let e = i.decompression_bomb_check(Some(400_000)).unwrap_err();
-        assert_eq!(
-            e.message(),
-            "Image size (1000000 pixels) exceeds limit of 800000 pixels, could be decompression bomb DOS attack."
-        );
+        assert_eq!(e.message(), "Image size (1000000 pixels) exceeds limit of 800000 pixels, could be decompression bomb DOS attack.");
         assert_eq!(pil_pixel_limit(Some(0)), None);
         assert_eq!(pil_pixel_limit(None), Some(89_478_485));
     }

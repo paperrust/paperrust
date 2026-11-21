@@ -7,7 +7,7 @@
 //! separators=(",", ":"))` (ensure_ascii=True). Error during the stream → the text
 //! [`CHAT_ERROR_MESSAGE`] as the last chunk (status stays 200).
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::pyjson;
 

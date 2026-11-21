@@ -7,53 +7,125 @@
 //! Environment: PL_REF_DB (default postgres://paperless:paperless@127.0.0.1:54329/paperless),
 //! PL_REF_DJANGO (default http://127.0.0.1:8000).
 
-use pl_authz::objects::{FilterOpts, permitted_objects_filter};
 use pl_authz::models::DOCUMENT;
+use pl_authz::objects::{FilterOpts, permitted_objects_filter};
+use pl_core::sqlbind::SqlxBinder;
 use pl_docfilter::{FilterContext, FilterError, QueryParams};
 use sea_query::{Alias, Expr, PostgresQueryBuilder, Query};
-use pl_core::sqlbind::SqlxBinder;
 use serde_json::Value;
 use sqlx::Row;
 
-const USERS: &[(&str, i64, &str)] = &[
-    ("admin", 2, "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a001"),
-    ("alice", 3, "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a002"),
-];
+const USERS: &[(&str, i64, &str)] =
+    &[("admin", 2, "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a001"), ("alice", 3, "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a002")];
 
 fn queries() -> Vec<String> {
     let mut q: Vec<String> = [
         // Ordering
-        "", "ordering=title", "ordering=-title", "ordering=-created", "ordering=archive_serial_number",
-        "ordering=-num_notes", "ordering=owner", "ordering=correspondent__name",
-        "ordering=-document_type__name", "ordering=storage_path__name", "ordering=page_count",
-        "ordering=added", "ordering=-modified", "ordering=id", "ordering=bogus", "ordering=title,-id",
-        "ordering=custom_field_999", "ordering=-num_notes,id",
+        "",
+        "ordering=title",
+        "ordering=-title",
+        "ordering=-created",
+        "ordering=archive_serial_number",
+        "ordering=-num_notes",
+        "ordering=owner",
+        "ordering=correspondent__name",
+        "ordering=-document_type__name",
+        "ordering=storage_path__name",
+        "ordering=page_count",
+        "ordering=added",
+        "ordering=-modified",
+        "ordering=id",
+        "ordering=bogus",
+        "ordering=title,-id",
+        "ordering=custom_field_999",
+        "ordering=-num_notes,id",
         // Filter
-        "title__icontains=tax", "title__istartswith=a", "title__iendswith=e", "title__iexact=x",
-        "content__icontains=quarterly", "content__istartswith=d", "title_content=steuer",
+        "title__icontains=tax",
+        "title__istartswith=a",
+        "title__iendswith=e",
+        "title__iexact=x",
+        "content__icontains=quarterly",
+        "content__istartswith=d",
+        "title_content=steuer",
         // O2: fast text search (textfold) incl. special characters/non-ASCII/escapes
-        "title_content=strasse", "title_content=fi", "title_content=%C3%9F", "title_content=a_b%25",
-        "content__iexact=x", "content__iendswith=n", "content__icontains=SS", "search=ss",
-        "archive_serial_number__gt=1100", "archive_serial_number__lte=1050", "archive_serial_number=1005",
-        "archive_serial_number__isnull=1", "archive_serial_number__gt=-1",
-        "created__year=2024", "created__month=3", "created__day=15", "created__gt=2024-06-01",
-        "created__date__lte=2024-12-31", "created__lt=10/25/2024",
-        "added__date__gt=2025-01-10", "added__date__lte=2025-01-08", "added__gt=2025-01-10T00:00:00Z",
-        "added__lt=2025-01-09", "modified__year=2025", "added__month=1", "added__day=7",
-        "correspondent__isnull=1", "correspondent__isnull=0", "correspondent__id=1",
-        "correspondent__id__in=1,2", "correspondent__id__none=1", "correspondent__name__icontains=a",
-        "document_type__id__none=1", "document_type__name__istartswith=in", "storage_path__id__none=1",
-        "storage_path__isnull=1", "tags__id__all=2,3", "tags__id__in=1,2", "tags__id__none=1", "tags__id=6",
-        "tags__name__iexact=paid", "tags__name__icontains=tax", "is_tagged=0", "is_tagged=1",
-        "is_in_inbox=true", "is_in_inbox=false", "owner__id=3", "owner__id__in=3,4", "owner__id__none=2",
-        "owner__isnull=1", "shared_by__id=2", "shared_by__id=3", "shared_by__id=4", "mime_type=pdf",
-        "mime_type=text", "has_custom_fields=1", "has_custom_fields=0", "custom_fields__id__all=1,3",
-        "custom_fields__id__none=1", "custom_fields__id__in=1,2", "custom_fields__icontains=a",
-        "custom_fields__icontains=medium", "custom_fields__icontains=CHF", "has_duplicates=1", "has_duplicates=0",
-        "search=tax", "search=%22quarterly-tax%22", "search=steuer,rechnung", "id__in=1,2,3,500", "id=5",
-        "id__in=,", "tags__id__all=1,x", "page_count=1",
+        "title_content=strasse",
+        "title_content=fi",
+        "title_content=%C3%9F",
+        "title_content=a_b%25",
+        "content__iexact=x",
+        "content__iendswith=n",
+        "content__icontains=SS",
+        "search=ss",
+        "archive_serial_number__gt=1100",
+        "archive_serial_number__lte=1050",
+        "archive_serial_number=1005",
+        "archive_serial_number__isnull=1",
+        "archive_serial_number__gt=-1",
+        "created__year=2024",
+        "created__month=3",
+        "created__day=15",
+        "created__gt=2024-06-01",
+        "created__date__lte=2024-12-31",
+        "created__lt=10/25/2024",
+        "added__date__gt=2025-01-10",
+        "added__date__lte=2025-01-08",
+        "added__gt=2025-01-10T00:00:00Z",
+        "added__lt=2025-01-09",
+        "modified__year=2025",
+        "added__month=1",
+        "added__day=7",
+        "correspondent__isnull=1",
+        "correspondent__isnull=0",
+        "correspondent__id=1",
+        "correspondent__id__in=1,2",
+        "correspondent__id__none=1",
+        "correspondent__name__icontains=a",
+        "document_type__id__none=1",
+        "document_type__name__istartswith=in",
+        "storage_path__id__none=1",
+        "storage_path__isnull=1",
+        "tags__id__all=2,3",
+        "tags__id__in=1,2",
+        "tags__id__none=1",
+        "tags__id=6",
+        "tags__name__iexact=paid",
+        "tags__name__icontains=tax",
+        "is_tagged=0",
+        "is_tagged=1",
+        "is_in_inbox=true",
+        "is_in_inbox=false",
+        "owner__id=3",
+        "owner__id__in=3,4",
+        "owner__id__none=2",
+        "owner__isnull=1",
+        "shared_by__id=2",
+        "shared_by__id=3",
+        "shared_by__id=4",
+        "mime_type=pdf",
+        "mime_type=text",
+        "has_custom_fields=1",
+        "has_custom_fields=0",
+        "custom_fields__id__all=1,3",
+        "custom_fields__id__none=1",
+        "custom_fields__id__in=1,2",
+        "custom_fields__icontains=a",
+        "custom_fields__icontains=medium",
+        "custom_fields__icontains=CHF",
+        "has_duplicates=1",
+        "has_duplicates=0",
+        "search=tax",
+        "search=%22quarterly-tax%22",
+        "search=steuer,rechnung",
+        "id__in=1,2,3,500",
+        "id=5",
+        "id__in=,",
+        "tags__id__all=1,x",
+        "page_count=1",
         // Form errors
-        "archive_serial_number=abc", "created__gt=bad", "added__gt=bad", "id__in=1,x&title__icontains=a%00",
+        "archive_serial_number=abc",
+        "created__gt=bad",
+        "added__gt=bad",
+        "id__in=1,x&title__icontains=a%00",
         "search=a%00",
     ]
     .iter()
@@ -130,14 +202,7 @@ async fn django(client: &reqwest::Client, base: &str, token: &str, q: &str) -> O
         return Outcome::Error(status, serde_json::from_str(&text).unwrap_or(Value::String(text)));
     }
     let v: Value = serde_json::from_str(&text).expect("json");
-    Outcome::Ids(
-        v["results"]
-            .as_array()
-            .expect("results")
-            .iter()
-            .map(|d| d["id"].as_i64().unwrap())
-            .collect(),
-    )
+    Outcome::Ids(v["results"].as_array().expect("results").iter().map(|d| d["id"].as_i64().unwrap()).collect())
 }
 
 async fn rust(pool: &sqlx::PgPool, user: &pl_authz::User, q: &str) -> Outcome {
@@ -177,14 +242,9 @@ async fn rust(pool: &sqlx::PgPool, user: &pl_authz::User, q: &str) -> Outcome {
 #[tokio::test]
 #[ignore = "braucht die laufende Referenzumgebung (reference/README.md)"]
 async fn parity_with_django() {
-    let db = std::env::var("PL_REF_DB")
-        .unwrap_or_else(|_| "postgres://paperless:paperless@127.0.0.1:54329/paperless".into());
+    let db = std::env::var("PL_REF_DB").unwrap_or_else(|_| "postgres://paperless:paperless@127.0.0.1:54329/paperless".into());
     let base = std::env::var("PL_REF_DJANGO").unwrap_or_else(|_| "http://127.0.0.1:8000".into());
-    let pool = sqlx::postgres::PgPoolOptions::new()
-        .max_connections(2)
-        .connect(&db)
-        .await
-        .expect("db");
+    let pool = sqlx::postgres::PgPoolOptions::new().max_connections(2).connect(&db).await.expect("db");
     let client = reqwest::Client::new();
     let (mut same, mut tie_only, mut different) = (0, 0, Vec::new());
     for (name, id, token) in USERS {
@@ -215,11 +275,7 @@ async fn parity_with_django() {
                     }
                 }
                 (Outcome::Error(sa, ba), Outcome::Error(sb, bb)) if sa == sb && (ba == bb || *sa == 500) => same += 1,
-                (d, r) => different.push(format!(
-                    "{name} {q}: django {} / rust {}",
-                    show(d),
-                    show(r)
-                )),
+                (d, r) => different.push(format!("{name} {q}: django {} / rust {}", show(d), show(r))),
             }
         }
     }

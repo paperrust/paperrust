@@ -40,10 +40,7 @@ impl NavPolicy {
         if port == 0 {
             return Self::none();
         }
-        Self {
-            origins: vec![format!("http://127.0.0.1:{port}")],
-            login_prefix: None,
-        }
+        Self { origins: vec![format!("http://127.0.0.1:{port}")], login_prefix: None }
     }
 
     /// `base` = profile address (`https://host[:port]/[path/]`), `extra` = confirmed SSO origins.
@@ -53,21 +50,14 @@ impl NavPolicy {
         };
         let mut origins = vec![b.origin().ascii_serialization()];
         origins.extend(extra.iter().cloned());
-        Self {
-            origins,
-            login_prefix: Some(format!("{}accounts/", b.as_str())),
-        }
+        Self { origins, login_prefix: Some(format!("{}accounts/", b.as_str())) }
     }
 
     pub fn allows(&self, u: &Url) -> bool {
         if is_local_page(u) || u.scheme() == "about" {
             return true;
         }
-        matches!(u.scheme(), "http" | "https")
-            && self
-                .origins
-                .iter()
-                .any(|o| *o == u.origin().ascii_serialization())
+        matches!(u.scheme(), "http" | "https") && self.origins.iter().any(|o| *o == u.origin().ascii_serialization())
     }
 
     /// `current` = page that the window is currently showing (source of the navigation).
@@ -172,11 +162,7 @@ mod tests {
 
     #[test]
     fn own_pages_always() {
-        for p in [
-            NavPolicy::none(),
-            NavPolicy::local(58_080),
-            NavPolicy::remote("https://a.example/", &[]),
-        ] {
+        for p in [NavPolicy::none(), NavPolicy::local(58_080), NavPolicy::remote("https://a.example/", &[])] {
             assert!(p.allows(&u("http://tauri.localhost/index.html")));
             assert!(p.allows(&u("https://tauri.localhost/settings.html")));
             assert!(p.allows(&u("tauri://localhost/index.html")));
@@ -194,13 +180,7 @@ mod tests {
         assert!(!p.allows(&u("http://localhost:58080/")));
         assert!(!p.allows(&u("https://127.0.0.1:58080/")));
         assert!(!p.allows(&u("https://docs.paperless-ngx.com/")));
-        assert_eq!(
-            p.decide(
-                Some(&u("http://127.0.0.1:58080/accounts/login/")),
-                &u("https://idp.example/")
-            ),
-            NavDecision::External
-        );
+        assert_eq!(p.decide(Some(&u("http://127.0.0.1:58080/accounts/login/")), &u("https://idp.example/")), NavDecision::External);
     }
 
     #[test]
@@ -227,29 +207,14 @@ mod tests {
         let idp = u("https://sso.example.ch/realms/x/auth?client_id=1");
         let p = NavPolicy::remote("https://docs.example.ch/", &[]);
         assert!(!p.allows(&idp));
-        assert_eq!(
-            p.decide(Some(&login), &idp),
-            NavDecision::AskSso("https://sso.example.ch".into())
-        );
+        assert_eq!(p.decide(Some(&login), &idp), NavDecision::AskSso("https://sso.example.ch".into()));
         // not from the login page (e.g. link in a document) → system browser
-        assert_eq!(
-            p.decide(
-                Some(&u("https://docs.example.ch/documents/1/details")),
-                &idp
-            ),
-            NavDecision::External
-        );
+        assert_eq!(p.decide(Some(&u("https://docs.example.ch/documents/1/details")), &idp), NavDecision::External);
         assert_eq!(p.decide(None, &idp), NavDecision::External);
         // never http IdP
-        assert_eq!(
-            p.decide(Some(&login), &u("http://sso.example.ch/")),
-            NavDecision::External
-        );
+        assert_eq!(p.decide(Some(&login), &u("http://sso.example.ch/")), NavDecision::External);
         // allowed after confirmation
-        let p = NavPolicy::remote(
-            "https://docs.example.ch/",
-            &["https://sso.example.ch".into()],
-        );
+        let p = NavPolicy::remote("https://docs.example.ch/", &["https://sso.example.ch".into()]);
         assert_eq!(p.decide(Some(&login), &idp), NavDecision::Allow);
         assert!(!p.allows(&u("https://sso.example.ch:8443/")));
     }

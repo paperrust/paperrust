@@ -30,32 +30,18 @@ pub struct Model {
     pub table: &'static str,
 }
 
-pub const MAIL_ACCOUNT: Model = Model {
-    name: "mailaccount",
-    object_name: "MailAccount",
-    table: "paperless_mail_mailaccount",
-};
-pub const MAIL_RULE: Model = Model {
-    name: "mailrule",
-    object_name: "MailRule",
-    table: "paperless_mail_mailrule",
-};
-pub const PROCESSED_MAIL: Model = Model {
-    name: "processedmail",
-    object_name: "ProcessedMail",
-    table: "paperless_mail_processedmail",
-};
+pub const MAIL_ACCOUNT: Model = Model { name: "mailaccount", object_name: "MailAccount", table: "paperless_mail_mailaccount" };
+pub const MAIL_RULE: Model = Model { name: "mailrule", object_name: "MailRule", table: "paperless_mail_mailrule" };
+pub const PROCESSED_MAIL: Model = Model { name: "processedmail", object_name: "ProcessedMail", table: "paperless_mail_processedmail" };
 
 /// `django_content_type.id` for a model of this app.
 pub async fn content_type_id(db: &PgPool, model: Model) -> ApiResult<i32> {
-    let row: Option<(i32,)> =
-        sqlx::query_as("SELECT id FROM django_content_type WHERE app_label = $1 AND model = $2")
-            .bind(APP_LABEL)
-            .bind(model.name)
-            .fetch_optional(db)
-            .await?;
-    row.map(|r| r.0)
-        .ok_or_else(|| ApiError::internal(format!("content type {} missing", model.name)))
+    let row: Option<(i32,)> = sqlx::query_as("SELECT id FROM django_content_type WHERE app_label = $1 AND model = $2")
+        .bind(APP_LABEL)
+        .bind(model.name)
+        .fetch_optional(db)
+        .await?;
+    row.map(|r| r.0).ok_or_else(|| ApiError::internal(format!("content type {} missing", model.name)))
 }
 
 /// `user.has_perm("paperless_mail.<codename>")` (ModelBackend).
@@ -99,11 +85,7 @@ pub fn action_for_method(method: &Method) -> &'static str {
 /// `PaperlessObjectPermissions.has_permission` → 403 on missing global permission.
 pub async fn require_model_perm(db: &PgPool, user: &MailUser, method: &Method, model: Model) -> ApiResult<()> {
     let codename = format!("{}_{}", action_for_method(method), model.name);
-    if has_global_perm(db, user, &codename).await? {
-        Ok(())
-    } else {
-        Err(ApiError::forbidden())
-    }
+    if has_global_perm(db, user, &codename).await? { Ok(()) } else { Err(ApiError::forbidden()) }
 }
 
 /// guardian `ObjectPermissionChecker(user).has_perm(codename, obj)`.
@@ -146,14 +128,7 @@ pub async fn guardian_has_perm(db: &PgPool, user: &MailUser, codename: &str, ct:
 }
 
 /// `has_perms_owner_aware(user, codename, obj)`.
-pub async fn has_perms_owner_aware(
-    db: &PgPool,
-    user: &MailUser,
-    codename: &str,
-    ct: i32,
-    pk: i32,
-    owner: Option<i32>,
-) -> ApiResult<bool> {
+pub async fn has_perms_owner_aware(db: &PgPool, user: &MailUser, codename: &str, ct: i32, pk: i32, owner: Option<i32>) -> ApiResult<bool> {
     match owner {
         None => Ok(true),
         Some(o) if o == user.id => Ok(true),
@@ -222,13 +197,7 @@ pub fn visible_sql(user: &MailUser, alias: &str, first: usize) -> Option<String>
 }
 
 /// List of the IDs from `ids` visible for `codename` (for bulk_delete / AccountField).
-pub async fn permitted_among(
-    db: &PgPool,
-    user: &MailUser,
-    model: Model,
-    codename: &str,
-    ids: &[i32],
-) -> ApiResult<HashSet<i32>> {
+pub async fn permitted_among(db: &PgPool, user: &MailUser, model: Model, codename: &str, ids: &[i32]) -> ApiResult<HashSet<i32>> {
     if ids.is_empty() {
         return Ok(HashSet::new());
     }
@@ -239,13 +208,7 @@ pub async fn permitted_among(
         Some(cond) => {
             let cond = cond.replace("{table}", model.table);
             let sql = format!("{base} AND {cond}");
-            sqlx::query_as(&sql)
-                .bind(ids)
-                .bind(user.id)
-                .bind(codename)
-                .bind(ct)
-                .fetch_all(db)
-                .await?
+            sqlx::query_as(&sql).bind(ids).bind(user.id).bind(codename).bind(ct).fetch_all(db).await?
         }
     };
     Ok(rows.into_iter().map(|r| r.0).collect())
@@ -267,10 +230,9 @@ pub async fn grantees(db: &PgPool, model: Model, ct: i32, pks: &[i32]) -> ApiRes
         let pk_strs: Vec<String> = pks.iter().map(|p| p.to_string()).collect();
         let grants = pl_authz::grants::use_grants();
         let pk_ids: Vec<i64> = pks.iter().map(|p| i64::from(*p)).collect();
-        for (table, col, is_user) in [
-            ("guardian_userobjectpermission", "user_id", true),
-            ("guardian_groupobjectpermission", "group_id", false),
-        ] {
+        for (table, col, is_user) in
+            [("guardian_userobjectpermission", "user_id", true), ("guardian_groupobjectpermission", "group_id", false)]
+        {
             let sql = format!(
                 "SELECT x.object_pk, p.codename, x.{col} FROM {table} x \
                  JOIN auth_permission p ON p.id = x.permission_id \
@@ -283,19 +245,9 @@ pub async fn grantees(db: &PgPool, model: Model, ct: i32, pks: &[i32]) -> ApiRes
                 let sql = format!(
                     "SELECT x.object_id::text, p.codename, abs(x.subject)::int4 FROM paperrust_grant x                      JOIN auth_permission p ON p.id = x.perm_id                      WHERE x.ct = $1 AND p.content_type_id = $1 AND x.subject {sign}                        AND p.codename = ANY($2) AND x.object_id = ANY($3) ORDER BY abs(x.subject)"
                 );
-                sqlx::query_as(&sql)
-                    .bind(ct)
-                    .bind(vec![view.clone(), change.clone()])
-                    .bind(&pk_ids)
-                    .fetch_all(db)
-                    .await?
+                sqlx::query_as(&sql).bind(ct).bind(vec![view.clone(), change.clone()]).bind(&pk_ids).fetch_all(db).await?
             } else {
-                sqlx::query_as(&sql)
-                    .bind(ct)
-                    .bind(vec![view.clone(), change.clone()])
-                    .bind(&pk_strs)
-                    .fetch_all(db)
-                    .await?
+                sqlx::query_as(&sql).bind(ct).bind(vec![view.clone(), change.clone()]).bind(&pk_strs).fetch_all(db).await?
             };
             for (opk, codename, ident) in rows {
                 let Ok(pk) = opk.parse::<i32>() else { continue };
@@ -407,23 +359,13 @@ pub struct PermFields {
 }
 
 impl PermFields {
-    pub async fn load(
-        db: &PgPool,
-        user: &MailUser,
-        model: Model,
-        full_perms: bool,
-        objs: &[(i32, Option<i32>)],
-    ) -> ApiResult<Self> {
+    pub async fn load(db: &PgPool, user: &MailUser, model: Model, full_perms: bool, objs: &[(i32, Option<i32>)]) -> ApiResult<Self> {
         let ct = content_type_id(db, model).await?;
         let pks: Vec<i32> = objs.iter().map(|o| o.0).collect();
         if full_perms {
             Ok(PermFields { full_perms, can_change: HashMap::new(), grantees: grantees(db, model, ct, &pks).await? })
         } else {
-            Ok(PermFields {
-                full_perms,
-                can_change: user_can_change(db, user, model, ct, objs).await?,
-                grantees: HashMap::new(),
-            })
+            Ok(PermFields { full_perms, can_change: user_can_change(db, user, model, ct, objs).await?, grantees: HashMap::new() })
         }
     }
 
@@ -432,10 +374,7 @@ impl PermFields {
             let empty = json!({"view":{"users":[],"groups":[]},"change":{"users":[],"groups":[]}});
             map.insert("permissions".into(), self.grantees.get(&pk).cloned().unwrap_or(empty));
         } else {
-            map.insert(
-                "user_can_change".into(),
-                Value::Bool(self.can_change.get(&pk).copied().unwrap_or(false)),
-            );
+            map.insert("user_can_change".into(), Value::Bool(self.can_change.get(&pk).copied().unwrap_or(false)));
         }
     }
 }
@@ -476,10 +415,7 @@ fn parse_int_list(v: &Value) -> Result<Option<Vec<i128>>, FieldError> {
             }
             if errs.is_empty() { Ok(Some(out)) } else { Err(Value::Object(errs)) }
         }
-        other => Err(drf::err(format!(
-            "Expected a list of items but got type \"{}\".",
-            pyval::type_name(other)
-        ))),
+        other => Err(drf::err(format!("Expected a list of items but got type \"{}\".", pyval::type_name(other)))),
     }
 }
 
@@ -564,14 +500,10 @@ pub struct ValidSetPermissions {
 async fn validate_ids(db: &PgPool, table: &str, ids: &[i128], msg: &str) -> Result<Vec<i32>, FieldError> {
     let in_range: Vec<i32> = ids.iter().filter_map(|i| i32::try_from(*i).ok()).collect();
     let sql = format!("SELECT id FROM {table} WHERE id = ANY($1) ORDER BY id");
-    let rows: Vec<(i32,)> = sqlx::query_as(&sql)
-        .bind(&in_range)
-        .fetch_all(db)
-        .await
-        .map_err(|e| {
-            tracing::error!(target: "pl_mail", "set_permissions lookup failed: {e}");
-            drf::err(msg)
-        })?;
+    let rows: Vec<(i32,)> = sqlx::query_as(&sql).bind(&in_range).fetch_all(db).await.map_err(|e| {
+        tracing::error!(target: "pl_mail", "set_permissions lookup failed: {e}");
+        drf::err(msg)
+    })?;
     if rows.len() != ids.len() {
         return Err(drf::err(msg));
     }
@@ -599,12 +531,7 @@ pub async fn validate_set_permissions(db: &PgPool, sp: &SetPermissions) -> Resul
 }
 
 /// `set_permissions_for_objects(permissions, model, [pk], merge=False)`.
-pub async fn apply_set_permissions(
-    tx: &mut Transaction<'_, Postgres>,
-    model: Model,
-    pk: i32,
-    sp: &ValidSetPermissions,
-) -> ApiResult<()> {
+pub async fn apply_set_permissions(tx: &mut Transaction<'_, Postgres>, model: Model, pk: i32, sp: &ValidSetPermissions) -> ApiResult<()> {
     let ct: (i32,) = sqlx::query_as("SELECT id FROM django_content_type WHERE app_label = $1 AND model = $2")
         .bind(APP_LABEL)
         .bind(model.name)
@@ -622,32 +549,24 @@ pub async fn apply_set_permissions(
         if action == "change" {
             implied.push(format!("view_{}", model.name));
         }
-        let perm_ids: Vec<(i32,)> =
-            sqlx::query_as("SELECT id FROM auth_permission WHERE content_type_id = $1 AND codename = ANY($2)")
-                .bind(ct)
-                .bind(&implied)
-                .fetch_all(&mut **tx)
-                .await?;
+        let perm_ids: Vec<(i32,)> = sqlx::query_as("SELECT id FROM auth_permission WHERE content_type_id = $1 AND codename = ANY($2)")
+            .bind(ct)
+            .bind(&implied)
+            .fetch_all(&mut **tx)
+            .await?;
         if perm_ids.len() != implied.len() {
             return Err(ApiError::internal(format!("permission rows missing for {codename}")));
         }
-        for (table, col, ids) in [
-            ("guardian_userobjectpermission", "user_id", &entry.users),
-            ("guardian_groupobjectpermission", "group_id", &entry.groups),
-        ] {
+        for (table, col, ids) in
+            [("guardian_userobjectpermission", "user_id", &entry.users), ("guardian_groupobjectpermission", "group_id", &entry.groups)]
+        {
             let Some(ids) = ids else { continue };
             let del = format!(
                 "DELETE FROM {table} WHERE content_type_id = $1 AND object_pk = $2 \
                  AND permission_id IN (SELECT id FROM auth_permission WHERE codename = $3) \
                  AND NOT ({col} = ANY($4))"
             );
-            sqlx::query(&del)
-                .bind(ct)
-                .bind(&object_pk)
-                .bind(&codename)
-                .bind(ids)
-                .execute(&mut **tx)
-                .await?;
+            sqlx::query(&del).bind(ct).bind(&object_pk).bind(&codename).bind(ids).execute(&mut **tx).await?;
             if ids.is_empty() {
                 continue;
             }
@@ -657,13 +576,7 @@ pub async fn apply_set_permissions(
                  ON CONFLICT DO NOTHING"
             );
             let pids: Vec<i32> = perm_ids.iter().map(|r| r.0).collect();
-            sqlx::query(&ins)
-                .bind(ct)
-                .bind(&object_pk)
-                .bind(&pids)
-                .bind(ids)
-                .execute(&mut **tx)
-                .await?;
+            sqlx::query(&ins).bind(ct).bind(&object_pk).bind(&pids).bind(ids).execute(&mut **tx).await?;
         }
     }
     Ok(())
@@ -680,11 +593,7 @@ pub async fn resolve_pk(db: &PgPool, table: &str, v: &Value) -> Result<i32, Fiel
         drf::PkLookup::OutOfRange => Err(drf::pk_does_not_exist(v)),
         drf::PkLookup::Id(id) => {
             let sql = format!("SELECT id FROM {table} WHERE id = $1");
-            let row: Option<(i32,)> = sqlx::query_as(&sql)
-                .bind(id)
-                .fetch_optional(db)
-                .await
-                .map_err(|_| drf::pk_does_not_exist(v))?;
+            let row: Option<(i32,)> = sqlx::query_as(&sql).bind(id).fetch_optional(db).await.map_err(|_| drf::pk_does_not_exist(v))?;
             row.map(|r| r.0).ok_or_else(|| drf::pk_does_not_exist(v))
         }
     }
@@ -694,10 +603,8 @@ pub async fn resolve_pk(db: &PgPool, table: &str, v: &Value) -> Result<i32, Fiel
 /// the same order as the single queries (first faulty entry wins), but only one
 /// query (review 2 N29).
 pub async fn resolve_pks(db: &PgPool, table: &str, items: &[Value]) -> Result<Vec<i32>, FieldError> {
-    let lookups: Vec<Result<drf::PkLookup, FieldError>> = items
-        .iter()
-        .map(|it| if it.is_null() { Err(drf::pk_does_not_exist(it)) } else { drf::pk_lookup(it) })
-        .collect();
+    let lookups: Vec<Result<drf::PkLookup, FieldError>> =
+        items.iter().map(|it| if it.is_null() { Err(drf::pk_does_not_exist(it)) } else { drf::pk_lookup(it) }).collect();
     let candidates: Vec<i32> = lookups
         .iter()
         .map_while(|l| l.as_ref().ok())
@@ -710,7 +617,8 @@ pub async fn resolve_pks(db: &PgPool, table: &str, items: &[Value]) -> Result<Ve
         Default::default()
     } else {
         let sql = format!("SELECT id FROM {table} WHERE id = ANY($1)");
-        let rows: Vec<(i32,)> = sqlx::query_as(&sql).bind(&candidates).fetch_all(db).await.map_err(|_| drf::pk_does_not_exist(&items[0]))?;
+        let rows: Vec<(i32,)> =
+            sqlx::query_as(&sql).bind(&candidates).fetch_all(db).await.map_err(|_| drf::pk_does_not_exist(&items[0]))?;
         rows.into_iter().map(|r| r.0).collect()
     };
     resolve_in_order(items, lookups, &existing)
@@ -755,10 +663,7 @@ mod tests {
         };
         assert_eq!(run(vec![json!(3), json!("1")]).unwrap(), vec![3, 1]);
         assert_eq!(run(vec![json!(1), json!(9), json!("x")]).unwrap_err(), json!(["Invalid pk \"9\" - object does not exist."]));
-        assert_eq!(
-            run(vec![json!(1), json!("x"), json!(9)]).unwrap_err(),
-            json!(["Incorrect type. Expected pk value, received str."])
-        );
+        assert_eq!(run(vec![json!(1), json!("x"), json!(9)]).unwrap_err(), json!(["Incorrect type. Expected pk value, received str."]));
         assert_eq!(run(vec![json!(null)]).unwrap_err(), json!(["Invalid pk \"None\" - object does not exist."]));
     }
     use serde_json::json;

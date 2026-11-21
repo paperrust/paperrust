@@ -24,7 +24,9 @@ pub enum Kind {
     Float,
     Bool,
     /// varchar(n) / text; `max` = character limit
-    Text { max: Option<usize> },
+    Text {
+        max: Option<usize>,
+    },
     /// timestamp with time zone (Django USE_TZ=True)
     Ts,
     /// timestamp without time zone
@@ -197,9 +199,7 @@ pub fn convert(kind: Kind, raw: &Raw, policy: Policy) -> Conv {
             if n > 0 {
                 match policy.nul {
                     NulPolicy::Fail => {
-                        return Conv::Err(format!(
-                            "JSON enthält {n} Zeichenkette(n) mit U+0000 (PostgreSQL jsonb verbietet \\u0000)"
-                        ));
+                        return Conv::Err(format!("JSON enthält {n} Zeichenkette(n) mit U+0000 (PostgreSQL jsonb verbietet \\u0000)"));
                     }
                     p => {
                         fix_json_nul(&mut v, p);
@@ -272,10 +272,9 @@ fn text_of(raw: &Raw, policy: Policy) -> Result<(String, Vec<String>), String> {
             Ok(s) => Ok((s, vec![])),
             Err(_) => match policy.utf8 {
                 Utf8Policy::Fail => Err(format!("ungültiges UTF-8: {}", preview_bytes(b))),
-                Utf8Policy::Replace => Ok((
-                    String::from_utf8_lossy(b).into_owned(),
-                    vec!["ungültige UTF-8-Bytes durch U+FFFD ersetzt".into()],
-                )),
+                Utf8Policy::Replace => {
+                    Ok((String::from_utf8_lossy(b).into_owned(), vec!["ungültige UTF-8-Bytes durch U+FFFD ersetzt".into()]))
+                }
             },
         },
         Raw::Int(i) => Ok((i.to_string(), vec![])),
@@ -290,9 +289,7 @@ fn apply_nul(s: String, p: NulPolicy) -> Result<(String, Option<String>), String
     }
     let n = s.matches('\0').count();
     match p {
-        NulPolicy::Fail => Err(format!(
-            "Text enthält {n} NUL-Zeichen (U+0000), PostgreSQL erlaubt das nicht"
-        )),
+        NulPolicy::Fail => Err(format!("Text enthält {n} NUL-Zeichen (U+0000), PostgreSQL erlaubt das nicht")),
         NulPolicy::Replace => Ok((s.replace('\0', "\u{FFFD}"), Some(format!("{n}× U+0000 {}", nul_action(p))))),
         NulPolicy::Strip => Ok((s.replace('\0', ""), Some(format!("{n}× U+0000 {}", nul_action(p))))),
     }
@@ -380,12 +377,7 @@ fn fmt_time(t: &NaiveTime) -> String {
 pub fn parse_ts(s: &str) -> Option<NaiveDateTime> {
     let s = s.trim();
     let s = s.strip_suffix('Z').map(|x| format!("{x}+00:00")).unwrap_or_else(|| s.to_string());
-    for f in [
-        "%Y-%m-%d %H:%M:%S%.f%:z",
-        "%Y-%m-%dT%H:%M:%S%.f%:z",
-        "%Y-%m-%d %H:%M:%S%.f%#z",
-        "%Y-%m-%dT%H:%M:%S%.f%#z",
-    ] {
+    for f in ["%Y-%m-%d %H:%M:%S%.f%:z", "%Y-%m-%dT%H:%M:%S%.f%:z", "%Y-%m-%d %H:%M:%S%.f%#z", "%Y-%m-%dT%H:%M:%S%.f%#z"] {
         if let Ok(dt) = chrono::DateTime::parse_from_str(&s, f) {
             return Some(dt.naive_utc());
         }
@@ -419,9 +411,7 @@ fn parse_date(s: &str) -> Option<NaiveDate> {
 
 fn parse_time(s: &str) -> Option<NaiveTime> {
     let s = s.trim();
-    NaiveTime::parse_from_str(s, "%H:%M:%S%.f")
-        .or_else(|_| NaiveTime::parse_from_str(s, "%H:%M"))
-        .ok()
+    NaiveTime::parse_from_str(s, "%H:%M:%S%.f").or_else(|_| NaiveTime::parse_from_str(s, "%H:%M")).ok()
 }
 
 /// JSON with recursively sorted keys, compact. jsonb reorders keys itself and
@@ -681,7 +671,10 @@ mod tests {
         assert_eq!(canon_from_pg(Kind::Json, r#"{"a": [1.5, "x"], "b": 1}"#).unwrap(), r#"{"a":[1.5,"x"],"b":1}"#);
         assert!(matches!(convert(Kind::Json, &t(r#"{"a": "\u0000"}"#), P), Conv::Err(_)));
         assert!(matches!(convert(Kind::Json, &t("NaN"), P), Conv::Err(_)));
-        assert_eq!(ok(Kind::Json, t("[-0.0, 1e2, 100000000000000000000]")).unwrap(), canon_from_pg(Kind::Json, "[0.0, 100, 100000000000000000000]").unwrap());
+        assert_eq!(
+            ok(Kind::Json, t("[-0.0, 1e2, 100000000000000000000]")).unwrap(),
+            canon_from_pg(Kind::Json, "[0.0, 100, 100000000000000000000]").unwrap()
+        );
         let p = Policy { nul: NulPolicy::Strip, utf8: Utf8Policy::Fail };
         match convert(Kind::Json, &t(r#"{"a\u0000": "x\u0000"}"#), p) {
             Conv::Fixed(Some(v), _) => assert_eq!(v, r#"{"a":"x"}"#),

@@ -81,11 +81,7 @@ pub fn translate(pat: &str) -> String {
                         }
                         k -= 1;
                     }
-                    stuff = chunks
-                        .iter()
-                        .map(|s| s.replace('\\', r"\\").replace('-', r"\-"))
-                        .collect::<Vec<_>>()
-                        .join("-");
+                    stuff = chunks.iter().map(|s| s.replace('\\', r"\\").replace('-', r"\-")).collect::<Vec<_>>().join("-");
                 }
                 // Escape set operations (&&, ~~ and ||).
                 let mut esc = String::new();

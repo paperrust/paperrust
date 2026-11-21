@@ -3,8 +3,8 @@
 //
 //! Document selection for bulk_edit and the operation routes.
 
-use sea_query::{Alias, Expr, PostgresQueryBuilder, Query};
 use pl_core::sqlbind::SqlxBinder;
+use sea_query::{Alias, Expr, PostgresQueryBuilder, Query};
 use serde_json::{Map, Value};
 use sqlx::PgConnection;
 

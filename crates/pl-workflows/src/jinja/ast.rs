@@ -91,17 +91,7 @@ pub struct Node {
 
 impl Node {
     pub fn new(k: K, lineno: usize, f: Vec<F>) -> Self {
-        Node {
-            k,
-            lineno,
-            s: String::new(),
-            s2: String::new(),
-            ctx: "load",
-            flag1: false,
-            flag2: false,
-            names: Vec::new(),
-            f,
-        }
+        Node { k, lineno, s: String::new(), s2: String::new(), ctx: "load", flag1: false, flag2: false, names: Vec::new(), f }
     }
 
     pub fn with_s(mut self, s: impl Into<String>) -> Self {

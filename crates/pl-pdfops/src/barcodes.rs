@@ -484,7 +484,11 @@ mod tests {
             vec![("TAG:invoice".to_string(), "invoice".to_string()), ("tag:Bank".into(), "Bank".into())]
         );
         let cfg = BarcodeConfig {
-            barcode_tag_mapping: vec![("ASN12.*".into(), "JOHN".into()), ("TAG:(.*)".into(), "".into()), ("CUST(.*)".into(), "\\g<1>".into())],
+            barcode_tag_mapping: vec![
+                ("ASN12.*".into(), "JOHN".into()),
+                ("TAG:(.*)".into(), "".into()),
+                ("CUST(.*)".into(), "\\g<1>".into()),
+            ],
             ..Default::default()
         };
         assert_eq!(

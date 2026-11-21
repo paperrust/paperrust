@@ -51,11 +51,7 @@ fn out(d: device::Device) -> DeviceOut {
 fn throttle_err(e: pl_core::ApiError) -> V2Error {
     let r = e.into_response();
     if r.status() == StatusCode::TOO_MANY_REQUESTS {
-        let wait = r
-            .headers()
-            .get(axum::http::header::RETRY_AFTER)
-            .and_then(|v| v.to_str().ok())
-            .and_then(|s| s.parse::<u64>().ok());
+        let wait = r.headers().get(axum::http::header::RETRY_AFTER).and_then(|v| v.to_str().ok()).and_then(|s| s.parse::<u64>().ok());
         V2Error(DomainError::Throttled { wait })
     } else {
         V2Error(DomainError::Internal(format!("throttle check failed ({})", r.status())))
@@ -74,18 +70,11 @@ async fn create_inner(state: AppState, req: Request) -> V2Result<Response> {
     // Throttle like `/api/token/` (before every password check; key = user or client address)
     let maybe = MaybeUser::from_request_parts(&mut parts, &state).await.map_err(auth_error)?;
     pl_auth_api::token::check_login_throttle(&state, &parts, maybe.user().map(|u| u.id)).await.map_err(throttle_err)?;
-    let authz = parts
-        .extensions
-        .get::<Authz>()
-        .cloned()
-        .ok_or_else(|| V2Error(DomainError::Internal("pl_authz::Authz missing".into())))?;
+    let authz = parts.extensions.get::<Authz>().cloned().ok_or_else(|| V2Error(DomainError::Internal("pl_authz::Authz missing".into())))?;
     // S7: client IP (ipware over headers + TCP peer) in the failed-login log
     let headers = parts.headers.clone();
     let meta = pl_authz::RequestMeta {
-        remote_addr: parts
-            .extensions
-            .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
-            .map(|c| c.0.ip()),
+        remote_addr: parts.extensions.get::<axum::extract::ConnectInfo<std::net::SocketAddr>>().map(|c| c.0.ip()),
         ..Default::default()
     };
     let req = Request::from_parts(parts, body);
@@ -106,7 +95,9 @@ async fn create_inner(state: AppState, req: Request) -> V2Result<Response> {
         };
         let auths = pl_auth_api::db::authenticators(db, user.id, Some("totp")).await.map_err(DomainError::internal)?;
         // F6: without a TOTP secret (MFA only with other methods) never check against an empty secret
-        let Some(secret) = auths.first().and_then(|a| a.data.get("secret")).and_then(Value::as_str).filter(|s| !s.is_empty()).map(str::to_string) else {
+        let Some(secret) =
+            auths.first().and_then(|a| a.data.get("secret")).and_then(Value::as_str).filter(|s| !s.is_empty()).map(str::to_string)
+        else {
             return Err(V2Error(DomainError::field("code", "Invalid MFA code")));
         };
         let valid = pl_auth_api::totp::validate_totp_code(&secret, code).unwrap_or(false);

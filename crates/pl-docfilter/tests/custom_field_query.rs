@@ -13,25 +13,29 @@ fn err(query_json: &str) -> Value {
 fn assert_err(query_json: &str, path: &[&str], keyword: &str) {
     let v = err(query_json);
     let (p, msg) = error_path(&v);
-    let expected: Vec<String> = std::iter::once("custom_field_query".to_string())
-        .chain(path.iter().map(|s| s.to_string()))
-        .collect();
+    let expected: Vec<String> = std::iter::once("custom_field_query".to_string()).chain(path.iter().map(|s| s.to_string())).collect();
     assert_eq!(p, expected, "path for {query_json}: {v}");
     assert!(msg.contains(keyword), "message {msg:?} lacks {keyword:?}");
 }
 
 fn ends(sql: &str, suffix: &str) {
-    assert!(sql.ends_with(suffix), "
+    assert!(
+        sql.ends_with(suffix),
+        "
 {sql}
  does not end with
-{suffix}");
+{suffix}"
+    );
 }
 
 fn has(sql: &str, part: &str) {
-    assert!(sql.contains(part), "
+    assert!(
+        sql.contains(part),
+        "
 {sql}
  does not contain
-{part}");
+{part}"
+    );
 }
 
 fn ok(query_json: &str) -> String {
@@ -41,10 +45,7 @@ fn ok(query_json: &str) -> String {
 #[test]
 fn upstream_invalid_queries() {
     assert_eq!(err("not valid json"), json!({"custom_field_query": ["Value must be valid JSON."]}));
-    assert_eq!(
-        err("\"valid json but not valid expr\""),
-        json!({"custom_field_query": ["Invalid custom field query expression"]})
-    );
+    assert_eq!(err("\"valid json but not valid expr\""), json!({"custom_field_query": ["Invalid custom field query expression"]}));
     assert_eq!(
         err(r#"["invalid name", "iexact", "foo"]"#),
         json!({"custom_field_query": {"0": ["'invalid name' is not a valid custom field."]}})
@@ -53,22 +54,13 @@ fn upstream_invalid_queries() {
         err(r#"["integer_field", "iexact", "foo"]"#),
         json!({"custom_field_query": {"1": ["integer does not support query expr 'iexact'."]}})
     );
-    assert_eq!(
-        err(r#"["select_field", "exact", []]"#),
-        json!({"custom_field_query": {"2": ["Not a valid string."]}})
-    );
+    assert_eq!(err(r#"["select_field", "exact", []]"#), json!({"custom_field_query": {"2": ["Not a valid string."]}}));
     assert_eq!(
         err(r#"["invalid op", ["integer_field", "gt", 0]]"#),
         json!({"custom_field_query": {"0": ["Invalid logical operator 'invalid op'"]}})
     );
-    assert_eq!(
-        err(r#"["AND", "not a list"]"#),
-        json!({"custom_field_query": {"1": ["Invalid expression list. Must be nonempty."]}})
-    );
-    assert_eq!(
-        err(r#"["AND", []]"#),
-        json!({"custom_field_query": {"1": ["Invalid expression list. Must be nonempty."]}})
-    );
+    assert_eq!(err(r#"["AND", "not a list"]"#), json!({"custom_field_query": {"1": ["Invalid expression list. Must be nonempty."]}}));
+    assert_eq!(err(r#"["AND", []]"#), json!({"custom_field_query": {"1": ["Invalid expression list. Must be nonempty."]}}));
     assert_err(r#"["integer_field", "foo__gt", 0]"#, &["1"], "does not support query expr");
     assert_err(r#"["date_field", "foo__gt", 0]"#, &["1"], "does not support query expr");
     assert_err(r#"["monetary_field", "exact", "USDnotanumber"]"#, &["2"], "valid number");
@@ -111,14 +103,8 @@ fn nested_error_paths() {
         json!({"custom_field_query": {"1": {"1": {"1": ["integer does not support query expr 'bad'."]}}}})
     );
     // ListField child error
-    assert_eq!(
-        err(r#"["integer_field", "in", [1, "x"]]"#),
-        json!({"custom_field_query": {"2": {"1": ["A valid integer is required."]}}})
-    );
-    assert_eq!(
-        err(r#"["integer_field", "in", []]"#),
-        json!({"custom_field_query": {"2": ["This list may not be empty."]}})
-    );
+    assert_eq!(err(r#"["integer_field", "in", [1, "x"]]"#), json!({"custom_field_query": {"2": {"1": ["A valid integer is required."]}}}));
+    assert_eq!(err(r#"["integer_field", "in", []]"#), json!({"custom_field_query": {"2": ["This list may not be empty."]}}));
     assert_eq!(
         err(r#"["float_field", "range", [1]]"#),
         json!({"custom_field_query": {"2": ["Ensure this field has at least 2 elements."]}})
@@ -131,26 +117,11 @@ fn nested_error_paths() {
         err(r#"["integer_field", "exact", 3000000000]"#),
         json!({"custom_field_query": {"2": ["Ensure this value is less than or equal to 2147483647."]}})
     );
-    assert_eq!(
-        err(r#"["integer_field", "exact", null]"#),
-        json!({"custom_field_query": {"2": ["This field may not be null."]}})
-    );
-    assert_eq!(
-        err(r#"["integer_field", "exact", 1.5]"#),
-        json!({"custom_field_query": {"2": ["A valid integer is required."]}})
-    );
-    assert_eq!(
-        err(r#"["boolean_field", "exact", "maybe"]"#),
-        json!({"custom_field_query": {"2": ["Must be a valid boolean."]}})
-    );
-    assert_eq!(
-        err(r#"["string_field", "exists", null]"#),
-        json!({"custom_field_query": {"2": ["This field may not be null."]}})
-    );
-    assert_eq!(
-        err(r#"["url_field", "exact", ""]"#),
-        json!({"custom_field_query": {"2": ["This field may not be blank."]}})
-    );
+    assert_eq!(err(r#"["integer_field", "exact", null]"#), json!({"custom_field_query": {"2": ["This field may not be null."]}}));
+    assert_eq!(err(r#"["integer_field", "exact", 1.5]"#), json!({"custom_field_query": {"2": ["A valid integer is required."]}}));
+    assert_eq!(err(r#"["boolean_field", "exact", "maybe"]"#), json!({"custom_field_query": {"2": ["Must be a valid boolean."]}}));
+    assert_eq!(err(r#"["string_field", "exists", null]"#), json!({"custom_field_query": {"2": ["This field may not be null."]}}));
+    assert_eq!(err(r#"["url_field", "exact", ""]"#), json!({"custom_field_query": {"2": ["This field may not be blank."]}}));
     assert_eq!(
         err(r#"["documentlink_field", "contains", "x"]"#),
         json!({"custom_field_query": {"2": ["Expected a list of items but got type \"str\"."]}})
@@ -159,18 +130,9 @@ fn nested_error_paths() {
         err(&format!(r#"["string_field", "exact", "{}"]"#, "x".repeat(129))),
         json!({"custom_field_query": {"2": ["Ensure this field has no more than 128 characters."]}})
     );
-    assert_eq!(
-        err(r#"[1.5, "exact", "x"]"#),
-        json!({"custom_field_query": {"0": ["1.5 is not a valid custom field."]}})
-    );
-    assert_eq!(
-        err(r#"[99, "exact", "x"]"#),
-        json!({"custom_field_query": {"0": ["99 is not a valid custom field."]}})
-    );
-    assert_eq!(
-        err(r#"["string_field", 5, "x"]"#),
-        json!({"custom_field_query": {"1": ["string does not support query expr 5."]}})
-    );
+    assert_eq!(err(r#"[1.5, "exact", "x"]"#), json!({"custom_field_query": {"0": ["1.5 is not a valid custom field."]}}));
+    assert_eq!(err(r#"[99, "exact", "x"]"#), json!({"custom_field_query": {"0": ["99 is not a valid custom field."]}}));
+    assert_eq!(err(r#"["string_field", 5, "x"]"#), json!({"custom_field_query": {"1": ["string does not support query expr 5."]}}));
 }
 
 #[test]
@@ -276,20 +238,10 @@ fn logical_combinations() {
 fn document_link_contains() {
     let mut db = upstream_fields();
     // Document 10 links to 1,2,3; document 11 to 1,2; document 12 to 2
-    db.links = vec![
-        (1, 8, json!([10, 11])),
-        (2, 8, json!([10, 11, 12])),
-        (6, 8, Value::Null),
-    ];
+    db.links = vec![(1, 8, json!([10, 11])), (2, 8, json!([10, 11, 12])), (6, 8, Value::Null)];
     let run = |q: &str| filter_sql_with(&cfq(q), &superuser(), &ctx(), &db).unwrap();
-    assert_eq!(
-        run(r#"["documentlink_field", "contains", [1, 2]]"#),
-        r#"WHERE "documents_document"."id" IN (10, 11)"#
-    );
-    assert_eq!(
-        run(r#"["documentlink_field", "contains", [2, 1]]"#),
-        r#"WHERE "documents_document"."id" IN (10, 11)"#
-    );
+    assert_eq!(run(r#"["documentlink_field", "contains", [1, 2]]"#), r#"WHERE "documents_document"."id" IN (10, 11)"#);
+    assert_eq!(run(r#"["documentlink_field", "contains", [2, 1]]"#), r#"WHERE "documents_document"."id" IN (10, 11)"#);
     // no back references for 7 → empty
     assert_eq!(run(r#"["documentlink_field", "contains", [7]]"#), "WHERE FALSE");
     assert_eq!(
@@ -305,12 +257,6 @@ fn field_lookup_by_id_and_cache() {
     has(&ok(r#"[1, "exact", "x"]"#), r#""cq"."field_id" = 1"#);
     // True == 1 in Python
     has(&ok(r#"[true, "exact", "x"]"#), r#""cq"."field_id" = 1"#);
-    assert_eq!(
-        err(r#"[false, "exact", "x"]"#),
-        json!({"custom_field_query": {"0": ["False is not a valid custom field."]}})
-    );
-    assert_eq!(
-        err(r#"[null, "exact", "x"]"#),
-        json!({"custom_field_query": {"0": ["None is not a valid custom field."]}})
-    );
+    assert_eq!(err(r#"[false, "exact", "x"]"#), json!({"custom_field_query": {"0": ["False is not a valid custom field."]}}));
+    assert_eq!(err(r#"[null, "exact", "x"]"#), json!({"custom_field_query": {"0": ["None is not a valid custom field."]}}));
 }

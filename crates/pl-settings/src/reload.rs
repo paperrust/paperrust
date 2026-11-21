@@ -59,9 +59,7 @@ pub struct SettingsHandle {
 
 impl std::fmt::Debug for SettingsHandle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SettingsHandle")
-            .field("rev", &self.load().rev)
-            .finish()
+        f.debug_struct("SettingsHandle").field("rev", &self.load().rev).finish()
     }
 }
 
@@ -71,16 +69,7 @@ impl SettingsHandle {
         let boot = initial.boot_values();
         let initial = Arc::new(initial);
         let (tx, _) = watch::channel(initial.clone());
-        Self {
-            inner: Arc::new(Inner {
-                current: ArcSwap::new(initial),
-                boot,
-                env,
-                sb,
-                tx,
-                publish: std::sync::OnceLock::new(),
-            }),
-        }
+        Self { inner: Arc::new(Inner { current: ArcSwap::new(initial), boot, env, sb, tx, publish: std::sync::OnceLock::new() }) }
     }
 
     /// Without database (process without DB, tests): environment/file/default only.
@@ -100,32 +89,12 @@ impl SettingsHandle {
     /// freshly built [`LiveConfig`] for `AppState::live_config()`.
     pub fn publish_process_wide(&self, live: LiveConfig, startup: pl_core::Config, base: Env) {
         let restart_only = |k: &str| {
-            crate::schema::find(k).is_some_and(|d| {
-                !matches!(
-                    d.effect,
-                    crate::schema::Effect::Live | crate::schema::Effect::Worker
-                )
-            })
+            crate::schema::find(k).is_some_and(|d| !matches!(d.effect, crate::schema::Effect::Live | crate::schema::Effect::Worker))
         };
         let boot_overlay = pl_core::config::live_overlay()
-            .map(|o| {
-                o.iter()
-                    .filter(|(k, _)| restart_only(k))
-                    .map(|(k, v)| (k.clone(), v.clone()))
-                    .collect()
-            })
+            .map(|o| o.iter().filter(|(k, _)| restart_only(k)).map(|(k, v)| (k.clone(), v.clone())).collect())
             .unwrap_or_default();
-        if self
-            .inner
-            .publish
-            .set(Publish {
-                live,
-                startup,
-                boot_overlay,
-                base,
-            })
-            .is_ok()
-        {
+        if self.inner.publish.set(Publish { live, startup, boot_overlay, base }).is_ok() {
             self.publish(&self.load());
         }
     }
@@ -140,12 +109,7 @@ impl SettingsHandle {
             // Only immediately effective keys (L/W); S keys apply only after the restart
             // (`restart_pending`), otherwise e.g. cookie names would change in the middle of operation.
             .filter(|e| e.source == crate::layer::Source::Db && crate::layer::rule_n(e.def))
-            .filter(|e| {
-                matches!(
-                    e.def.effect,
-                    crate::schema::Effect::Live | crate::schema::Effect::Worker
-                )
-            })
+            .filter(|e| matches!(e.def.effect, crate::schema::Effect::Live | crate::schema::Effect::Worker))
             .filter_map(|e| e.value.clone().map(|v| (e.def.key.to_string(), v)))
             .collect();
         overlay.extend(p.boot_overlay.iter().map(|(k, v)| (k.clone(), v.clone())));
@@ -204,33 +168,17 @@ impl SettingsHandle {
     /// Fresh snapshot directly from the DB (without swapping), with the same start values – for
     /// display (AC columns may have changed via v1/Django without NOTIFY).
     pub async fn fresh(&self, pool: &PgPool) -> Result<Settings, sqlx::Error> {
-        store::load_settings(
-            pool,
-            self.inner.env.clone(),
-            &self.inner.sb,
-            Some(&self.inner.boot),
-        )
-        .await
+        store::load_settings(pool, self.inner.env.clone(), &self.inner.sb, Some(&self.inner.boot)).await
     }
 
     /// Reloads and swaps the snapshot. `true` if the state changed.
     pub async fn reload(&self, pool: &PgPool) -> Result<bool, sqlx::Error> {
-        let s = store::load_settings(
-            pool,
-            self.inner.env.clone(),
-            &self.inner.sb,
-            Some(&self.inner.boot),
-        )
-        .await?;
+        let s = store::load_settings(pool, self.inner.env.clone(), &self.inner.sb, Some(&self.inner.boot)).await?;
         let changed = s.rev != self.load().rev;
         let s = Arc::new(s);
         self.inner.current.store(s.clone());
         if changed {
-            tracing::info!(
-                rev = s.rev,
-                restart_pending = s.restart_pending_count(),
-                "settings reloaded"
-            );
+            tracing::info!(rev = s.rev, restart_pending = s.restart_pending_count(), "settings reloaded");
             self.publish(&s);
             self.inner.tx.send_replace(s);
         }
@@ -238,21 +186,12 @@ impl SettingsHandle {
     }
 
     /// Starts the listener task (until `stop` becomes `true`).
-    pub fn spawn_listener(
-        &self,
-        pool: PgPool,
-        stop: watch::Receiver<bool>,
-    ) -> tokio::task::JoinHandle<()> {
+    pub fn spawn_listener(&self, pool: PgPool, stop: watch::Receiver<bool>) -> tokio::task::JoinHandle<()> {
         self.spawn_listener_with(pool, stop, FALLBACK_INTERVAL)
     }
 
     /// Like [`SettingsHandle::spawn_listener`] with its own fallback interval (tests).
-    pub fn spawn_listener_with(
-        &self,
-        pool: PgPool,
-        mut stop: watch::Receiver<bool>,
-        fallback: Duration,
-    ) -> tokio::task::JoinHandle<()> {
+    pub fn spawn_listener_with(&self, pool: PgPool, mut stop: watch::Receiver<bool>, fallback: Duration) -> tokio::task::JoinHandle<()> {
         let h = self.clone();
         tokio::spawn(async move {
             let mut tick = tokio::time::interval(fallback);
@@ -325,11 +264,7 @@ impl SettingsHandle {
 /// Assembly in the server/worker: first snapshot (with DB, otherwise environment only), hook the service into
 /// `AppState`, start the listener task. Errors while loading are not fatal (table missing
 /// → environment only; `manage migrate` installs the migration).
-pub async fn install(
-    state: &pl_core::AppState,
-    with_db: bool,
-    stop: watch::Receiver<bool>,
-) -> SettingsHandle {
+pub async fn install(state: &pl_core::AppState, with_db: bool, stop: watch::Receiver<bool>) -> SettingsHandle {
     let cfg = state.config();
     // Layering always over the pure environment (without the overlay from [`startup_overlay`],
     // otherwise DB values would appear locked as "from environment").
@@ -349,11 +284,7 @@ pub async fn install(
     } else {
         SettingsHandle::without_db(env, sb)
     };
-    tracing::info!(
-        rev = handle.load().rev,
-        supervised = crate::restart::supported(handle.env()),
-        "settings snapshot loaded"
-    );
+    tracing::info!(rev = handle.load().rev, supervised = crate::restart::supported(handle.env()), "settings snapshot loaded");
     let live = LiveConfig::new(cfg.clone());
     state.set_service(live.clone());
     handle.publish_process_wide(live, cfg.clone(), Env::from_process_raw());
@@ -371,11 +302,7 @@ pub async fn startup_overlay(core: &pl_core::Config) -> bool {
         return false;
     }
     let opts = pl_core::state::pg_connect_options(&core.db);
-    let conn = tokio::time::timeout(
-        Duration::from_secs(10),
-        sqlx::PgConnection::connect_with(&opts),
-    )
-    .await;
+    let conn = tokio::time::timeout(Duration::from_secs(10), sqlx::PgConnection::connect_with(&opts)).await;
     let mut conn = match conn {
         Ok(Ok(c)) => c,
         Ok(Err(e)) => {
@@ -394,16 +321,7 @@ pub async fn startup_overlay(core: &pl_core::Config) -> bool {
         }
     };
     let _ = conn.close().await;
-    let s = Settings::build(
-        &Layers {
-            env,
-            db,
-            ac: None,
-            desktop: Default::default(),
-        },
-        0,
-        None,
-    );
+    let s = Settings::build(&Layers { env, db, ac: None, desktop: Default::default() }, 0, None);
     let overlay: std::collections::BTreeMap<String, String> = s
         .entries()
         .iter()
@@ -413,10 +331,7 @@ pub async fn startup_overlay(core: &pl_core::Config) -> bool {
     if overlay.is_empty() {
         return false;
     }
-    tracing::info!(
-        keys = overlay.len(),
-        "settings from the web UI applied at startup"
-    );
+    tracing::info!(keys = overlay.len(), "settings from the web UI applied at startup");
     pl_core::config::set_live_overlay(overlay);
     true
 }

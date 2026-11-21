@@ -18,8 +18,8 @@ pub mod status;
 pub mod sysinfo;
 pub mod tasks;
 
-use axum::http::Method;
 use axum::extract::DefaultBodyLimit;
+use axum::http::Method;
 use axum::routing::{delete, get, patch, post, put};
 use pl_core::ApiRoute;
 use pl_core::route::{ALLOW_MODEL_DETAIL, ALLOW_MODEL_LIST, ALLOW_POST_ONLY, ALLOW_READ_ONLY, drf_view};

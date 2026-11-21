@@ -45,7 +45,8 @@ pub struct SignInput<'a> {
 }
 
 fn canonical_query(q: &[(String, String)]) -> String {
-    let mut v: Vec<(String, String)> = q.iter().map(|(k, v)| (utf8_percent_encode(k, URI_ENCODE).to_string(), utf8_percent_encode(v, URI_ENCODE).to_string())).collect();
+    let mut v: Vec<(String, String)> =
+        q.iter().map(|(k, v)| (utf8_percent_encode(k, URI_ENCODE).to_string(), utf8_percent_encode(v, URI_ENCODE).to_string())).collect();
     v.sort();
     v.iter().map(|(k, v)| format!("{k}={v}")).collect::<Vec<_>>().join("&")
 }
@@ -179,7 +180,11 @@ impl Client {
         }
         let status = resp.status().as_u16();
         let body = resp.text().await.unwrap_or_default();
-        Err(S3Error { status: Some(status), code: xml_tag(&body, "Code").unwrap_or_default(), message: xml_tag(&body, "Message").unwrap_or_else(|| body.chars().take(200).collect()) })
+        Err(S3Error {
+            status: Some(status),
+            code: xml_tag(&body, "Code").unwrap_or_default(),
+            message: xml_tag(&body, "Message").unwrap_or_else(|| body.chars().take(200).collect()),
+        })
     }
 
     fn lock_headers(&self, until: Option<DateTime<Utc>>) -> Vec<(String, String)> {
@@ -227,10 +232,16 @@ impl Client {
 
     /// Delete; `Ok(false)` if the retention period (Object Lock) prevents it.
     pub async fn delete(&self, key: &str) -> Result<bool, S3Error> {
-        let r = self.send(reqwest::Method::DELETE, Some(key), Vec::new(), Vec::new(), reqwest::Body::from(Vec::new()), EMPTY_SHA256).await?;
+        let r =
+            self.send(reqwest::Method::DELETE, Some(key), Vec::new(), Vec::new(), reqwest::Body::from(Vec::new()), EMPTY_SHA256).await?;
         match Self::check(r).await {
             Ok(_) => Ok(true),
-            Err(e) if e.status == Some(403) && (e.code == "AccessDenied" || e.code.contains("ObjectLock") || e.message.contains("retention")) => Ok(false),
+            Err(e)
+                if e.status == Some(403)
+                    && (e.code == "AccessDenied" || e.code.contains("ObjectLock") || e.message.contains("retention")) =>
+            {
+                Ok(false)
+            }
             Err(e) => Err(e),
         }
     }
@@ -246,7 +257,14 @@ impl Client {
         let sha = sha256_hex(&body);
         let md5 = base64::engine::general_purpose::STANDARD.encode(md5::Md5::digest(&body));
         let r = self
-            .send(reqwest::Method::PUT, Some(key), vec![("retention".into(), String::new())], vec![("content-md5".into(), md5)], reqwest::Body::from(body), &sha)
+            .send(
+                reqwest::Method::PUT,
+                Some(key),
+                vec![("retention".into(), String::new())],
+                vec![("content-md5".into(), md5)],
+                reqwest::Body::from(body),
+                &sha,
+            )
             .await?;
         Self::check(r).await.map(|_| ())
     }
@@ -262,7 +280,8 @@ impl Client {
                 q.push(("continuation-token".into(), t.clone()));
             }
             let r = self.send(reqwest::Method::GET, None, q, Vec::new(), reqwest::Body::from(Vec::new()), EMPTY_SHA256).await?;
-            let body = Self::check(r).await?.text().await.map_err(|e| S3Error { status: None, code: String::new(), message: e.to_string() })?;
+            let body =
+                Self::check(r).await?.text().await.map_err(|e| S3Error { status: None, code: String::new(), message: e.to_string() })?;
             let mut rest = body.as_str();
             while let Some(i) = rest.find("<Key>") {
                 let after = &rest[i + 5..];

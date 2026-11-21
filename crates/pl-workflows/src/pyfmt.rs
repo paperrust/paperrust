@@ -56,11 +56,7 @@ pub fn float_repr(f: f64) -> String {
         };
         format!("{sign}{body}")
     } else {
-        let m = if digits.len() > 1 {
-            format!("{}.{}", &digits[..1], &digits[1..])
-        } else {
-            digits.clone()
-        };
+        let m = if digits.len() > 1 { format!("{}.{}", &digits[..1], &digits[1..]) } else { digits.clone() };
         let es = if exp < 0 { "-" } else { "+" };
         format!("{sign}{m}e{es}{:02}", exp.abs())
     }
@@ -113,8 +109,7 @@ pub fn repr(v: &Value) -> String {
             format!("[{}]", items.join(", "))
         }
         Value::Object(o) => {
-            let items: Vec<String> =
-                o.iter().map(|(k, v)| format!("{}: {}", str_repr(k), repr(v))).collect();
+            let items: Vec<String> = o.iter().map(|(k, v)| format!("{}: {}", str_repr(k), repr(v))).collect();
             format!("{{{}}}", items.join(", "))
         }
         other => py_str(other),
@@ -191,11 +186,7 @@ pub fn parse_int(text: &str) -> PyInt {
         return PyInt::Overflow(neg);
     }
     let v = if neg { -acc } else { acc };
-    if v > i64::MAX as i128 || v < i64::MIN as i128 {
-        PyInt::Overflow(neg)
-    } else {
-        PyInt::Ok(v as i64)
-    }
+    if v > i64::MAX as i128 || v < i64::MIN as i128 { PyInt::Overflow(neg) } else { PyInt::Ok(v as i64) }
 }
 
 /// Python `int(value)` for a JSON value (like Django `IntegerField.get_prep_value`).
@@ -213,11 +204,7 @@ pub fn int_of_value(v: &Value) -> Result<PyInt, PyTypeError> {
                     return Err(PyTypeError);
                 }
                 let t = f.trunc();
-                if (-9.2e18..=9.2e18).contains(&t) {
-                    Ok(PyInt::Ok(t as i64))
-                } else {
-                    Ok(PyInt::Overflow(t < 0.0))
-                }
+                if (-9.2e18..=9.2e18).contains(&t) { Ok(PyInt::Ok(t as i64)) } else { Ok(PyInt::Overflow(t < 0.0)) }
             }
         }
         // bool is an int in Python; the DRF fields catch bool beforehand.

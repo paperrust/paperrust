@@ -95,7 +95,10 @@ pub async fn cleanup_email_addresses(ctx: &Ctx, addresses: Vec<EmailAddr>) -> R<
     for mut address in addresses {
         let Some(email) = valid_email_or_none(Some(&address.email)) else { continue };
         address.email = email.clone();
-        let (exists,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM account_emailaddress WHERE email = $1)").bind(&email).fetch_one(ctx.st.db()).await?;
+        let (exists,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM account_emailaddress WHERE email = $1)")
+            .bind(&email)
+            .fetch_one(ctx.st.db())
+            .await?;
         if exists {
             continue;
         }
@@ -122,7 +125,8 @@ pub async fn cleanup_email_addresses(ctx: &Ctx, addresses: Vec<EmailAddr>) -> R<
             verified.push(a.email.clone());
         }
     }
-    let primary_email = primary_verified.first().or(verified.first()).or(primary.first()).cloned().or_else(|| e2a.first().map(|a| a.email.clone()));
+    let primary_email =
+        primary_verified.first().or(verified.first()).or(primary.first()).cloned().or_else(|| e2a.first().map(|a| a.email.clone()));
     if let Some(p) = &primary_email {
         for a in e2a.iter_mut() {
             a.primary = a.email.to_lowercase() == p.to_lowercase();
@@ -166,12 +170,19 @@ pub async fn setup_user_email(ctx: &mut Ctx, user_id: i64, user_email: &str, add
 /// `has_verified_email(user, email)`.
 pub async fn has_verified_email(ctx: &Ctx, user_id: i64, email: Option<&str>) -> R<bool> {
     let (v,): (bool,) = match email.filter(|e| !e.is_empty()) {
-        Some(e) => sqlx::query_as("SELECT COALESCE((SELECT verified FROM account_emailaddress WHERE user_id = $1 AND email = $2 LIMIT 1), false)")
-            .bind(user_id)
-            .bind(e.to_lowercase())
-            .fetch_one(ctx.st.db())
-            .await?,
-        None => sqlx::query_as("SELECT EXISTS(SELECT 1 FROM account_emailaddress WHERE user_id = $1 AND verified)").bind(user_id).fetch_one(ctx.st.db()).await?,
+        Some(e) => {
+            sqlx::query_as("SELECT COALESCE((SELECT verified FROM account_emailaddress WHERE user_id = $1 AND email = $2 LIMIT 1), false)")
+                .bind(user_id)
+                .bind(e.to_lowercase())
+                .fetch_one(ctx.st.db())
+                .await?
+        }
+        None => {
+            sqlx::query_as("SELECT EXISTS(SELECT 1 FROM account_emailaddress WHERE user_id = $1 AND verified)")
+                .bind(user_id)
+                .fetch_one(ctx.st.db())
+                .await?
+        }
     };
     Ok(v)
 }
@@ -199,18 +210,24 @@ pub async fn has_any_address(ctx: &Ctx, user_id: i64, email: Option<&str>) -> R<
 pub async fn send_account_already_exists(ctx: &mut Ctx, email: &str) -> R<bool> {
     let key = email.to_lowercase();
     let subj = Subject { ip: None, user_id: None, key: Some(&key) };
-    if ratelimit::consume(&ctx.cache, "confirm_email", Settings::rate_limits("confirm_email"), &subj, false).await.map_err(|e| Internal(e.0))?.is_none() {
+    if ratelimit::consume(&ctx.cache, "confirm_email", Settings::rate_limits("confirm_email"), &subj, false)
+        .await
+        .map_err(|e| Internal(e.0))?
+        .is_none()
+    {
         return Ok(false);
     }
     let l = ctx.lang;
     let reset = absolute_uri(ctx, &crate::page::url(ctx, "account_reset_password"));
-    let body = format!(
-        "{}\n\n{reset}\n\n{}",
-        crate::i18n::tf(l, "auth.mail.exists_text", &[("EMAIL", email)]),
-        tr!(l, "auth.mail.ignore"),
-    );
+    let body =
+        format!("{}\n\n{reset}\n\n{}", crate::i18n::tf(l, "auth.mail.exists_text", &[("EMAIL", email)]), tr!(l, "auth.mail.ignore"),);
     let subject = tr!(l, "auth.mail.exists_subject");
-    let m = Mail { from: ctx.s.default_from_email.clone(), to: email.to_string(), subject: format!("[{}] {subject}", ctx.s.site_name), body: mail_wrap(ctx, &body) };
+    let m = Mail {
+        from: ctx.s.default_from_email.clone(),
+        to: email.to_string(),
+        subject: format!("[{}] {subject}", ctx.s.site_name),
+        body: mail_wrap(ctx, &body),
+    };
     if let Err(e) = mail::send(&ctx.s, &m).await {
         tracing::warn!(target: "paperless.auth", host = %ctx.s.email_host, port = ctx.s.email_port, error = %e, "account-exists mail could not be sent");
     }
@@ -240,9 +257,13 @@ pub async fn verification_sent(
 /// `filter_users_by_email(email)` → count (for `assess_unique_email`, without active filter).
 pub async fn users_with_email(ctx: &Ctx, email: &str, exclude_user: Option<i64>) -> R<usize> {
     let email = email.to_lowercase();
-    let rows: Vec<(i64, String)> = sqlx::query_as("SELECT user_id::int8, email FROM account_emailaddress WHERE email = $1").bind(&email).fetch_all(ctx.st.db()).await?;
+    let rows: Vec<(i64, String)> = sqlx::query_as("SELECT user_id::int8, email FROM account_emailaddress WHERE email = $1")
+        .bind(&email)
+        .fetch_all(ctx.st.db())
+        .await?;
     let mut ids: Vec<i64> = rows.into_iter().filter(|(_, e)| unicode_ci_eq(e, &email)).map(|(u, _)| u).collect();
-    let rows: Vec<(i64, String)> = sqlx::query_as("SELECT id::int8, email FROM auth_user WHERE email = $1").bind(&email).fetch_all(ctx.st.db()).await?;
+    let rows: Vec<(i64, String)> =
+        sqlx::query_as("SELECT id::int8, email FROM auth_user WHERE email = $1").bind(&email).fetch_all(ctx.st.db()).await?;
     ids.extend(rows.into_iter().filter(|(_, e)| unicode_ci_eq(e, &email)).map(|(u, _)| u));
     Ok(ids.into_iter().filter(|u| Some(*u) != exclude_user).count())
 }
@@ -267,11 +288,12 @@ pub async fn assess_unique_email(ctx: &Ctx, email: &str) -> R<Option<bool>> {
 /// `get_address_for_user(user)`: first address by `-primary, -verified`, otherwise
 /// `sync_user_email_address`.
 async fn address_for_user(ctx: &Ctx, user_id: i64) -> R<Option<(i64, String, bool)>> {
-    let row: Option<(i64, String, bool)> =
-        sqlx::query_as("SELECT id::int8, email, verified FROM account_emailaddress WHERE user_id = $1 ORDER BY \"primary\" DESC, verified DESC LIMIT 1")
-            .bind(user_id)
-            .fetch_optional(ctx.st.db())
-            .await?;
+    let row: Option<(i64, String, bool)> = sqlx::query_as(
+        "SELECT id::int8, email, verified FROM account_emailaddress WHERE user_id = $1 ORDER BY \"primary\" DESC, verified DESC LIMIT 1",
+    )
+    .bind(user_id)
+    .fetch_optional(ctx.st.db())
+    .await?;
     if row.is_some() {
         return Ok(row);
     }
@@ -280,13 +302,18 @@ async fn address_for_user(ctx: &Ctx, user_id: i64) -> R<Option<(i64, String, boo
     if email.is_empty() {
         return Ok(None);
     }
-    let (primary_exists,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM account_emailaddress WHERE user_id = $1 AND \"primary\")").bind(user_id).fetch_one(ctx.st.db()).await?;
-    let (id,): (i64,) = sqlx::query_as("INSERT INTO account_emailaddress (email, verified, \"primary\", user_id) VALUES ($1, false, $2, $3) RETURNING id::int8")
-        .bind(email.to_lowercase())
-        .bind(!primary_exists)
+    let (primary_exists,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM account_emailaddress WHERE user_id = $1 AND \"primary\")")
         .bind(user_id)
         .fetch_one(ctx.st.db())
         .await?;
+    let (id,): (i64,) = sqlx::query_as(
+        "INSERT INTO account_emailaddress (email, verified, \"primary\", user_id) VALUES ($1, false, $2, $3) RETURNING id::int8",
+    )
+    .bind(email.to_lowercase())
+    .bind(!primary_exists)
+    .bind(user_id)
+    .fetch_one(ctx.st.db())
+    .await?;
     Ok(Some((id, email.to_lowercase(), false)))
 }
 
@@ -324,7 +351,11 @@ pub fn mail_wrap(ctx: &Ctx, content: &str) -> String {
 pub async fn send_verification_to_address(ctx: &mut Ctx, pk: i64, email: &str, username: &str, signup: bool) -> R<bool> {
     let key = email.to_lowercase();
     let subj = Subject { ip: None, user_id: None, key: Some(&key) };
-    if ratelimit::consume(&ctx.cache, "confirm_email", Settings::rate_limits("confirm_email"), &subj, false).await.map_err(|e| Internal(e.0))?.is_none() {
+    if ratelimit::consume(&ctx.cache, "confirm_email", Settings::rate_limits("confirm_email"), &subj, false)
+        .await
+        .map_err(|e| Internal(e.0))?
+        .is_none()
+    {
         return Ok(false);
     }
     let l = ctx.lang;
@@ -339,7 +370,12 @@ pub async fn send_verification_to_address(ctx: &mut Ctx, pk: i64, email: &str, u
     // email_confirmation_signup_* and email_confirmation_* have the same content
     let _ = signup;
     let subject = tr!(l, "auth.mail.confirm_subject");
-    let m = Mail { from: ctx.s.default_from_email.clone(), to: email.to_string(), subject: format!("[{}] {subject}", ctx.s.site_name), body: mail_wrap(ctx, &body) };
+    let m = Mail {
+        from: ctx.s.default_from_email.clone(),
+        to: email.to_string(),
+        subject: format!("[{}] {subject}", ctx.s.site_name),
+        body: mail_wrap(ctx, &body),
+    };
     // Mail errors (no SMTP, server unreachable) only go to the log, no 500 – as with the
     // password reset (Known differences, test log 2026-11-16). No "sent" message.
     if let Err(e) = mail::send(&ctx.s, &m).await {
@@ -355,11 +391,12 @@ pub async fn send_verification_to_address(ctx: &mut Ctx, pk: i64, email: &str, u
 pub async fn send_verification_at_login(ctx: &mut Ctx, user_id: i64, username: &str, login_email: Option<&str>, signup: bool) -> R<bool> {
     let addr = match login_email.filter(|e| !e.is_empty()) {
         Some(e) => {
-            let row: Option<(i64, String, bool)> = sqlx::query_as("SELECT id::int8, email, verified FROM account_emailaddress WHERE user_id = $1 AND email = $2")
-                .bind(user_id)
-                .bind(e.to_lowercase())
-                .fetch_optional(ctx.st.db())
-                .await?;
+            let row: Option<(i64, String, bool)> =
+                sqlx::query_as("SELECT id::int8, email, verified FROM account_emailaddress WHERE user_id = $1 AND email = $2")
+                    .bind(user_id)
+                    .bind(e.to_lowercase())
+                    .fetch_optional(ctx.st.db())
+                    .await?;
             row
         }
         None => address_for_user(ctx, user_id).await?,
@@ -379,10 +416,11 @@ pub async fn from_key(ctx: &Ctx, key: &str) -> R<Option<(i64, String, i64)>> {
     }
     let Ok(v) = pl_authz::signing::loads(key, SALT, &ctx.s.secret_key) else { return Ok(None) };
     let Some(pk) = v.as_i64() else { return Ok(None) };
-    let row: Option<(i64, String, i64)> = sqlx::query_as("SELECT id::int8, email, user_id::int8 FROM account_emailaddress WHERE id = $1 AND NOT verified")
-        .bind(pk)
-        .fetch_optional(ctx.st.db())
-        .await?;
+    let row: Option<(i64, String, i64)> =
+        sqlx::query_as("SELECT id::int8, email, user_id::int8 FROM account_emailaddress WHERE id = $1 AND NOT verified")
+            .bind(pk)
+            .fetch_optional(ctx.st.db())
+            .await?;
     Ok(row)
 }
 
@@ -436,17 +474,22 @@ async fn confirm_view(ctx: &mut Ctx, key: String) -> R<axum::response::Response>
     let mut extra = serde_json::Map::new();
     if let Some((pk, email, uid)) = &obj {
         logout_other_user(ctx, *uid);
-        let (conflict,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM account_emailaddress WHERE id <> $1 AND verified AND email = $2)")
-            .bind(pk)
-            .bind(email)
-            .fetch_one(ctx.st.db())
-            .await?;
-        let (username,): (String,) = sqlx::query_as("SELECT username FROM auth_user WHERE id = $1").bind(uid).fetch_one(ctx.st.db()).await?;
+        let (conflict,): (bool,) =
+            sqlx::query_as("SELECT EXISTS(SELECT 1 FROM account_emailaddress WHERE id <> $1 AND verified AND email = $2)")
+                .bind(pk)
+                .bind(email)
+                .fetch_one(ctx.st.db())
+                .await?;
+        let (username,): (String,) =
+            sqlx::query_as("SELECT username FROM auth_user WHERE id = $1").bind(uid).fetch_one(ctx.st.db()).await?;
         extra.insert("confirmation".into(), Value::Bool(true));
         extra.insert("can_confirm".into(), Value::Bool(!conflict));
         extra.insert("email".into(), Value::from(email.clone()));
         extra.insert("user_display".into(), Value::from(username));
-        extra.insert("action_url".into(), Value::from(format!("{}accounts/confirm-email/{}/", ctx.s.base_url, crate::web::iri_to_uri(&key))));
+        extra.insert(
+            "action_url".into(),
+            Value::from(format!("{}accounts/confirm-email/{}/", ctx.s.base_url, crate::web::iri_to_uri(&key))),
+        );
         if !conflict {
             // {% csrf_token %} only in the form (get_token sets the cookie)
             let csrf = ctx.csrf_input();
@@ -471,22 +514,29 @@ fn logout_other_user(ctx: &mut Ctx, uid: i64) {
 /// `flows.email_verification.verify_email(request, email_address)`.
 async fn verify_email(ctx: &mut Ctx, pk: i64, email: &str, uid: i64) -> R<bool> {
     let l = ctx.lang;
-    let (conflict,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM account_emailaddress WHERE id <> $1 AND verified AND email = $2)")
-        .bind(pk)
-        .bind(email)
-        .fetch_one(ctx.st.db())
-        .await?;
+    let (conflict,): (bool,) =
+        sqlx::query_as("SELECT EXISTS(SELECT 1 FROM account_emailaddress WHERE id <> $1 AND verified AND email = $2)")
+            .bind(pk)
+            .bind(email)
+            .fetch_one(ctx.st.db())
+            .await?;
     if conflict {
         let t = crate::i18n::tf(l, "auth.confirm.taken", &[("EMAIL", email)]);
         ctx.messages.add(messages::ERROR, t);
         return Ok(false);
     }
     // set_as_primary(conditional=True): only without an existing primary address
-    let (has_primary,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM account_emailaddress WHERE user_id = $1 AND \"primary\")").bind(uid).fetch_one(ctx.st.db()).await?;
+    let (has_primary,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM account_emailaddress WHERE user_id = $1 AND \"primary\")")
+        .bind(uid)
+        .fetch_one(ctx.st.db())
+        .await?;
     if has_primary {
         sqlx::query("UPDATE account_emailaddress SET verified = true WHERE id = $1").bind(pk).execute(ctx.st.db()).await?;
     } else {
-        sqlx::query("UPDATE account_emailaddress SET verified = true, \"primary\" = true WHERE id = $1").bind(pk).execute(ctx.st.db()).await?;
+        sqlx::query("UPDATE account_emailaddress SET verified = true, \"primary\" = true WHERE id = $1")
+            .bind(pk)
+            .execute(ctx.st.db())
+            .await?;
         sqlx::query("UPDATE auth_user SET email = $1 WHERE id = $2").bind(email).bind(uid).execute(ctx.st.db()).await?;
     }
     let t = crate::i18n::tf(l, "auth.msg.confirmed", &[("EMAIL", email)]);
@@ -534,7 +584,10 @@ mod tests {
     fn email_addr_roundtrip() {
         let a = EmailAddr { email: "a@b.invalid".into(), verified: Value::Bool(false), primary: true };
         let v = a.serialize();
-        assert_eq!(pl_authz::signing::python_json_dumps(&v), r#"{"id":null,"user_id":null,"email":"a@b.invalid","verified":false,"primary":true}"#);
+        assert_eq!(
+            pl_authz::signing::python_json_dumps(&v),
+            r#"{"id":null,"user_id":null,"email":"a@b.invalid","verified":false,"primary":true}"#
+        );
         assert_eq!(EmailAddr::deserialize(&v), Some(a));
     }
 }

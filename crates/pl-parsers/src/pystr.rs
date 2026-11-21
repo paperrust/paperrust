@@ -44,11 +44,7 @@ pub fn py_isprintable(c: char) -> bool {
     }
     let u = c as u32;
     // Zs (except ' '), Zl, Zp
-    if matches!(
-        c,
-        '\u{a0}' | '\u{1680}' | '\u{2000}'
-            ..='\u{200a}' | '\u{2028}' | '\u{2029}' | '\u{202f}' | '\u{205f}' | '\u{3000}'
-    ) {
+    if matches!(c, '\u{a0}' | '\u{1680}' | '\u{2000}'..='\u{200a}' | '\u{2028}' | '\u{2029}' | '\u{202f}' | '\u{205f}' | '\u{3000}') {
         return false;
     }
     // Cf (common format characters)
@@ -60,8 +56,7 @@ pub fn py_isprintable(c: char) -> bool {
         return false;
     }
     // Co / Cn (Private Use, Noncharacters)
-    if matches!(u, 0xe000..=0xf8ff | 0xf0000..=0x10ffff | 0xfdd0..=0xfdef) || (u & 0xfffe) == 0xfffe
-    {
+    if matches!(u, 0xe000..=0xf8ff | 0xf0000..=0x10ffff | 0xfdd0..=0xfdef) || (u & 0xfffe) == 0xfffe {
         return false;
     }
     true
@@ -128,12 +123,7 @@ pub enum PyCodec {
 
 /// Normalizes like `encodings.normalize_encoding` + aliases; `None` = `LookupError`.
 pub fn lookup_codec(label: &str) -> Option<PyCodec> {
-    let norm: String = label
-        .trim()
-        .to_ascii_lowercase()
-        .chars()
-        .map(|c| if c == '_' || c == ' ' { '-' } else { c })
-        .collect();
+    let norm: String = label.trim().to_ascii_lowercase().chars().map(|c| if c == '_' || c == ' ' { '-' } else { c }).collect();
     let compact: String = norm.chars().filter(|c| *c != '-').collect();
     match compact.as_str() {
         "utf8" | "u8" | "utf" | "cp65001" | "utf8sig" => return Some(PyCodec::Utf8),
@@ -190,10 +180,7 @@ pub fn decode_with(codec: PyCodec, bytes: &[u8], errors: Errors) -> String {
 
 fn decode_enc(enc: &'static Encoding, bytes: &[u8], errors: Errors) -> String {
     let mut dec = enc.new_decoder_without_bom_handling();
-    let cap = dec
-        .max_utf8_buffer_length_without_replacement(bytes.len())
-        .unwrap_or(bytes.len().saturating_mul(3))
-        .saturating_add(16);
+    let cap = dec.max_utf8_buffer_length_without_replacement(bytes.len()).unwrap_or(bytes.len().saturating_mul(3)).saturating_add(16);
     let mut out = String::with_capacity(cap.min(64 * 1024 * 1024));
     let mut input = bytes;
     loop {
@@ -230,18 +217,7 @@ pub fn py_splitlines(s: &str) -> Vec<&str> {
     let mut start = 0;
     let mut it = s.char_indices().peekable();
     while let Some((i, c)) = it.next() {
-        let is_break = matches!(
-            c,
-            '\n' | '\r'
-                | '\u{0b}'
-                | '\u{0c}'
-                | '\u{1c}'
-                | '\u{1d}'
-                | '\u{1e}'
-                | '\u{85}'
-                | '\u{2028}'
-                | '\u{2029}'
-        );
+        let is_break = matches!(c, '\n' | '\r' | '\u{0b}' | '\u{0c}' | '\u{1c}' | '\u{1d}' | '\u{1e}' | '\u{85}' | '\u{2028}' | '\u{2029}');
         if is_break {
             out.push(&s[start..i]);
             let mut end = i + c.len_utf8();

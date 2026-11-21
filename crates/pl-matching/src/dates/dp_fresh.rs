@@ -13,11 +13,9 @@ use super::dp_tz::{apply_timezone, fixed_offset, pop_tz_offset};
 
 const UNITS: &str = "decade|year|month|week|day|hour|minute|second";
 
-static PATTERN: LazyLock<fancy_regex::Regex> = LazyLock::new(|| {
-    fancy_regex::Regex::new(&format!(r"(?is)([+-]?\s*\d++[.,]?\d*+)\s*({UNITS})\b")).unwrap()
-});
-static SKIP: LazyLock<regex::Regex> =
-    LazyLock::new(|| regex::Regex::new(&format!(r"^(?:{UNITS}|ago|in|\d+|:|[ap]m)")).unwrap());
+static PATTERN: LazyLock<fancy_regex::Regex> =
+    LazyLock::new(|| fancy_regex::Regex::new(&format!(r"(?is)([+-]?\s*\d++[.,]?\d*+)\s*({UNITS})\b")).unwrap());
+static SKIP: LazyLock<regex::Regex> = LazyLock::new(|| regex::Regex::new(&format!(r"^(?:{UNITS}|ago|in|\d+|:|[ap]m)")).unwrap());
 static NON_WORD: LazyLock<regex::Regex> = LazyLock::new(|| regex::Regex::new(r"\W").unwrap());
 static SPACES: LazyLock<regex::Regex> = LazyLock::new(|| regex::Regex::new(r"\s+").unwrap());
 static AGO_IN: LazyLock<regex::Regex> = LazyLock::new(|| regex::Regex::new(r"\b(?:ago|in)\b").unwrap());

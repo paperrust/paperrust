@@ -24,20 +24,12 @@ impl SearchError {
 
     /// `InvalidDateQuery(field, value)`; Python `{value!r}`/`{field!r}` repr.
     pub fn invalid_date(field: Option<&str>, value: Option<&str>) -> Self {
-        SearchError::query(format!(
-            "Invalid date value {} for field {}.",
-            py_repr_opt(value),
-            py_repr_opt(field)
-        ))
+        SearchError::query(format!("Invalid date value {} for field {}.", py_repr_opt(value), py_repr_opt(field)))
     }
 
     /// `InvalidNumberQuery(field, value)`.
     pub fn invalid_number(field: Option<&str>, value: Option<&str>) -> Self {
-        SearchError::query(format!(
-            "Invalid numeric value {} for field {}.",
-            py_repr_opt(value),
-            py_repr_opt(field)
-        ))
+        SearchError::query(format!("Invalid numeric value {} for field {}.", py_repr_opt(value), py_repr_opt(field)))
     }
 
     /// `QueryTooLongError(length, limit)`.
@@ -93,11 +85,7 @@ pub fn py_repr_opt(v: Option<&str>) -> String {
 /// single quote and no double quote; escapes `\\`, the chosen quote, `\n`,
 /// `\r`, `\t` and non-printable ASCII control characters.
 pub fn py_repr(s: &str) -> String {
-    let quote = if s.contains('\'') && !s.contains('"') {
-        '"'
-    } else {
-        '\''
-    };
+    let quote = if s.contains('\'') && !s.contains('"') { '"' } else { '\'' };
     let mut out = String::with_capacity(s.len() + 2);
     out.push(quote);
     for c in s.chars() {
@@ -159,14 +147,8 @@ mod tests {
     #[test]
     fn messages() {
         let e = SearchError::invalid_date(Some("created"), Some("foo"));
-        assert_eq!(
-            e.messages().unwrap(),
-            ["Invalid date value 'foo' for field 'created'.".to_string()]
-        );
+        assert_eq!(e.messages().unwrap(), ["Invalid date value 'foo' for field 'created'.".to_string()]);
         let e = SearchError::too_long(5000, 4096);
-        assert_eq!(
-            e.to_string(),
-            "The search query is too long (5000 characters). The maximum allowed length is 4096 characters."
-        );
+        assert_eq!(e.to_string(), "The search query is too long (5000 characters). The maximum allowed length is 4096 characters.");
     }
 }

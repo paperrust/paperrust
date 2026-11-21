@@ -12,15 +12,18 @@ use axum::http::header::{CACHE_CONTROL, CONTENT_TYPE, SET_COOKIE};
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use futures::StreamExt;
+use pl_authz::MaybeUser;
 use pl_authz::models::DOCUMENT;
 use pl_authz::objects::user_is_unrestricted;
-use pl_authz::perms::{has_perms_owner_aware, ObjRef, VIEW_DOCUMENTS_PERMISSIONS};
-use pl_authz::MaybeUser;
+use pl_authz::perms::{ObjRef, VIEW_DOCUMENTS_PERMISSIONS, has_perms_owner_aware};
 use pl_core::{ApiError, AppState, RequestContext};
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 
 use super::data;
-use crate::chat::{document_references, format_metadata_trailer, permitted_documents_filter, retain_permitted, CHAT_ERROR_MESSAGE, CHAT_MAX_QUESTION, CHAT_NO_CONTENT_MESSAGE, CHAT_RETRIEVER_TOP_K};
+use crate::chat::{
+    CHAT_ERROR_MESSAGE, CHAT_MAX_QUESTION, CHAT_NO_CONTENT_MESSAGE, CHAT_RETRIEVER_TOP_K, document_references, format_metadata_trailer,
+    permitted_documents_filter, retain_permitted,
+};
 use crate::config::AiConfig;
 use crate::embedding::Embedder;
 use crate::llm::LlmClient;
@@ -197,7 +200,9 @@ async fn chat_inner(state: &AppState, ctx: &RequestContext, auth: &MaybeUser, bo
             let Some(doc) = data::load_doc(db, id).await? else {
                 return Ok(ApiError::django_text(StatusCode::BAD_REQUEST, "Document not found").into_response());
             };
-            if !has_perms_owner_aware(db, Some(&user), "view_document", &DOCUMENT, ObjRef { id: doc.root_id, owner_id: doc.root_owner_id }).await? {
+            if !has_perms_owner_aware(db, Some(&user), "view_document", &DOCUMENT, ObjRef { id: doc.root_id, owner_id: doc.root_owner_id })
+                .await?
+            {
                 return Ok(ApiError::django_text(StatusCode::FORBIDDEN, "Insufficient permissions").into_response());
             }
             (vec![doc.id], false)
@@ -264,7 +269,10 @@ async fn run(
     // v3.4.2): everything after retrieval works on the nodes in memory, so a slow LLM stream
     // never holds the lock (a compaction swap waiting for exclusive access is not starved).
     let top = {
-        let _r = tokio::task::spawn_blocking(move || crate::locks::RwGuard::read(&d2)).await.map_err(|e| e.to_string())?.map_err(|e| e.to_string())?;
+        let _r = tokio::task::spawn_blocking(move || crate::locks::RwGuard::read(&d2))
+            .await
+            .map_err(|e| e.to_string())?
+            .map_err(|e| e.to_string())?;
         let st = VecStore::open(&dir, None).map_err(|e| e.to_string())?;
         let filters = match (&trashed, &permitted) {
             (Some(t), _) => vec![DocFilter::NotIn(t.clone())],

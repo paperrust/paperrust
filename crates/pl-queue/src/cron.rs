@@ -174,11 +174,7 @@ impl CrontabParser {
 }
 
 fn py_repr(s: &str) -> String {
-    if s.contains('\'') && !s.contains('"') {
-        format!("\"{s}\"")
-    } else {
-        format!("'{}'", s.replace('\\', "\\\\").replace('\'', "\\'"))
-    }
+    if s.contains('\'') && !s.contains('"') { format!("\"{s}\"") } else { format!("'{}'", s.replace('\\', "\\\\").replace('\'', "\\'")) }
 }
 
 /// `celery.schedules.crontab` (string fields only, as in paperless).

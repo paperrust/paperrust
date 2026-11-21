@@ -162,7 +162,10 @@ impl Mock {
             "notes_count": 1, "files": files, "access": {"can_view": true, "can_change": true, "can_delete": true}});
         self.with(|s| {
             s.content.insert(uuid.into(), content.into());
-            s.notes.insert(uuid.into(), json!([{"legacy_id": 1, "note": format!("Notiz zu {title}"), "created": "2024-03-02T08:00:00Z", "user": null}]));
+            s.notes.insert(
+                uuid.into(),
+                json!([{"legacy_id": 1, "note": format!("Notiz zu {title}"), "created": "2024-03-02T08:00:00Z", "user": null}]),
+            );
             s.files.insert((uuid.into(), "original".into()), orig);
             if archive {
                 s.files.insert((uuid.into(), "archive".into()), arch);
@@ -240,7 +243,10 @@ async fn server(State(m): State<M>, h: HeaderMap) -> Response {
 
 async fn create_device(State(m): State<M>, axum::Json(b): axum::Json<Value>) -> Response {
     if b["username"] != USER || b["password"] != PASS {
-        return (StatusCode::BAD_REQUEST, axum::Json(json!({"error": {"code": "invalid", "message": "Unable to log in with provided credentials."}})))
+        return (
+            StatusCode::BAD_REQUEST,
+            axum::Json(json!({"error": {"code": "invalid", "message": "Unable to log in with provided credentials."}})),
+        )
             .into_response();
     }
     let token = format!("prt_{}", uuid::Uuid::new_v4().simple());
@@ -311,12 +317,8 @@ async fn changes(State(m): State<M>, h: HeaderMap, Query(q): Query<HashMap<Strin
         }
     }
     let s = m.st.lock().unwrap();
-    let mut entries: Vec<&Obj> = s
-        .objs
-        .values()
-        .filter(|o| o.seq > after)
-        .filter(|o| kinds.as_ref().is_none_or(|k| k.contains(&o.kind)))
-        .collect();
+    let mut entries: Vec<&Obj> =
+        s.objs.values().filter(|o| o.seq > after).filter(|o| kinds.as_ref().is_none_or(|k| k.contains(&o.kind))).collect();
     entries.sort_by_key(|o| o.seq);
     let has_more = entries.len() > limit;
     entries.truncate(limit);
@@ -327,7 +329,9 @@ async fn changes(State(m): State<M>, h: HeaderMap, Query(q): Query<HashMap<Strin
         if o.deleted {
             out.push(del);
         } else if o.visible {
-            out.push(json!({"seq": o.seq, "kind": o.kind, "uuid": o.uuid, "op": "upsert", "rev": o.rev, "object": doc_out(&s, o, false, false)}));
+            out.push(
+                json!({"seq": o.seq, "kind": o.kind, "uuid": o.uuid, "op": "upsert", "rev": o.rev, "object": doc_out(&s, o, false, false)}),
+            );
         } else if o.perm_seq.is_some_and(|p| p > after) {
             out.push(del);
         }
@@ -352,7 +356,9 @@ async fn ids(State(m): State<M>, h: HeaderMap, Query(q): Query<HashMap<String, S
 async fn resolve(State(m): State<M>, h: HeaderMap, axum::Json(b): axum::Json<Value>) -> Response {
     need_auth!(m, h);
     let s = m.st.lock().unwrap();
-    let strs = |k: &str| -> Vec<String> { b[k].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default() };
+    let strs = |k: &str| -> Vec<String> {
+        b[k].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default()
+    };
     let (docs, tags, views) = (strs("documents"), strs("tags"), strs("saved_views"));
     let mut out = Vec::new();
     for o in live(&s, "document") {
@@ -445,7 +451,8 @@ async fn file(State(m): State<M>, h: HeaderMap, Path((u, variant)): Path<(String
 
 async fn v1_ui_settings(State(m): State<M>, h: HeaderMap) -> Response {
     need_auth!(m, h);
-    axum::Json(json!({"user": {"id": 3, "username": USER}, "settings": {"from": "server"}, "permissions": ["view_document"]})).into_response()
+    axum::Json(json!({"user": {"id": 3, "username": USER}, "settings": {"from": "server"}, "permissions": ["view_document"]}))
+        .into_response()
 }
 
 pub fn router(m: M) -> Router {
@@ -524,14 +531,26 @@ pub async fn serve_on(router: Router, tls: Option<tokio_rustls::TlsAcceptor>, bi
 
 /// Test data: 2 tags, 1 correspondent, `n` documents (even → tag A, every third with archive).
 pub fn seed(m: &M, n: u64) {
-    m.put("tag", &uid(2, 1), json!({"name": "Steuern", "color": "#a6cee3", "text_color": "#000000", "is_inbox_tag": false,
+    m.put(
+        "tag",
+        &uid(2, 1),
+        json!({"name": "Steuern", "color": "#a6cee3", "text_color": "#000000", "is_inbox_tag": false,
         "matching": {"algorithm": "none", "pattern": "", "is_insensitive": true}, "parent": null, "owner": null,
-        "access": {"can_view": true, "can_change": true, "can_delete": true}}));
-    m.put("tag", &uid(2, 2), json!({"name": "Auto", "color": "#b2df8a", "text_color": "#000000", "is_inbox_tag": false,
+        "access": {"can_view": true, "can_change": true, "can_delete": true}}),
+    );
+    m.put(
+        "tag",
+        &uid(2, 2),
+        json!({"name": "Auto", "color": "#b2df8a", "text_color": "#000000", "is_inbox_tag": false,
         "matching": {"algorithm": "none", "pattern": "", "is_insensitive": true}, "parent": null, "owner": null,
-        "access": {"can_view": true, "can_change": true, "can_delete": true}}));
-    m.put("correspondent", &uid(3, 1), json!({"name": "Steueramt Zürich", "matching": {"algorithm": "none", "pattern": "", "is_insensitive": true},
-        "owner": null, "access": {"can_view": true, "can_change": true, "can_delete": true}}));
+        "access": {"can_view": true, "can_change": true, "can_delete": true}}),
+    );
+    m.put(
+        "correspondent",
+        &uid(3, 1),
+        json!({"name": "Steueramt Zürich", "matching": {"algorithm": "none", "pattern": "", "is_insensitive": true},
+        "owner": null, "access": {"can_view": true, "can_change": true, "can_delete": true}}),
+    );
     m.put("user", &uid(8, 1), json!({"username": USER, "first_name": "", "last_name": ""}));
     for i in 1..=n {
         let tags: Vec<String> = if i % 2 == 0 { vec![uid(2, 1)] } else { vec![uid(2, 2)] };

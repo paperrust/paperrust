@@ -6,11 +6,11 @@ use std::sync::Arc;
 
 use axum::routing::post;
 use pl_ai::classifier::IdentityTruncator;
-use pl_ai::mcp::http::{router, testclient::Client, SESSION_HEADER};
+use pl_ai::mcp::http::{SESSION_HEADER, router, testclient::Client};
 use pl_ai::mcp::memory::{MemDocument, MemUser, MemoryBackend};
 use pl_ai::mcp::{McpService, McpSettings};
 use pl_ai::taxonomy::{Grant, TaxonomyEntry, TaxonomyKind};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 const ALICE: &str = "alicetoken0000000000000000000000000000000";
 const BOB: &str = "bobtoken000000000000000000000000000000000";
@@ -36,8 +36,24 @@ fn entry(kind: TaxonomyKind, id: i64, name: &str, owner: Option<i64>) -> Taxonom
 
 fn backend() -> Arc<MemoryBackend> {
     let b = MemoryBackend::default();
-    b.add_user(MemUser { id: 1, username: "alice".into(), token: ALICE.into(), is_superuser: false, is_active: true, groups: vec![], perms: all_perms() });
-    b.add_user(MemUser { id: 2, username: "bob".into(), token: BOB.into(), is_superuser: false, is_active: true, groups: vec![9], perms: all_perms() });
+    b.add_user(MemUser {
+        id: 1,
+        username: "alice".into(),
+        token: ALICE.into(),
+        is_superuser: false,
+        is_active: true,
+        groups: vec![],
+        perms: all_perms(),
+    });
+    b.add_user(MemUser {
+        id: 2,
+        username: "bob".into(),
+        token: BOB.into(),
+        is_superuser: false,
+        is_active: true,
+        groups: vec![9],
+        perms: all_perms(),
+    });
     b.add_user(MemUser {
         id: 3,
         username: "reader".into(),
@@ -151,7 +167,14 @@ async fn transport_rules() {
     let r = c.http.get(format!("{base}/mcp")).header("authorization", format!("Token {ALICE}")).send().await.unwrap();
     assert_eq!(r.status().as_u16(), 405);
     let sid = c.session.clone().unwrap();
-    let r = c.http.delete(format!("{base}/mcp")).header("authorization", format!("Token {ALICE}")).header(SESSION_HEADER, &sid).send().await.unwrap();
+    let r = c
+        .http
+        .delete(format!("{base}/mcp"))
+        .header("authorization", format!("Token {ALICE}"))
+        .header(SESSION_HEADER, &sid)
+        .send()
+        .await
+        .unwrap();
     assert_eq!(r.status().as_u16(), 204);
     let (st, _, _) = c.raw(&json!({"jsonrpc": "2.0", "id": 1, "method": "ping"}), &[]).await.unwrap();
     assert_eq!(st, 404);
@@ -164,7 +187,16 @@ async fn tool_list_guides_agent() {
     c.initialize().await.unwrap();
     let tools = c.request("tools/list", json!({})).await.unwrap();
     let names: Vec<&str> = tools["result"]["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect();
-    for n in ["search_documents", "get_document", "list_taxonomy", "find_similar", "suggest_metadata", "update_document", "create_taxonomy", "add_alias"] {
+    for n in [
+        "search_documents",
+        "get_document",
+        "list_taxonomy",
+        "find_similar",
+        "suggest_metadata",
+        "update_document",
+        "create_taxonomy",
+        "add_alias",
+    ] {
         assert!(names.contains(&n), "{n}");
     }
     assert!(!names.iter().any(|n| n.contains("delete") || n.contains("permission")));
@@ -207,7 +239,10 @@ async fn create_is_duplicate_protected() {
     let r = c.call("create_taxonomy", json!({"kind": "tag", "name": "Steuern 2025", "force": true, "reason": "kurz"})).await.unwrap();
     assert_eq!(r["isError"], true);
     // force with identical core → never allowed
-    let r = c.call("create_taxonomy", json!({"kind": "correspondent", "name": "SWISSCOM AG", "force": true, "reason": "ich will das unbedingt"})).await.unwrap();
+    let r = c
+        .call("create_taxonomy", json!({"kind": "correspondent", "name": "SWISSCOM AG", "force": true, "reason": "ich will das unbedingt"}))
+        .await
+        .unwrap();
     assert_eq!(sc(&r)["reason"], "identical_exists");
     // really new → created
     let r = c.call("create_taxonomy", json!({"kind": "correspondent", "name": "Salt Mobile SA"})).await.unwrap();
@@ -216,7 +251,10 @@ async fn create_is_duplicate_protected() {
     // similar but different (Steuern 2025 vs 2024) → blocked, created with force + reason
     let r = c.call("create_taxonomy", json!({"kind": "tag", "name": "Steuern 2025"})).await.unwrap();
     assert_eq!(sc(&r)["created"], false);
-    let r = c.call("create_taxonomy", json!({"kind": "tag", "name": "Steuern 2025", "force": true, "reason": "anderes Steuerjahr als 2024"})).await.unwrap();
+    let r = c
+        .call("create_taxonomy", json!({"kind": "tag", "name": "Steuern 2025", "force": true, "reason": "anderes Steuerjahr als 2024"}))
+        .await
+        .unwrap();
     assert_eq!(sc(&r)["created"], true);
     assert_eq!(sc(&r)["forced"], true);
     let log = b.audit_log();

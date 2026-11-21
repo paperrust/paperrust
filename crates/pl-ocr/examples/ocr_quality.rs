@@ -37,9 +37,7 @@ fn engine(kind: &str, with_osd: bool) -> Box<dyn OcrEngine> {
     match kind {
         "tesseract" => Box::new(tesseract()),
         #[cfg(windows)]
-        "windows" => Box::new(
-            pl_ocr::winocr::WindowsOcr::new(with_osd.then(tesseract)).expect("Windows OCR not available"),
-        ),
+        "windows" => Box::new(pl_ocr::winocr::WindowsOcr::new(with_osd.then(tesseract)).expect("Windows OCR not available")),
         other => {
             let _ = with_osd;
             panic!("unknown/unsupported engine {other}")

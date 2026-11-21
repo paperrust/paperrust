@@ -55,11 +55,7 @@ mod tests {
     #[test]
     fn swap() {
         let cfg = |h: &str| {
-            Config::from_env_map(crate::config::Env::from_pairs([
-                ("PAPERLESS_SECRET_KEY", "k"),
-                ("PAPERLESS_EMAIL_HOST", h),
-            ]))
-            .unwrap()
+            Config::from_env_map(crate::config::Env::from_pairs([("PAPERLESS_SECRET_KEY", "k"), ("PAPERLESS_EMAIL_HOST", h)])).unwrap()
         };
         let l = LiveConfig::new(cfg("a"));
         let before = l.get();

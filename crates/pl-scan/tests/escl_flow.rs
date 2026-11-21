@@ -30,7 +30,12 @@ impl Intake for Captured {
     }
 }
 
-async fn run_job(f: Fake, source: Source, color: Option<ColorMode>, resolution: Option<u32>) -> (Arc<Fake>, Arc<Captured>, pl_scan::job::JobView, tempfile::TempDir) {
+async fn run_job(
+    f: Fake,
+    source: Source,
+    color: Option<ColorMode>,
+    resolution: Option<u32>,
+) -> (Arc<Fake>, Arc<Captured>, pl_scan::job::JobView, tempfile::TempDir) {
     let (fake, client) = start_fake(f).await;
     let caps = client.capabilities().await.unwrap();
     let settings = ScanSettings::resolve(&caps, source, color, resolution).unwrap();
@@ -38,7 +43,15 @@ async fn run_job(f: Fake, source: Source, color: Option<ColorMode>, resolution: 
     let scratch = tempfile::tempdir().unwrap();
     let reg = Registry::default();
     let job = reg
-        .start(JobSpec { scanner_id: 1, client, settings, user_id: 42, title: Some("Post".into()), scratch: scratch.path().to_path_buf(), intake: cap.clone() })
+        .start(JobSpec {
+            scanner_id: 1,
+            client,
+            settings,
+            user_id: 42,
+            title: Some("Post".into()),
+            scratch: scratch.path().to_path_buf(),
+            intake: cap.clone(),
+        })
         .unwrap();
     let view = wait(&job).await;
     (fake, cap, view, scratch)
@@ -88,7 +101,8 @@ async fn adf_multi_page_to_one_pdf() {
 
 #[tokio::test]
 async fn adf_duplex_delivers_both_sides() {
-    let (fake, cap, view, _t) = run_job(Fake { sheets: 2, ..Default::default() }, Source::AdfDuplex, Some(ColorMode::Grayscale), Some(200)).await;
+    let (fake, cap, view, _t) =
+        run_job(Fake { sheets: 2, ..Default::default() }, Source::AdfDuplex, Some(ColorMode::Grayscale), Some(200)).await;
     assert_eq!(view.state, JobState::Done, "{view:?}");
     assert_eq!(view.pages, 4);
     assert_eq!(pdf_pages(&cap.docs.lock().unwrap()[0].1).len(), 4);
@@ -140,10 +154,26 @@ async fn cancel_while_scanning() {
     let scratch = tempfile::tempdir().unwrap();
     let reg = Registry::default();
     let job = reg
-        .start(JobSpec { scanner_id: 7, client: client.clone(), settings: settings.clone(), user_id: 1, title: None, scratch: scratch.path().to_path_buf(), intake: cap.clone() })
+        .start(JobSpec {
+            scanner_id: 7,
+            client: client.clone(),
+            settings: settings.clone(),
+            user_id: 1,
+            title: None,
+            scratch: scratch.path().to_path_buf(),
+            intake: cap.clone(),
+        })
         .unwrap();
     // second job on the same scanner: busy (without a request to the device)
-    let second = reg.start(JobSpec { scanner_id: 7, client, settings, user_id: 2, title: None, scratch: scratch.path().to_path_buf(), intake: cap.clone() });
+    let second = reg.start(JobSpec {
+        scanner_id: 7,
+        client,
+        settings,
+        user_id: 2,
+        title: None,
+        scratch: scratch.path().to_path_buf(),
+        intake: cap.clone(),
+    });
     assert!(matches!(second, Err(ScanError::Busy)));
     tokio::time::sleep(Duration::from_millis(300)).await;
     assert!(job.cancel());

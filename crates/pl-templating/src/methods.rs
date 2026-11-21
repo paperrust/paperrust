@@ -10,10 +10,9 @@ use minijinja::{Error, ErrorKind, State};
 
 use crate::pystr::{py_isspace, py_strip, py_strip_chars};
 use crate::pyvalue::{
-    as_num, as_pystr, check_len, date_iso, invalid, py_eq_inner, py_repr, py_str, security_error, Num, PyDate,
-    PyDateTime, MAX_SEQ_ITEMS,
+    MAX_SEQ_ITEMS, Num, PyDate, PyDateTime, as_num, as_pystr, check_len, date_iso, invalid, py_eq_inner, py_repr, py_str, security_error,
 };
-use crate::strftime::{strftime, TzInfo};
+use crate::strftime::{TzInfo, strftime};
 
 /// Bind positional and keyword arguments the Python way.
 pub(crate) struct PyArgs {
@@ -54,11 +53,7 @@ impl PyArgs {
     /// Checks that at most `names.len()` arguments and only known names were passed.
     pub fn check(&self, func: &str, names: &[&str]) -> Result<(), Error> {
         if self.pos.len() > names.len() {
-            return Err(invalid(format!(
-                "{func}() takes at most {} arguments ({} given)",
-                names.len(),
-                self.pos.len()
-            )));
+            return Err(invalid(format!("{func}() takes at most {} arguments ({} given)", names.len(), self.pos.len())));
         }
         for (k, _) in &self.kw {
             if !names.contains(&k.as_str()) {
@@ -70,8 +65,7 @@ impl PyArgs {
 }
 
 fn req(args: &PyArgs, idx: usize, name: &str, func: &str) -> Result<Value, Error> {
-    args.get(idx, name)
-        .ok_or_else(|| invalid(format!("{func}() missing required argument '{name}' (pos {})", idx + 1)))
+    args.get(idx, name).ok_or_else(|| invalid(format!("{func}() missing required argument '{name}' (pos {})", idx + 1)))
 }
 
 fn int_arg(v: &Value, func: &str) -> Result<i64, Error> {
@@ -276,11 +270,7 @@ fn str_method(s: &str, method: &str, args: &PyArgs) -> Result<Value, Error> {
         "swapcase" => Value::from(
             s.chars()
                 .flat_map(|c| -> Vec<char> {
-                    if c.is_uppercase() {
-                        c.to_lowercase().collect()
-                    } else {
-                        c.to_uppercase().collect()
-                    }
+                    if c.is_uppercase() { c.to_lowercase().collect() } else { c.to_uppercase().collect() }
                 })
                 .collect::<String>(),
         ),
@@ -321,11 +311,7 @@ fn str_method(s: &str, method: &str, args: &PyArgs) -> Result<Value, Error> {
                 Some(v) => int_arg(&v, method)?,
                 None => -1,
             };
-            if method == "split" {
-                strs(py_split(s, sep.as_deref(), max)?)
-            } else {
-                strs(py_rsplit(s, sep.as_deref(), max)?)
-            }
+            if method == "split" { strs(py_split(s, sep.as_deref(), max)?) } else { strs(py_rsplit(s, sep.as_deref(), max)?) }
         }
         "splitlines" => strs(s.lines().map(str::to_string).collect()),
         "startswith" => Value::from(affix_any(&a0()?, |p| s.starts_with(p))?),
@@ -378,9 +364,7 @@ fn str_method(s: &str, method: &str, args: &PyArgs) -> Result<Value, Error> {
             };
             Value::from(pad_to(s, w, fill, align)?)
         }
-        "isdigit" | "isdecimal" | "isnumeric" => {
-            Value::from(!s.is_empty() && s.chars().all(|c| c.is_numeric()))
-        }
+        "isdigit" | "isdecimal" | "isnumeric" => Value::from(!s.is_empty() && s.chars().all(|c| c.is_numeric())),
         "isalpha" => Value::from(!s.is_empty() && s.chars().all(char::is_alphabetic)),
         "isalnum" => Value::from(!s.is_empty() && s.chars().all(char::is_alphanumeric)),
         "isspace" => Value::from(!s.is_empty() && s.chars().all(py_isspace)),
@@ -432,17 +416,7 @@ struct Spec {
 fn parse_spec(spec: &str) -> Result<Spec, Error> {
     let c: Vec<char> = spec.chars().collect();
     let mut i = 0;
-    let mut s = Spec {
-        fill: ' ',
-        align: None,
-        sign: '-',
-        alt: false,
-        zero: false,
-        width: 0,
-        grouping: None,
-        precision: None,
-        ty: None,
-    };
+    let mut s = Spec { fill: ' ', align: None, sign: '-', alt: false, zero: false, width: 0, grouping: None, precision: None, ty: None };
     let is_align = |x: char| matches!(x, '<' | '>' | '^' | '=');
     if c.len() >= 2 && is_align(c[1]) {
         s.fill = c[0];
@@ -590,11 +564,7 @@ pub fn py_format_value(v: &Value, spec_str: &str) -> Result<String, Error> {
                 let (m, e) = s.split_once('e').unwrap_or((&s, "0"));
                 let e: i32 = e.parse().unwrap_or(0);
                 let r = format!("{m}e{}{:02}", if e < 0 { '-' } else { '+' }, e.abs());
-                if spec.ty == Some('E') {
-                    r.to_uppercase()
-                } else {
-                    r
-                }
+                if spec.ty == Some('E') { r.to_uppercase() } else { r }
             }
             Some('%') => format!("{:.*}%", spec.precision.unwrap_or(6), a * 100.0),
             None if spec.precision.is_none() => crate::pystr::py_float_repr(a),
@@ -607,22 +577,15 @@ pub fn py_format_value(v: &Value, spec_str: &str) -> Result<String, Error> {
                     s
                 } else {
                     let t = format!("{:.*}", (p as i32 - 1 - exp).max(0) as usize, a);
-                    if t.contains('.') {
-                        t.trim_end_matches('0').trim_end_matches('.').to_string()
-                    } else {
-                        t
-                    }
+                    if t.contains('.') { t.trim_end_matches('0').trim_end_matches('.').to_string() } else { t }
                 }
             }
         };
         let body = match spec.grouping {
             Some(g) => {
-                let (int, frac) = body.split_once('.').map(|(a, b)| (a.to_string(), format!(".{b}"))).unwrap_or((body.clone(), String::new()));
-                if int.chars().all(|c| c.is_ascii_digit()) {
-                    format!("{}{frac}", group(&int, g))
-                } else {
-                    body
-                }
+                let (int, frac) =
+                    body.split_once('.').map(|(a, b)| (a.to_string(), format!(".{b}"))).unwrap_or((body.clone(), String::new()));
+                if int.chars().all(|c| c.is_ascii_digit()) { format!("{}{frac}", group(&int, g)) } else { body }
             }
             None => body,
         };
@@ -630,11 +593,7 @@ pub fn py_format_value(v: &Value, spec_str: &str) -> Result<String, Error> {
     }
     // str() for everything else (incl. bool with empty type)
     if spec.ty.is_some_and(|t| t != 's') {
-        return Err(invalid(format!(
-            "Unknown format code '{}' for object of type '{}'",
-            spec.ty.unwrap_or('s'),
-            type_short(v)
-        )));
+        return Err(invalid(format!("Unknown format code '{}' for object of type '{}'", spec.ty.unwrap_or('s'), type_short(v))));
     }
     let mut s = py_str(v)?;
     if let Some(p) = spec.precision {
@@ -728,11 +687,7 @@ fn resolve_field(name: &str, args: &PyArgs, auto_idx: &mut usize) -> Result<Valu
             .cloned()
             .ok_or_else(|| invalid(format!("Replacement index {idx} out of range for positional args tuple")))?
     } else {
-        args.kwargs()
-            .iter()
-            .find(|(k, _)| *k == first)
-            .map(|(_, v)| v.clone())
-            .ok_or_else(|| invalid(format!("'{first}'")))?
+        args.kwargs().iter().find(|(k, _)| *k == first).map(|(_, v)| v.clone()).ok_or_else(|| invalid(format!("'{first}'")))?
     };
     while !rest.is_empty() {
         if let Some(r) = rest.strip_prefix('.') {
@@ -876,11 +831,7 @@ pub(crate) fn unknown_method(_state: &State, value: &Value, method: &str, args: 
             "get" => {
                 let key = req(&args, 0, "key", "get")?;
                 let v = value.get_item(&key)?;
-                if v.is_undefined() {
-                    Ok(args.get(1, "default").unwrap_or(Value::from(())))
-                } else {
-                    Ok(v)
-                }
+                if v.is_undefined() { Ok(args.get(1, "default").unwrap_or(Value::from(()))) } else { Ok(v) }
             }
             "copy" => Ok(value.clone()),
             _ => Err(Error::from(ErrorKind::UnknownMethod)),

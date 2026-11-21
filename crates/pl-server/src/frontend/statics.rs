@@ -558,15 +558,7 @@ fn virtual_files(root: &Path, real: &HashMap<PathBuf, &std::fs::Metadata>) -> Ve
             skipped += 1;
             continue;
         }
-        let delta = Delta {
-            key: key.clone(),
-            base,
-            base_size: d.base_size,
-            file,
-            size: d.size,
-            fnv1a32: fnv,
-            cache: cache.clone(),
-        };
+        let delta = Delta { key: key.clone(), base, base_size: d.base_size, file, size: d.size, fnv1a32: fnv, cache: cache.clone() };
         out.push((p, d.size, mtime_secs(&fm), Src::Delta(Arc::new(delta))));
     }
     if skipped > 0 {

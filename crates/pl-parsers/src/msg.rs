@@ -12,9 +12,7 @@ use std::path::Path;
 use chrono::{DateTime, FixedOffset, TimeZone, Utc};
 
 use crate::mail::{naturalsize_binary, strip_text};
-use crate::{
-    DocumentParser, MetadataEntry, ParseContext, ParseError, ParsedDocument, Result, read_limited,
-};
+use crate::{DocumentParser, MetadataEntry, ParseContext, ParseError, ParsedDocument, Result, read_limited};
 
 type Cfb<'a> = cfb::CompoundFile<Cursor<&'a [u8]>>;
 
@@ -28,12 +26,7 @@ fn read_stream(cf: &mut Cfb<'_>, path: &str, max: u64) -> Option<Vec<u8>> {
 /// String property (Unicode 001F preferred, otherwise 8-bit 001E).
 fn prop_string(cf: &mut Cfb<'_>, base: &str, id: u16, max: u64) -> Option<String> {
     if let Some(b) = read_stream(cf, &format!("{base}/__substg1.0_{id:04X}001F"), max) {
-        let u: Vec<u16> = b
-            .as_chunks::<2>()
-            .0
-            .iter()
-            .map(|c| u16::from_le_bytes([c[0], c[1]]))
-            .collect();
+        let u: Vec<u16> = b.as_chunks::<2>().0.iter().map(|c| u16::from_le_bytes([c[0], c[1]])).collect();
         let s = String::from_utf16_lossy(&u);
         return Some(s.trim_end_matches('\0').to_owned());
     }
@@ -72,9 +65,7 @@ fn filetime(v: [u8; 8]) -> Option<DateTime<FixedOffset>> {
         return None;
     }
     let secs = (ft / 10_000_000) as i64 - 11_644_473_600;
-    Utc.timestamp_opt(secs, 0)
-        .single()
-        .map(|d| d.fixed_offset())
+    Utc.timestamp_opt(secs, 0).single().map(|d| d.fixed_offset())
 }
 
 #[derive(Debug, Default, Clone)]
@@ -101,16 +92,10 @@ fn full(name: &str, email: &str) -> String {
 }
 
 pub fn parse_msg(data: &[u8], max_stream: u64) -> Result<MsgMessage> {
-    let mut cf = cfb::CompoundFile::open(Cursor::new(data))
-        .map_err(|e| ParseError::Invalid(format!("MSG: {e}")))?;
-    let mut m = MsgMessage {
-        subject: prop_string(&mut cf, "", 0x0037, max_stream).unwrap_or_default(),
-        ..Default::default()
-    };
+    let mut cf = cfb::CompoundFile::open(Cursor::new(data)).map_err(|e| ParseError::Invalid(format!("MSG: {e}")))?;
+    let mut m = MsgMessage { subject: prop_string(&mut cf, "", 0x0037, max_stream).unwrap_or_default(), ..Default::default() };
     let sname = prop_string(&mut cf, "", 0x0C1A, max_stream).unwrap_or_default();
-    let smail = prop_string(&mut cf, "", 0x5D01, max_stream)
-        .or_else(|| prop_string(&mut cf, "", 0x0C1F, max_stream))
-        .unwrap_or_default();
+    let smail = prop_string(&mut cf, "", 0x5D01, max_stream).or_else(|| prop_string(&mut cf, "", 0x0C1F, max_stream)).unwrap_or_default();
     m.sender = full(&sname, &smail);
     m.body = prop_string(&mut cf, "", 0x1000, max_stream).unwrap_or_default();
     if let Some(h) = prop_binary(&mut cf, "", 0x1013, max_stream) {
@@ -123,11 +108,7 @@ pub fn parse_msg(data: &[u8], max_stream: u64) -> Result<MsgMessage> {
             m.date = filetime(v);
         }
     }
-    let entries: Vec<String> = cf
-        .read_root_storage()
-        .filter(|e| e.is_storage())
-        .map(|e| e.name().to_owned())
-        .collect();
+    let entries: Vec<String> = cf.read_root_storage().filter(|e| e.is_storage()).map(|e| e.name().to_owned()).collect();
     let mut have_recips = false;
     for name in &entries {
         let base = format!("/{name}");
@@ -153,22 +134,13 @@ pub fn parse_msg(data: &[u8], max_stream: u64) -> Result<MsgMessage> {
                 .or_else(|| prop_string(&mut cf, &base, 0x3704, max_stream))
                 .or_else(|| prop_string(&mut cf, &base, 0x3001, max_stream))
                 .unwrap_or_default();
-            let size = cf
-                .entry(format!("{base}/__substg1.0_37010102"))
-                .map(|e| e.len())
-                .unwrap_or(0);
+            let size = cf.entry(format!("{base}/__substg1.0_37010102")).map(|e| e.len()).unwrap_or(0);
             m.attachments.push((fname, size));
         }
     }
     if !have_recips {
         let split = |s: Option<String>| -> Vec<String> {
-            s.map(|v| {
-                v.split(';')
-                    .map(|x| x.trim().to_owned())
-                    .filter(|x| !x.is_empty())
-                    .collect()
-            })
-            .unwrap_or_default()
+            s.map(|v| v.split(';').map(|x| x.trim().to_owned()).filter(|x| !x.is_empty()).collect()).unwrap_or_default()
         };
         m.to = split(prop_string(&mut cf, "", 0x0E04, max_stream));
         m.cc = split(prop_string(&mut cf, "", 0x0E03, max_stream));
@@ -178,12 +150,7 @@ pub fn parse_msg(data: &[u8], max_stream: u64) -> Result<MsgMessage> {
 }
 
 pub fn format_msg(m: &MsgMessage, ctx: &ParseContext) -> Result<String> {
-    let mut t = format!(
-        "Subject: {}\n\nFrom: {}\n\nTo: {}\n\n",
-        m.subject,
-        m.sender,
-        m.to.join(", ")
-    );
+    let mut t = format!("Subject: {}\n\nFrom: {}\n\nTo: {}\n\n", m.subject, m.sender, m.to.join(", "));
     if !m.cc.is_empty() {
         t.push_str(&format!("CC: {}\n\n", m.cc.join(", ")));
     }
@@ -191,11 +158,7 @@ pub fn format_msg(m: &MsgMessage, ctx: &ParseContext) -> Result<String> {
         t.push_str(&format!("BCC: {}\n\n", m.bcc.join(", ")));
     }
     if !m.attachments.is_empty() {
-        let v: Vec<String> = m
-            .attachments
-            .iter()
-            .map(|(n, s)| format!("{n} ({})", naturalsize_binary(*s)))
-            .collect();
+        let v: Vec<String> = m.attachments.iter().map(|(n, s)| format!("{n} ({})", naturalsize_binary(*s))).collect();
         t.push_str(&format!("Attachments: {}\n\n", v.join(", ")));
     }
     if !m.html.is_empty() {
@@ -235,11 +198,7 @@ impl DocumentParser for MsgDocumentParser {
     fn parse(&self, path: &Path, _m: &str, ctx: &ParseContext) -> Result<ParsedDocument> {
         let data = read_limited(path, &ctx.limits)?;
         let m = parse_msg(&data, ctx.limits.max_entry_size)?;
-        Ok(ParsedDocument {
-            text: format_msg(&m, ctx)?,
-            date: m.date,
-            archive_path: None,
-        })
+        Ok(ParsedDocument { text: format_msg(&m, ctx)?, date: m.date, archive_path: None })
     }
     fn page_count(&self, _p: &Path, _m: &str, _c: &ParseContext) -> Option<u32> {
         None
@@ -255,19 +214,10 @@ impl DocumentParser for MsgDocumentParser {
             "",
             "",
             "attachments",
-            m.attachments
-                .iter()
-                .map(|(n, s)| format!("{n}({})", naturalsize_binary(*s)))
-                .collect::<Vec<_>>()
-                .join(", "),
+            m.attachments.iter().map(|(n, s)| format!("{n}({})", naturalsize_binary(*s))).collect::<Vec<_>>().join(", "),
         )];
         if let Some(d) = m.date {
-            out.push(MetadataEntry::new(
-                "",
-                "",
-                "date",
-                d.format("%Y-%m-%d %H:%M:%S UTC").to_string(),
-            ));
+            out.push(MetadataEntry::new("", "", "date", d.format("%Y-%m-%d %H:%M:%S UTC").to_string()));
         }
         for (k, v) in [("from", &m.sender), ("subject", &m.subject)] {
             if !v.is_empty() {
@@ -277,9 +227,7 @@ impl DocumentParser for MsgDocumentParser {
         if !m.to.is_empty() {
             out.push(MetadataEntry::new("", "header", "to", m.to.join(", ")));
         }
-        out.sort_by(|a, b| {
-            (a.prefix.as_str(), a.key.as_str()).cmp(&(b.prefix.as_str(), b.key.as_str()))
-        });
+        out.sort_by(|a, b| (a.prefix.as_str(), a.key.as_str()).cmp(&(b.prefix.as_str(), b.key.as_str())));
         out
     }
 }
@@ -304,11 +252,7 @@ pub(crate) mod tests {
         put(&mut cf, "/__substg1.0_0037001F", &utf16("MSG Betreff"));
         put(&mut cf, "/__substg1.0_0C1A001F", &utf16("Anna Absender"));
         put(&mut cf, "/__substg1.0_5D01001F", &utf16("anna@example.com"));
-        put(
-            &mut cf,
-            "/__substg1.0_1000001F",
-            &utf16("Hallo\r\n\r\n  Welt"),
-        );
+        put(&mut cf, "/__substg1.0_1000001F", &utf16("Hallo\r\n\r\n  Welt"));
         // Properties: header 32 bytes + PR_CLIENT_SUBMIT_TIME (0x0039, PT_SYSTIME)
         let mut props = vec![0u8; 32];
         props.extend_from_slice(&0x0040u16.to_le_bytes());
@@ -319,37 +263,17 @@ pub(crate) mod tests {
         props.extend_from_slice(&ft.to_le_bytes());
         put(&mut cf, "/__properties_version1.0", &props);
         cf.create_storage("/__recip_version1.0_#00000000").unwrap();
-        put(
-            &mut cf,
-            "/__recip_version1.0_#00000000/__substg1.0_3001001F",
-            &utf16("Bert"),
-        );
-        put(
-            &mut cf,
-            "/__recip_version1.0_#00000000/__substg1.0_39FE001F",
-            &utf16("bert@example.com"),
-        );
+        put(&mut cf, "/__recip_version1.0_#00000000/__substg1.0_3001001F", &utf16("Bert"));
+        put(&mut cf, "/__recip_version1.0_#00000000/__substg1.0_39FE001F", &utf16("bert@example.com"));
         let mut rp = vec![0u8; 8];
         rp.extend_from_slice(&0x0003u16.to_le_bytes());
         rp.extend_from_slice(&0x0C15u16.to_le_bytes());
         rp.extend_from_slice(&[0u8; 4]);
         rp.extend_from_slice(&2u64.to_le_bytes());
-        put(
-            &mut cf,
-            "/__recip_version1.0_#00000000/__properties_version1.0",
-            &rp,
-        );
+        put(&mut cf, "/__recip_version1.0_#00000000/__properties_version1.0", &rp);
         cf.create_storage("/__attach_version1.0_#00000000").unwrap();
-        put(
-            &mut cf,
-            "/__attach_version1.0_#00000000/__substg1.0_3707001F",
-            &utf16("anhang.pdf"),
-        );
-        put(
-            &mut cf,
-            "/__attach_version1.0_#00000000/__substg1.0_37010102",
-            &[7u8; 1500],
-        );
+        put(&mut cf, "/__attach_version1.0_#00000000/__substg1.0_3707001F", &utf16("anhang.pdf"));
+        put(&mut cf, "/__attach_version1.0_#00000000/__substg1.0_37010102", &[7u8; 1500]);
         cf.flush().unwrap();
         cf.into_inner().into_inner()
     }
@@ -357,10 +281,7 @@ pub(crate) mod tests {
     #[test]
     fn msg_parse_and_format() {
         let data = build_msg();
-        assert_eq!(
-            crate::mime::detect_bytes(&data),
-            "application/vnd.ms-outlook"
-        );
+        assert_eq!(crate::mime::detect_bytes(&data), "application/vnd.ms-outlook");
         let m = parse_msg(&data, 1 << 20).unwrap();
         assert_eq!(m.subject, "MSG Betreff");
         assert_eq!(m.sender, "Anna Absender <anna@example.com>");

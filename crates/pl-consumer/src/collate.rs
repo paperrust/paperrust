@@ -32,9 +32,10 @@ fn materialize_inherited(doc: &mut Document, page: ObjectId) -> Result<(), Stage
         let Ok(pd) = doc.get_dictionary(pid) else { break };
         for key in INHERITABLE {
             if let Ok(v) = pd.get(key)
-                && !inherited.iter().any(|(k, _)| k.as_slice() == *key) {
-                    inherited.push((key.to_vec(), v.clone()));
-                }
+                && !inherited.iter().any(|(k, _)| k.as_slice() == *key)
+            {
+                inherited.push((key.to_vec(), v.clone()));
+            }
         }
         parent = pd.get(b"Parent").and_then(Object::as_reference).ok();
     }
@@ -123,7 +124,7 @@ mod tests {
         doc.objects.insert(
             pages_id,
             Object::Dictionary(dictionary! {"Type" => "Pages", "Kids" => kids, "Count" => n,
-                "Resources" => resources_id, "MediaBox" => vec![0.into(), 0.into(), 595.into(), 842.into()]}),
+            "Resources" => resources_id, "MediaBox" => vec![0.into(), 0.into(), 595.into(), 842.into()]}),
         );
         let cat = doc.add_object(dictionary! {"Type" => "Catalog", "Pages" => pages_id});
         doc.trailer.set("Root", cat);

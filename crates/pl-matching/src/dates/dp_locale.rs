@@ -50,8 +50,7 @@ pub(crate) struct DpData {
 }
 
 pub(crate) static DATA: LazyLock<DpData> = LazyLock::new(|| {
-    let raw: RawData = serde_json::from_str(include_str!("../../data/dateparser.json"))
-        .expect("embedded dateparser.json is valid");
+    let raw: RawData = serde_json::from_str(include_str!("../../data/dateparser.json")).expect("embedded dateparser.json is valid");
     let language_index = raw.language_order.iter().enumerate().map(|(i, l)| (l.clone(), i)).collect();
     let compiled = (0..raw.datasets.len()).map(|_| OnceLock::new()).collect();
     DpData {
@@ -171,10 +170,7 @@ pub(crate) fn rewrite_data_pattern(p: &str) -> String {
     let mut s = p.to_string();
     s = s.replace(r"(?<=(?:\A|\W|_))", r"(?:\A|(?<=[\W_]))");
     s = s.replace(r"(?<=\A|\W|_)", r"(?:\A|(?<=[\W_]))");
-    s = s.replace(
-        r"(?<=(через|спустя|в течение)\s+)",
-        r"(?:(?<=через\s)|(?<=спустя\s)|(?<=в течение\s))",
-    );
+    s = s.replace(r"(?<=(через|спустя|в течение)\s+)", r"(?:(?<=через\s)|(?<=спустя\s)|(?<=в течение\s))");
     s = s.replace(r"(?<=[^\d]\s+|^)", r"(?:(?<=[^\d]\s)|^)");
     s = s.replace(r"(?<=(za|pred)\s)", r"(?:(?<=za\s)|(?<=pred\s))");
     s = s.replace(r"\Z", r"\z");
@@ -212,11 +208,7 @@ fn compile_dataset(ds: &RawDataset) -> Result<CompiledLocale, String> {
     let mut words: Vec<&str> = SKIP_TOKENS.iter().copied().chain(ds.dict.iter().map(|(k, _)| k.as_str())).collect();
     words.sort_by_key(|w| std::cmp::Reverse(w.chars().count()));
     let group = words.iter().map(|w| regex::escape(w)).collect::<Vec<_>>().join("|");
-    let split_src = if ds.nws {
-        format!(r"^(.*?)({group})(.*)\z")
-    } else {
-        format!(r"^(.*?(?:\A|[\W_\d]))({group})((?:\z|[\W_\d]).*)\z")
-    };
+    let split_src = if ds.nws { format!(r"^(.*?)({group})(.*)\z") } else { format!(r"^(.*?(?:\A|[\W_\d]))({group})((?:\z|[\W_\d]).*)\z") };
     let split_regex = regex::RegexBuilder::new(&split_src)
         .case_insensitive(true)
         .size_limit(256 * 1024 * 1024)
@@ -225,11 +217,8 @@ fn compile_dataset(ds: &RawDataset) -> Result<CompiledLocale, String> {
         .map_err(|e| e.to_string())?;
 
     let rel_group = ds.rel.join("|");
-    let split_rel = if ds.nws {
-        fancy(&format!("({rel_group})"))?
-    } else {
-        fancy(&format!(r"(?<=(?:\A|\W|_))({rel_group})(?=(?:\Z|\W|_))"))?
-    };
+    let split_rel =
+        if ds.nws { fancy(&format!("({rel_group})"))? } else { fancy(&format!(r"(?<=(?:\A|\W|_))({rel_group})(?=(?:\Z|\W|_))"))? };
     let match_rel = fancy(&format!(r"^({rel_group})\z"))?;
 
     let mut rel_tr = Vec::new();
@@ -458,11 +447,7 @@ impl Locale {
                 let a: i64 = caps[1].parse().unwrap_or(-1);
                 let b: i64 = caps[2].parse().unwrap_or(-1);
                 let r = a + b;
-                if (1..=31).contains(&r) && (a == 20 || a == 30) && (1..=9).contains(&b) {
-                    r.to_string()
-                } else {
-                    caps[0].to_string()
-                }
+                if (1..=31).contains(&r) && (a == 20 || a == 30) && (1..=9).contains(&b) { r.to_string() } else { caps[0].to_string() }
             })
             .into_owned()
         } else {

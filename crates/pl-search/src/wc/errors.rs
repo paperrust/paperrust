@@ -49,15 +49,19 @@ pub fn cause_for(kind: DiagnosticKind) -> Cause {
     use DiagnosticKind::*;
     match kind {
         BadDate | BadNumber | TooDeep => Cause::InvalidInput,
-        PatternOnNumeric | PatternOnBooleanExists | PatternOnSubpath
-        | SingleCharBracketRange => Cause::Unsupported,
+        PatternOnNumeric | PatternOnBooleanExists | PatternOnSubpath | SingleCharBracketRange => Cause::Unsupported,
         ExistsRequiresFast => Cause::Misconfigured,
         TextRange | PatternTooComplex => Cause::Unsupported,
         SchemaFieldMissing => Cause::Misconfigured,
-        AstUnfieldedTerm | AstUnknownField | AstJsonNeedsSubpath | AstBadNumber | AstBadDate
-        | AstPatternOnKind | AstKindNotImplemented | AstInvalidShape | BackendRejected => {
-            Cause::Internal
-        }
+        AstUnfieldedTerm
+        | AstUnknownField
+        | AstJsonNeedsSubpath
+        | AstBadNumber
+        | AstBadDate
+        | AstPatternOnKind
+        | AstKindNotImplemented
+        | AstInvalidShape
+        | BackendRejected => Cause::Internal,
     }
 }
 

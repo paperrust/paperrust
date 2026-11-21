@@ -27,15 +27,15 @@ use axum::extract::State;
 use axum::response::{IntoResponse, Response};
 use chrono::{DateTime, Utc};
 use pl_authz::{AuthUser, perms};
+use pl_core::sqlbind::SqlxBinder as _;
 use pl_core::{AppState, Config, Drf, RequestContext};
 use sea_query::{Alias, Order, PostgresQueryBuilder, Query};
-use pl_core::sqlbind::SqlxBinder as _;
 use serde_json::{Map, Value, json};
 use sqlx::{PgPool, Row as _};
 
 use crate::error::{Result, insufficient_permissions};
-use pl_core::brand::{PAPERRUST_VERSION, PRODUCT_NAME, UPSTREAM_VERSION};
 use crate::sysinfo;
+use pl_core::brand::{PAPERRUST_VERSION, PRODUCT_NAME, UPSTREAM_VERSION};
 
 #[path = "migrations_generated.rs"]
 #[allow(clippy::type_complexity)]
@@ -121,17 +121,10 @@ pub fn graph_nodes(applied: &[String]) -> Vec<String> {
 }
 
 async fn applied_migrations(db: &PgPool) -> std::result::Result<Vec<String>, sqlx::Error> {
-    let q = Query::select()
-        .column(a("app"))
-        .column(a("name"))
-        .from(a("django_migrations"))
-        .order_by(a("id"), Order::Asc)
-        .to_owned();
+    let q = Query::select().column(a("app")).column(a("name")).from(a("django_migrations")).order_by(a("id"), Order::Asc).to_owned();
     let (sql, values) = q.build_sqlx(PostgresQueryBuilder);
     let rows = sqlx::query_with(&sql, values).fetch_all(db).await?;
-    rows.iter()
-        .map(|r| Ok(format!("{}.{}", r.try_get::<String, _>("app")?, r.try_get::<String, _>("name")?)))
-        .collect()
+    rows.iter().map(|r| Ok(format!("{}.{}", r.try_get::<String, _>("app")?, r.try_get::<String, _>("name")?))).collect()
 }
 
 /// (`database` object of the UI, check for `paperrust`).
@@ -155,15 +148,8 @@ async fn database_status(db: &PgPool, name: &str) -> (Value, Value) {
             m.insert("status".into(), json!(OK));
             m.insert("error".into(), Value::Null);
             let pending = unapplied.len();
-            m.insert(
-                "migration_status".into(),
-                json!({"latest_migration": applied.last(), "unapplied_migrations": unapplied}),
-            );
-            let (st, err) = if pending == 0 {
-                (OK, Value::Null)
-            } else {
-                (WARNING, json!(format!("{pending} unapplied migration(s).")))
-            };
+            m.insert("migration_status".into(), json!({"latest_migration": applied.last(), "unapplied_migrations": unapplied}));
+            let (st, err) = if pending == 0 { (OK, Value::Null) } else { (WARNING, json!(format!("{pending} unapplied migration(s)."))) };
             json!({"status": st, "error": err, "latency_ms": ms(elapsed)})
         }
         Err(timeout) => {
@@ -335,12 +321,7 @@ async fn task_info(db: &PgPool) -> std::result::Result<TaskInfo, sqlx::Error> {
         classifier: last_from(&r, "c")?,
         sanity: last_from(&r, "s")?,
         llm_index: last_from(&r, "l")?,
-        summary: [
-            r.try_get("total_count")?,
-            r.try_get("pending_count")?,
-            r.try_get("success_count")?,
-            r.try_get("failure_count")?,
-        ],
+        summary: [r.try_get("total_count")?, r.try_get("pending_count")?, r.try_get("success_count")?, r.try_get("failure_count")?],
         ai_enabled: r.try_get("ai_enabled")?,
         embedding_backend: r.try_get("llm_embedding_backend")?,
         llm_backend: r.try_get("llm_backend")?,
@@ -366,9 +347,7 @@ fn task_check(t: Option<&LastTask>, missing: &str) -> (Value, Value, Value) {
 
 /// `PAPERLESS_AI_LLM_EMBEDDING_BACKEND` (`get_choice_from_env`).
 fn env_embedding_backend(env: &pl_core::config::Env) -> Option<String> {
-    env.get("PAPERLESS_AI_LLM_EMBEDDING_BACKEND")
-        .filter(|v| ["huggingface", "openai-like", "ollama"].contains(v))
-        .map(str::to_string)
+    env.get("PAPERLESS_AI_LLM_EMBEDDING_BACKEND").filter(|v| ["huggingface", "openai-like", "ollama"].contains(v)).map(str::to_string)
 }
 
 /// `PAPERLESS_AI_LLM_BACKEND`.
@@ -390,16 +369,13 @@ fn index_status(index_dir: &Path, tz: &chrono_tz::Tz) -> (Value, Value, Value) {
     let newest = if ok { sysinfo::newest_file_mtime_ns(index_dir) } else { Err(std::io::Error::other("index missing")) };
     match newest {
         Ok(ns) => {
-            let last = ns
-                .and_then(sysinfo::fromtimestamp_local)
-                .map(|n| sysinfo::make_aware(n, *tz))
-                .map(|d| {
-                    let s = pl_core::datetime::python_isoformat(&d);
-                    match s.strip_suffix("+00:00") {
-                        Some(b) => format!("{b}Z"),
-                        None => s,
-                    }
-                });
+            let last = ns.and_then(sysinfo::fromtimestamp_local).map(|n| sysinfo::make_aware(n, *tz)).map(|d| {
+                let s = pl_core::datetime::python_isoformat(&d);
+                match s.strip_suffix("+00:00") {
+                    Some(b) => format!("{b}Z"),
+                    None => s,
+                }
+            });
             (json!(OK), last.map_or(Value::Null, Value::from), Value::Null)
         }
         Err(e) => {
@@ -562,12 +538,9 @@ fn server_os_cached() -> &'static str {
 async fn cache_status(state: &AppState) -> (Value, &'static str, Value, Value) {
     match state.cache().backend() {
         // process-local: no connection
-        pl_core::cache::Backend::Local => (
-            json!("memory://local"),
-            OK,
-            Value::Null,
-            json!({"backend": "local", "status": OK, "error": null, "latency_ms": 0.0}),
-        ),
+        pl_core::cache::Backend::Local => {
+            (json!("memory://local"), OK, Value::Null, json!({"backend": "local", "status": OK, "error": null, "latency_ms": 0.0}))
+        }
         pl_core::cache::Backend::Postgres => {
             let url = json!(format!("postgresql://{}/paperrust_cache", state.config().db.name));
             let t0 = Instant::now();
@@ -598,10 +571,7 @@ pub async fn get(State(state): State<AppState>, _ctx: RequestContext, auth: Auth
     let cfg = state.config();
     let db = state.db();
 
-    let install_type = sysinfo::install_type(
-        cfg.env.get("KUBERNETES_SERVICE_HOST"),
-        cfg.env.get("PNGX_CONTAINERIZED"),
-    );
+    let install_type = sysinfo::install_type(cfg.env.get("KUBERNETES_SERVICE_HOST"), cfg.env.get("PNGX_CONTAINERIZED"));
 
     // --- all checks in parallel --------------------------------------------------------------
     let media_root = cfg.media_root.clone();
@@ -628,8 +598,7 @@ pub async fn get(State(state): State<AppState>, _ctx: RequestContext, auth: Auth
     let (redis_url, redis_status, redis_error, cache_check) = cache_redis;
     let (celery_active, celery_url, celery_error, worker_check) = worker;
 
-    let (index_status, index_last_modified, index_error) =
-        index.unwrap_or_else(|| (json!(ERROR), Value::Null, json!(timed_out("Index"))));
+    let (index_status, index_last_modified, index_error) = index.unwrap_or_else(|| (json!(ERROR), Value::Null, json!(timed_out("Index"))));
 
     let tasks_err = match &tasks {
         Some(Ok(_)) => None,
@@ -649,8 +618,7 @@ pub async fn get(State(state): State<AppState>, _ctx: RequestContext, auth: Auth
     };
     let (classifier_status, classifier_last_trained, classifier_error) =
         task_or_err(info.classifier.as_ref(), "No classifier training tasks found");
-    let (sanity_status, sanity_last_run, sanity_error) =
-        task_or_err(info.sanity.as_ref(), "No sanity check tasks found");
+    let (sanity_status, sanity_last_run, sanity_error) = task_or_err(info.sanity.as_ref(), "No sanity check tasks found");
 
     let ai_enabled = info.ai_enabled.unwrap_or(cfg.ai_enabled);
     let embedding = nonempty(info.embedding_backend.clone()).or_else(|| env_embedding_backend(&cfg.env));
@@ -725,10 +693,7 @@ pub async fn get(State(state): State<AppState>, _ctx: RequestContext, auth: Auth
     checks.insert("database".into(), db_check);
     checks.insert("worker".into(), worker_check);
     checks.insert("cache".into(), cache_check);
-    checks.insert(
-        "index".into(),
-        json!({"status": index_status, "error": index_error, "last_modified": index_last_modified}),
-    );
+    checks.insert("index".into(), json!({"status": index_status, "error": index_error, "last_modified": index_last_modified}));
     checks.insert(
         "classifier".into(),
         json!({
@@ -739,10 +704,7 @@ pub async fn get(State(state): State<AppState>, _ctx: RequestContext, auth: Auth
             "model_file_modified": raw_dt(model_modified),
         }),
     );
-    checks.insert(
-        "sanity_check".into(),
-        json!({"status": sanity_status, "error": sanity_error, "last_run": sanity_last_run}),
-    );
+    checks.insert("sanity_check".into(), json!({"status": sanity_status, "error": sanity_error, "last_run": sanity_last_run}));
     checks.insert("ocr".into(), ocr_check(ocr));
     checks.insert("ai".into(), ai_check);
     checks.insert("storage".into(), storage_check(&storage));

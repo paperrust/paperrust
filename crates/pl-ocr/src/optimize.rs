@@ -43,10 +43,22 @@ impl OptimizeOptions {
         Self { level: 0, jpeg_quality: 0, png_quality: 0, force_jpeg: false }
     }
     pub fn effective_jpeg_quality(&self) -> u8 {
-        if self.jpeg_quality > 0 { self.jpeg_quality } else if self.level < 3 { DEFAULT_JPEG_QUALITY } else { 40 }
+        if self.jpeg_quality > 0 {
+            self.jpeg_quality
+        } else if self.level < 3 {
+            DEFAULT_JPEG_QUALITY
+        } else {
+            40
+        }
     }
     pub fn effective_png_quality(&self) -> u8 {
-        if self.png_quality > 0 { self.png_quality } else if self.level < 3 { DEFAULT_PNG_QUALITY } else { 30 }
+        if self.png_quality > 0 {
+            self.png_quality
+        } else if self.level < 3 {
+            DEFAULT_PNG_QUALITY
+        } else {
+            30
+        }
     }
     fn complevel(&self) -> u32 {
         if self.level >= 3 { 9 } else { 6 }
@@ -218,7 +230,13 @@ fn quantize(p: &Pixels, png_quality: u8) -> Option<Pixels> {
 
 fn jbig2(p: &Pixels) -> Option<Encoded> {
     let data = crate::jbig2::encode_generic(&p.data, p.width, p.height)?;
-    Some(Encoded { content: data, filter: Object::Name(b"JBIG2Decode".to_vec()), decode_parms: None, bpc: 1, cs: Object::Name(b"DeviceGray".to_vec()) })
+    Some(Encoded {
+        content: data,
+        filter: Object::Name(b"JBIG2Decode".to_vec()),
+        decode_parms: None,
+        bpc: 1,
+        cs: Object::Name(b"DeviceGray".to_vec()),
+    })
 }
 
 /// Best possible lossless encoding of an 8-/1-bit image.
@@ -296,7 +314,9 @@ pub fn optimize_images(doc: &mut Document, o: &OptimizeOptions) -> OptimizeRepor
         let h = s.dict.get(b"Height").ok().and_then(|v| v.as_i64().ok()).unwrap_or(0);
         // 1-bit masks (ImageMask): bits unchanged to JBIG2.
         if image_mask {
-            if f.iter().any(|n| matches!(n.as_slice(), b"JBIG2Decode" | b"CCITTFaxDecode" | b"DCTDecode" | b"JPXDecode")) || s.dict.has(b"Decode") {
+            if f.iter().any(|n| matches!(n.as_slice(), b"JBIG2Decode" | b"CCITTFaxDecode" | b"DCTDecode" | b"JPXDecode"))
+                || s.dict.has(b"Decode")
+            {
                 continue;
             }
             let Ok(data) = s.decompressed_content_with_limit(pdfimage::MAX_DECODED) else { continue };
@@ -383,8 +403,12 @@ pub fn optimize_images(doc: &mut Document, o: &OptimizeOptions) -> OptimizeRepor
                 }
                 if final_len >= before {
                     // Not smaller: only try Flate over the original JPEG.
-                    if px.was_jpeg && f.len() == 1 && let Some(z) = jpeg_deflate(&s.content) {
-                        s.dict.set("Filter", Object::Array(vec![Object::Name(b"FlateDecode".to_vec()), Object::Name(b"DCTDecode".to_vec())]));
+                    if px.was_jpeg
+                        && f.len() == 1
+                        && let Some(z) = jpeg_deflate(&s.content)
+                    {
+                        s.dict
+                            .set("Filter", Object::Array(vec![Object::Name(b"FlateDecode".to_vec()), Object::Name(b"DCTDecode".to_vec())]));
                         s.dict.remove(b"DecodeParms");
                         s.set_content(z);
                         s.allows_compression = false;
@@ -392,7 +416,13 @@ pub fn optimize_images(doc: &mut Document, o: &OptimizeOptions) -> OptimizeRepor
                     }
                     continue;
                 }
-                let kind = if e.filter == Object::Name(b"JBIG2Decode".to_vec()) { 1 } else if is_dct { 2 } else { 0 };
+                let kind = if e.filter == Object::Name(b"JBIG2Decode".to_vec()) {
+                    1
+                } else if is_dct {
+                    2
+                } else {
+                    0
+                };
                 pdfimage::apply(s, e);
                 if let Some(z) = deflated {
                     s.dict.set("Filter", Object::Array(vec![Object::Name(b"FlateDecode".to_vec()), Object::Name(b"DCTDecode".to_vec())]));
@@ -406,7 +436,10 @@ pub fn optimize_images(doc: &mut Document, o: &OptimizeOptions) -> OptimizeRepor
                 }
             }
             _ => {
-                if px.was_jpeg && f.len() == 1 && let Some(z) = jpeg_deflate(&s.content) {
+                if px.was_jpeg
+                    && f.len() == 1
+                    && let Some(z) = jpeg_deflate(&s.content)
+                {
                     s.dict.set("Filter", Object::Array(vec![Object::Name(b"FlateDecode".to_vec()), Object::Name(b"DCTDecode".to_vec())]));
                     s.dict.remove(b"DecodeParms");
                     s.set_content(z);

@@ -15,22 +15,21 @@ use axum::http::{Method, StatusCode};
 use axum::response::Response;
 use chrono::{DateTime, Utc};
 use pl_core::AppState;
-use sea_query::{Alias, Expr, PostgresQueryBuilder, Query, SelectStatement};
 use pl_core::sqlbind::SqlxBinder;
+use sea_query::{Alias, Expr, PostgresQueryBuilder, Query, SelectStatement};
 use serde_json::{Map, Value, json};
 use sqlx::{PgPool, Row};
 
 use crate::authz::{check_object_perm, permitted_document_ids_sql, require_model_perm, visible};
-use pl_authz::models::{ObjectModel, SHARE_LINK_BUNDLE};
 use crate::celery::enqueue_build_share_link_bundle;
 use crate::fields::{ChoiceOpts, Errors, F, IntOpts, check_int, choice_str, int_field};
 use crate::query::{FilterErrors, apply_ordering, datetime_filters, ordering_terms};
-use crate::shim::{
-    ApiError, ApiResult, Ctx, finish, fmt_dt, fmt_dt_opt, get_random_string, json_response,
-    no_content, page_request, paginated, parse_body, parse_pk, py_type_name, require_object,
-    resolve_page,
-};
 use crate::share_links::FILE_VERSIONS;
+use crate::shim::{
+    ApiError, ApiResult, Ctx, finish, fmt_dt, fmt_dt_opt, get_random_string, json_response, no_content, page_request, paginated,
+    parse_body, parse_pk, py_type_name, require_object, resolve_page,
+};
+use pl_authz::models::{ObjectModel, SHARE_LINK_BUNDLE};
 
 const OM: ObjectModel = SHARE_LINK_BUNDLE;
 const LABEL: &str = "ShareLinkBundle";
@@ -98,10 +97,7 @@ fn from_row(r: &sqlx::postgres::PgRow) -> Result<Bundle, sqlx::Error> {
         file_version: r.try_get("file_version")?,
         status: r.try_get("status")?,
         size_bytes: r.try_get("size_bytes")?,
-        last_error: r
-            .try_get::<Option<sqlx::types::Json<Value>>, _>("last_error")?
-            .map(|j| j.0)
-            .unwrap_or(Value::Null),
+        last_error: r.try_get::<Option<sqlx::types::Json<Value>>, _>("last_error")?.map(|j| j.0).unwrap_or(Value::Null),
         built_at: r.try_get("built_at")?,
         file_path: r.try_get("file_path")?,
         owner_id: r.try_get("owner_id")?,
@@ -125,9 +121,7 @@ async fn load_documents(db: &PgPool, ids: &[i64]) -> ApiResult<HashMap<i64, Vec<
     .fetch_all(db)
     .await?;
     for r in rows {
-        out.entry(r.try_get("b")?)
-            .or_default()
-            .push(r.try_get("d")?);
+        out.entry(r.try_get("b")?).or_default().push(r.try_get("d")?);
     }
     Ok(out)
 }
@@ -150,11 +144,7 @@ fn to_json(b: &Bundle, docs: &[i64], document_count: i64) -> Value {
 
 /// `get_document_count`: `document_total or documents.count()`
 fn doc_count(b: &Bundle, docs: &[i64]) -> i64 {
-    if b.document_total != 0 {
-        b.document_total
-    } else {
-        docs.len() as i64
-    }
+    if b.document_total != 0 { b.document_total } else { docs.len() as i64 }
 }
 
 async fn single_json(db: &PgPool, b: &Bundle, override_total: Option<i64>) -> ApiResult<Value> {
@@ -228,31 +218,20 @@ async fn list_inner(db: &PgPool, ctx: &Ctx) -> ApiResult<Response> {
         if STATUSES.contains(&s) {
             q.and_where(Expr::cust_with_values("b.status = $1", [s.to_string()]));
         } else {
-            errs.add(
-                "status",
-                &format!("Select a valid choice. {s} is not one of the available choices."),
-            );
+            errs.add("status", &format!("Select a valid choice. {s} is not one of the available choices."));
         }
     }
     errs.into_result()?;
     // filter_documents: invalid number → empty, no IDs → no filter
     if let Some(v) = ctx.param("documents").filter(|v| !v.is_empty()) {
-        let parsed: Result<Vec<i64>, _> = v
-            .split(',')
-            .filter(|s| !s.is_empty())
-            .map(|s| s.trim().parse::<i64>())
-            .collect();
+        let parsed: Result<Vec<i64>, _> = v.split(',').filter(|s| !s.is_empty()).map(|s| s.trim().parse::<i64>()).collect();
         match parsed {
             Err(_) => {
                 q.and_where(Expr::cust("FALSE"));
             }
             Ok(ids) if ids.is_empty() => {}
             Ok(ids) => {
-                let list = ids
-                    .iter()
-                    .map(i64::to_string)
-                    .collect::<Vec<_>>()
-                    .join(", ");
+                let list = ids.iter().map(i64::to_string).collect::<Vec<_>>().join(", ");
                 q.and_where(Expr::cust(format!(
                     "b.id IN (SELECT t.sharelinkbundle_id FROM documents_sharelinkbundle_documents t \
                      WHERE t.document_id IN ({list}))"
@@ -313,9 +292,7 @@ async fn retrieve_inner(db: &PgPool, ctx: &Ctx, pk: &str) -> ApiResult<Response>
 
 /// `document_ids`: ListField(IntegerField(min_value=1), allow_empty=False) + duplicate check.
 fn validate_document_ids(data: &Map<String, Value>, errs: &mut Errors) -> Option<Vec<i64>> {
-    let v = data
-        .get("__list__document_ids")
-        .or_else(|| data.get("document_ids"));
+    let v = data.get("__list__document_ids").or_else(|| data.get("document_ids"));
     let Some(v) = v else {
         errs.add("document_ids", crate::fields::REQUIRED);
         return None;
@@ -327,13 +304,7 @@ fn validate_document_ids(data: &Map<String, Value>, errs: &mut Errors) -> Option
         }
         Value::Array(items) => items,
         other => {
-            errs.add(
-                "document_ids",
-                &format!(
-                    "Expected a list of items but got type \"{}\".",
-                    py_type_name(other)
-                ),
-            );
+            errs.add("document_ids", &format!("Expected a list of items but got type \"{}\".", py_type_name(other)));
             return None;
         }
     };
@@ -344,11 +315,7 @@ fn validate_document_ids(data: &Map<String, Value>, errs: &mut Errors) -> Option
     let mut ids = Vec::new();
     let mut child = Map::new();
     for (i, x) in items.iter().enumerate() {
-        let r = if x.is_null() {
-            Err(crate::fields::NULL.to_string())
-        } else {
-            check_int(x, Some(1), None)
-        };
+        let r = if x.is_null() { Err(crate::fields::NULL.to_string()) } else { check_int(x, Some(1), None) };
         match r {
             Ok(n) => ids.push(n),
             Err(m) => {
@@ -362,10 +329,7 @@ fn validate_document_ids(data: &Map<String, Value>, errs: &mut Errors) -> Option
     }
     let unique: BTreeSet<i64> = ids.iter().copied().collect();
     if unique.len() != ids.len() {
-        errs.add(
-            "document_ids",
-            "Duplicate document identifiers are not allowed.",
-        );
+        errs.add("document_ids", "Duplicate document identifiers are not allowed.");
         return None;
     }
     Some(ids)
@@ -385,30 +349,17 @@ async fn create_inner(st: &AppState, ctx: &Ctx, body: &[u8]) -> ApiResult<Respon
     let data = require_object(parse_body(&ctx.headers, body)?)?;
     let mut errs = Errors::default();
     // Field order: expiration_days, file_version, document_ids
-    let expiration_days = match int_field(
-        &data,
-        "expiration_days",
-        IntOpts {
-            required: false,
-            allow_null: true,
-            min: Some(1),
-            max: None,
-        },
-        false,
-        &mut errs,
-    ) {
-        F::Val(v) => v,
-        _ => None,
-    };
+    let expiration_days =
+        match int_field(&data, "expiration_days", IntOpts { required: false, allow_null: true, min: Some(1), max: None }, false, &mut errs)
+        {
+            F::Val(v) => v,
+            _ => None,
+        };
     let file_version = match choice_str(
         &data,
         "file_version",
         FILE_VERSIONS,
-        ChoiceOpts {
-            required: false,
-            allow_null: false,
-            allow_blank: false,
-        },
+        ChoiceOpts { required: false, allow_null: false, allow_blank: false },
         false,
         &mut errs,
     ) {
@@ -422,20 +373,12 @@ async fn create_inner(st: &AppState, ctx: &Ctx, body: &[u8]) -> ApiResult<Respon
     };
 
     // View: missing documents (default manager: non-deleted)
-    let found: Vec<i64> = sqlx::query_scalar(
-        "SELECT id::int8 FROM documents_document WHERE id = ANY($1::int8[]) AND deleted_at IS NULL",
-    )
-    .bind(&ids)
-    .fetch_all(db)
-    .await?;
+    let found: Vec<i64> = sqlx::query_scalar("SELECT id::int8 FROM documents_document WHERE id = ANY($1::int8[]) AND deleted_at IS NULL")
+        .bind(&ids)
+        .fetch_all(db)
+        .await?;
     let found: BTreeSet<i64> = found.into_iter().collect();
-    let missing: Vec<String> = ids
-        .iter()
-        .copied()
-        .collect::<BTreeSet<i64>>()
-        .difference(&found)
-        .map(|i| i.to_string())
-        .collect();
+    let missing: Vec<String> = ids.iter().copied().collect::<BTreeSet<i64>>().difference(&found).map(|i| i.to_string()).collect();
     if !missing.is_empty() {
         return Err(ApiError::bad_request(json!({
             "document_ids": format!("Documents not found: {}", missing.join(", "))
@@ -446,10 +389,7 @@ async fn create_inner(st: &AppState, ctx: &Ctx, body: &[u8]) -> ApiResult<Respon
          AND id NOT IN ({}) ORDER BY id LIMIT 1",
         permitted_document_ids_sql(ctx)
     );
-    let denied: Option<i64> = sqlx::query_scalar(&denied_sql)
-        .bind(&ids)
-        .fetch_optional(db)
-        .await?;
+    let denied: Option<i64> = sqlx::query_scalar(&denied_sql).bind(&ids).fetch_optional(db).await?;
     if let Some(d) = denied {
         return Err(ApiError::bad_request(json!({
             "document_ids": format!("Insufficient permissions to share document {d}.")
@@ -492,10 +432,7 @@ async fn create_inner(st: &AppState, ctx: &Ctx, body: &[u8]) -> ApiResult<Respon
     .await?;
     enqueue_build_share_link_bundle(st, id).await?;
     let b = reload(db, id).await?;
-    Ok(json_response(
-        StatusCode::CREATED,
-        &single_json(db, &b, Some(ids.len() as i64)).await?,
-    ))
+    Ok(json_response(StatusCode::CREATED, &single_json(db, &b, Some(ids.len() as i64)).await?))
 }
 
 // ---------------------------------------------------------------------------
@@ -511,10 +448,7 @@ async fn rebuild_inner(st: &AppState, ctx: &Ctx, pk: &str) -> ApiResult<Response
     require_model_perm(ctx, &OM)?;
     let b = get_object(db, ctx, &Method::POST, pk).await?;
     if b.status == "processing" {
-        return Err(ApiError::detail(
-            StatusCode::BAD_REQUEST,
-            "Bundle is already being processed.",
-        ));
+        return Err(ApiError::detail(StatusCode::BAD_REQUEST, "Bundle is already being processed."));
     }
     remove_file(&ctx.share_link_bundle_dir, &b.file_path);
     sqlx::query(
@@ -549,14 +483,8 @@ async fn destroy_inner(db: &PgPool, ctx: &Ctx, pk: &str) -> ApiResult<Response> 
     let b = get_object(db, ctx, &Method::DELETE, pk).await?;
     remove_file(&ctx.share_link_bundle_dir, &b.file_path);
     let mut tx = db.begin().await?;
-    sqlx::query("DELETE FROM documents_sharelinkbundle_documents WHERE sharelinkbundle_id = $1::int8")
-        .bind(b.id)
-        .execute(&mut *tx)
-        .await?;
-    sqlx::query("DELETE FROM documents_sharelinkbundle WHERE id = $1::int8")
-        .bind(b.id)
-        .execute(&mut *tx)
-        .await?;
+    sqlx::query("DELETE FROM documents_sharelinkbundle_documents WHERE sharelinkbundle_id = $1::int8").bind(b.id).execute(&mut *tx).await?;
+    sqlx::query("DELETE FROM documents_sharelinkbundle WHERE id = $1::int8").bind(b.id).execute(&mut *tx).await?;
     tx.commit().await?;
     Ok(no_content())
 }

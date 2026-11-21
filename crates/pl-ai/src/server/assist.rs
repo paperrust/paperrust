@@ -13,10 +13,10 @@ use axum::body::Bytes;
 use axum::extract::State;
 use axum::response::{IntoResponse, Response};
 use pl_authz::models::DOCUMENT;
-use pl_authz::perms::{has_perms_owner_aware, ObjRef};
+use pl_authz::perms::{ObjRef, has_perms_owner_aware};
 use pl_authz::{AuthUser, User};
 use pl_core::{ApiError, AppState, Drf, RequestContext};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use super::data::{self, Cat};
 use super::store::body_json;
@@ -69,7 +69,10 @@ pub async fn workflow_draft(state: &AppState, description: &str, user: Option<&U
         storage_paths: pool(Cat::StoragePaths).await.map_err(|e| e.status().to_string())?,
     };
     let client = LlmClient::from_config(&cfg).map_err(|e| e.to_string())?;
-    let raw = client.complete_json(&workflow_assist::workflow_prompt(description, &t), "WorkflowDraft", &workflow_assist::draft_schema()).await.map_err(|e| e.to_string())?;
+    let raw = client
+        .complete_json(&workflow_assist::workflow_prompt(description, &t), "WorkflowDraft", &workflow_assist::draft_schema())
+        .await
+        .map_err(|e| e.to_string())?;
     Ok(workflow_assist::sanitize_draft(&raw, &t))
 }
 
@@ -120,9 +123,12 @@ fn budget(kind: &str, per_hour: u32) -> &'static crate::mcp::ratelimit::Budget {
 pub async fn verdict_view(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser, body: Bytes) -> Result<Response, ApiError> {
     let user = auth.require_model_perms(&DOCUMENT)?;
     let b = body_json(&body)?;
-    let id = b.get("document").and_then(Value::as_i64).ok_or_else(|| ApiError::validation(json!({"document": ["This field is required."]})))?;
+    let id =
+        b.get("document").and_then(Value::as_i64).ok_or_else(|| ApiError::validation(json!({"document": ["This field is required."]})))?;
     let d = data::load_doc(state.db(), id).await?.ok_or_else(ApiError::not_found)?;
-    if !has_perms_owner_aware(state.db(), Some(user), "view_document", &DOCUMENT, ObjRef { id: d.root_id, owner_id: d.root_owner_id }).await? {
+    if !has_perms_owner_aware(state.db(), Some(user), "view_document", &DOCUMENT, ObjRef { id: d.root_id, owner_id: d.root_owner_id })
+        .await?
+    {
         return Err(ApiError::not_found());
     }
     if let Err(wait) = budget("verdict", 60).try_take(&format!("u{}", user.id), 1) {
@@ -133,7 +139,12 @@ pub async fn verdict_view(State(state): State<AppState>, ctx: RequestContext, au
 }
 
 /// POST /api/x-ai/assist/workflow-draft/ `{"description": "…"}` → [`WorkflowDraft`].
-pub async fn workflow_draft_view(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser, body: Bytes) -> Result<Response, ApiError> {
+pub async fn workflow_draft_view(
+    State(state): State<AppState>,
+    ctx: RequestContext,
+    auth: AuthUser,
+    body: Bytes,
+) -> Result<Response, ApiError> {
     let user = auth.require_perms_by_method(&[("POST", &["documents.add_workflow"])])?;
     let b = body_json(&body)?;
     let desc = b.get("description").and_then(Value::as_str).map(str::trim).unwrap_or("");

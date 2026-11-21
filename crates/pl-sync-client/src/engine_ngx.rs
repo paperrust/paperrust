@@ -102,7 +102,15 @@ impl SyncClient {
                     .as_array()
                     .map(|a| {
                         a.iter()
-                            .map(|r| (r["rule_type"].as_i64().unwrap_or(-1), r["value"].as_str().map(str::to_string).or_else(|| (!r["value"].is_null()).then(|| r["value"].to_string()))))
+                            .map(|r| {
+                                (
+                                    r["rule_type"].as_i64().unwrap_or(-1),
+                                    r["value"]
+                                        .as_str()
+                                        .map(str::to_string)
+                                        .or_else(|| (!r["value"].is_null()).then(|| r["value"].to_string())),
+                                )
+                            })
                             .collect()
                     })
                     .unwrap_or_default();
@@ -240,10 +248,13 @@ impl SyncClient {
             }
         }
         let row = r.remote().await?.unwrap_or_default();
-        let watermark: Option<String> = sqlx::query_scalar("SELECT ngx_watermark FROM remote WHERE id = 1").fetch_optional(r.pool()).await?.flatten();
+        let watermark: Option<String> =
+            sqlx::query_scalar("SELECT ngx_watermark FROM remote WHERE id = 1").fetch_optional(r.pool()).await?.flatten();
         let mut new_mark = watermark.clone();
         if let Some(w) = &watermark {
-            let since = chrono::DateTime::parse_from_rfc3339(w).map(|t| (t - chrono::Duration::seconds(2)).to_rfc3339()).unwrap_or_else(|_| w.clone());
+            let since = chrono::DateTime::parse_from_rfc3339(w)
+                .map(|t| (t - chrono::Duration::seconds(2)).to_rfc3339())
+                .unwrap_or_else(|_| w.clone());
             for (id, m) in ngx.modified_since(&since).await? {
                 if p.docs.contains_key(&ngx_uuid(1, id)) {
                     need.insert(id);

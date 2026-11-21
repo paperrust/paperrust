@@ -24,7 +24,10 @@ async fn counting_server(body: &'static str) -> (std::net::SocketAddr, Arc<Atomi
             tokio::spawn(async move {
                 let mut b = [0u8; 4096];
                 let _ = s.read(&mut b).await;
-                let resp = format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len());
+                let resp = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                );
                 let _ = s.write_all(resp.as_bytes()).await;
             });
         }

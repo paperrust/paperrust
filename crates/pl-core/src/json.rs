@@ -274,10 +274,7 @@ mod tests {
     #[test]
     fn compact_and_unicode() {
         let v = json!({"a": "ä\u{2028}", "b": [1, 2.0, null, true], "c": {}});
-        assert_eq!(
-            String::from_utf8(to_drf_json(&v).unwrap()).unwrap(),
-            "{\"a\":\"ä\\u2028\",\"b\":[1,2.0,null,true],\"c\":{}}"
-        );
+        assert_eq!(String::from_utf8(to_drf_json(&v).unwrap()).unwrap(), "{\"a\":\"ä\\u2028\",\"b\":[1,2.0,null,true],\"c\":{}}");
     }
 
     #[test]

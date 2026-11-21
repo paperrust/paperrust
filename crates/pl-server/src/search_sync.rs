@@ -18,10 +18,7 @@ const BUSY_RETRY: Duration = Duration::from_secs(5);
 const ERROR_RETRY: Duration = Duration::from_secs(30);
 
 fn writer_off(state: &AppState) -> bool {
-    matches!(
-        state.config().env.get("PAPERRUST_INDEX_WRITER").map(|v| v.trim().to_ascii_lowercase()).as_deref(),
-        Some("off" | "none")
-    )
+    matches!(state.config().env.get("PAPERRUST_INDEX_WRITER").map(|v| v.trim().to_ascii_lowercase()).as_deref(), Some("off" | "none"))
 }
 
 /// Endless loop until `stop`.

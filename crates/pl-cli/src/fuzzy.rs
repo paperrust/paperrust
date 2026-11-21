@@ -112,7 +112,13 @@ pub async fn find_matches(docs: Vec<(i64, String)>, opt_ratio: f64, processes: u
 }
 
 /// `_render_results` as text; returns: marked ids (`doc_two_pk` per pair).
-fn render(matches: &[Match], titles: &std::collections::HashMap<i64, String>, opt_ratio: f64, do_delete: bool, base_url: Option<&str>) -> Vec<i64> {
+fn render(
+    matches: &[Match],
+    titles: &std::collections::HashMap<i64, String>,
+    opt_ratio: f64,
+    do_delete: bool,
+    base_url: Option<&str>,
+) -> Vec<i64> {
     if matches.is_empty() {
         println!("No duplicate documents found.");
         return Vec::new();
@@ -147,21 +153,19 @@ pub async fn command(argv: Vec<String>) -> CliResult {
     }
     let do_delete = a.flag("delete");
     if do_delete {
-        println!(
-            "WARNING: This run is configured to delete documents. One document from each matched pair WILL BE PERMANENTLY DELETED."
-        );
+        println!("WARNING: This run is configured to delete documents. One document from each matched pair WILL BE PERMANENTLY DELETED.");
     }
     let c = Ctx::connect().await?;
-    let rows: Vec<(i32, String)> = sqlx::query_as("SELECT id, content FROM documents_document WHERE deleted_at IS NULL ORDER BY id")
-        .fetch_all(&c.pool)
-        .await?;
+    let rows: Vec<(i32, String)> =
+        sqlx::query_as("SELECT id, content FROM documents_document WHERE deleted_at IS NULL ORDER BY id").fetch_all(&c.pool).await?;
     let docs: Vec<(i64, String)> = rows.into_iter().map(|(i, s)| (i64::from(i), s)).collect();
     let matches = find_matches(docs, opt_ratio, processes).await;
     let base_url = a.value("url").filter(|u| !u.is_empty());
     let mut titles = std::collections::HashMap::new();
     if base_url.is_none() && !matches.is_empty() {
         let pks: Vec<i32> = matches.iter().flat_map(|m| [m.doc_one_pk, m.doc_two_pk]).filter_map(|p| i32::try_from(p).ok()).collect();
-        let t: Vec<(i32, String)> = sqlx::query_as("SELECT id, title FROM documents_document WHERE id = ANY($1)").bind(&pks).fetch_all(&c.pool).await?;
+        let t: Vec<(i32, String)> =
+            sqlx::query_as("SELECT id, title FROM documents_document WHERE id = ANY($1)").bind(&pks).fetch_all(&c.pool).await?;
         titles = t.into_iter().map(|(i, s)| (i64::from(i), s)).collect();
     }
     let ids = render(&matches, &titles, opt_ratio, do_delete, base_url);
@@ -225,9 +229,18 @@ mod tests {
     #[test]
     fn ratio_matches_rapidfuzz_reference_values() {
         // rapidfuzz.fuzz.ratio("this is a test", "this is a test!") == 96.55172413793103
-        assert!((ratio(&"this is a test".chars().collect::<Vec<_>>(), &"this is a test!".chars().collect::<Vec<_>>(), 0.0) - 96.551_724_137_931_03).abs() < 1e-9);
+        assert!(
+            (ratio(&"this is a test".chars().collect::<Vec<_>>(), &"this is a test!".chars().collect::<Vec<_>>(), 0.0)
+                - 96.551_724_137_931_03)
+                .abs()
+                < 1e-9
+        );
         // fuzz.ratio("lewenstein", "levenshtein") == 85.71428571428572
-        assert!((ratio(&"lewenstein".chars().collect::<Vec<_>>(), &"levenshtein".chars().collect::<Vec<_>>(), 0.0) - 85.714_285_714_285_72).abs() < 1e-9);
+        assert!(
+            (ratio(&"lewenstein".chars().collect::<Vec<_>>(), &"levenshtein".chars().collect::<Vec<_>>(), 0.0) - 85.714_285_714_285_72)
+                .abs()
+                < 1e-9
+        );
         assert_eq!(r("abc", "abc"), 100.0);
         assert_eq!(r("", ""), 100.0);
         assert_eq!(r("abc", "xyz"), 0.0);

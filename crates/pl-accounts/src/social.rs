@@ -352,9 +352,24 @@ pub fn oidc_login_path(base_url: &str, provider_id: &str) -> R<String> {
 /// (RFC 3986 unreserved + sub-delims + `:@/`).
 fn url_path_escape(s: &str) -> String {
     const SET: &percent_encoding::AsciiSet = &percent_encoding::NON_ALPHANUMERIC
-        .remove(b'-').remove(b'.').remove(b'_').remove(b'~')
-        .remove(b'!').remove(b'$').remove(b'&').remove(0x27).remove(b'(').remove(b')')
-        .remove(b'*').remove(b'+').remove(b',').remove(b';').remove(b'=').remove(b':').remove(b'@').remove(b'/');
+        .remove(b'-')
+        .remove(b'.')
+        .remove(b'_')
+        .remove(b'~')
+        .remove(b'!')
+        .remove(b'$')
+        .remove(b'&')
+        .remove(0x27)
+        .remove(b'(')
+        .remove(b')')
+        .remove(b'*')
+        .remove(b'+')
+        .remove(b',')
+        .remove(b';')
+        .remove(b'=')
+        .remove(b':')
+        .remove(b'@')
+        .remove(b'/');
     percent_encoding::utf8_percent_encode(s, SET).to_string()
 }
 

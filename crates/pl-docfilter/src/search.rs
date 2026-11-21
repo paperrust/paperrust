@@ -85,15 +85,9 @@ fn unescape_string_literal(s: &str) -> String {
     let quote = s.chars().next().unwrap_or('"');
     let inner: String = {
         let cs: Vec<char> = s.chars().collect();
-        if cs.len() >= 2 {
-            cs[1..cs.len() - 1].iter().collect()
-        } else {
-            String::new()
-        }
+        if cs.len() >= 2 { cs[1..cs.len() - 1].iter().collect() } else { String::new() }
     };
-    inner
-        .replace(&format!("\\{quote}"), &quote.to_string())
-        .replace("\\\\", "\\")
+    inner.replace(&format!("\\{quote}"), &quote.to_string()).replace("\\\\", "\\")
 }
 
 /// DRF `search_smart_split`

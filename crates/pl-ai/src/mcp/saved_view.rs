@@ -115,7 +115,15 @@ mod tests {
 
     #[test]
     fn like_upstream_frontend() {
-        let p = params_from_rules(&[r(6, Some("1")), r(6, Some("2")), r(3, None), r(19, Some("rechnung")), r(5, Some("true")), r(4, Some("-1"))]).unwrap();
+        let p = params_from_rules(&[
+            r(6, Some("1")),
+            r(6, Some("2")),
+            r(3, None),
+            r(19, Some("rechnung")),
+            r(5, Some("true")),
+            r(4, Some("-1")),
+        ])
+        .unwrap();
         assert_eq!(
             p,
             vec![

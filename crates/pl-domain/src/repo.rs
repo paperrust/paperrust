@@ -48,12 +48,10 @@ pub trait Repo: Send + Sync {
     fn get<'a>(&'a self, p: &'a Principal, kind: Kind, uuid: Uuid, sharing: bool) -> BoxFut<'a, Object>;
 
     /// Several objects of a kind (≤ 500). Returns: (found, missing-or-invisible).
-    fn batch<'a>(&'a self, p: &'a Principal, kind: Kind, uuids: &'a [Uuid], include: DocInclude)
-    -> BoxFut<'a, (Vec<Object>, Vec<Uuid>)>;
+    fn batch<'a>(&'a self, p: &'a Principal, kind: Kind, uuids: &'a [Uuid], include: DocInclude) -> BoxFut<'a, (Vec<Object>, Vec<Uuid>)>;
 
     /// Visible objects by `legacy_id` (for the feed: visibility + embedding).
-    fn by_legacy_ids<'a>(&'a self, p: &'a Principal, kind: Kind, ids: &'a [i64], embed: bool)
-    -> BoxFut<'a, Vec<(i64, Option<Object>)>>;
+    fn by_legacy_ids<'a>(&'a self, p: &'a Principal, kind: Kind, ids: &'a [i64], embed: bool) -> BoxFut<'a, Vec<(i64, Option<Object>)>>;
 
     /// Document list via the query AST.
     fn query_documents<'a>(&'a self, p: &'a Principal, q: &'a DocQuery) -> BoxFut<'a, Page<Document>>;
@@ -67,12 +65,10 @@ pub trait Repo: Send + Sync {
     /// Create tags, correspondents, document types.
     fn create<'a>(&'a self, p: &'a Principal, kind: Kind, w: &'a ObjectWrite) -> BoxFut<'a, Object>;
     /// Change with optimistic locking (`if_match` = expected `rev`).
-    fn update<'a>(&'a self, p: &'a Principal, kind: Kind, uuid: Uuid, if_match: Option<i64>, w: &'a ObjectWrite)
-    -> BoxFut<'a, Object>;
+    fn update<'a>(&'a self, p: &'a Principal, kind: Kind, uuid: Uuid, if_match: Option<i64>, w: &'a ObjectWrite) -> BoxFut<'a, Object>;
     fn delete<'a>(&'a self, p: &'a Principal, kind: Kind, uuid: Uuid, if_match: Option<i64>) -> BoxFut<'a, ()>;
 
-    fn patch_document<'a>(&'a self, p: &'a Principal, uuid: Uuid, if_match: Option<i64>, patch: &'a DocumentPatch)
-    -> BoxFut<'a, Document>;
+    fn patch_document<'a>(&'a self, p: &'a Principal, uuid: Uuid, if_match: Option<i64>, patch: &'a DocumentPatch) -> BoxFut<'a, Document>;
 
     /// File of a document (permissions like v1 `download`).
     fn file<'a>(&'a self, p: &'a Principal, uuid: Uuid, variant: FileVariant) -> BoxFut<'a, FileRef>;

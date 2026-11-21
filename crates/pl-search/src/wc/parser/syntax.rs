@@ -94,15 +94,7 @@ pub enum SNode {
     /// TextNode subclasses
     Text { kind: TextKind, text: String, fieldname: Option<String>, boost: f64, sc: Pos, ec: Pos },
     /// syntax.RangeNode
-    Range {
-        start: Option<String>,
-        end: Option<String>,
-        startexcl: bool,
-        endexcl: bool,
-        fieldname: Option<String>,
-        sc: Pos,
-        ec: Pos,
-    },
+    Range { start: Option<String>, end: Option<String>, startexcl: bool, endexcl: bool, fieldname: Option<String>, sc: Pos, ec: Pos },
     /// syntax.Operator subclasses
     Operator { op: OpKind, sc: Pos, ec: Pos },
     /// BoostPlugin.BoostNode
@@ -221,10 +213,7 @@ impl SNode {
 
     /// `has_fieldname`
     pub fn has_fieldname(&self) -> bool {
-        matches!(
-            self,
-            SNode::Fieldname { .. } | SNode::Text { .. } | SNode::Range { .. } | SNode::DateRange { .. }
-        )
+        matches!(self, SNode::Fieldname { .. } | SNode::Text { .. } | SNode::Range { .. } | SNode::DateRange { .. })
     }
 
     /// `has_boost`
@@ -239,9 +228,7 @@ impl SNode {
     /// `node.fieldname` (None for nodes without one)
     pub fn fieldname(&self) -> Option<&str> {
         match self {
-            SNode::Fieldname { fieldname, .. }
-            | SNode::Text { fieldname, .. }
-            | SNode::Range { fieldname, .. } => fieldname.as_deref(),
+            SNode::Fieldname { fieldname, .. } | SNode::Text { fieldname, .. } | SNode::Range { fieldname, .. } => fieldname.as_deref(),
             SNode::DateRange { fieldname, .. } => Some(fieldname.as_str()),
             _ => None,
         }
@@ -255,9 +242,7 @@ impl SNode {
                     n.set_fieldname(name, ovr);
                 }
             }
-            SNode::Fieldname { fieldname, .. }
-            | SNode::Text { fieldname, .. }
-            | SNode::Range { fieldname, .. } => {
+            SNode::Fieldname { fieldname, .. } | SNode::Text { fieldname, .. } | SNode::Range { fieldname, .. } => {
                 if fieldname.is_none() || ovr {
                     *fieldname = name.map(str::to_string);
                 }
@@ -300,11 +285,9 @@ impl SNode {
     /// `GroupNode.empty_copy()`
     pub fn empty_copy(&self) -> SNode {
         match self {
-            SNode::Group { kind, boost, .. } => SNode::Group {
-                kind: *kind,
-                nodes: Vec::new(),
-                boost: if kind.has_boost() { *boost } else { 1.0 },
-            },
+            SNode::Group { kind, boost, .. } => {
+                SNode::Group { kind: *kind, nodes: Vec::new(), boost: if kind.has_boost() { *boost } else { 1.0 } }
+            }
             other => other.clone(),
         }
     }

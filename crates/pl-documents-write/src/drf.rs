@@ -60,11 +60,7 @@ pub fn py_int_from_str(s: &str) -> Option<i64> {
 /// whether `int(re.sub(r'\.0*\s*$', '', str(f)))` succeeds – that is exactly the case for integral floats
 /// with magnitude < 1e16 (above that Python writes exponent notation).
 fn float_as_drf_int(f: f64) -> Option<i64> {
-    if f.is_finite() && f.fract() == 0.0 && f.abs() < 1e16 {
-        Some(f as i64)
-    } else {
-        None
-    }
+    if f.is_finite() && f.fract() == 0.0 && f.abs() < 1e16 { Some(f as i64) } else { None }
 }
 
 /// DRF `IntegerField.to_internal_value` (without null/required handling).
@@ -95,11 +91,7 @@ pub fn drf_int(v: &Value) -> Result<i64, &'static str> {
 fn strip_decimal_suffix(s: &str) -> &str {
     let t = s.trim_end();
     let without_zeros = t.trim_end_matches('0');
-    if let Some(prefix) = without_zeros.strip_suffix('.') {
-        prefix
-    } else {
-        s
-    }
+    if let Some(prefix) = without_zeros.strip_suffix('.') { prefix } else { s }
 }
 
 /// DRF `BooleanField.to_internal_value`.
@@ -154,10 +146,7 @@ pub fn int_list(v: &Value) -> Result<Vec<i64>, FieldError> {
             }
             if errors.is_empty() { Ok(out) } else { Err(Value::Object(errors)) }
         }
-        other => Err(msg(format!(
-            "Expected a list of items but got type \"{}\".",
-            py_type_name(other)
-        ))),
+        other => Err(msg(format!("Expected a list of items but got type \"{}\".", py_type_name(other)))),
     }
 }
 
@@ -166,10 +155,7 @@ pub fn dict(v: &Value) -> Result<Map<String, Value>, FieldError> {
     match v {
         Value::Null => Err(msg(NULL)),
         Value::Object(o) => Ok(o.clone()),
-        other => Err(msg(format!(
-            "Expected a dictionary of items but got type \"{}\".",
-            py_type_name(other)
-        ))),
+        other => Err(msg(format!("Expected a dictionary of items but got type \"{}\".", py_type_name(other)))),
     }
 }
 
@@ -200,11 +186,7 @@ pub fn py_str(v: &Value) -> String {
 }
 
 fn py_float_repr(f: f64) -> String {
-    if f.fract() == 0.0 && f.abs() < 1e16 {
-        format!("{f:.1}")
-    } else {
-        format!("{f}")
-    }
+    if f.fract() == 0.0 && f.abs() < 1e16 { format!("{f:.1}") } else { format!("{f}") }
 }
 
 /// Python `repr()` of a JSON value (for Celery `kwargsrepr` and error texts).
@@ -226,10 +208,7 @@ pub fn py_repr(v: &Value) -> String {
             format!("[{}]", parts.join(", "))
         }
         Value::Object(o) => {
-            let parts: Vec<String> = o
-                .iter()
-                .map(|(k, v)| format!("{}: {}", py_str_repr(k), py_repr(v)))
-                .collect();
+            let parts: Vec<String> = o.iter().map(|(k, v)| format!("{}: {}", py_str_repr(k), py_repr(v))).collect();
             format!("{{{}}}", parts.join(", "))
         }
     }

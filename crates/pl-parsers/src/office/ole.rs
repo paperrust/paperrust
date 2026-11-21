@@ -380,11 +380,7 @@ fn xl_string(b: &[u8], biff8: bool) -> String {
         return cp1252(b.get(2..(2 + cch).min(b.len())).unwrap_or(&[]));
     }
     let high = b.get(2).is_some_and(|f| f & 1 != 0);
-    if high {
-        utf16(b.get(3..(3 + cch * 2).min(b.len())).unwrap_or(&[]))
-    } else {
-        latin1(b.get(3..(3 + cch).min(b.len())).unwrap_or(&[]))
-    }
+    if high { utf16(b.get(3..(3 + cch * 2).min(b.len())).unwrap_or(&[])) } else { latin1(b.get(3..(3 + cch).min(b.len())).unwrap_or(&[])) }
 }
 
 /// A worksheet: name and cells (row, column, text).
@@ -442,7 +438,11 @@ fn xls_sheets(cf: &mut Cfb<'_>, limits: &Limits, deadline: Deadline) -> Result<V
                 let cch = d.get(6).copied().unwrap_or(0) as usize;
                 let name = if biff8 {
                     let high = d.get(7).is_some_and(|f| f & 1 != 0);
-                    if high { utf16(d.get(8..(8 + cch * 2).min(d.len())).unwrap_or(&[])) } else { latin1(d.get(8..(8 + cch).min(d.len())).unwrap_or(&[])) }
+                    if high {
+                        utf16(d.get(8..(8 + cch * 2).min(d.len())).unwrap_or(&[]))
+                    } else {
+                        latin1(d.get(8..(8 + cch).min(d.len())).unwrap_or(&[]))
+                    }
                 } else {
                     cp1252(d.get(7..(7 + cch).min(d.len())).unwrap_or(&[]))
                 };
@@ -625,7 +625,11 @@ fn text_atom(ty: u16, d: &[u8]) -> Option<String> {
         RT_TEXT_BYTES => latin1(d),
         _ => return None,
     };
-    let s: String = s.chars().map(|c| if c == '\r' || c == '\u{0b}' { '\n' } else { c }).filter(|c| !c.is_control() || *c == '\n' || *c == '\t').collect();
+    let s: String = s
+        .chars()
+        .map(|c| if c == '\r' || c == '\u{0b}' { '\n' } else { c })
+        .filter(|c| !c.is_control() || *c == '\n' || *c == '\t')
+        .collect();
     let s = s.trim().to_string();
     (!s.is_empty()).then_some(s)
 }
@@ -720,7 +724,11 @@ fn to_slide(texts: Vec<(u32, String)>, notes: Vec<(u32, String)>) -> Slide {
             lines.extend(t.split('\n').map(str::to_owned).filter(|l| !l.trim().is_empty()));
         }
     }
-    let notes = notes.into_iter().flat_map(|(_, t)| t.split('\n').map(str::to_owned).collect::<Vec<_>>()).filter(|l| !l.trim().is_empty()).collect();
+    let notes = notes
+        .into_iter()
+        .flat_map(|(_, t)| t.split('\n').map(str::to_owned).collect::<Vec<_>>())
+        .filter(|l| !l.trim().is_empty())
+        .collect();
     Slide { title, lines, notes }
 }
 
@@ -892,7 +900,9 @@ fn property_set(b: &[u8]) -> Vec<(u32, PropVal)> {
                 let raw = b.get(v + 4..(v + 4).saturating_add(len as usize * 2))?;
                 Some(PropVal::Text(utf16(raw).trim_end_matches('\0').to_string()))
             }),
-            64 => u32_at(b, v).zip(u32_at(b, v + 4)).and_then(|(lo, hi)| filetime(u64::from(lo) | (u64::from(hi) << 32))).map(PropVal::Time),
+            64 => {
+                u32_at(b, v).zip(u32_at(b, v + 4)).and_then(|(lo, hi)| filetime(u64::from(lo) | (u64::from(hi) << 32))).map(PropVal::Time)
+            }
             _ => None,
         };
         if let Some(val) = val {
@@ -904,8 +914,16 @@ fn property_set(b: &[u8]) -> Vec<(u32, PropVal)> {
 
 /// Tika metadata from the OLE properties (keys like in the OOXML reader) and `dcterms:created`.
 fn summary_metadata(cf: &mut Cfb<'_>, mime_type: &str, limits: &Limits) -> (Vec<(String, String)>, Option<String>) {
-    let si = stream(cf, "\u{5}SummaryInformation", limits.max_entry_size.min(16 << 20)).ok().flatten().map(|b| property_set(&b)).unwrap_or_default();
-    let dsi = stream(cf, "\u{5}DocumentSummaryInformation", limits.max_entry_size.min(16 << 20)).ok().flatten().map(|b| property_set(&b)).unwrap_or_default();
+    let si = stream(cf, "\u{5}SummaryInformation", limits.max_entry_size.min(16 << 20))
+        .ok()
+        .flatten()
+        .map(|b| property_set(&b))
+        .unwrap_or_default();
+    let dsi = stream(cf, "\u{5}DocumentSummaryInformation", limits.max_entry_size.min(16 << 20))
+        .ok()
+        .flatten()
+        .map(|b| property_set(&b))
+        .unwrap_or_default();
     let text = |v: &PropVal| match v {
         PropVal::Text(s) | PropVal::Time(s) => s.clone(),
         PropVal::Int(i) => i.to_string(),

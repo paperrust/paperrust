@@ -71,7 +71,12 @@ pub async fn events_list(State(state): State<AppState>, ctx: RequestContext, aut
 }
 
 /// GET /api/x-guard/events/{id}/
-pub async fn events_retrieve(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser, Path(id): Path<String>) -> Result<Response, ApiError> {
+pub async fn events_retrieve(
+    State(state): State<AppState>,
+    ctx: RequestContext,
+    auth: AuthUser,
+    Path(id): Path<String>,
+) -> Result<Response, ApiError> {
     require_superuser(&auth)?;
     let id: i64 = id.parse().map_err(|_| ApiError::not_found())?;
     let e = store::get_event(state.db(), id).await.map_err(db_err)?.ok_or_else(ApiError::not_found)?;
@@ -82,7 +87,11 @@ pub async fn events_retrieve(State(state): State<AppState>, ctx: RequestContext,
 /// POST /api/x-guard/lift/ `{"note"?}` – lift read-only mode, mark open events as reviewed.
 pub async fn lift(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser, body: Bytes) -> Result<Response, ApiError> {
     let u = require_superuser(&auth)?;
-    let v: Value = if body.is_empty() { json!({}) } else { serde_json::from_slice(&body).map_err(|_| ApiError::parse_error(Some("JSON parse error")))? };
+    let v: Value = if body.is_empty() {
+        json!({})
+    } else {
+        serde_json::from_slice(&body).map_err(|_| ApiError::parse_error(Some("JSON parse error")))?
+    };
     let note: String = v.get("note").and_then(Value::as_str).unwrap_or("").chars().take(2000).collect();
     let uid = i32::try_from(u.id).ok();
     store::lift_read_only(state.db(), uid, &note).await.map_err(db_err)?;

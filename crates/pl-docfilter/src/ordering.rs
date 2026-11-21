@@ -34,8 +34,7 @@ const PREFIX: &str = "custom_field_";
 /// `ordering=custom_field_<not an int>` (upstream `int()` → ValueError → 500) and
 /// `custom_field_<id>` together with other terms (upstream FieldError → 500). PaperRust: 400
 /// (B-305/B-313/D-039, Known differences).
-pub const ORDERING_CF_INVALID: &str =
-    "Invalid custom field ordering. Use custom_field_<id> or -custom_field_<id> on its own.";
+pub const ORDERING_CF_INVALID: &str = "Invalid custom field ordering. Use custom_field_<id> or -custom_field_<id> on its own.";
 
 /// Sort expression plus a LEFT JOIN where needed.
 ///
@@ -63,12 +62,7 @@ impl Join {
     fn apply(&self, q: &mut SelectStatement) {
         match self {
             Join::Related { table, fk, alias } => {
-                q.join_as(
-                    JoinType::LeftJoin,
-                    Alias::new(*table),
-                    Alias::new(*alias),
-                    col(alias, "id").eq(doc_col(fk)),
-                );
+                q.join_as(JoinType::LeftJoin, Alias::new(*table), Alias::new(*alias), col(alias, "id").eq(doc_col(fk)));
             }
             Join::Notes => {
                 let counts = Query::select()
@@ -78,12 +72,7 @@ impl Join {
                     .and_where(col("nn", "deleted_at").is_null())
                     .group_by_col((Alias::new("nn"), Alias::new("document_id")))
                     .to_owned();
-                q.join_subquery(
-                    JoinType::LeftJoin,
-                    counts,
-                    Alias::new(NOTES_ALIAS),
-                    col(NOTES_ALIAS, "document_id").eq(doc_col("id")),
-                );
+                q.join_subquery(JoinType::LeftJoin, counts, Alias::new(NOTES_ALIAS), col(NOTES_ALIAS, "document_id").eq(doc_col("id")));
             }
         }
     }
@@ -100,9 +89,7 @@ fn num_notes_expr() -> SimpleExpr {
 fn field_expr(name: &str) -> Option<(SimpleExpr, Option<Join>)> {
     let related = |table, fk, alias| (col(alias, "name"), Some(Join::Related { table, fk, alias }));
     Some(match name {
-        "id" | "title" | "created" | "modified" | "added" | "archive_serial_number" | "page_count" => {
-            (doc_col(name), None)
-        }
+        "id" | "title" | "created" | "modified" | "added" | "archive_serial_number" | "page_count" => (doc_col(name), None),
         // Order by the FK: User has no Meta.ordering → owner_id
         "owner" => (doc_col("owner_id"), None),
         "correspondent__name" => related(CORRESPONDENT, "correspondent_id", "oc"),
@@ -115,8 +102,7 @@ fn field_expr(name: &str) -> Option<(SimpleExpr, Option<Join>)> {
 
 /// Default from `DocumentViewSet.get_queryset`: `-created, -id`.
 pub fn apply_default_ordering(q: &mut SelectStatement) {
-    q.order_by_expr(doc_col("created"), Order::Desc)
-        .order_by_expr(doc_col("id"), Order::Desc);
+    q.order_by_expr(doc_col("created"), Order::Desc).order_by_expr(doc_col("id"), Order::Desc);
 }
 
 /// DRF `OrderingFilter.get_ordering` → valid terms (or empty).
@@ -216,11 +202,7 @@ pub fn select_options_sorted(field: &CustomFieldDef) -> Result<(Vec<Option<Strin
                 Json::Bool(b) => *b as i64 as f64,
                 other => other.as_f64().unwrap_or(f64::NAN),
             };
-            idx.sort_by(|a, b| {
-                num(&labels[*a])
-                    .partial_cmp(&num(&labels[*b]))
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
+            idx.sort_by(|a, b| num(&labels[*a]).partial_cmp(&num(&labels[*b])).unwrap_or(std::cmp::Ordering::Equal));
         } else if !all_null {
             return Err(FilterError::internal("TypeError: '<' not supported between label types"));
         } else {
@@ -259,11 +241,7 @@ fn custom_field_value_expr(field: &CustomFieldDef) -> Result<SimpleExpr, FilterE
 /// Expects a query **without** ORDER BY; sets the complete ordering including the
 /// default `-created, -id` if no valid term is given. Like upstream there is no
 /// additional tiebreaker for explicit ordering.
-pub async fn apply_ordering<D: FilterDb>(
-    q: &mut SelectStatement,
-    ordering: Option<&str>,
-    db: &D,
-) -> Result<(), FilterError> {
+pub async fn apply_ordering<D: FilterDb>(q: &mut SelectStatement, ordering: Option<&str>, db: &D) -> Result<(), FilterError> {
     let param = ordering.unwrap_or("");
     if !param.is_empty() && param.contains(PREFIX) {
         let after = param.split(PREFIX).nth(1).unwrap_or("");
@@ -274,11 +252,7 @@ pub async fn apply_ordering<D: FilterDb>(
             crate::pyval::PyInt::Small(v) => v.to_string(),
             crate::pyval::PyInt::Big { negative } => {
                 // str(int(...)) normalized: sign, without underscores/leading zeros
-                let digits: String = py_strip(after)
-                    .trim_start_matches(['+', '-'])
-                    .chars()
-                    .filter(|c| *c != '_')
-                    .collect();
+                let digits: String = py_strip(after).trim_start_matches(['+', '-']).chars().filter(|c| *c != '_').collect();
                 format!("{}{}", if negative { "-" } else { "" }, digits.trim_start_matches('0'))
             }
         };
@@ -326,7 +300,6 @@ pub async fn apply_ordering<D: FilterDb>(
     }
     Ok(())
 }
-
 
 // ---------------------------------------------------------------------------------------
 // L1: `ordering` → pl_domain::filter::Sort (same errors as apply_ordering)
@@ -379,11 +352,7 @@ pub async fn parse_ordering<D: FilterDb>(ordering: Option<&str>, db: &D) -> Resu
         let id_str = match id {
             crate::pyval::PyInt::Small(v) => v.to_string(),
             crate::pyval::PyInt::Big { negative } => {
-                let digits: String = py_strip(after)
-                    .trim_start_matches(['+', '-'])
-                    .chars()
-                    .filter(|c| *c != '_')
-                    .collect();
+                let digits: String = py_strip(after).trim_start_matches(['+', '-']).chars().filter(|c| *c != '_').collect();
                 format!("{}{}", if negative { "-" } else { "" }, digits.trim_start_matches('0'))
             }
         };

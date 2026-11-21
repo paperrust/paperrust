@@ -20,9 +20,7 @@ pub async fn send_bulk_update_documents(state: &AppState, doc_ids: &[i64]) -> Re
 }
 
 pub fn bulk_update_request(doc_ids: &[i64]) -> TaskRequest {
-    TaskRequest::new(BULK_UPDATE_DOCUMENTS)
-        .kwarg("document_ids", json!(doc_ids))
-        .trigger_source(trigger_source::SYSTEM)
+    TaskRequest::new(BULK_UPDATE_DOCUMENTS).kwarg("document_ids", json!(doc_ids)).trigger_source(trigger_source::SYSTEM)
 }
 
 /// Django cache key (`default_key_func`): `"<KEY_PREFIX>:<version>:<key>"`.

@@ -67,7 +67,9 @@ fn paths() -> Vec<String> {
     ] {
         v.push(format!("/api/tags/{q}"));
     }
-    for q in ["?last_correspondence=true", "?last_correspondence=false&page_size=100", "?last_correspondence=1&ordering=-last_correspondence"] {
+    for q in
+        ["?last_correspondence=true", "?last_correspondence=false&page_size=100", "?last_correspondence=1&ordering=-last_correspondence"]
+    {
         v.push(format!("/api/correspondents/{q}"));
     }
     v.push("/api/storage_paths/?path__icontains=bob".into());
@@ -121,11 +123,12 @@ async fn get_routes_match_django() {
                 total += 1;
                 let a = django(&client, &p, token, version).await;
                 let b = rust(&app, &p, token, version).await;
-                let same = a.0 == b.0 && match (&a.1, &b.1) {
-                    (Some(x), Some(y)) => x == y,
-                    (None, None) => a.2.trim() == b.2.trim(),
-                    _ => false,
-                };
+                let same = a.0 == b.0
+                    && match (&a.1, &b.1) {
+                        (Some(x), Some(y)) => x == y,
+                        (None, None) => a.2.trim() == b.2.trim(),
+                        _ => false,
+                    };
                 if !same {
                     diffs += 1;
                     println!("DIFF {user} v{version} {p}\n  django {} {}\n  rust   {} {}", a.0, trunc(&a.2), b.0, trunc(&b.2));

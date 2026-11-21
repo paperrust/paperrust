@@ -127,7 +127,12 @@ pub(crate) mod testing {
     }
 
     impl pl_queue::TaskQueue for RecordingQueue {
-        fn enqueue<'a>(&'a self, task_name: &'a str, kwargs: Map<String, Value>, opts: EnqueueOptions) -> BoxFuture<'a, Result<Uuid, QueueError>> {
+        fn enqueue<'a>(
+            &'a self,
+            task_name: &'a str,
+            kwargs: Map<String, Value>,
+            opts: EnqueueOptions,
+        ) -> BoxFuture<'a, Result<Uuid, QueueError>> {
             Box::pin(async move {
                 if let Ok(mut c) = self.calls.lock() {
                     c.push((task_name.to_string(), kwargs, opts.trigger_source.clone()));
@@ -162,7 +167,13 @@ mod tests {
         let q = Arc::new(testing::RecordingQueue::default());
         let intake = QueueIntake(q.clone());
         let id = intake
-            .submit(IntakeDoc { path: p, filename: "scan.pdf".into(), title: Some("Brief".into()), owner_id: 7, source: DocumentSource::WebUI })
+            .submit(IntakeDoc {
+                path: p,
+                filename: "scan.pdf".into(),
+                title: Some("Brief".into()),
+                owner_id: 7,
+                source: DocumentSource::WebUI,
+            })
             .await
             .unwrap();
         assert!(!id.is_empty());

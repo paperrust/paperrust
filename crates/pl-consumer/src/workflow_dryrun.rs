@@ -155,7 +155,12 @@ impl WorkflowEffects for Recorder {
 }
 
 impl DocumentDeleter for Recorder {
-    fn soft_delete<'a>(&'a self, _conn: &'a mut PgConnection, _audit: &'a AuditLog, _doc_id: i64) -> BoxFuture<'a, Result<(), sqlx::Error>> {
+    fn soft_delete<'a>(
+        &'a self,
+        _conn: &'a mut PgConnection,
+        _audit: &'a AuditLog,
+        _doc_id: i64,
+    ) -> BoxFuture<'a, Result<(), sqlx::Error>> {
         Box::pin(async move {
             self.push(DryRunEffect { action_id: None, kind: "trash", target: None });
             Ok(())
@@ -197,10 +202,9 @@ pub async fn doc_state(conn: &mut PgConnection, id: i64) -> Result<Option<DocSta
         in_trash: r.deleted_at.is_some(),
         ..Default::default()
     };
-    for (table, col, view, change) in [
-        ("guardian_userobjectpermission", "user_id", 0, 1),
-        ("guardian_groupobjectpermission", "group_id", 2, 3),
-    ] {
+    for (table, col, view, change) in
+        [("guardian_userobjectpermission", "user_id", 0, 1), ("guardian_groupobjectpermission", "group_id", 2, 3)]
+    {
         let sql = format!(
             "SELECT p.codename, x.{col} FROM {table} x JOIN auth_permission p ON p.id = x.permission_id \
              JOIN django_content_type ct ON ct.id = x.content_type_id \
@@ -242,7 +246,12 @@ pub fn consumable_for(wf: &WorkflowDef, original_filename: Option<&str>, opts: &
 /// Test run of `wf` on `doc_ids` (order is kept). Runs in the transaction of `conn`; each
 /// document in its own savepoint that is rolled back. Error on one document →
 /// result `error` for that document, the run continues.
-pub async fn dry_run(conn: &mut PgConnection, wf: &WorkflowDef, doc_ids: &[i64], opts: &DryRunOptions) -> Result<Vec<DryRunDoc>, sqlx::Error> {
+pub async fn dry_run(
+    conn: &mut PgConnection,
+    wf: &WorkflowDef,
+    doc_ids: &[i64],
+    opts: &DryRunOptions,
+) -> Result<Vec<DryRunDoc>, sqlx::Error> {
     let mut out = Vec::with_capacity(doc_ids.len());
     for &id in doc_ids {
         sqlx::query("SAVEPOINT paperrust_dry_run").execute(&mut *conn).await?;
@@ -285,19 +294,21 @@ async fn dry_run_one(conn: &mut PgConnection, wf: &WorkflowDef, id: i64, opts: &
     let before = doc_state(conn, id).await?;
     let mode = if approximate {
         let c = consumable_for(wf, row.original_filename.as_deref(), opts);
-        MatchMode::Given(match document_matches_workflow(WorkflowDocument::Consumable(&c), &wf.name, &wf.triggers, TRIGGER_CONSUMPTION, None) {
-            Ok(true) => MatchState::Matched,
-            Ok(false) if !wf.fires_on(TRIGGER_CONSUMPTION) => MatchState::NotFired,
-            Ok(false) => MatchState::NotMatched {
-                reason: wf
-                    .triggers
-                    .iter()
-                    .filter(|t| t.trigger_type == TRIGGER_CONSUMPTION)
-                    .map(|t| pl_matching::workflow::consumable_document_matches_workflow(&c, t).1)
-                    .rfind(|r| !r.is_empty()),
+        MatchMode::Given(
+            match document_matches_workflow(WorkflowDocument::Consumable(&c), &wf.name, &wf.triggers, TRIGGER_CONSUMPTION, None) {
+                Ok(true) => MatchState::Matched,
+                Ok(false) if !wf.fires_on(TRIGGER_CONSUMPTION) => MatchState::NotFired,
+                Ok(false) => MatchState::NotMatched {
+                    reason: wf
+                        .triggers
+                        .iter()
+                        .filter(|t| t.trigger_type == TRIGGER_CONSUMPTION)
+                        .map(|t| pl_matching::workflow::consumable_document_matches_workflow(&c, t).1)
+                        .rfind(|r| !r.is_empty()),
+                },
+                Err(e) => MatchState::Error(format!("{e:?}")),
             },
-            Err(e) => MatchState::Error(format!("{e:?}")),
-        })
+        )
     } else {
         MatchMode::Evaluate
     };
@@ -371,7 +382,10 @@ mod tests {
         // and the real paths run through the same core
         let wf = include_str!("workflows.rs");
         let prod = &wf[..wf.find("mod tests {").unwrap_or(wf.len())];
-        assert!(prod.matches("run_workflow_list_inner(conn, env,").count() >= 3, "run_workflows/run_workflow_list/run_workflow_as use the core");
+        assert!(
+            prod.matches("run_workflow_list_inner(conn, env,").count() >= 3,
+            "run_workflows/run_workflow_list/run_workflow_as use the core"
+        );
         assert!(prod.contains("workflow_ext::decide(wf, trigger_type, state"), "core decides via workflow_ext::decide");
         assert_eq!(prod.matches("async fn apply_assignment_to_document(").count(), 1);
     }
@@ -385,7 +399,8 @@ mod tests {
             ..Default::default()
         };
         let wf = WorkflowDef { id: 1, triggers: vec![t], ..Default::default() };
-        let opts = DryRunOptions { trigger_type: 1, ai_mode: AiMode::NotChecked, time_zone: chrono_tz::UTC, source: None, mailrule_id: None };
+        let opts =
+            DryRunOptions { trigger_type: 1, ai_mode: AiMode::NotChecked, time_zone: chrono_tz::UTC, source: None, mailrule_id: None };
         let c = consumable_for(&wf, Some("Rechnung 2024.pdf"), &opts);
         assert_eq!(c.source, DocumentSource::MailFetch);
         assert_eq!(c.mailrule_id, Some(7));

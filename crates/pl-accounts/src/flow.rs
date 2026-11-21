@@ -221,7 +221,8 @@ pub async fn resume_login(ctx: &mut Ctx, user: User, backend: &'static str, logi
         if needs_mail && login.email_verification == "optional" && login.signup {
             crate::emailaddr::send_verification_at_login(ctx, user.id, &user.username, login.email.as_deref(), login.signup).await?;
         } else if needs_mail && login.email_verification == "mandatory" {
-            let sent = crate::emailaddr::send_verification_at_login(ctx, user.id, &user.username, login.email.as_deref(), login.signup).await?;
+            let sent =
+                crate::emailaddr::send_verification_at_login(ctx, user.id, &user.username, login.email.as_deref(), login.signup).await?;
             if !sent && !crate::emailaddr::has_any_address(ctx, user.id, login.email.as_deref()).await? {
                 // as in allauth: without an address only the notice page remains (no error, but no
                 // login either) – reason goes to the log

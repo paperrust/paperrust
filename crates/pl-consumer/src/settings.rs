@@ -186,10 +186,7 @@ fn env_bool(key: &str, default: &str) -> Result<bool, SettingsError> {
 fn env_float(key: &str, default: f64) -> Result<f64, SettingsError> {
     match env(key) {
         None => Ok(default),
-        Some(v) => v
-            .trim()
-            .parse::<f64>()
-            .map_err(|_| SettingsError(format!("could not convert string to float: '{v}'"))),
+        Some(v) => v.trim().parse::<f64>().map_err(|_| SettingsError(format!("could not convert string to float: '{v}'"))),
     }
 }
 
@@ -197,10 +194,7 @@ fn env_float(key: &str, default: f64) -> Result<f64, SettingsError> {
 fn env_uint(key: &str, default: u32) -> Result<u32, SettingsError> {
     match env(key) {
         None => Ok(default),
-        Some(v) => v
-            .trim()
-            .parse::<u32>()
-            .map_err(|_| SettingsError(format!("invalid literal for int() with base 10: '{v}'"))),
+        Some(v) => v.trim().parse::<u32>().map_err(|_| SettingsError(format!("invalid literal for int() with base 10: '{v}'"))),
     }
 }
 
@@ -208,10 +202,9 @@ fn env_json_list(key: &str) -> Result<Vec<String>, SettingsError> {
     match env(key) {
         None => Ok(Vec::new()),
         Some(raw) => match serde_json::from_str::<serde_json::Value>(&raw) {
-            Ok(serde_json::Value::Array(a)) => Ok(a
-                .into_iter()
-                .map(|v| v.as_str().map(str::to_string).unwrap_or_else(|| v.to_string()))
-                .collect()),
+            Ok(serde_json::Value::Array(a)) => {
+                Ok(a.into_iter().map(|v| v.as_str().map(str::to_string).unwrap_or_else(|| v.to_string())).collect())
+            }
             Ok(_) => Err(SettingsError(format!("Environment variable {} must be a JSON list", pl_core::config::primary_name(key)))),
             Err(e) => Err(SettingsError(format!("Environment variable {} is not valid JSON: {e}", pl_core::config::primary_name(key)))),
         },
@@ -222,10 +215,9 @@ fn env_json_map(key: &str, default: Vec<(String, String)>) -> Result<Vec<(String
     match env(key) {
         None => Ok(default),
         Some(raw) => match serde_json::from_str::<serde_json::Value>(&raw) {
-            Ok(serde_json::Value::Object(m)) => Ok(m
-                .into_iter()
-                .map(|(k, v)| (k, v.as_str().map(str::to_string).unwrap_or_else(|| v.to_string())))
-                .collect()),
+            Ok(serde_json::Value::Object(m)) => {
+                Ok(m.into_iter().map(|(k, v)| (k, v.as_str().map(str::to_string).unwrap_or_else(|| v.to_string()))).collect())
+            }
             Ok(_) => Err(SettingsError(format!("Environment variable {} must be a JSON object", pl_core::config::primary_name(key)))),
             Err(e) => Err(SettingsError(format!("Environment variable {} is not valid JSON: {e}", pl_core::config::primary_name(key)))),
         },
@@ -281,10 +273,8 @@ impl ConsumerSettings {
             .unwrap_or_else(|| PathBuf::from("."));
         let media_root = env("PAPERLESS_MEDIA_ROOT").map(PathBuf::from).unwrap_or_else(|| cwd.join("media"));
         let data_dir = env("PAPERLESS_DATA_DIR").map(PathBuf::from).unwrap_or_else(|| cwd.join("data"));
-        let scratch_dir =
-            env("PAPERLESS_SCRATCH_DIR").map(PathBuf::from).unwrap_or_else(|| std::env::temp_dir().join("paperrust"));
-        let consumption_dir =
-            env("PAPERLESS_CONSUMPTION_DIR").map(PathBuf::from).unwrap_or_else(|| cwd.join("consume"));
+        let scratch_dir = env("PAPERLESS_SCRATCH_DIR").map(PathBuf::from).unwrap_or_else(|| std::env::temp_dir().join("paperrust"));
+        let consumption_dir = env("PAPERLESS_CONSUMPTION_DIR").map(PathBuf::from).unwrap_or_else(|| cwd.join("consume"));
         let mut s = Self::with_root(media_root, data_dir.clone(), scratch_dir, consumption_dir);
         let tz_name = env("PAPERLESS_TIME_ZONE").unwrap_or_else(|| "UTC".into());
         s.time_zone = tz_name.parse::<Tz>().map_err(|_| SettingsError(format!("No time zone found with key {tz_name}")))?;
@@ -307,10 +297,7 @@ impl ConsumerSettings {
             barcode_enable_asn: env_bool("PAPERLESS_CONSUMER_ENABLE_ASN_BARCODE", "NO")?,
             barcode_asn_prefix: env("PAPERLESS_CONSUMER_ASN_BARCODE_PREFIX").unwrap_or_else(|| "ASN".into()),
             barcode_enable_tag: env_bool("PAPERLESS_CONSUMER_ENABLE_TAG_BARCODE", "NO")?,
-            barcode_tag_mapping: env_json_map(
-                "PAPERLESS_CONSUMER_TAG_BARCODE_MAPPING",
-                vec![("TAG:(.*)".into(), "\\g<1>".into())],
-            )?,
+            barcode_tag_mapping: env_json_map("PAPERLESS_CONSUMER_TAG_BARCODE_MAPPING", vec![("TAG:(.*)".into(), "\\g<1>".into())])?,
             barcode_tag_split: env_bool("PAPERLESS_CONSUMER_TAG_BARCODE_SPLIT", "NO")?,
             barcode_store_values: env_bool("PAPERLESS_CONSUMER_STORE_BARCODE_VALUES", "NO")?,
             barcode_retain_split_pages: env_bool("PAPERLESS_CONSUMER_BARCODE_RETAIN_SPLIT_PAGES", "NO")?,

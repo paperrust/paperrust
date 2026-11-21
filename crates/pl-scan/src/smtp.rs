@@ -92,9 +92,8 @@ pub fn load_tls(cert: &str, key: &str) -> Result<Arc<rustls::ServerConfig>, Stri
     use rustls::pki_types::{CertificateDer, PrivateKeyDer};
     let cert_pem = std::fs::read(cert).map_err(|e| format!("{SETTING_TLS_CERT}: {e}"))?;
     let key_pem = std::fs::read(key).map_err(|e| format!("{SETTING_TLS_KEY}: {e}"))?;
-    let certs: Vec<CertificateDer<'static>> = CertificateDer::pem_slice_iter(&cert_pem)
-        .collect::<Result<_, _>>()
-        .map_err(|e| format!("{SETTING_TLS_CERT}: {e}"))?;
+    let certs: Vec<CertificateDer<'static>> =
+        CertificateDer::pem_slice_iter(&cert_pem).collect::<Result<_, _>>().map_err(|e| format!("{SETTING_TLS_CERT}: {e}"))?;
     if certs.is_empty() {
         return Err(format!("{SETTING_TLS_CERT}: no certificate found"));
     }
@@ -116,14 +115,26 @@ impl SmtpConfig {
             return Ok(None);
         }
         let listen_s = get(SETTING_LISTEN).filter(|s| !s.trim().is_empty()).unwrap_or_else(|| DEFAULT_LISTEN.into());
-        let listen: SocketAddr = listen_s.trim().parse().map_err(|_| format!("{SETTING_LISTEN}: invalid address {listen_s:?} (expected ip:port)"))?;
+        let listen: SocketAddr =
+            listen_s.trim().parse().map_err(|_| format!("{SETTING_LISTEN}: invalid address {listen_s:?} (expected ip:port)"))?;
         let max_mb = match get(SETTING_MAX_MB).filter(|s| !s.trim().is_empty()) {
-            Some(v) => v.trim().parse::<u64>().ok().filter(|v| (1..=1024).contains(v)).ok_or_else(|| format!("{SETTING_MAX_MB}: expected 1–1024"))?,
+            Some(v) => v
+                .trim()
+                .parse::<u64>()
+                .ok()
+                .filter(|v| (1..=1024).contains(v))
+                .ok_or_else(|| format!("{SETTING_MAX_MB}: expected 1–1024"))?,
             None => DEFAULT_MAX_MB,
         };
-        let allowed_ips = net::parse_list(&get(SETTING_ALLOWED_IPS).unwrap_or_default()).map_err(|e| format!("{SETTING_ALLOWED_IPS}: invalid entry {e:?}"))?;
+        let allowed_ips = net::parse_list(&get(SETTING_ALLOWED_IPS).unwrap_or_default())
+            .map_err(|e| format!("{SETTING_ALLOWED_IPS}: invalid entry {e:?}"))?;
         let rate = match get(SETTING_RATE).filter(|s| !s.trim().is_empty()) {
-            Some(v) => v.trim().parse::<u32>().ok().filter(|v| (1..=10_000).contains(v)).ok_or_else(|| format!("{SETTING_RATE}: expected 1–10000"))?,
+            Some(v) => v
+                .trim()
+                .parse::<u32>()
+                .ok()
+                .filter(|v| (1..=10_000).contains(v))
+                .ok_or_else(|| format!("{SETTING_RATE}: expected 1–10000"))?,
             None => DEFAULT_RATE,
         };
         let cert = get(SETTING_TLS_CERT).filter(|s| !s.trim().is_empty());
@@ -278,7 +289,13 @@ impl Conn {
         loop {
             let buf = self.io.fill_buf().await?;
             if buf.is_empty() {
-                return Ok(if out.is_empty() && !too_long { Line::Eof } else if too_long { Line::TooLong } else { Line::Text(out) });
+                return Ok(if out.is_empty() && !too_long {
+                    Line::Eof
+                } else if too_long {
+                    Line::TooLong
+                } else {
+                    Line::Text(out)
+                });
             }
             let (chunk, done) = match buf.iter().position(|b| *b == b'\n') {
                 Some(i) => (&buf[..=i], true),
@@ -380,7 +397,10 @@ pub async fn deliver(ctx: &Context, device: &ActiveDevice, raw: &[u8]) -> Delive
         };
         let fallback = format!("scan-{stamp}-{}.{ext}", n + 1);
         let mut name = crate::intake::safe_name(&a.filename, &fallback);
-        if !name.to_ascii_lowercase().ends_with(&format!(".{ext}")) && !(ext == "tif" && name.to_ascii_lowercase().ends_with(".tiff")) && !(ext == "jpg" && name.to_ascii_lowercase().ends_with(".jpeg")) {
+        if !name.to_ascii_lowercase().ends_with(&format!(".{ext}"))
+            && !(ext == "tif" && name.to_ascii_lowercase().ends_with(".tiff"))
+            && !(ext == "jpg" && name.to_ascii_lowercase().ends_with(".jpeg"))
+        {
             name = format!("{name}.{ext}");
         }
         let path = match crate::intake::spool(&ctx.cfg.scratch, &name, &a.payload) {
@@ -390,7 +410,13 @@ pub async fn deliver(ctx: &Context, device: &ActiveDevice, raw: &[u8]) -> Delive
                 return if queued > 0 { Delivery::Queued(queued) } else { Delivery::TempFail };
             }
         };
-        let doc = IntakeDoc { path: path.clone(), filename: name, title: None, owner_id: device.owner_id, source: pl_consumer::DocumentSource::ApiUpload };
+        let doc = IntakeDoc {
+            path: path.clone(),
+            filename: name,
+            title: None,
+            owner_id: device.owner_id,
+            source: pl_consumer::DocumentSource::ApiUpload,
+        };
         match ctx.intake.submit(doc).await {
             Ok(task) => {
                 queued += 1;
@@ -539,7 +565,11 @@ async fn command(conn: &mut Conn, s: &mut Session, ctx: &Context) -> Step {
             if verb == "HELO" {
                 format!("250 {}", ctx.cfg.hostname)
             } else {
-                let mut lines = vec![format!("250-{} greets {}", ctx.cfg.hostname, rest.trim()), format!("250-SIZE {}", ctx.cfg.max_bytes), "250-8BITMIME".into()];
+                let mut lines = vec![
+                    format!("250-{} greets {}", ctx.cfg.hostname, rest.trim()),
+                    format!("250-SIZE {}", ctx.cfg.max_bytes),
+                    "250-8BITMIME".into(),
+                ];
                 if ctx.cfg.tls.is_some() && !s.tls {
                     lines.push("250-STARTTLS".into());
                 }
@@ -615,7 +645,13 @@ async fn command(conn: &mut Conn, s: &mut Session, ctx: &Context) -> Step {
                                     return Step::Close;
                                 }
                                 match read_auth_line(conn).await {
-                                    Some(l) if l.trim() == "*" => return if conn.send("501 5.0.0 Authentication cancelled").await.is_err() { Step::Close } else { Step::Continue },
+                                    Some(l) if l.trim() == "*" => {
+                                        return if conn.send("501 5.0.0 Authentication cancelled").await.is_err() {
+                                            Step::Close
+                                        } else {
+                                            Step::Continue
+                                        };
+                                    }
                                     Some(l) => b64(&l),
                                     None => return Step::Close,
                                 }
@@ -625,7 +661,13 @@ async fn command(conn: &mut Conn, s: &mut Session, ctx: &Context) -> Step {
                             return Step::Close;
                         }
                         let pass = match read_auth_line(conn).await {
-                            Some(l) if l.trim() == "*" => return if conn.send("501 5.0.0 Authentication cancelled").await.is_err() { Step::Close } else { Step::Continue },
+                            Some(l) if l.trim() == "*" => {
+                                return if conn.send("501 5.0.0 Authentication cancelled").await.is_err() {
+                                    Step::Close
+                                } else {
+                                    Step::Continue
+                                };
+                            }
                             Some(l) => b64(&l),
                             None => return Step::Close,
                         };
@@ -658,7 +700,9 @@ async fn command(conn: &mut Conn, s: &mut Session, ctx: &Context) -> Step {
                 reply("501 5.5.4 Syntax: MAIL FROM:<address>")
             } else {
                 let (_, params) = path_arg(&rest[5..]);
-                let size = params.split_whitespace().find_map(|p| p.to_ascii_uppercase().strip_prefix("SIZE=").and_then(|v| v.parse::<u64>().ok()));
+                let size = params
+                    .split_whitespace()
+                    .find_map(|p| p.to_ascii_uppercase().strip_prefix("SIZE=").and_then(|v| v.parse::<u64>().ok()));
                 if size.is_some_and(|n| n > ctx.cfg.max_bytes as u64) {
                     reply("552 5.3.4 Message size exceeds fixed limit")
                 } else {
@@ -865,8 +909,26 @@ pub fn info() -> Info {
             max_mb: Some((c.max_bytes / (1024 * 1024)) as u64),
             error: None,
         },
-        Ok(None) => Info { enabled: false, listen: None, port: None, tls: false, require_tls: false, implicit_tls: false, max_mb: None, error: None },
-        Err(e) => Info { enabled: true, listen: None, port: None, tls: false, require_tls: false, implicit_tls: false, max_mb: None, error: Some(e) },
+        Ok(None) => Info {
+            enabled: false,
+            listen: None,
+            port: None,
+            tls: false,
+            require_tls: false,
+            implicit_tls: false,
+            max_mb: None,
+            error: None,
+        },
+        Err(e) => Info {
+            enabled: true,
+            listen: None,
+            port: None,
+            tls: false,
+            require_tls: false,
+            implicit_tls: false,
+            max_mb: None,
+            error: Some(e),
+        },
     }
 }
 

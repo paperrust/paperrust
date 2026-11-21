@@ -68,12 +68,67 @@ macro_rules! need {
 }
 
 const WORDS: &[&str] = &[
-    "invoice", "number", "customer", "account", "payment", "received", "thank", "you", "for", "your", "order",
-    "please", "transfer", "the", "amount", "within", "days", "delivery", "address", "street", "city", "insurance",
-    "contract", "period", "monthly", "premium", "document", "reference", "date", "total", "balance", "service",
-    "office", "letter", "notice", "tax", "return", "statement", "bank", "credit", "note", "product", "quantity",
-    "price", "discount", "shipping", "company", "limited", "regards", "manager", "phone", "email", "website",
-    "department", "information", "request", "confirm", "receipt", "appointment", "schedule", "renewal",
+    "invoice",
+    "number",
+    "customer",
+    "account",
+    "payment",
+    "received",
+    "thank",
+    "you",
+    "for",
+    "your",
+    "order",
+    "please",
+    "transfer",
+    "the",
+    "amount",
+    "within",
+    "days",
+    "delivery",
+    "address",
+    "street",
+    "city",
+    "insurance",
+    "contract",
+    "period",
+    "monthly",
+    "premium",
+    "document",
+    "reference",
+    "date",
+    "total",
+    "balance",
+    "service",
+    "office",
+    "letter",
+    "notice",
+    "tax",
+    "return",
+    "statement",
+    "bank",
+    "credit",
+    "note",
+    "product",
+    "quantity",
+    "price",
+    "discount",
+    "shipping",
+    "company",
+    "limited",
+    "regards",
+    "manager",
+    "phone",
+    "email",
+    "website",
+    "department",
+    "information",
+    "request",
+    "confirm",
+    "receipt",
+    "appointment",
+    "schedule",
+    "renewal",
 ];
 
 struct Lcg(u64);
@@ -211,7 +266,8 @@ fn first_page_images(pdf: &Path) -> Vec<(i64, i64, String, Option<Vec<u8>>)> {
             continue;
         }
         let num = |k: &[u8]| s.dict.get(k).and_then(lopdf::Object::as_i64).unwrap_or(0);
-        let filter = s.dict.get(b"Filter").and_then(lopdf::Object::as_name).map(|n| String::from_utf8_lossy(n).into_owned()).unwrap_or_default();
+        let filter =
+            s.dict.get(b"Filter").and_then(lopdf::Object::as_name).map(|n| String::from_utf8_lossy(n).into_owned()).unwrap_or_default();
         let data = if filter == "FlateDecode" { s.decompressed_content().ok() } else { None };
         out.push((num(b"Width"), num(b"Height"), filter, data));
     }
@@ -238,7 +294,8 @@ fn skewed_dirty_scan_word_recall_and_archive() {
     ] {
         let d = tmp.path().join(name.replace('+', "_"));
         let t = Instant::now();
-        let r = parse_document(&b, &cfg(deskew, clean), &d, &input, "image/png", true).unwrap_or_else(|e| panic!("{name}: {}", e.message()));
+        let r =
+            parse_document(&b, &cfg(deskew, clean), &d, &input, "image/png", true).unwrap_or_else(|e| panic!("{name}: {}", e.message()));
         let secs = t.elapsed().as_secs_f64();
         let recall = word_recall(&words, &r.text);
         let imgs = first_page_images(r.archive_path.as_ref().unwrap());

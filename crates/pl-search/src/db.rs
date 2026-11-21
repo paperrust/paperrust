@@ -35,14 +35,7 @@ impl RequestUser {
 
     /// The index permission filter user (`None` for superusers, as upstream).
     pub fn search_user(&self) -> Option<crate::SearchUser> {
-        if self.is_superuser {
-            None
-        } else {
-            Some(crate::SearchUser {
-                id: self.id,
-                group_ids: self.group_ids.clone(),
-            })
-        }
+        if self.is_superuser { None } else { Some(crate::SearchUser { id: self.id, group_ids: self.group_ids.clone() }) }
     }
 }
 
@@ -133,12 +126,7 @@ pub fn icontains_pattern(q: &str) -> String {
 /// GlobalSearchView db_only branch:
 /// `Document.objects.filter(id__in=permitted_document_ids(user), title__icontains=q)[:limit]`
 /// (Meta ordering `-created`).
-pub async fn docs_title_icontains(
-    db: &PgPool,
-    user: &RequestUser,
-    query: &str,
-    limit: i64,
-) -> Result<Vec<DocTitleRow>, sqlx::Error> {
+pub async fn docs_title_icontains(db: &PgPool, user: &RequestUser, query: &str, limit: i64) -> Result<Vec<DocTitleRow>, sqlx::Error> {
     let (cond, binds_user) = visibility_sql(user);
     let sql = format!(
         "SELECT d.id::bigint AS id, d.title, d.created FROM documents_document d \
@@ -157,11 +145,7 @@ pub async fn docs_title_icontains(
 }
 
 /// GlobalSearchView index branch: `all_docs.in_bulk(ids)`.
-pub async fn docs_in_bulk(
-    db: &PgPool,
-    user: &RequestUser,
-    ids: &[i64],
-) -> Result<Vec<DocTitleRow>, sqlx::Error> {
+pub async fn docs_in_bulk(db: &PgPool, user: &RequestUser, ids: &[i64]) -> Result<Vec<DocTitleRow>, sqlx::Error> {
     if ids.is_empty() {
         return Ok(Vec::new());
     }
@@ -192,11 +176,7 @@ pub enum MoreLikeLookup {
 
 /// `_get_more_like_id(query_params, user)`; `user` is `None` when the caller
 /// passes no user (list path for superusers).
-pub async fn more_like_lookup(
-    db: &PgPool,
-    doc_id: i64,
-    user: Option<&RequestUser>,
-) -> Result<MoreLikeLookup, sqlx::Error> {
+pub async fn more_like_lookup(db: &PgPool, doc_id: i64, user: Option<&RequestUser>) -> Result<MoreLikeLookup, sqlx::Error> {
     // Document.objects (not deleted) .get(pk=...), with root owner.
     let row: Option<(Option<i64>, Option<i64>, Option<i64>)> = sqlx::query_as(
         "SELECT d.root_document_id::bigint, \
@@ -237,11 +217,7 @@ pub async fn more_like_lookup(
 
 /// guardian `ObjectPermissionChecker(user).has_perm("view_document", obj)`
 /// (user + group object permissions).
-async fn guardian_has_view_document(
-    db: &PgPool,
-    user_id: i64,
-    object_id: i64,
-) -> Result<bool, sqlx::Error> {
+async fn guardian_has_view_document(db: &PgPool, user_id: i64, object_id: i64) -> Result<bool, sqlx::Error> {
     if use_grants() {
         let found: Option<i32> = sqlx::query_scalar(
             "SELECT 1 FROM paperrust_grant g                JOIN auth_permission p ON p.id = g.perm_id                JOIN django_content_type ct ON ct.id = p.content_type_id               WHERE g.object_id = $2 AND g.ct = ct.id AND p.codename = 'view_document'                 AND ct.app_label = 'documents' AND ct.model = 'document'                 AND g.subject = ANY(ARRAY(SELECT -ug.group_id::int8 FROM auth_user_groups ug                                           WHERE ug.user_id = $1) || ($1)::int8)               LIMIT 1",
@@ -279,10 +255,7 @@ async fn guardian_has_view_document(
 
 /// `user.groups.values_list("pk", flat=True)`.
 pub async fn user_group_ids(db: &PgPool, user_id: i64) -> Result<Vec<i64>, sqlx::Error> {
-    sqlx::query_scalar("SELECT group_id::bigint FROM auth_user_groups WHERE user_id = $1")
-        .bind(user_id)
-        .fetch_all(db)
-        .await
+    sqlx::query_scalar("SELECT group_id::bigint FROM auth_user_groups WHERE user_id = $1").bind(user_id).fetch_all(db).await
 }
 
 /// L3: Is the search index for permissions and trash up to date with the database? `true` if the
@@ -309,13 +282,7 @@ mod tests {
 
     #[test]
     fn has_perm_rules() {
-        let mut u = RequestUser {
-            id: 1,
-            is_superuser: true,
-            is_active: false,
-            group_ids: vec![],
-            perms: Default::default(),
-        };
+        let mut u = RequestUser { id: 1, is_superuser: true, is_active: false, group_ids: vec![], perms: Default::default() };
         assert!(!u.has_perm("documents.view_document"));
         u.is_active = true;
         assert!(u.has_perm("documents.view_document"));

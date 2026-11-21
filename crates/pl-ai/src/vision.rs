@@ -18,7 +18,7 @@
 use std::time::Duration;
 
 use base64::Engine as _;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::config::LlmBackend;
 use crate::llm::{LlmClient, LlmError};
@@ -138,7 +138,9 @@ pub fn request_body(client: &LlmClient, prompt: &str, img: &PageImage, limits: &
 fn tokens(backend: LlmBackend, v: &Value) -> (Option<u64>, Option<u64>) {
     match backend {
         LlmBackend::Ollama => (v.get("prompt_eval_count").and_then(Value::as_u64), v.get("eval_count").and_then(Value::as_u64)),
-        LlmBackend::OpenAiLike => (v.pointer("/usage/prompt_tokens").and_then(Value::as_u64), v.pointer("/usage/completion_tokens").and_then(Value::as_u64)),
+        LlmBackend::OpenAiLike => {
+            (v.pointer("/usage/prompt_tokens").and_then(Value::as_u64), v.pointer("/usage/completion_tokens").and_then(Value::as_u64))
+        }
     }
 }
 
@@ -146,7 +148,12 @@ fn tokens(backend: LlmBackend, v: &Value) -> (Option<u64>, Option<u64>) {
 /// ([`LlmClient::with_model`]); `prompt` empty → [`DEFAULT_VISION_PROMPT`].
 ///
 /// Errors of a page abort (the caller then falls back to the normal text recognition).
-pub async fn recognize_pages(client: &LlmClient, prompt: &str, pages: &[PageImage], limits: &VisionLimits) -> Result<VisionResult, LlmError> {
+pub async fn recognize_pages(
+    client: &LlmClient,
+    prompt: &str,
+    pages: &[PageImage],
+    limits: &VisionLimits,
+) -> Result<VisionResult, LlmError> {
     let prompt = if prompt.trim().is_empty() { DEFAULT_VISION_PROMPT } else { prompt };
     let mut take = pages.len().min(limits.max_pages as usize);
     if limits.max_pages_per_day > 0 && take > 0 {
@@ -220,7 +227,10 @@ mod tests {
 
     #[tokio::test]
     async fn openai_image_url_and_errors() {
-        let (url, log) = mock_server(|_| (200, r#"{"choices":[{"message":{"content":"Handschrift"}}],"usage":{"prompt_tokens":7,"completion_tokens":3}}"#.into())).await;
+        let (url, log) = mock_server(|_| {
+            (200, r#"{"choices":[{"message":{"content":"Handschrift"}}],"usage":{"prompt_tokens":7,"completion_tokens":3}}"#.into())
+        })
+        .await;
         let c = client("openai-like", &format!("{url}/v1"));
         let r = recognize_pages(&c, "Lies vor", &[png(9)], &VisionLimits { max_pages_per_day: 0, ..Default::default() }).await.unwrap();
         assert_eq!(r.text(), "Handschrift");
@@ -236,7 +246,10 @@ mod tests {
         assert!(recognize_pages(&c, "", &[png(1)], &big).await.is_err());
         let (e500, _) = mock_server(|_| (500, "{}".into())).await;
         let c = client("ollama", &e500);
-        assert!(matches!(recognize_pages(&c, "", &[png(1)], &VisionLimits { max_pages_per_day: 0, ..Default::default() }).await, Err(LlmError::Provider(500))));
+        assert!(matches!(
+            recognize_pages(&c, "", &[png(1)], &VisionLimits { max_pages_per_day: 0, ..Default::default() }).await,
+            Err(LlmError::Provider(500))
+        ));
         // no pages → empty result without a request
         let r = recognize_pages(&c, "", &[], &VisionLimits::default()).await.unwrap();
         assert!(r.pages.is_empty());

@@ -79,11 +79,7 @@ pub struct Subject<'a> {
 
 /// Time window as key part: whole seconds without decimals (`300s`), otherwise like `f64` (`0.5s`).
 fn window_part(duration: f64) -> String {
-    if duration.fract() == 0.0 && duration.abs() < 1e15 {
-        format!("{}s", duration as i64)
-    } else {
-        format!("{duration}s")
-    }
+    if duration.fract() == 0.0 && duration.abs() < 1e15 { format!("{}s", duration as i64) } else { format!("{duration}s") }
 }
 
 /// `get_cache_key(app="allauth.account", action, rate, key, user)`, additionally with the time window of the

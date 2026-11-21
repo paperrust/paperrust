@@ -50,10 +50,7 @@ pub fn pick_port(preferred: Option<u16>, avoid: &[u16]) -> std::io::Result<u16> 
             return Ok(p);
         }
     }
-    Err(std::io::Error::new(
-        std::io::ErrorKind::AddrInUse,
-        "kein freier Port auf 127.0.0.1 gefunden",
-    ))
+    Err(std::io::Error::new(std::io::ErrorKind::AddrInUse, "kein freier Port auf 127.0.0.1 gefunden"))
 }
 
 #[cfg(test)]

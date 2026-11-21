@@ -43,7 +43,13 @@ pub fn routes() -> Vec<ApiRoute> {
     vec![
         ApiRoute::new("guard.status", Method::GET, "/api/x-guard/status/", SRC, drf_view(get(api::status), ALLOW_GET)),
         ApiRoute::new("guard.events.list", Method::GET, "/api/x-guard/events/", SRC, drf_view(get(api::events_list), ALLOW_GET)),
-        ApiRoute::new("guard.events.retrieve", Method::GET, "/api/x-guard/events/{id}/", SRC, drf_view(get(api::events_retrieve), ALLOW_GET)),
+        ApiRoute::new(
+            "guard.events.retrieve",
+            Method::GET,
+            "/api/x-guard/events/{id}/",
+            SRC,
+            drf_view(get(api::events_retrieve), ALLOW_GET),
+        ),
         ApiRoute::new("guard.lift", Method::POST, "/api/x-guard/lift/", SRC, drf_view(post(api::lift), ALLOW_POST)),
         ApiRoute::new("guard.backup.status", Method::GET, "/api/x-guard/backup/", SRC, drf_view(get(api::backup_status), ALLOW_GET)),
         ApiRoute::new("guard.backup.run", Method::POST, "/api/x-guard/backup/run/", SRC, drf_view(post(api::backup_run), ALLOW_POST)),
@@ -65,7 +71,13 @@ pub fn backup_beat_entry(get: impl Fn(&str) -> Option<String>) -> Result<Option<
     let schedule = pl_queue::cron::Crontab::from_paperless(value.trim()).map_err(|e| format!("PAPERRUST_BACKUP_CRON: {e}"))?;
     let mut headers = serde_json::Map::new();
     headers.insert("trigger_source".into(), serde_json::Value::String("scheduled".into()));
-    Ok(Some(pl_queue::beat::BeatEntry { name: "PaperRust: encrypted backup".into(), task: TASK_BACKUP.into(), schedule, expires: 6.0 * 3600.0, headers }))
+    Ok(Some(pl_queue::beat::BeatEntry {
+        name: "PaperRust: encrypted backup".into(),
+        task: TASK_BACKUP.into(),
+        schedule,
+        expires: 6.0 * 3600.0,
+        headers,
+    }))
 }
 
 /// Handler of the backup task (worker).

@@ -11,7 +11,7 @@ use pl_ai::classifier::IdentityTruncator;
 use pl_ai::mcp::api::{ApiBackend, MemorySideStore};
 use pl_ai::mcp::http::{router, testclient::Client};
 use pl_ai::mcp::{McpService, McpSettings};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 const DJANGO: &str = "http://127.0.0.1:8000";
 const ALICE: &str = "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a002";

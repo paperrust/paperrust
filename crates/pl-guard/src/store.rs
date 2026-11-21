@@ -109,11 +109,13 @@ pub async fn lift_read_only(pool: &PgPool, user_id: Option<i32>, note: &str) -> 
         .bind(user_id)
         .execute(&mut *tx)
         .await?;
-    sqlx::query("UPDATE paperrust_guard_event SET status = 'resolved', resolved_at = now(), resolved_by = $1, note = $2 WHERE status = 'open'")
-        .bind(user_id)
-        .bind(note)
-        .execute(&mut *tx)
-        .await?;
+    sqlx::query(
+        "UPDATE paperrust_guard_event SET status = 'resolved', resolved_at = now(), resolved_by = $1, note = $2 WHERE status = 'open'",
+    )
+    .bind(user_id)
+    .bind(note)
+    .execute(&mut *tx)
+    .await?;
     tx.commit().await
 }
 
@@ -142,16 +144,25 @@ pub struct FindingRow {
     pub weight: i32,
 }
 
-pub async fn insert_finding(pool: &PgPool, path: &str, reason: &str, detail: &str, weight: i32, event_id: Option<i64>) -> Result<i64, sqlx::Error> {
+pub async fn insert_finding(
+    pool: &PgPool,
+    path: &str,
+    reason: &str,
+    detail: &str,
+    weight: i32,
+    event_id: Option<i64>,
+) -> Result<i64, sqlx::Error> {
     ensure(pool).await?;
-    sqlx::query_scalar("INSERT INTO paperrust_guard_finding (path, reason, detail, weight, event_id) VALUES ($1, $2, $3, $4, $5) RETURNING id")
-        .bind(path)
-        .bind(reason)
-        .bind(detail)
-        .bind(weight)
-        .bind(event_id)
-        .fetch_one(pool)
-        .await
+    sqlx::query_scalar(
+        "INSERT INTO paperrust_guard_finding (path, reason, detail, weight, event_id) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+    )
+    .bind(path)
+    .bind(reason)
+    .bind(detail)
+    .bind(weight)
+    .bind(event_id)
+    .fetch_one(pool)
+    .await
 }
 
 /// Sum of the weights of all findings without an event in the last `minutes` minutes.
@@ -173,12 +184,17 @@ pub async fn open_event(pool: &PgPool) -> Result<Option<i64>, sqlx::Error> {
 /// Create an event and attach the free findings of the last `minutes` minutes to it.
 pub async fn create_event(pool: &PgPool, minutes: i64, summary: &str) -> Result<i64, sqlx::Error> {
     let mut tx = pool.begin().await?;
-    let id: i64 = sqlx::query_scalar("INSERT INTO paperrust_guard_event (summary) VALUES ($1) RETURNING id").bind(summary).fetch_one(&mut *tx).await?;
-    sqlx::query("UPDATE paperrust_guard_finding SET event_id = $1 WHERE event_id IS NULL AND created > now() - make_interval(mins => $2::int)")
-        .bind(id)
-        .bind(minutes as i32)
-        .execute(&mut *tx)
+    let id: i64 = sqlx::query_scalar("INSERT INTO paperrust_guard_event (summary) VALUES ($1) RETURNING id")
+        .bind(summary)
+        .fetch_one(&mut *tx)
         .await?;
+    sqlx::query(
+        "UPDATE paperrust_guard_finding SET event_id = $1 WHERE event_id IS NULL AND created > now() - make_interval(mins => $2::int)",
+    )
+    .bind(id)
+    .bind(minutes as i32)
+    .execute(&mut *tx)
+    .await?;
     refresh_event_count(&mut tx, id).await?;
     tx.commit().await?;
     Ok(id)
@@ -213,19 +229,22 @@ fn event_row(r: &sqlx::postgres::PgRow) -> Result<Event, sqlx::Error> {
 
 pub async fn list_events(pool: &PgPool, limit: i64) -> Result<Vec<Event>, sqlx::Error> {
     ensure(pool).await?;
-    let rows = sqlx::query("SELECT id, created, status, files, summary, resolved_at, resolved_by, note FROM paperrust_guard_event ORDER BY id DESC LIMIT $1")
-        .bind(limit)
-        .fetch_all(pool)
-        .await?;
+    let rows = sqlx::query(
+        "SELECT id, created, status, files, summary, resolved_at, resolved_by, note FROM paperrust_guard_event ORDER BY id DESC LIMIT $1",
+    )
+    .bind(limit)
+    .fetch_all(pool)
+    .await?;
     rows.iter().map(event_row).collect()
 }
 
 pub async fn get_event(pool: &PgPool, id: i64) -> Result<Option<Event>, sqlx::Error> {
     ensure(pool).await?;
-    let r = sqlx::query("SELECT id, created, status, files, summary, resolved_at, resolved_by, note FROM paperrust_guard_event WHERE id = $1")
-        .bind(id)
-        .fetch_optional(pool)
-        .await?;
+    let r =
+        sqlx::query("SELECT id, created, status, files, summary, resolved_at, resolved_by, note FROM paperrust_guard_event WHERE id = $1")
+            .bind(id)
+            .fetch_optional(pool)
+            .await?;
     r.as_ref().map(event_row).transpose()
 }
 
@@ -337,13 +356,16 @@ const RUN_COLS: &str = "id, started, finished, status, trig, target, snapshot, f
 
 pub async fn list_runs(pool: &PgPool, limit: i64) -> Result<Vec<BackupRun>, sqlx::Error> {
     ensure(pool).await?;
-    let rows = sqlx::query(&format!("SELECT {RUN_COLS} FROM paperrust_backup_run ORDER BY id DESC LIMIT $1")).bind(limit).fetch_all(pool).await?;
+    let rows =
+        sqlx::query(&format!("SELECT {RUN_COLS} FROM paperrust_backup_run ORDER BY id DESC LIMIT $1")).bind(limit).fetch_all(pool).await?;
     rows.iter().map(run_row).collect()
 }
 
 pub async fn last_success(pool: &PgPool) -> Result<Option<BackupRun>, sqlx::Error> {
     ensure(pool).await?;
-    let r = sqlx::query(&format!("SELECT {RUN_COLS} FROM paperrust_backup_run WHERE status = 'ok' ORDER BY id DESC LIMIT 1")).fetch_optional(pool).await?;
+    let r = sqlx::query(&format!("SELECT {RUN_COLS} FROM paperrust_backup_run WHERE status = 'ok' ORDER BY id DESC LIMIT 1"))
+        .fetch_optional(pool)
+        .await?;
     r.as_ref().map(run_row).transpose()
 }
 

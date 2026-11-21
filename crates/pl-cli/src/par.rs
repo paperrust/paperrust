@@ -71,7 +71,8 @@ mod tests {
 
     #[test]
     fn processes_option() {
-        let p = |v: &[&str]| crate::args::parse(&v.iter().map(|s| s.to_string()).collect::<Vec<_>>(), &[crate::args::PROCESSES], 0).unwrap();
+        let p =
+            |v: &[&str]| crate::args::parse(&v.iter().map(|s| s.to_string()).collect::<Vec<_>>(), &[crate::args::PROCESSES], 0).unwrap();
         assert_eq!(processes(&p(&[])).unwrap(), default_processes());
         assert_eq!(processes(&p(&["--processes", "3"])).unwrap(), 3);
         assert!(matches!(processes(&p(&["--processes", "0"])), Err(CliError::Command(m)) if m == "--processes must be at least 1"));

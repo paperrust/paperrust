@@ -139,7 +139,8 @@ async fn b7_task_document_marker() {
     tx.commit().await.expect("commit");
     assert_eq!(pl_consumer::consumer::task_document(&pool, &task).await.expect("lookup"), Some(id));
     // existing header rows are preserved
-    let h: serde_json::Value = sqlx::query_scalar("SELECT headers FROM paperrust_task_queue WHERE task_id = $1").bind(&task).fetch_one(&pool).await.expect("h");
+    let h: serde_json::Value =
+        sqlx::query_scalar("SELECT headers FROM paperrust_task_queue WHERE task_id = $1").bind(&task).fetch_one(&pool).await.expect("h");
     assert_eq!(h[pl_consumer::consumer::TASK_DOCUMENT_HEADER], serde_json::json!(id));
     // unknown task
     assert_eq!(pl_consumer::consumer::task_document(&pool, "no-such-task").await.expect("lookup"), None);

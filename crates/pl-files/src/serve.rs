@@ -44,11 +44,7 @@ pub async fn open(path: Option<&Path>) -> Result<OpenedFile, OpenError> {
     if meta.is_dir() {
         return Err(OpenError::Other(std::io::Error::other("is a directory")));
     }
-    Ok(OpenedFile {
-        file,
-        len: meta.len(),
-        modified: meta.modified().ok(),
-    })
+    Ok(OpenedFile { file, len: meta.len(), modified: meta.modified().ok() })
 }
 
 /// Removes a temporary file once the body that streams it is dropped.
@@ -64,23 +60,20 @@ impl Drop for TempGuard {
 
 /// Stream a file in fixed-size chunks.
 pub fn file_body(file: tokio::fs::File, guard: Option<TempGuard>) -> Body {
-    let s = stream::unfold(
-        (file, guard, false),
-        |(mut file, guard, done)| async move {
-            if done {
-                return None;
+    let s = stream::unfold((file, guard, false), |(mut file, guard, done)| async move {
+        if done {
+            return None;
+        }
+        let mut buf = vec![0u8; CHUNK];
+        match file.read(&mut buf).await {
+            Ok(0) => None,
+            Ok(n) => {
+                buf.truncate(n);
+                Some((Ok::<_, std::io::Error>(axum::body::Bytes::from(buf)), (file, guard, false)))
             }
-            let mut buf = vec![0u8; CHUNK];
-            match file.read(&mut buf).await {
-                Ok(0) => None,
-                Ok(n) => {
-                    buf.truncate(n);
-                    Some((Ok::<_, std::io::Error>(axum::body::Bytes::from(buf)), (file, guard, false)))
-                }
-                Err(e) => Some((Err(e), (file, guard, true))),
-            }
-        },
-    );
+            Err(e) => Some((Err(e), (file, guard, true))),
+        }
+    });
     Body::from_stream(s)
 }
 
@@ -94,10 +87,7 @@ mod tests {
         assert!(safe_join(base, "../../etc/passwd").is_none());
         assert!(safe_join(base, "/etc/passwd").is_none());
         assert!(safe_join(base, "a/../../x").is_none());
-        assert_eq!(
-            safe_join(base, "2020/./a/../b.pdf").unwrap(),
-            base.join("2020").join("b.pdf")
-        );
+        assert_eq!(safe_join(base, "2020/./a/../b.pdf").unwrap(), base.join("2020").join("b.pdf"));
         assert_eq!(safe_join(base, "0000001.pdf").unwrap(), base.join("0000001.pdf"));
     }
 

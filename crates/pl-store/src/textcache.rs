@@ -82,10 +82,7 @@ pub const NATIVE_CONTENT_TABLE: &str = "paperrust_document_content";
 /// Connections for the build ([`WORKERS_VAR`]).
 fn workers() -> usize {
     let default = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1).min(8);
-    pl_core::config::var(WORKERS_VAR)
-        .and_then(|v| v.trim().parse::<usize>().ok())
-        .unwrap_or(default)
-        .clamp(1, 32)
+    pl_core::config::var(WORKERS_VAR).and_then(|v| v.trim().parse::<usize>().ok()).unwrap_or(default).clamp(1, 32)
 }
 
 /// Where text and row version live.
@@ -124,10 +121,7 @@ pub async fn layout(db: &sqlx::PgPool) -> Result<Layout, sqlx::Error> {
 
 /// Hit cache switched on?
 pub fn enabled() -> bool {
-    !matches!(
-        pl_core::config::var(VAR).map(|v| v.trim().to_ascii_lowercase()).as_deref(),
-        Some("off" | "false" | "0" | "no")
-    )
+    !matches!(pl_core::config::var(VAR).map(|v| v.trim().to_ascii_lowercase()).as_deref(), Some("off" | "false" | "0" | "no"))
 }
 
 /// Column whose own text is checked.
@@ -208,10 +202,7 @@ impl HitSet {
 
     /// Does the set contain `id`? (tests)
     pub fn contains(&self, id: i64) -> bool {
-        usize::try_from(id)
-            .ok()
-            .and_then(|i| self.bitmap.get(i / 8).map(|b| b & (1 << (i % 8)) != 0))
-            .unwrap_or(false)
+        usize::try_from(id).ok().and_then(|i| self.bitmap.get(i / 8).map(|b| b & (1 << (i % 8)) != 0)).unwrap_or(false)
     }
 
     /// "Row version `xmin` was confirmed in the snapshot".
@@ -220,10 +211,7 @@ impl HitSet {
             Expr::cust_with_exprs("age($1) > age(($2)::text::xid)", [xmin.clone(), Expr::val(self.xmax.to_string()).into()]);
         if !self.xip.is_empty() {
             let list = format!("{{{}}}", self.xip.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(","));
-            unchanged = Expr::cust_with_exprs(
-                "($1 AND NOT ($2 = ANY(($3)::text::xid[])))",
-                [unchanged, xmin, Expr::val(list).into()],
-            );
+            unchanged = Expr::cust_with_exprs("($1 AND NOT ($2 = ANY(($3)::text::xid[])))", [unchanged, xmin, Expr::val(list).into()]);
         }
         unchanged
     }
@@ -318,13 +306,7 @@ fn build_lock() -> &'static tokio::sync::Mutex<()> {
 
 fn key(db: &sqlx::PgPool, layout: Layout, c: HitColumn, lookup: SqlLookup, value: &str) -> String {
     let o = db.connect_options();
-    format!(
-        "{}:{}/{}|{layout:?}|{}|{lookup:?}|{value}",
-        o.get_host(),
-        o.get_port(),
-        o.get_database().unwrap_or(""),
-        c.name()
-    )
+    format!("{}:{}/{}|{layout:?}|{}|{lookup:?}|{value}", o.get_host(), o.get_port(), o.get_database().unwrap_or(""), c.name())
 }
 
 fn cached(k: &str) -> Option<Arc<HitSet>> {
@@ -336,13 +318,7 @@ fn cached(k: &str) -> Option<Arc<HitSet>> {
 /// rows of the table (also trash and versions; the outer query continues to filter).
 /// `None`: switched off, ids too large, title in the own data model, or error (then the
 /// previous path stays).
-pub async fn hits(
-    db: &sqlx::PgPool,
-    fold: Option<&UpperFold>,
-    c: HitColumn,
-    lookup: SqlLookup,
-    value: &str,
-) -> Option<Arc<HitSet>> {
+pub async fn hits(db: &sqlx::PgPool, fold: Option<&UpperFold>, c: HitColumn, lookup: SqlLookup, value: &str) -> Option<Arc<HitSet>> {
     if !enabled() {
         return None;
     }
@@ -429,9 +405,7 @@ fn range_query(
                 .to_owned()
         }
         None => {
-            inner
-                .expr(col("t", id).cast_as(Alias::new("int8")))
-                .and_where(folded_lookup(fold, col("t", text).into(), lookup, value));
+            inner.expr(col("t", id).cast_as(Alias::new("int8"))).and_where(folded_lookup(fold, col("t", text).into(), lookup, value));
             inner
         }
     };

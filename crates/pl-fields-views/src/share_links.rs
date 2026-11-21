@@ -10,19 +10,19 @@ use axum::http::{Method, StatusCode};
 use axum::response::Response;
 use chrono::{DateTime, Utc};
 use pl_core::AppState;
-use sea_query::{Alias, Expr, PostgresQueryBuilder, Query, SelectStatement};
 use pl_core::sqlbind::SqlxBinder;
+use sea_query::{Alias, Expr, PostgresQueryBuilder, Query, SelectStatement};
 use serde_json::{Map, Value, json};
 use sqlx::{PgPool, Row};
 
 use crate::authz::{can_share_document, check_object_perm, require_model_perm, visible};
-use pl_authz::models::{ObjectModel, SHARE_LINK};
 use crate::fields::{ChoiceOpts, Errors, F, choice_str, datetime_field, pk_input, pk_missing_msg};
 use crate::query::{FilterErrors, apply_ordering, datetime_filters, ordering_terms};
 use crate::shim::{
-    ApiError, ApiResult, Ctx, finish, fmt_dt, fmt_dt_opt, get_random_string, json_response,
-    no_content, page_request, paginated, parse_body, parse_pk, require_object, resolve_page,
+    ApiError, ApiResult, Ctx, finish, fmt_dt, fmt_dt_opt, get_random_string, json_response, no_content, page_request, paginated,
+    parse_body, parse_pk, require_object, resolve_page,
 };
+use pl_authz::models::{ObjectModel, SHARE_LINK};
 
 const OM: ObjectModel = SHARE_LINK;
 const LABEL: &str = "ShareLink";
@@ -191,12 +191,11 @@ async fn create_inner(db: &PgPool, ctx: &Ctx, body: &[u8]) -> ApiResult<Response
         Some(v) => match pk_input(v) {
             Err(m) => errs.add("document", &m),
             Ok(pk) => {
-                let title: Option<String> = sqlx::query_scalar(
-                    "SELECT title FROM documents_document WHERE id = $1::int8 AND deleted_at IS NULL",
-                )
-                .bind(pk)
-                .fetch_optional(db)
-                .await?;
+                let title: Option<String> =
+                    sqlx::query_scalar("SELECT title FROM documents_document WHERE id = $1::int8 AND deleted_at IS NULL")
+                        .bind(pk)
+                        .fetch_optional(db)
+                        .await?;
                 match title {
                     None => errs.add("document", &pk_missing_msg(v)),
                     Some(t) => {
@@ -215,11 +214,7 @@ async fn create_inner(db: &PgPool, ctx: &Ctx, body: &[u8]) -> ApiResult<Response
         &data,
         "file_version",
         FILE_VERSIONS,
-        ChoiceOpts {
-            required: false,
-            allow_null: false,
-            allow_blank: false,
-        },
+        ChoiceOpts { required: false, allow_null: false, allow_blank: false },
         false,
         &mut errs,
     ) {
@@ -248,16 +243,7 @@ async fn create_inner(db: &PgPool, ctx: &Ctx, body: &[u8]) -> ApiResult<Response
     .bind(ctx.user.id)
     .fetch_one(db)
     .await?;
-    let l = Link {
-        id,
-        created: now,
-        expiration,
-        slug,
-        document: doc_id,
-        document_title: title,
-        file_version,
-        owner_id: Some(ctx.user.id),
-    };
+    let l = Link { id, created: now, expiration, slug, document: doc_id, document_title: title, file_version, owner_id: Some(ctx.user.id) };
     Ok(json_response(StatusCode::CREATED, &to_json(&l)))
 }
 

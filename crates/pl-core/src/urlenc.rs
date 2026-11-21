@@ -149,10 +149,7 @@ pub fn urlsplit(url: &str) -> SplitUrl {
     let mut scheme = String::new();
     if let Some(i) = rest.find(':') {
         let cand = &rest[..i];
-        if !cand.is_empty()
-            && cand.chars().next().is_some_and(|c| c.is_ascii_alphabetic())
-            && cand.chars().all(valid_scheme_char)
-        {
+        if !cand.is_empty() && cand.chars().next().is_some_and(|c| c.is_ascii_alphabetic()) && cand.chars().all(valid_scheme_char) {
             scheme = cand.to_ascii_lowercase();
             rest = &rest[i + 1..];
         }
@@ -183,8 +180,7 @@ pub fn urlunsplit(u: &SplitUrl) -> String {
         }
         url = format!("//{}{}", u.netloc, url);
     } else if url.starts_with("//")
-        || (matches!(u.scheme.as_str(), "http" | "https" | "ftp" | "ws" | "wss")
-            && (url.is_empty() || url.starts_with('/')))
+        || (matches!(u.scheme.as_str(), "http" | "https" | "ftp" | "ws" | "wss") && (url.is_empty() || url.starts_with('/')))
     {
         url = format!("//{url}");
     }
@@ -295,12 +291,7 @@ mod tests {
     fn parse_qsl_like_python() {
         assert_eq!(
             parse_qsl("a=1&&b&c=x+y&a=2", true),
-            vec![
-                ("a".into(), "1".into()),
-                ("b".into(), "".into()),
-                ("c".into(), "x y".into()),
-                ("a".into(), "2".into())
-            ]
+            vec![("a".into(), "1".into()), ("b".into(), "".into()), ("c".into(), "x y".into()), ("a".into(), "2".into())]
         );
         assert_eq!(parse_qsl("b&c=", false), vec![]);
     }
@@ -309,14 +300,8 @@ mod tests {
     fn replace_and_remove() {
         // Sort by key, re-encode with quote_plus.
         let url = "http://h/api/documents/?title__icontains=a%20b&page=2&ordering=-created";
-        assert_eq!(
-            replace_query_param(url, "page", "3"),
-            "http://h/api/documents/?ordering=-created&page=3&title__icontains=a+b"
-        );
-        assert_eq!(
-            remove_query_param(url, "page"),
-            "http://h/api/documents/?ordering=-created&title__icontains=a+b"
-        );
+        assert_eq!(replace_query_param(url, "page", "3"), "http://h/api/documents/?ordering=-created&page=3&title__icontains=a+b");
+        assert_eq!(remove_query_param(url, "page"), "http://h/api/documents/?ordering=-created&title__icontains=a+b");
         assert_eq!(remove_query_param("http://h/x/?page=2", "page"), "http://h/x/");
         assert_eq!(replace_query_param("http://h/x/", "page", "2"), "http://h/x/?page=2");
         // Multiple values stay in order.

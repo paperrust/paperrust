@@ -20,9 +20,7 @@ use chrono::{DateTime, Duration, FixedOffset, NaiveDateTime, Offset, TimeZone};
 use chrono_tz::{OffsetName, Tz};
 use regex::Regex;
 
-use crate::{
-    DocumentParser, MetadataEntry, ParseContext, ParseError, ParsedDocument, Result, read_limited,
-};
+use crate::{DocumentParser, MetadataEntry, ParseContext, ParseError, ParsedDocument, Result, read_limited};
 use header::{EmailAddress, HeaderValue, MailDate};
 use message::{Message, Payload};
 
@@ -51,9 +49,7 @@ impl MailAttachment {
 
 /// humanize `naturalsize(value, binary=True, format="%.2f")`.
 pub fn naturalsize_binary(n: u64) -> String {
-    const SUF: [&str; 10] = [
-        " KiB", " MiB", " GiB", " TiB", " PiB", " EiB", " ZiB", " YiB", " RiB", " QiB",
-    ];
+    const SUF: [&str; 10] = [" KiB", " MiB", " GiB", " TiB", " PiB", " EiB", " ZiB", " YiB", " RiB", " QiB"];
     if n == 1 {
         return "1 Byte".into();
     }
@@ -70,10 +66,8 @@ pub fn naturalsize_binary(n: u64) -> String {
 fn replace_html_ct_charset(html: &str) -> String {
     static META: OnceLock<Regex> = OnceLock::new();
     static CS: OnceLock<Regex> = OnceLock::new();
-    let meta_re = META
-        .get_or_init(|| Regex::new(r"(?is)<\s*meta .*?content-type.*?>").expect("static regex"));
-    let cs_re = CS
-        .get_or_init(|| Regex::new(r"(?i)charset\s*=\s*[a-zA-Z0-9_:.+-]+").expect("static regex"));
+    let meta_re = META.get_or_init(|| Regex::new(r"(?is)<\s*meta .*?content-type.*?>").expect("static regex"));
+    let cs_re = CS.get_or_init(|| Regex::new(r"(?i)charset\s*=\s*[a-zA-Z0-9_:.+-]+").expect("static regex"));
     if let Some(m) = meta_re.find(html) {
         let meta = m.as_str();
         let new_meta = cs_re.replacen(meta, 1, "charset=utf-8").into_owned();
@@ -107,33 +101,20 @@ fn approx_as_bytes(m: &Message) -> Vec<u8> {
 
 impl MailMessage {
     pub fn from_bytes(data: &[u8], max_depth: usize) -> Self {
-        Self {
-            msg: Message::parse(data, max_depth),
-        }
+        Self { msg: Message::parse(data, max_depth) }
     }
 
     pub fn subject(&self) -> String {
-        self.msg
-            .get("subject")
-            .map(HeaderValue::decoded)
-            .unwrap_or_default()
+        self.msg.get("subject").map(HeaderValue::decoded).unwrap_or_default()
     }
 
     pub fn from_values(&self) -> Option<EmailAddress> {
-        let raw = self
-            .msg
-            .get("from")
-            .map(HeaderValue::for_addresses)
-            .unwrap_or_default();
+        let raw = self.msg.get("from").map(HeaderValue::for_addresses).unwrap_or_default();
         header::parse_email_addresses(&raw).into_iter().next()
     }
 
     fn addr_values(&self, name: &str) -> Vec<EmailAddress> {
-        self.msg
-            .get_all(name)
-            .into_iter()
-            .flat_map(|v| header::parse_email_addresses(&v.for_addresses()))
-            .collect()
+        self.msg.get_all(name).into_iter().flat_map(|v| header::parse_email_addresses(&v.for_addresses())).collect()
     }
 
     pub fn to_values(&self) -> Vec<EmailAddress> {
@@ -147,10 +128,7 @@ impl MailMessage {
     }
 
     pub fn date_str(&self) -> String {
-        self.msg
-            .get("date")
-            .map(HeaderValue::py_str)
-            .unwrap_or_default()
+        self.msg.get("date").map(HeaderValue::py_str).unwrap_or_default()
     }
 
     pub fn date(&self) -> MailDate {
@@ -171,10 +149,7 @@ impl MailMessage {
             if (ct == "text/plain" || ct == "text/")
                 && let Some(b) = p.get_payload_decoded()
             {
-                out.push_str(&crate::pystr::decode_value(
-                    &b,
-                    p.get_content_charset().as_deref(),
-                ));
+                out.push_str(&crate::pystr::decode_value(&b, p.get_content_charset().as_deref()));
             }
         }
         out
@@ -216,20 +191,14 @@ impl MailMessage {
                 continue;
             }
             let ct = p.get_content_type();
-            if p.get("content-id").is_none() && p.get_filename().is_none() && ct != "message/rfc822"
-            {
+            if p.get("content-id").is_none() && p.get_filename().is_none() && ct != "message/rfc822" {
                 continue;
             }
             out.push(MailAttachment {
                 filename: attachment_filename(p),
                 content_id: p
                     .get("content-id")
-                    .map(|v| {
-                        v.decoded()
-                            .trim_start_matches('<')
-                            .trim_end_matches('>')
-                            .to_owned()
-                    })
+                    .map(|v| v.decoded().trim_start_matches('<').trim_end_matches('>').to_owned())
                     .unwrap_or_default(),
                 content_type: ct,
                 payload: attachment_payload(p),
@@ -245,10 +214,7 @@ fn attachment_filename(p: &Message) -> String {
     if !a1.contains('\u{fffd}') {
         return a1;
     }
-    for (hname, target) in [
-        ("content-disposition", "filename"),
-        ("content-type", "name"),
-    ] {
+    for (hname, target) in [("content-disposition", "filename"), ("content-type", "name")] {
         let Some(hv) = p.get(hname) else { continue };
         if hv.0.is_empty() || hv.is_ascii() {
             continue;
@@ -277,10 +243,7 @@ fn attachment_payload(p: &Message) -> Vec<u8> {
         && let Some(item) = items.first()
     {
         let bytes = approx_as_bytes(item);
-        let cte = p
-            .get_str("content-transfer-encoding")
-            .unwrap_or_default()
-            .to_lowercase();
+        let cte = p.get_str("content-transfer-encoding").unwrap_or_default().to_lowercase();
         let cte = cte.trim();
         if cte == "base64" {
             return header::b64_decode_lenient(&bytes);
@@ -302,14 +265,8 @@ pub fn strip_text(text: &str) -> String {
 pub fn make_aware(naive: NaiveDateTime, tz: Tz) -> (DateTime<FixedOffset>, String) {
     let pick = |off: <Tz as TimeZone>::Offset| -> (DateTime<FixedOffset>, String) {
         let fixed = off.fix();
-        let name = off
-            .abbreviation()
-            .map(str::to_owned)
-            .unwrap_or_else(|| header::fixed_tzname(fixed.local_minus_utc()));
-        let dt = fixed
-            .from_local_datetime(&naive)
-            .single()
-            .unwrap_or_else(|| DateTime::from_naive_utc_and_offset(naive, fixed));
+        let name = off.abbreviation().map(str::to_owned).unwrap_or_else(|| header::fixed_tzname(fixed.local_minus_utc()));
+        let dt = fixed.from_local_datetime(&naive).single().unwrap_or_else(|| DateTime::from_naive_utc_and_offset(naive, fixed));
         (dt, name)
     };
     match tz.offset_from_local_datetime(&naive) {
@@ -342,10 +299,7 @@ pub struct MailDocumentParser {
 
 impl Default for MailDocumentParser {
     fn default() -> Self {
-        Self {
-            html_to_text: crate::html::html_to_text,
-            converter: None,
-        }
+        Self { html_to_text: crate::html::html_to_text, converter: None }
     }
 }
 
@@ -361,13 +315,10 @@ impl MailDocumentParser {
     /// `parse_file_to_message`.
     pub fn parse_file_to_message(path: &Path, ctx: &ParseContext) -> Result<MailMessage> {
         let p = path.display();
-        let data = read_limited(path, &ctx.limits)
-            .map_err(|e| ParseError::Upstream(format!("Could not parse {p}: {e}")))?;
+        let data = read_limited(path, &ctx.limits).map_err(|e| ParseError::Upstream(format!("Could not parse {p}: {e}")))?;
         let m = MailMessage::from_bytes(&data, ctx.limits.max_depth.min(64));
         if m.from_values().is_none() {
-            return Err(ParseError::Upstream(format!(
-                "Could not parse {p}: Could not parse {p}: Missing 'from'"
-            )));
+            return Err(ParseError::Upstream(format!("Could not parse {p}: Could not parse {p}: Missing 'from'")));
         }
         Ok(m)
     }
@@ -375,10 +326,7 @@ impl MailDocumentParser {
     /// `build_formatted_text`.
     pub fn build_formatted_text(&self, mail: &MailMessage, ctx: &ParseContext) -> Result<String> {
         let mut t = format!("Subject: {}\n\n", mail.subject());
-        t.push_str(&format!(
-            "From: {}\n\n",
-            mail.from_values().map(|a| a.full()).unwrap_or_default()
-        ));
+        t.push_str(&format!("From: {}\n\n", mail.from_values().map(|a| a.full()).unwrap_or_default()));
         let to: Vec<String> = mail.to_values().iter().map(EmailAddress::full).collect();
         t.push_str(&format!("To: {}\n\n", to.join(", ")));
         let cc = mail.cc_values();
@@ -393,10 +341,7 @@ impl MailDocumentParser {
         }
         let atts = mail.attachments();
         if !atts.is_empty() {
-            let v: Vec<String> = atts
-                .iter()
-                .map(|a| format!("{} ({})", a.filename, naturalsize_binary(a.size() as u64)))
-                .collect();
+            let v: Vec<String> = atts.iter().map(|a| format!("{} ({})", a.filename, naturalsize_binary(a.size() as u64))).collect();
             t.push_str(&format!("Attachments: {}\n\n", v.join(", ")));
         }
         let html = mail.html();
@@ -419,22 +364,12 @@ impl MailDocumentParser {
             let value: Vec<String> = vals.iter().map(|v| v.py_str()).collect();
             result.push(MetadataEntry::new("", "header", key, value.join(", ")));
         }
-        let atts: Vec<String> = mail
-            .attachments()
-            .iter()
-            .map(|a| format!("{}({})", a.filename, naturalsize_binary(a.size() as u64)))
-            .collect();
+        let atts: Vec<String> =
+            mail.attachments().iter().map(|a| format!("{}({})", a.filename, naturalsize_binary(a.size() as u64))).collect();
         result.push(MetadataEntry::new("", "", "attachments", atts.join(", ")));
         let (dt, name) = aware_date(mail.date(), tz);
-        result.push(MetadataEntry::new(
-            "",
-            "",
-            "date",
-            format!("{} {}", dt.format("%Y-%m-%d %H:%M:%S"), name),
-        ));
-        result.sort_by(|a, b| {
-            (a.prefix.as_str(), a.key.as_str()).cmp(&(b.prefix.as_str(), b.key.as_str()))
-        });
+        result.push(MetadataEntry::new("", "", "date", format!("{} {}", dt.format("%Y-%m-%d %H:%M:%S"), name)));
+        result.sort_by(|a, b| (a.prefix.as_str(), a.key.as_str()).cmp(&(b.prefix.as_str(), b.key.as_str())));
         result
     }
 }
@@ -481,11 +416,7 @@ impl DocumentParser for MailDocumentParser {
             }
             None => None,
         };
-        Ok(ParsedDocument {
-            text,
-            date: Some(date),
-            archive_path,
-        })
+        Ok(ParsedDocument { text, date: Some(date), archive_path })
     }
     fn page_count(&self, _p: &Path, _m: &str, _c: &ParseContext) -> Option<u32> {
         None
@@ -518,19 +449,14 @@ mod tests {
     #[test]
     fn ct_charset() {
         assert_eq!(
-            replace_html_ct_charset(
-                "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\">x"
-            ),
+            replace_html_ct_charset("<meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\">x"),
             "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\">x"
         );
     }
 
     #[test]
     fn make_aware_zurich() {
-        let n = chrono::NaiveDate::from_ymd_opt(1900, 1, 1)
-            .unwrap()
-            .and_hms_opt(0, 0, 0)
-            .unwrap();
+        let n = chrono::NaiveDate::from_ymd_opt(1900, 1, 1).unwrap().and_hms_opt(0, 0, 0).unwrap();
         let (d, name) = make_aware(n, chrono_tz::Europe::Zurich);
         assert_eq!(d.to_rfc3339(), "1900-01-01T00:00:00+01:00");
         assert_eq!(name, "CET");

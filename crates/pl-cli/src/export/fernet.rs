@@ -147,10 +147,7 @@ pub fn hex_decode(s: &str) -> Option<Vec<u8>> {
     if !clean.len().is_multiple_of(2) {
         return None;
     }
-    clean
-        .chunks(2)
-        .map(|c| std::str::from_utf8(c).ok().and_then(|h| u8::from_str_radix(h, 16).ok()))
-        .collect()
+    clean.chunks(2).map(|c| std::str::from_utf8(c).ok().and_then(|h| u8::from_str_radix(h, 16).ok())).collect()
 }
 
 #[cfg(test)]
@@ -166,7 +163,9 @@ mod tests {
         let tok = f.encrypt_with(b"hello", 499162800, iv);
         assert_eq!(tok, "gAAAAAAdwJ6wAAECAwQFBgcICQoLDA0ODy021cpGVWKZ_eEwCGM4BLLF_5CV9dOPmrhuVUPgJobwOz7JcbmrR64jVmpU4IwqDA==");
         assert_eq!(f.decrypt(tok.as_bytes()).unwrap(), b"hello");
-        assert!(f.decrypt(b"gAAAAAAdwJ6xAAECAwQFBgcICQoLDA0OD3HkMATM5lFqGaerZ-fWPAl1-szkFVzXTuGb4hR8AKtwcaX1YdykQUFBQUFBQUFBQQ==").is_err());
+        assert!(
+            f.decrypt(b"gAAAAAAdwJ6xAAECAwQFBgcICQoLDA0OD3HkMATM5lFqGaerZ-fWPAl1-szkFVzXTuGb4hR8AKtwcaX1YdykQUFBQUFBQUFBQQ==").is_err()
+        );
     }
 
     #[test]

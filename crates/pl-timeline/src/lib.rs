@@ -40,21 +40,10 @@ pub enum DateKind {
 }
 
 impl DateKind {
-    pub const ALL: [DateKind; 6] = [
-        DateKind::Created,
-        DateKind::Due,
-        DateKind::CancelBy,
-        DateKind::ValidFrom,
-        DateKind::ValidUntil,
-        DateKind::WarrantyUntil,
-    ];
+    pub const ALL: [DateKind; 6] =
+        [DateKind::Created, DateKind::Due, DateKind::CancelBy, DateKind::ValidFrom, DateKind::ValidUntil, DateKind::WarrantyUntil];
     /// Deadlines ("Upcoming", done/snooze make sense).
-    pub const DEADLINES: [DateKind; 4] = [
-        DateKind::Due,
-        DateKind::CancelBy,
-        DateKind::ValidUntil,
-        DateKind::WarrantyUntil,
-    ];
+    pub const DEADLINES: [DateKind; 4] = [DateKind::Due, DateKind::CancelBy, DateKind::ValidUntil, DateKind::WarrantyUntil];
 
     pub fn as_str(self) -> &'static str {
         match self {
@@ -101,14 +90,7 @@ impl Source {
         }
     }
     pub fn parse(s: &str) -> Option<Source> {
-        [
-            Source::Created,
-            Source::CustomField,
-            Source::User,
-            Source::Content,
-        ]
-        .into_iter()
-        .find(|x| x.as_str() == s)
+        [Source::Created, Source::CustomField, Source::User, Source::Content].into_iter().find(|x| x.as_str() == s)
     }
     /// Smaller = more important.
     pub fn rank(self) -> u8 {
@@ -143,10 +125,7 @@ pub(crate) fn invalid(field: &str, msg: impl Into<String>) -> TimelineError {
 
 /// `true`/`yes`/`1`/`on` (like the bool settings).
 pub fn truthy(v: Option<&str>) -> bool {
-    matches!(
-        v.map(|s| s.trim().to_ascii_lowercase()).as_deref(),
-        Some("1" | "y" | "yes" | "t" | "true" | "on")
-    )
+    matches!(v.map(|s| s.trim().to_ascii_lowercase()).as_deref(), Some("1" | "y" | "yes" | "t" | "true" | "on"))
 }
 
 #[cfg(test)]
@@ -159,11 +138,7 @@ mod tests {
             assert_eq!(DateKind::parse(k.as_str()), Some(k));
             assert_eq!(serde_json::to_value(k).unwrap(), k.as_str());
         }
-        assert!(
-            DateKind::Due.is_deadline()
-                && !DateKind::ValidFrom.is_deadline()
-                && !DateKind::Created.is_deadline()
-        );
+        assert!(DateKind::Due.is_deadline() && !DateKind::ValidFrom.is_deadline() && !DateKind::Created.is_deadline());
         assert!(DateKind::ValidUntil.has_span() && !DateKind::Due.has_span());
         assert!(truthy(Some(" Yes")) && !truthy(Some("no")) && !truthy(None));
     }

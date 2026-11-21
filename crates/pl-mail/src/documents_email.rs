@@ -17,11 +17,11 @@ use axum::http::{StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use pl_authz::AuthUser;
 use pl_authz::perms::VIEW_DOCUMENTS_PERMISSIONS;
+use pl_core::sqlbind::SqlxBinder as _;
 use pl_core::{ApiError, AppState, Drf, RequestContext};
 use pl_files::db::DocRow;
 use pl_files::docfile::{self, Ctx};
 use sea_query::{Alias, Expr, PostgresQueryBuilder, Query};
-use pl_core::sqlbind::SqlxBinder as _;
 use serde_json::{Map, Value, json};
 
 use crate::drf::{self, CharOpts, Errors, Raw};
@@ -54,9 +54,7 @@ pub fn is_valid_email(value: &str) -> bool {
     let user_ok = if user.starts_with('"') && user.ends_with('"') && user.len() >= 2 {
         true
     } else {
-        user.split('.').all(|atom| {
-            !atom.is_empty() && atom.chars().all(|c| c.is_ascii_alphanumeric() || "!#$%&'*+/=?^_`{|}~-".contains(c))
-        })
+        user.split('.').all(|atom| !atom.is_empty() && atom.chars().all(|c| c.is_ascii_alphanumeric() || "!#$%&'*+/=?^_`{|}~-".contains(c)))
     };
     if !user_ok {
         return false;
@@ -73,7 +71,11 @@ pub fn is_valid_email(value: &str) -> bool {
         || (tld.starts_with("xn--") && tld.len() > 4);
     tld_ok
         && labels[..labels.len() - 1].iter().all(|l| {
-            !l.is_empty() && l.chars().count() <= 63 && !l.starts_with('-') && !l.ends_with('-') && l.chars().all(|c| c.is_alphanumeric() || c == '-')
+            !l.is_empty()
+                && l.chars().count() <= 63
+                && !l.starts_with('-')
+                && !l.ends_with('-')
+                && l.chars().all(|c| c.is_alphanumeric() || c == '-')
         })
 }
 

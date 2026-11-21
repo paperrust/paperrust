@@ -21,9 +21,9 @@ use pl_search::{SearchBackend, SearchMode, SearchSettings, SearchUser};
 use serde_json::{Value, json};
 use sqlx::Row;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
+use tantivy::postings::Postings;
 use tantivy::schema::document::Document as _;
 use tantivy::schema::{FieldType, IndexRecordOption};
-use tantivy::postings::Postings;
 use tantivy::{DocId, DocSet, Index, TERMINATED, TantivyDocument};
 
 const LANG: &str = "en";
@@ -75,9 +75,7 @@ fn snapshot(dir: &Path) -> Snapshot {
             while stream.advance() {
                 let key = term_key(stream.key());
                 let ti = stream.value().clone();
-                let mut postings = inv
-                    .read_postings_from_terminfo(&ti, IndexRecordOption::WithFreqsAndPositions)
-                    .expect("postings");
+                let mut postings = inv.read_postings_from_terminfo(&ti, IndexRecordOption::WithFreqsAndPositions).expect("postings");
                 let mut list = Vec::new();
                 let mut doc = postings.doc();
                 while doc != TERMINATED {
@@ -95,9 +93,7 @@ fn snapshot(dir: &Path) -> Snapshot {
                     e.sort();
                 }
             }
-            if matches!(entry.field_type(), FieldType::Str(_) | FieldType::JsonObject(_))
-                && entry.is_indexed()
-            {
+            if matches!(entry.field_type(), FieldType::Str(_) | FieldType::JsonObject(_)) && entry.is_indexed() {
                 if let Ok(norms) = seg.get_fieldnorms_reader(field) {
                     for d in 0..seg.max_doc() {
                         if alive(d) {
@@ -117,15 +113,10 @@ fn snapshot(dir: &Path) -> Snapshot {
                             Some(c) => c.values_for_doc(d).map(|v| v.to_string()).collect(),
                             None => vec![],
                         },
-                        FieldType::Date(_) => {
-                            match ff.column_opt::<tantivy::DateTime>(&name).expect("col") {
-                                Some(c) => c
-                                    .values_for_doc(d)
-                                    .map(|v| v.into_timestamp_nanos().to_string())
-                                    .collect(),
-                                None => vec![],
-                            }
-                        }
+                        FieldType::Date(_) => match ff.column_opt::<tantivy::DateTime>(&name).expect("col") {
+                            Some(c) => c.values_for_doc(d).map(|v| v.into_timestamp_nanos().to_string()).collect(),
+                            None => vec![],
+                        },
                         FieldType::Str(_) => match ff.str(&name).expect("col") {
                             Some(c) => c
                                 .term_ords(d)
@@ -157,7 +148,9 @@ fn diff_maps<K: Ord + std::fmt::Debug, V: PartialEq + std::fmt::Debug>(
     for (k, va) in a {
         match b.get(k) {
             None => out.push(json!({"what": what, "key": format!("{k:?}"), "only_in": "upstream", "upstream": format!("{va:?}")})),
-            Some(vb) if vb != va => out.push(json!({"what": what, "key": format!("{k:?}"), "upstream": format!("{va:?}"), "rust": format!("{vb:?}")})),
+            Some(vb) if vb != va => {
+                out.push(json!({"what": what, "key": format!("{k:?}"), "upstream": format!("{va:?}"), "rust": format!("{vb:?}")}))
+            }
             _ => {}
         }
     }
@@ -195,10 +188,7 @@ fn run_search(b: &SearchBackend, case: &Value, user: Option<&SearchUser>) -> Val
         Err(e) => json!({"error": e.to_string()}),
         Ok(ids) => {
             let hits = b.highlight_hits(q, &ids, mode, 1).unwrap_or_default();
-            let hits: Vec<Value> = hits
-                .iter()
-                .map(|h| json!([h.id, h.score, h.content_highlight, h.notes_highlight]))
-                .collect();
+            let hits: Vec<Value> = hits.iter().map(|h| json!([h.id, h.score, h.content_highlight, h.notes_highlight])).collect();
             json!({"ids": ids, "hits": hits})
         }
     }
@@ -226,16 +216,10 @@ fn sort_index_field(sort: &str) -> Option<&'static str> {
 fn same_up_to_ties(case: &Value, a: &Value, b: &Value, snap: &Snapshot) -> bool {
     let sort_field = case.get("sort").and_then(|s| s.as_str()).and_then(sort_index_field);
     let key = |v: &Value| {
-        let mut hits: Vec<String> = v["hits"]
-            .as_array()
-            .map(|h| h.iter().map(|x| x.to_string()).collect())
-            .unwrap_or_default();
+        let mut hits: Vec<String> = v["hits"].as_array().map(|h| h.iter().map(|x| x.to_string()).collect()).unwrap_or_default();
         hits.sort();
         let ranking: Vec<String> = match sort_field {
-            None => v["hits"]
-                .as_array()
-                .map(|h| h.iter().map(|x| x[1].to_string()).collect())
-                .unwrap_or_default(),
+            None => v["hits"].as_array().map(|h| h.iter().map(|x| x[1].to_string()).collect()).unwrap_or_default(),
             Some(f) => v["ids"]
                 .as_array()
                 .map(|ids| {
@@ -280,7 +264,8 @@ fn compare_queries(bp: &SearchBackend, br: &SearchBackend, cases: &Value, users:
                 n_ties += 1;
                 search_diffs.push(json!({"case": case, "user": user.as_ref().map(|u| u.id), "kind": "tie-order", "upstream": rp["ids"], "rust": rr["ids"]}));
             } else {
-                search_diffs.push(json!({"case": case, "user": user.as_ref().map(|u| u.id), "kind": "different", "upstream": rp, "rust": rr}));
+                search_diffs
+                    .push(json!({"case": case, "user": user.as_ref().map(|u| u.id), "kind": "different", "upstream": rp, "rust": rr}));
             }
         }
     }
@@ -320,10 +305,8 @@ fn compare_queries(bp: &SearchBackend, br: &SearchBackend, cases: &Value, users:
                 // tf-idf are chosen at random, upstream as well. Accept a different set if
                 // repeating the query on the UPSTREAM index produces exactly that set.
                 let rust_set = sorted(&r);
-                let upstream_also = (0..20).any(|_| {
-                    sorted(&bp.more_like_this_ids(id, user.as_ref(), None).map_err(|e| e.to_string()))
-                        == rust_set
-                });
+                let upstream_also =
+                    (0..20).any(|_| sorted(&bp.more_like_this_ids(id, user.as_ref(), None).map_err(|e| e.to_string())) == rust_set);
                 if sorted(&p) == rust_set {
                     n_mlt_order += 1;
                 } else if upstream_also {
@@ -339,10 +322,8 @@ fn compare_queries(bp: &SearchBackend, br: &SearchBackend, cases: &Value, users:
 
 async fn load_cases_and_users(pool: &sqlx::PgPool) -> (Value, Vec<Option<SearchUser>>) {
     let cases: Value = serde_json::from_str(
-        &std::fs::read_to_string(
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/parity/pl-indexer/queries.json"),
-        )
-        .expect("queries.json"),
+        &std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/parity/pl-indexer/queries.json"))
+            .expect("queries.json"),
     )
     .expect("queries json");
     let mut users: Vec<Option<SearchUser>> = Vec::new();
@@ -364,12 +345,10 @@ async fn load_cases_and_users(pool: &sqlx::PgPool) -> (Value, Vec<Option<SearchU
 }
 
 async fn reference_pool() -> sqlx::PgPool {
-    let url = std::env::var("PAPERRUST_INDEXER_DB_URL")
-        .unwrap_or_else(|_| "postgres://paperless:paperless@127.0.0.1:54329/paperless".into());
+    let url =
+        std::env::var("PAPERRUST_INDEXER_DB_URL").unwrap_or_else(|_| "postgres://paperless:paperless@127.0.0.1:54329/paperless".into());
     // read-only session: nothing in the reference DB can be changed
-    let opts = PgConnectOptions::from_str(&url)
-        .expect("db url")
-        .options([("default_transaction_read_only", "on")]);
+    let opts = PgConnectOptions::from_str(&url).expect("db url").options([("default_transaction_read_only", "on")]);
     PgPoolOptions::new().max_connections(2).connect_with(opts).await.expect("connect")
 }
 
@@ -465,13 +444,9 @@ async fn parity_against_upstream_index() {
         "search_diffs": search_diffs,
         "other_diffs": other_diffs,
     });
-    std::fs::write(base.join("report.json"), serde_json::to_string_pretty(&report).unwrap_or_default())
-        .expect("write report");
+    std::fs::write(base.join("report.json"), serde_json::to_string_pretty(&report).unwrap_or_default()).expect("write report");
     println!("{}", serde_json::to_string_pretty(&report["compared"]).unwrap_or_default());
-    println!(
-        "index_diffs={n_index_diffs} search_diffs={real_search_diffs} (tie-order {n_ties}) other_diffs={}",
-        other_diffs.len()
-    );
+    println!("index_diffs={n_index_diffs} search_diffs={real_search_diffs} (tie-order {n_ties}) other_diffs={}", other_diffs.len());
     assert_eq!(n_index_diffs, 0, "index differs, see {}", base.join("report.json").display());
     assert_eq!(real_search_diffs, 0, "search results differ");
     assert!(other_diffs.is_empty(), "autocomplete/mlt differ");
@@ -503,8 +478,7 @@ async fn incremental_parity() {
     copy_dir(&inc_base, &rs_inc);
     let pool = reference_pool().await;
 
-    let (ix, outcome) = Indexer::open(IndexerConfig { index_dir: rs_inc.clone(), language: Some(LANG.into()) })
-        .expect("open");
+    let (ix, outcome) = Indexer::open(IndexerConfig { index_dir: rs_inc.clone(), language: Some(LANG.into()) }).expect("open");
     assert_eq!(outcome, pl_indexer::settings::OpenOutcome::Opened);
     // 1) bulk path
     let mut batch = ix.batch_default().await.expect("batch");
@@ -539,10 +513,13 @@ async fn incremental_parity() {
         "search_diffs": search_diffs,
         "other_diffs": other_diffs,
     });
-    std::fs::write(base.join("report_incremental.json"), serde_json::to_string_pretty(&report).unwrap_or_default())
-        .expect("write report");
+    std::fs::write(base.join("report_incremental.json"), serde_json::to_string_pretty(&report).unwrap_or_default()).expect("write report");
     println!("incremental: {}", serde_json::to_string_pretty(&report["compared"]).unwrap_or_default());
-    println!("incremental: index_diffs={} search_diffs={real} other_diffs={}", report["index_diffs"].as_array().map(|a| a.len()).unwrap_or(0), report["other_diffs"].as_array().map(|a| a.len()).unwrap_or(0));
+    println!(
+        "incremental: index_diffs={} search_diffs={real} other_diffs={}",
+        report["index_diffs"].as_array().map(|a| a.len()).unwrap_or(0),
+        report["other_diffs"].as_array().map(|a| a.len()).unwrap_or(0)
+    );
     assert!(report["index_diffs"].as_array().is_some_and(|d| d.is_empty()), "index differs");
     assert_eq!(real, 0, "search results differ");
     assert!(report["other_diffs"].as_array().is_some_and(|d| d.is_empty()), "autocomplete/mlt differ");

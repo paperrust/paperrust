@@ -49,9 +49,7 @@ fn now_ms() -> u64 {
 pub fn is_connection_error(e: &sqlx::Error) -> bool {
     match e {
         sqlx::Error::Io(_) | sqlx::Error::Tls(_) | sqlx::Error::Protocol(_) => true,
-        sqlx::Error::Database(d) => d
-            .code()
-            .is_some_and(|c| c.starts_with("08") || matches!(c.as_ref(), "57P01" | "57P02" | "57P03")),
+        sqlx::Error::Database(d) => d.code().is_some_and(|c| c.starts_with("08") || matches!(c.as_ref(), "57P01" | "57P02" | "57P03")),
         _ => false,
     }
 }

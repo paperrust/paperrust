@@ -65,7 +65,11 @@ pub struct Suggestion {
 
 impl Suggestion {
     fn has_any(&self) -> bool {
-        self.correspondent.is_some() || self.document_type.is_some() || !self.tags_add.is_empty() || !self.tags_remove.is_empty() || self.storage_path.is_some()
+        self.correspondent.is_some()
+            || self.document_type.is_some()
+            || !self.tags_add.is_empty()
+            || !self.tags_remove.is_empty()
+            || self.storage_path.is_some()
     }
 }
 

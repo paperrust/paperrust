@@ -58,8 +58,7 @@ pub struct ResourcePlan {
 impl ResourcePlan {
     /// `PAPERLESS_THREADS_PER_WORKER` that must be written into the process environment.
     pub fn env_override(&self) -> Option<(&'static str, String)> {
-        (self.threads_source == ThreadsSource::MemoryCapped)
-            .then(|| ("PAPERLESS_THREADS_PER_WORKER", self.threads_per_worker.to_string()))
+        (self.threads_source == ThreadsSource::MemoryCapped).then(|| ("PAPERLESS_THREADS_PER_WORKER", self.threads_per_worker.to_string()))
     }
 
     /// One line for the startup log.

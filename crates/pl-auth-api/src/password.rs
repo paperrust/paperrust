@@ -92,11 +92,7 @@ fn quick_ratio(a: &[char], b: &[char]) -> f64 {
         }
     }
     let length = a.len() + b.len();
-    if length == 0 {
-        1.0
-    } else {
-        2.0 * matches as f64 / length as f64
-    }
+    if length == 0 { 1.0 } else { 2.0 * matches as f64 / length as f64 }
 }
 
 fn exceeds_maximum_length_ratio(pwd_len: usize, value_len: usize) -> bool {
@@ -125,12 +121,7 @@ pub fn validate_password(password: &str, user: Option<&UserAttrs>) -> Vec<String
     // 1. UserAttributeSimilarityValidator
     if let Some(u) = user {
         let pw: Vec<char> = password.to_lowercase().chars().collect();
-        let attrs = [
-            (&u.username, "username"),
-            (&u.first_name, "first name"),
-            (&u.last_name, "last name"),
-            (&u.email, "email address"),
-        ];
+        let attrs = [(&u.username, "username"), (&u.first_name, "first name"), (&u.last_name, "last name"), (&u.email, "email address")];
         'outer: for (value, verbose) in attrs {
             if value.is_empty() {
                 continue;
@@ -153,9 +144,7 @@ pub fn validate_password(password: &str, user: Option<&UserAttrs>) -> Vec<String
 
     // 2. MinimumLengthValidator
     if password.chars().count() < MIN_LENGTH {
-        errors.push(format!(
-            "This password is too short. It must contain at least {MIN_LENGTH} characters."
-        ));
+        errors.push(format!("This password is too short. It must contain at least {MIN_LENGTH} characters."));
     }
 
     // 3. CommonPasswordValidator
@@ -195,14 +184,8 @@ mod tests {
         );
         assert_eq!(validate_password("password", None), vec!["This password is too common.".to_string()]);
         assert!(validate_password("correct horse battery staple 77", Some(&user())).is_empty());
-        assert_eq!(
-            validate_password("testuser1", Some(&user())),
-            vec!["The password is too similar to the username.".to_string()]
-        );
-        assert_eq!(
-            validate_password("maxpower!", Some(&user())),
-            vec!["The password is too similar to the email address.".to_string()]
-        );
+        assert_eq!(validate_password("testuser1", Some(&user())), vec!["The password is too similar to the username.".to_string()]);
+        assert_eq!(validate_password("maxpower!", Some(&user())), vec!["The password is too similar to the email address.".to_string()]);
     }
 
     #[test]

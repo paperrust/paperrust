@@ -30,11 +30,7 @@ fn lookup(table: &[(&str, &'static str)], key: &str) -> Option<&'static str> {
     table.iter().find(|(k, _)| *k == key).map(|(_, v)| *v)
 }
 
-const TEXT_TYPES: &[(&str, &str)] = &[
-    ("text/plain", ".txt"),
-    ("text/csv", ".csv"),
-    ("application/csv", ".csv"),
-];
+const TEXT_TYPES: &[(&str, &str)] = &[("text/plain", ".txt"), ("text/csv", ".csv"), ("application/csv", ".csv")];
 const TESSERACT_TYPES: &[(&str, &str)] = &[
     ("application/pdf", ".pdf"),
     ("image/jpeg", ".jpg"),
@@ -73,47 +69,103 @@ const TIKA_TYPES: &[(&str, &str)] = &[
 ];
 // Generated from CPython 3.12 `mimetypes.MimeTypes(filenames=()).guess_extension(t)`.
 const PY_MIMETYPES: &[(&str, &str)] = &[
-    ("application/json", ".json"), ("application/manifest+json", ".webmanifest"),
-    ("application/msword", ".doc"), ("application/n-quads", ".nq"),
-    ("application/n-triples", ".nt"), ("application/octet-stream", ".bin"),
-    ("application/oda", ".oda"), ("application/pdf", ".pdf"),
-    ("application/pkcs7-mime", ".p7c"), ("application/postscript", ".ps"),
-    ("application/trig", ".trig"), ("application/vnd.apple.mpegurl", ".m3u"),
-    ("application/vnd.ms-excel", ".xls"), ("application/vnd.ms-powerpoint", ".ppt"),
-    ("application/wasm", ".wasm"), ("application/x-bcpio", ".bcpio"),
-    ("application/x-cpio", ".cpio"), ("application/x-csh", ".csh"),
-    ("application/x-dvi", ".dvi"), ("application/x-gtar", ".gtar"),
-    ("application/x-hdf", ".hdf"), ("application/x-hdf5", ".h5"),
-    ("application/x-latex", ".latex"), ("application/x-mif", ".mif"),
-    ("application/x-netcdf", ".cdf"), ("application/x-pkcs12", ".p12"),
-    ("application/x-pn-realaudio", ".ram"), ("application/x-python-code", ".pyc"),
-    ("application/x-sh", ".sh"), ("application/x-shar", ".shar"),
-    ("application/x-shockwave-flash", ".swf"), ("application/x-sv4cpio", ".sv4cpio"),
-    ("application/x-sv4crc", ".sv4crc"), ("application/x-tar", ".tar"),
-    ("application/x-tcl", ".tcl"), ("application/x-tex", ".tex"),
-    ("application/x-texinfo", ".texi"), ("application/x-troff", ".roff"),
-    ("application/x-troff-man", ".man"), ("application/x-troff-me", ".me"),
-    ("application/x-troff-ms", ".ms"), ("application/x-ustar", ".ustar"),
-    ("application/x-wais-source", ".src"), ("application/xml", ".xsl"),
-    ("application/zip", ".zip"), ("audio/3gpp", ".3gp"), ("audio/3gpp2", ".3g2"),
-    ("audio/aac", ".aac"), ("audio/basic", ".au"), ("audio/mpeg", ".mp3"),
-    ("audio/opus", ".opus"), ("audio/x-aiff", ".aif"), ("audio/x-pn-realaudio", ".ra"),
-    ("audio/x-wav", ".wav"), ("image/avif", ".avif"), ("image/bmp", ".bmp"),
-    ("image/gif", ".gif"), ("image/heic", ".heic"), ("image/heif", ".heif"),
-    ("image/ief", ".ief"), ("image/jpeg", ".jpg"), ("image/png", ".png"),
-    ("image/svg+xml", ".svg"), ("image/tiff", ".tiff"), ("image/vnd.microsoft.icon", ".ico"),
-    ("image/x-cmu-raster", ".ras"), ("image/x-portable-anymap", ".pnm"),
-    ("image/x-portable-bitmap", ".pbm"), ("image/x-portable-graymap", ".pgm"),
-    ("image/x-portable-pixmap", ".ppm"), ("image/x-rgb", ".rgb"),
-    ("image/x-xbitmap", ".xbm"), ("image/x-xpixmap", ".xpm"),
-    ("image/x-xwindowdump", ".xwd"), ("message/rfc822", ".eml"), ("text/css", ".css"),
-    ("text/csv", ".csv"), ("text/html", ".html"), ("text/javascript", ".js"),
-    ("text/markdown", ".md"), ("text/n3", ".n3"), ("text/plain", ".txt"),
-    ("text/richtext", ".rtx"), ("text/tab-separated-values", ".tsv"), ("text/vtt", ".vtt"),
-    ("text/x-python", ".py"), ("text/x-rst", ".rst"), ("text/x-setext", ".etx"),
-    ("text/x-sgml", ".sgm"), ("text/x-vcard", ".vcf"), ("text/xml", ".xml"),
-    ("video/mp4", ".mp4"), ("video/mpeg", ".mpeg"), ("video/quicktime", ".mov"),
-    ("video/webm", ".webm"), ("video/x-msvideo", ".avi"), ("video/x-sgi-movie", ".movie"),
+    ("application/json", ".json"),
+    ("application/manifest+json", ".webmanifest"),
+    ("application/msword", ".doc"),
+    ("application/n-quads", ".nq"),
+    ("application/n-triples", ".nt"),
+    ("application/octet-stream", ".bin"),
+    ("application/oda", ".oda"),
+    ("application/pdf", ".pdf"),
+    ("application/pkcs7-mime", ".p7c"),
+    ("application/postscript", ".ps"),
+    ("application/trig", ".trig"),
+    ("application/vnd.apple.mpegurl", ".m3u"),
+    ("application/vnd.ms-excel", ".xls"),
+    ("application/vnd.ms-powerpoint", ".ppt"),
+    ("application/wasm", ".wasm"),
+    ("application/x-bcpio", ".bcpio"),
+    ("application/x-cpio", ".cpio"),
+    ("application/x-csh", ".csh"),
+    ("application/x-dvi", ".dvi"),
+    ("application/x-gtar", ".gtar"),
+    ("application/x-hdf", ".hdf"),
+    ("application/x-hdf5", ".h5"),
+    ("application/x-latex", ".latex"),
+    ("application/x-mif", ".mif"),
+    ("application/x-netcdf", ".cdf"),
+    ("application/x-pkcs12", ".p12"),
+    ("application/x-pn-realaudio", ".ram"),
+    ("application/x-python-code", ".pyc"),
+    ("application/x-sh", ".sh"),
+    ("application/x-shar", ".shar"),
+    ("application/x-shockwave-flash", ".swf"),
+    ("application/x-sv4cpio", ".sv4cpio"),
+    ("application/x-sv4crc", ".sv4crc"),
+    ("application/x-tar", ".tar"),
+    ("application/x-tcl", ".tcl"),
+    ("application/x-tex", ".tex"),
+    ("application/x-texinfo", ".texi"),
+    ("application/x-troff", ".roff"),
+    ("application/x-troff-man", ".man"),
+    ("application/x-troff-me", ".me"),
+    ("application/x-troff-ms", ".ms"),
+    ("application/x-ustar", ".ustar"),
+    ("application/x-wais-source", ".src"),
+    ("application/xml", ".xsl"),
+    ("application/zip", ".zip"),
+    ("audio/3gpp", ".3gp"),
+    ("audio/3gpp2", ".3g2"),
+    ("audio/aac", ".aac"),
+    ("audio/basic", ".au"),
+    ("audio/mpeg", ".mp3"),
+    ("audio/opus", ".opus"),
+    ("audio/x-aiff", ".aif"),
+    ("audio/x-pn-realaudio", ".ra"),
+    ("audio/x-wav", ".wav"),
+    ("image/avif", ".avif"),
+    ("image/bmp", ".bmp"),
+    ("image/gif", ".gif"),
+    ("image/heic", ".heic"),
+    ("image/heif", ".heif"),
+    ("image/ief", ".ief"),
+    ("image/jpeg", ".jpg"),
+    ("image/png", ".png"),
+    ("image/svg+xml", ".svg"),
+    ("image/tiff", ".tiff"),
+    ("image/vnd.microsoft.icon", ".ico"),
+    ("image/x-cmu-raster", ".ras"),
+    ("image/x-portable-anymap", ".pnm"),
+    ("image/x-portable-bitmap", ".pbm"),
+    ("image/x-portable-graymap", ".pgm"),
+    ("image/x-portable-pixmap", ".ppm"),
+    ("image/x-rgb", ".rgb"),
+    ("image/x-xbitmap", ".xbm"),
+    ("image/x-xpixmap", ".xpm"),
+    ("image/x-xwindowdump", ".xwd"),
+    ("message/rfc822", ".eml"),
+    ("text/css", ".css"),
+    ("text/csv", ".csv"),
+    ("text/html", ".html"),
+    ("text/javascript", ".js"),
+    ("text/markdown", ".md"),
+    ("text/n3", ".n3"),
+    ("text/plain", ".txt"),
+    ("text/richtext", ".rtx"),
+    ("text/tab-separated-values", ".tsv"),
+    ("text/vtt", ".vtt"),
+    ("text/x-python", ".py"),
+    ("text/x-rst", ".rst"),
+    ("text/x-setext", ".etx"),
+    ("text/x-sgml", ".sgm"),
+    ("text/x-vcard", ".vcf"),
+    ("text/xml", ".xml"),
+    ("video/mp4", ".mp4"),
+    ("video/mpeg", ".mpeg"),
+    ("video/quicktime", ".mov"),
+    ("video/webm", ".webm"),
+    ("video/x-msvideo", ".avi"),
+    ("video/x-sgi-movie", ".movie"),
 ];
 
 /// `Document.__str__` of the context (root) document.
@@ -145,11 +197,7 @@ pub fn truncate_utf8(s: &str, max: usize) -> &str {
 
 /// `Document.get_public_filename(archive=..., counter=...)`.
 pub fn public_filename(doc_str: &str, extension: &str, counter: u32) -> String {
-    let tail = if counter != 0 {
-        format!("_{counter:02}{extension}")
-    } else {
-        extension.to_string()
-    };
+    let tail = if counter != 0 { format!("_{counter:02}{extension}") } else { extension.to_string() };
     let head_bytes = MAX_PUBLIC_FILENAME_BYTES.saturating_sub(tail.len());
     let head = truncate_utf8(doc_str, head_bytes);
     sanitize_filename(&format!("{head}{tail}"), "-", MAX_PUBLIC_FILENAME_BYTES)
@@ -159,10 +207,7 @@ fn is_invalid_universal_char(c: char) -> bool {
     let u = c as u32;
     // unprintable ASCII (not in string.printable): 0x00-0x08, 0x0e-0x1f, 0x7f
     (u <= 0x08 || (0x0e..=0x1f).contains(&u) || u == 0x7f)
-        || matches!(
-            c,
-            '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|' | '\t' | '\n' | '\r' | '\x0b' | '\x0c' | '\\'
-        )
+        || matches!(c, '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|' | '\t' | '\n' | '\r' | '\x0b' | '\x0c' | '\\')
 }
 
 fn is_reserved(name: &str) -> bool {
@@ -264,29 +309,17 @@ pub fn url_quote(s: &str) -> String {
 /// `serve_file` Content-Disposition (RFC 5987 form with ASCII fallback).
 pub fn serve_file_disposition(disposition: &str, filename: &str) -> String {
     let replaced = filename.replace(',', "_");
-    let normalized: String = replaced
-        .nfkd()
-        .filter(|c| c.is_ascii())
-        .collect::<String>()
-        .replace(['\\', '"'], "_");
-    format!(
-        "{disposition}; filename=\"{normalized}\"; filename*=utf-8''{}",
-        url_quote(filename)
-    )
+    let normalized: String = replaced.nfkd().filter(|c| c.is_ascii()).collect::<String>().replace(['\\', '"'], "_");
+    format!("{disposition}; filename=\"{normalized}\"; filename*=utf-8''{}", url_quote(filename))
 }
 
 /// Django `content_disposition_header(as_attachment, filename)` as used by `FileResponse`.
 pub fn django_content_disposition(as_attachment: bool, filename: &str) -> Option<String> {
     if !filename.is_empty() {
         let disposition = if as_attachment { "attachment" } else { "inline" };
-        let quotable = filename
-            .chars()
-            .all(|c| c == '\t' || (' '..='~').contains(&c));
+        let quotable = filename.chars().all(|c| c == '\t' || (' '..='~').contains(&c));
         let expr = if quotable {
-            format!(
-                "filename=\"{}\"",
-                filename.replace('\\', "\\\\").replace('"', "\\\"")
-            )
+            format!("filename=\"{}\"", filename.replace('\\', "\\\\").replace('"', "\\\""))
         } else {
             format!("filename*=utf-8''{}", url_quote(filename))
         };
@@ -301,10 +334,7 @@ pub fn django_content_disposition(as_attachment: bool, filename: &str) -> Option
 /// `SharedLinkView` bundle disposition (note the single quotes, as upstream).
 pub fn bundle_disposition(download_name: &str) -> String {
     let normalized: String = download_name.nfkd().filter(|c| c.is_ascii()).collect();
-    format!(
-        "attachment; filename='{normalized}'; filename*=utf-8''{}",
-        url_quote(download_name)
-    )
+    format!("attachment; filename='{normalized}'; filename*=utf-8''{}", url_quote(download_name))
 }
 
 #[cfg(test)]
@@ -315,11 +345,7 @@ mod tests {
     #[test]
     fn upstream_injection_test() {
         // test_api_documents.py::test_download_filename_normalization_does_not_inject_parameters
-        let s = document_str(
-            NaiveDate::from_ymd_opt(2020, 1, 2).unwrap(),
-            None,
-            "file.doc\u{ff02}; x=\u{ff02}\u{ff3c}",
-        );
+        let s = document_str(NaiveDate::from_ymd_opt(2020, 1, 2).unwrap(), None, "file.doc\u{ff02}; x=\u{ff02}\u{ff3c}");
         let name = public_filename(&s, ".pdf", 0);
         assert_eq!(
             serve_file_disposition("attachment", &name),
@@ -362,14 +388,8 @@ mod tests {
     #[test]
     fn quote_and_django_cd() {
         assert_eq!(url_quote("a b/ü~"), "a%20b/%C3%BC~");
-        assert_eq!(
-            django_content_disposition(false, "0000001.webp").unwrap(),
-            "inline; filename=\"0000001.webp\""
-        );
-        assert_eq!(
-            django_content_disposition(true, "ä.png").unwrap(),
-            "attachment; filename*=utf-8''%C3%A4.png"
-        );
+        assert_eq!(django_content_disposition(false, "0000001.webp").unwrap(), "inline; filename=\"0000001.webp\"");
+        assert_eq!(django_content_disposition(true, "ä.png").unwrap(), "attachment; filename*=utf-8''%C3%A4.png");
         assert_eq!(
             bundle_disposition("paperless-share-abc.zip"),
             "attachment; filename='paperless-share-abc.zip'; filename*=utf-8''paperless-share-abc.zip"

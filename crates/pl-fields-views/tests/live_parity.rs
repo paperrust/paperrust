@@ -22,13 +22,8 @@ const USERS: &[(&str, Option<&str>)] = &[
 ];
 
 async fn django(path: &str, token: Option<&str>, version: &str) -> (u16, String) {
-    let client = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .expect("client");
-    let mut req = client
-        .get(format!("{DJANGO}{path}"))
-        .header("Accept", format!("application/json; version={version}"));
+    let client = reqwest::Client::builder().redirect(reqwest::redirect::Policy::none()).build().expect("client");
+    let mut req = client.get(format!("{DJANGO}{path}")).header("Accept", format!("application/json; version={version}"));
     if let Some(t) = token {
         req = req.header("Authorization", format!("Token {t}"));
     }
@@ -49,19 +44,12 @@ async fn rust(app: &Router, path: &str, token: Option<&str>, version: &str) -> (
     let req = b.body(Body::empty()).expect("request");
     let resp = app.clone().oneshot(req).await.expect("infallible");
     let status = resp.status().as_u16();
-    let bytes = axum::body::to_bytes(resp.into_body(), 64 * 1024 * 1024)
-        .await
-        .unwrap_or_default();
+    let bytes = axum::body::to_bytes(resp.into_body(), 64 * 1024 * 1024).await.unwrap_or_default();
     (status, String::from_utf8_lossy(&bytes).into_owned())
 }
 
 async fn first_id(list: &str) -> Option<i64> {
-    let (_, body) = django(
-        &format!("{list}?ordering=id&page_size=1"),
-        USERS[0].1,
-        "10",
-    )
-    .await;
+    let (_, body) = django(&format!("{list}?ordering=id&page_size=1"), USERS[0].1, "10").await;
     let v: serde_json::Value = serde_json::from_str(&body).ok()?;
     v["results"][0]["id"].as_i64()
 }
@@ -70,19 +58,14 @@ async fn first_id(list: &str) -> Option<i64> {
 #[ignore = "braucht die laufende Referenzumgebung (Django 127.0.0.1:8000, PostgreSQL) und reference/env.sh"]
 async fn live_read_parity() {
     let state = pl_core::AppState::from_env().await.expect("AppState from env");
-    let authz = pl_authz::Authz::new(
-        state.inner.db.clone(),
-        pl_authz::AuthConfig::from_env().expect("AuthConfig"),
-    );
+    let authz = pl_authz::Authz::new(state.inner.db.clone(), pl_authz::AuthConfig::from_env().expect("AuthConfig"));
     let mut router: Router<pl_core::AppState> = Router::new();
     for r in pl_fields_views::routes() {
         if r.method == Method::GET {
             router = router.route(r.path, r.handler);
         }
     }
-    let app = router
-        .layer(axum::Extension(authz))
-        .with_state(state);
+    let app = router.layer(axum::Extension(authz)).with_state(state);
 
     let mut paths: Vec<String> = vec![
         "/api/custom_fields/".into(),
@@ -113,12 +96,7 @@ async fn live_read_parity() {
         "/api/share_link_bundles/?documents=x".into(),
         "/api/share_link_bundles/999999/".into(),
     ];
-    for list in [
-        "/api/custom_fields/",
-        "/api/saved_views/",
-        "/api/share_links/",
-        "/api/share_link_bundles/",
-    ] {
+    for list in ["/api/custom_fields/", "/api/saved_views/", "/api/share_links/", "/api/share_link_bundles/"] {
         if let Some(id) = first_id(list).await {
             paths.push(format!("{list}{id}/"));
         }

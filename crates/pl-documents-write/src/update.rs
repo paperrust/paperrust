@@ -132,11 +132,10 @@ async fn content_doc_id(conn: &mut PgConnection, ctx: &RequestContext, root_id: 
             let Some(vid) = crate::drf::py_int_from_str(p) else {
                 return Err(ApiError::Core(pl_core::ApiError::with_detail(StatusCode::NOT_FOUND, "Invalid version parameter")));
             };
-            let row: Option<(i32, Option<i32>)> =
-                sqlx::query_as("SELECT id, root_document_id FROM documents_document WHERE id = $1")
-                    .bind(vid as i32)
-                    .fetch_optional(&mut *conn)
-                    .await?;
+            let row: Option<(i32, Option<i32>)> = sqlx::query_as("SELECT id, root_document_id FROM documents_document WHERE id = $1")
+                .bind(vid as i32)
+                .fetch_optional(&mut *conn)
+                .await?;
             match row {
                 Some((id, root)) if i64::from(id) == root_id || root.map(i64::from) == Some(root_id) => Ok(i64::from(id)),
                 _ => Err(ApiError::Core(pl_core::ApiError::not_found())),
@@ -454,7 +453,9 @@ async fn set_asn_location(conn: &mut PgConnection, ctx: &LogCtx, media: &MediaCf
                 return Ok(());
             };
             let Some(f) = cfi::field_def(&mut tx, p.field_id).await.map_err(|e| e.to_string())? else { return Ok(()) };
-            cfi::update_or_create(&mut tx, ctx, media, doc_id, &f, &Value::String(p.location.clone())).await.map_err(|e| format!("{e:?}"))?;
+            cfi::update_or_create(&mut tx, ctx, media, doc_id, &f, &Value::String(p.location.clone()))
+                .await
+                .map_err(|e| format!("{e:?}"))?;
             tracing::info!(target: "paperrust.asn_location", "document {doc_id}: ASN {asn} → location {:?}", p.location);
             Ok(())
         }
@@ -572,8 +573,7 @@ async fn apply_update(
 
     // OwnedObjectSerializer.update
     let owner_changed = vd.owner.is_some_and(|o| o != root.owner_id);
-    if (owner_changed || vd.set_permissions.is_some())
-        && !(user.is_superuser || root.owner_id == Some(user.id) || root.owner_id.is_none())
+    if (owner_changed || vd.set_permissions.is_some()) && !(user.is_superuser || root.owner_id == Some(user.id) || root.owner_id.is_none())
     {
         return Err(ApiError::Core(pl_core::ApiError::permission_denied_msg("Insufficient permissions.")));
     }
@@ -725,10 +725,7 @@ mod form_tests {
     #[test]
     fn put_form_like_drf() {
         let m = document_form_data(&fd(&[("title", "a"), ("title", "b"), ("correspondent", ""), ("created", ""), ("content", "")]), false);
-        assert_eq!(
-            Value::Object(m),
-            json!({"title": "b", "content": "", "correspondent": null, "tags": [], "remove_inbox_tags": false})
-        );
+        assert_eq!(Value::Object(m), json!({"title": "b", "content": "", "correspondent": null, "tags": [], "remove_inbox_tags": false}));
     }
 
     #[test]

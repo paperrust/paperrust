@@ -109,9 +109,7 @@ pub struct QueueSetup {
 /// Build the queue, apply the queue migration and hang queue + bus into `state`.
 pub async fn setup_queue(state: &AppState, cfg: QueueConfig) -> Result<QueueSetup, String> {
     let events = EventBus::default();
-    pl_queue::migrations::apply(state.db())
-        .await
-        .map_err(|e| format!("applying the task queue migration failed: {e}"))?;
+    pl_queue::migrations::apply(state.db()).await.map_err(|e| format!("applying the task queue migration failed: {e}"))?;
     tracing::info!("task queue: PostgreSQL (paperrust_task_queue, migration 0001 applied)");
     let pg = PgQueue::new(state.db().clone(), cfg.max_deliveries);
     let queue: Arc<dyn TaskQueue> = Arc::new(pg.clone());
@@ -256,9 +254,7 @@ impl pl_documents_write::hooks::DocumentUpdatedHook for AiDocumentUpdated {
 /// whether it was applied.
 #[cfg(feature = "ai")]
 pub async fn apply_ai_migration(state: &AppState, _plan: &MountPlan) -> Result<bool, String> {
-    pl_ai::server::migrations::apply(state.db())
-        .await
-        .map_err(|e| format!("applying the AI migration 0001_paperrust_ai failed: {e}"))?;
+    pl_ai::server::migrations::apply(state.db()).await.map_err(|e| format!("applying the AI migration 0001_paperrust_ai failed: {e}"))?;
     tracing::info!("AI tables: migration 0001_paperrust_ai applied (paperrust_taxonomy_alias, paperrust_ai_audit, paperrust_ai_review)");
     Ok(true)
 }
@@ -357,10 +353,7 @@ impl TaskRegistry {
 
 /// Error of a task without Rust port.
 pub fn not_ported_error(task: &str, missing: &str) -> TaskError {
-    TaskError::fail(
-        "NotImplementedError",
-        format!("{task} is not ported to PaperRust yet (noch nicht portiert): {missing}"),
-    )
+    TaskError::fail("NotImplementedError", format!("{task} is not ported to PaperRust yet (noch nicht portiert): {missing}"))
 }
 
 /// Positional (`args[i]`) or keyword argument of a task.
@@ -370,13 +363,10 @@ fn task_arg<'a>(ctx: &'a TaskContext, index: usize, name: &str) -> Option<&'a Va
 
 fn int_arg(ctx: &TaskContext, index: usize, name: &str) -> Result<i64, TaskError> {
     match task_arg(ctx, index, name) {
-        Some(v) => v
-            .as_i64()
-            .ok_or_else(|| TaskError::fail("TypeError", format!("{name} must be an integer"))),
-        None => Err(TaskError::fail(
-            "TypeError",
-            format!("{}() missing 1 required positional argument: '{name}'", short_name(&ctx.task_name)),
-        )),
+        Some(v) => v.as_i64().ok_or_else(|| TaskError::fail("TypeError", format!("{name} must be an integer"))),
+        None => {
+            Err(TaskError::fail("TypeError", format!("{}() missing 1 required positional argument: '{name}'", short_name(&ctx.task_name))))
+        }
     }
 }
 
@@ -392,9 +382,7 @@ fn indexer_error(e: pl_indexer::IndexerError) -> TaskError {
         // already exists) have already been retried several times by the indexer; afterwards do not
         // fail for good but run the task again later (do not lose the index change).
         ref t if t.is_transient() => TaskError::retry("OSError", e.to_string(), Some(60.0)),
-        pl_indexer::IndexerError::Io(_) | pl_indexer::IndexerError::MissingIndexDir(_) => {
-            TaskError::fail("OSError", e.to_string())
-        }
+        pl_indexer::IndexerError::Io(_) | pl_indexer::IndexerError::MissingIndexDir(_) => TaskError::fail("OSError", e.to_string()),
         other => TaskError::fail("ValueError", other.to_string()),
     }
 }
@@ -423,9 +411,8 @@ pub fn register_guard_handlers(reg: TaskRegistry, ctx: &WorkerContext) -> TaskRe
 /// Ingestion building blocks with the current settings (environment + UI + ApplicationConfiguration).
 pub async fn build_consumer(ctx: &WorkerContext) -> Result<pl_consumer::Consumer, String> {
     let pool = ctx.state.db().clone();
-    let mut consumer = pl_consumer::Consumer::from_env(pool.clone(), ctx.events.clone())
-        .await
-        .map_err(|e| format!("consumer setup failed: {e}"))?;
+    let mut consumer =
+        pl_consumer::Consumer::from_env(pool.clone(), ctx.events.clone()).await.map_err(|e| format!("consumer setup failed: {e}"))?;
     consumer.queue = Some(ctx.queue.clone());
     // Workflow actions e-mail / webhook / password removal (pl-mail, W6) instead of logging only.
     // Live configuration (SMTP etc. from the web UI, docs/SETTINGS.md WP4b).
@@ -436,7 +423,8 @@ pub async fn build_consumer(ctx: &WorkerContext) -> Result<pl_consumer::Consumer
     consumer.effects = Arc::new(pl_mail::effects::SharedEffects(Arc::new(effects)));
     // W15: clear_document_caches (Redis + LLM suggestions) and the full soft-delete cascade.
     consumer.caches = Arc::new(RedisDocumentCaches { state: ctx.state.clone() });
-    consumer.deleter = Arc::new(DocumentsWriteSoftDelete { media: pl_documents_write::files::MediaCfg::from_config(&ctx.state.live_config()) });
+    consumer.deleter =
+        Arc::new(DocumentsWriteSoftDelete { media: pl_documents_write::files::MediaCfg::from_config(&ctx.state.live_config()) });
     // Workflows new: ensure tables, attach the AI condition to pl-ai (without `ai`: ignored, marked).
     pl_automation::init(&ctx.state).await;
     // AI text recognition (pl-core `vision`, implementation pl-ai); unchanged without feature `ai`.
@@ -451,7 +439,8 @@ pub async fn build_consumer(ctx: &WorkerContext) -> Result<pl_consumer::Consumer
     }
     // tests/chaos C5: clean up working folders of aborted ingestions (hard abort) – only
     // folders older than a task's hard time limit + 10 min.
-    let age = std::time::Duration::from_secs_f64(queue_config(&ctx.state.config().env).map(|c| c.time_limit_secs).unwrap_or(1800.0) + 600.0);
+    let age =
+        std::time::Duration::from_secs_f64(queue_config(&ctx.state.config().env).map(|c| c.time_limit_secs).unwrap_or(1800.0) + 600.0);
     tokio::spawn(pl_consumer::consumer::scratch_sweeper(consumer.settings.scratch_dir.clone(), age));
     Ok(consumer)
 }
@@ -476,7 +465,7 @@ pub async fn register_document_handlers(reg: TaskRegistry, ctx: &WorkerContext) 
         audit_enabled: consumer.settings.audit_log_enabled,
         settings: consumer.settings.clone(),
     })));
-    let indexer =Arc::new(pl_indexer::Indexer::new(pl_indexer::IndexerConfig::from_env()));
+    let indexer = Arc::new(pl_indexer::Indexer::new(pl_indexer::IndexerConfig::from_env()));
     // A2: upstream init-search-index `document_index reindex --if-needed` at every start:
     // rebuild if schema/language (SEARCH_LANGUAGE) do not match, the index is missing or an
     // earlier rebuild was aborted. In the background, so that the worker accepts tasks immediately.
@@ -652,9 +641,8 @@ pub async fn register_document_handlers(reg: TaskRegistry, ctx: &WorkerContext) 
 async fn ai_after_reprocess(state: &AppState, queue: &dyn TaskQueue, document_id: i64) {
     let Some(cfg) = ai_config(state).await else { return };
     if cfg.llm_index_enabled()
-        && let Err(e) = queue
-            .enqueue(names::UPDATE_DOCUMENT_IN_LLM_INDEX, document_kwargs(document_id), pl_queue::EnqueueOptions::default())
-            .await
+        && let Err(e) =
+            queue.enqueue(names::UPDATE_DOCUMENT_IN_LLM_INDEX, document_kwargs(document_id), pl_queue::EnqueueOptions::default()).await
     {
         tracing::error!(target: "paperless.tasks", document_id, error = %e, "could not queue update_document_in_llm_index");
     }
@@ -708,9 +696,7 @@ pub fn register_documents_write_handlers(reg: TaskRegistry, state: &AppState) ->
                 .get("custom_field_id")
                 .and_then(Value::as_i64)
                 .ok_or_else(|| TaskError::fail("TypeError", "process_cf_select_update() missing 'custom_field_id'"))?;
-            pl_documents_write::tasks::process_cf_select_update(&st, id)
-                .await
-                .map_err(|e| TaskError::fail("Exception", e))?;
+            pl_documents_write::tasks::process_cf_select_update(&st, id).await.map_err(|e| TaskError::fail("Exception", e))?;
             Ok(Value::Null)
         }
     });
@@ -718,9 +704,7 @@ pub fn register_documents_write_handlers(reg: TaskRegistry, state: &AppState) ->
     reg.register(names::RESTORE_ARCHIVE_SERIAL_NUMBERS, move |c: TaskContext| {
         let st = st.clone();
         async move {
-            pl_documents_write::tasks::restore_asn_task(st.db(), &c.args, &c.kwargs)
-                .await
-                .map_err(|(t, m)| TaskError::fail(&t, m))?;
+            pl_documents_write::tasks::restore_asn_task(st.db(), &c.args, &c.kwargs).await.map_err(|(t, m)| TaskError::fail(&t, m))?;
             Ok(Value::Null)
         }
     })
@@ -737,10 +721,9 @@ pub fn register_mail_handlers(reg: TaskRegistry, ctx: &WorkerContext) -> Result<
         pl_mail::fetch::MailWorkerConfig::from_core(core),
     ));
     let webhooks = Arc::new(pl_mail::effects::webhook::WebhookSettings::from_env(&core.env)?);
-    Ok(reg.with_handlers(
-        &[names::PROCESS_MAIL_ACCOUNTS, names::APPLY_MAIL_ACTION, names::MAIL_ERROR_CALLBACK, names::SEND_WEBHOOK],
-        |h| pl_mail::fetch::register_mail_handlers(h, worker, webhooks),
-    ))
+    Ok(reg.with_handlers(&[names::PROCESS_MAIL_ACCOUNTS, names::APPLY_MAIL_ACTION, names::MAIL_ERROR_CALLBACK, names::SEND_WEBHOOK], |h| {
+        pl_mail::fetch::register_mail_handlers(h, worker, webhooks)
+    }))
 }
 
 // ------------------------------------------------------------------ train_classifier
@@ -837,10 +820,7 @@ pub async fn train_classifier(pool: &sqlx::PgPool, cfg: &ClassifierTaskConfig) -
     let pool = pool.clone();
     let handle = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || -> Result<String, TaskError> {
-        let mut classifier = pl_classifier::model::load_classifier(&cfg.model_file, &cfg.key, false)
-            .ok()
-            .flatten()
-            .unwrap_or_default();
+        let mut classifier = pl_classifier::model::load_classifier(&cfg.model_file, &cfg.key, false).ok().flatten().unwrap_or_default();
         // Document.objects.only("content").in_bulk(chunk): deleted meanwhile -> "".
         let content = |pks: &[i64]| -> Vec<Option<String>> {
             let ids: Vec<i32> = pks.iter().filter_map(|p| i32::try_from(*p).ok()).collect();
@@ -858,9 +838,7 @@ pub async fn train_classifier(pool: &sqlx::PgPool, cfg: &ClassifierTaskConfig) -
             .map_err(|e| TaskError::fail("ValueError", e.to_string()))?;
         if trained {
             tracing::info!(target: "paperless.tasks", "Saving updated classifier model to {}...", cfg.model_file.display());
-            classifier
-                .save(&cfg.model_file, &cfg.key)
-                .map_err(|e| TaskError::fail("OSError", e.to_string()))?;
+            classifier.save(&cfg.model_file, &cfg.key).map_err(|e| TaskError::fail("OSError", e.to_string()))?;
             Ok("Training completed successfully".into())
         } else {
             tracing::debug!(target: "paperless.tasks", "Training data unchanged.");
@@ -887,10 +865,7 @@ async fn bulk_update_documents(
         Some(Value::Array(a)) => a.iter().filter_map(Value::as_i64).collect(),
         Some(_) => return Err(TaskError::fail("TypeError", "document_ids must be a list of integers")),
         None => {
-            return Err(TaskError::fail(
-                "TypeError",
-                "bulk_update_documents() missing 1 required positional argument: 'document_ids'",
-            ));
+            return Err(TaskError::fail("TypeError", "bulk_update_documents() missing 1 required positional argument: 'document_ids'"));
         }
     };
     // PaperRust (PERF-SCALE §10): bundled follow-up, same effect as the single path;
@@ -1116,9 +1091,8 @@ fn api_task_error(e: pl_core::ApiError) -> TaskError {
 pub async fn ai_after_consumption(state: &AppState, queue: &dyn TaskQueue, document_id: i64) {
     let Some(cfg) = ai_config(state).await else { return };
     if cfg.llm_index_enabled()
-        && let Err(e) = queue
-            .enqueue(names::UPDATE_DOCUMENT_IN_LLM_INDEX, document_kwargs(document_id), pl_queue::EnqueueOptions::default())
-            .await
+        && let Err(e) =
+            queue.enqueue(names::UPDATE_DOCUMENT_IN_LLM_INDEX, document_kwargs(document_id), pl_queue::EnqueueOptions::default()).await
     {
         tracing::error!(target: "paperless.handlers", document_id, error = %e, "could not queue update_document_in_llm_index");
     }
@@ -1157,7 +1131,8 @@ impl pl_core::vision::VisionOcr for AiVisionOcr {
 
     fn recognize(&self, pages: Vec<pl_core::vision::PageImage>) -> pl_core::vision::VisionFuture<'_, Result<Option<String>, String>> {
         Box::pin(async move {
-            let pages: Vec<pl_ai::vision::PageImage> = pages.into_iter().map(|p| pl_ai::vision::PageImage { mime: p.mime, data: p.data }).collect();
+            let pages: Vec<pl_ai::vision::PageImage> =
+                pages.into_iter().map(|p| pl_ai::vision::PageImage { mime: p.mime, data: p.data }).collect();
             let r = pl_ai::server::assist::vision_ocr(&self.state, &pages).await?;
             Ok(r.map(|r| {
                 if r.skipped_pages > 0 {
@@ -1245,7 +1220,12 @@ impl pl_ai::server::workflow::DocWriter for ConsumerDocWriter {
         })
     }
 
-    fn add_nested_tags<'a>(&'a self, state: &'a AppState, doc_id: i64, tag_ids: &'a [i64]) -> futures::future::BoxFuture<'a, Result<(), String>> {
+    fn add_nested_tags<'a>(
+        &'a self,
+        state: &'a AppState,
+        doc_id: i64,
+        tag_ids: &'a [i64],
+    ) -> futures::future::BoxFuture<'a, Result<(), String>> {
         Box::pin(async move {
             let mut tx = state.db().begin().await.map_err(|e| e.to_string())?;
             let doc = load_instance(&mut tx, doc_id).await?;
@@ -1255,7 +1235,12 @@ impl pl_ai::server::workflow::DocWriter for ConsumerDocWriter {
         })
     }
 
-    fn remove_tags<'a>(&'a self, state: &'a AppState, doc_id: i64, tag_ids: &'a [i64]) -> futures::future::BoxFuture<'a, Result<(), String>> {
+    fn remove_tags<'a>(
+        &'a self,
+        state: &'a AppState,
+        doc_id: i64,
+        tag_ids: &'a [i64],
+    ) -> futures::future::BoxFuture<'a, Result<(), String>> {
         Box::pin(async move {
             let mut tx = state.db().begin().await.map_err(|e| e.to_string())?;
             let doc = load_instance(&mut tx, doc_id).await?;
@@ -1297,15 +1282,18 @@ impl pl_ai::server::workflow::DocWriter for ConsumerDocWriter {
             if field.data_type != data_type {
                 return Err(format!("custom field {field_id} has type {}, not {data_type}", field.data_type));
             }
-            pl_documents_write::cfi::update_or_create(&mut tx, &log, &media, doc_id, &field, value)
-                .await
-                .map_err(|e| format!("{e:?}"))?;
+            pl_documents_write::cfi::update_or_create(&mut tx, &log, &media, doc_id, &field, value).await.map_err(|e| format!("{e:?}"))?;
             tx.commit().await.map_err(|e| e.to_string())
         })
     }
 
     /// Soft delete of the live instance (`SoftDeleteModel.delete`, auditlog, file name); no instance → no-op.
-    fn remove_custom_field<'a>(&'a self, state: &'a AppState, doc_id: i64, field_id: i64) -> futures::future::BoxFuture<'a, Result<(), String>> {
+    fn remove_custom_field<'a>(
+        &'a self,
+        state: &'a AppState,
+        doc_id: i64,
+        field_id: i64,
+    ) -> futures::future::BoxFuture<'a, Result<(), String>> {
         Box::pin(async move {
             let media = pl_documents_write::files::MediaCfg::from_config(&state.live_config());
             let log = pl_documents_write::auditlog::LogCtx { enabled: self.audit_enabled, ..Default::default() };
@@ -1325,9 +1313,7 @@ impl pl_ai::server::workflow::DocWriter for ConsumerDocWriter {
 async fn llm_index_update_ids(state: &AppState, ids: &[i64]) -> Result<(), TaskError> {
     let Some(cfg) = ai_config(state).await else { return Ok(()) };
     if cfg.llm_index_enabled() {
-        pl_ai::server::index::update_llm_index(state, &cfg, false, Some(ids.to_vec()))
-            .await
-            .map_err(ai_task_error)?;
+        pl_ai::server::index::update_llm_index(state, &cfg, false, Some(ids.to_vec())).await.map_err(ai_task_error)?;
     }
     Ok(())
 }
@@ -1528,12 +1514,7 @@ pub async fn start_background(
     if !mode.runs_worker() {
         return Ok(Background { set });
     }
-    let ctx = WorkerContext {
-        state: state.clone(),
-        queue: setup.queue.clone(),
-        events: setup.events.clone(),
-        cfg: setup.cfg.clone(),
-    };
+    let ctx = WorkerContext { state: state.clone(), queue: setup.queue.clone(), events: setup.events.clone(), cfg: setup.cfg.clone() };
     let registry = build_registry(&ctx).await?;
     tracing::info!(
         ported = ?registry.ported().collect::<Vec<_>>(),
@@ -1561,7 +1542,8 @@ pub async fn start_background(
     beat_entries(true)?;
     let (db, queue, tz) = (state.db().clone(), setup.queue.clone(), setup.cfg.tz);
     let start: crate::settings_live::Start = Box::new(move |s| {
-        let beat = pl_queue::beat::Beat::new(beat_entries(false)?, Arc::new(pl_queue::beat::PgBeatStore::new(db.clone())), queue.clone(), tz);
+        let beat =
+            pl_queue::beat::Beat::new(beat_entries(false)?, Arc::new(pl_queue::beat::PgBeatStore::new(db.clone())), queue.clone(), tz);
         Ok(Box::pin(async move { beat.run(s).await }))
     });
     set.spawn(crate::settings_live::restartable(state.clone(), "scheduler", crate::settings_live::cron_keys(), start, stop.clone()));
@@ -1609,7 +1591,13 @@ pub async fn start_background(
         let st = st.clone();
         Ok(Box::pin(async move { pl_guard::db::run_guard(st, s).await }))
     });
-    set.spawn(crate::settings_live::restartable(state.clone(), "ransomware guard", pl_guard::config::GUARD_KEYS.to_vec(), start, stop.clone()));
+    set.spawn(crate::settings_live::restartable(
+        state.clone(),
+        "ransomware guard",
+        pl_guard::config::GUARD_KEYS.to_vec(),
+        start,
+        stop.clone(),
+    ));
 
     // Restarted when CONSUMER_POLLING_INTERVAL/RECURSIVE/… change in the web UI (docs/SETTINGS.md WP4a).
     let (st, queue) = (state.clone(), setup.queue.clone());
@@ -1738,9 +1726,7 @@ mod tests {
         assert_eq!(names::APPLY_MAIL_ACTION, pl_mail::fetch::TASK_APPLY_MAIL_ACTION);
         assert_eq!(names::MAIL_ERROR_CALLBACK, pl_mail::fetch::TASK_ERROR_CALLBACK);
         assert_eq!(names::SEND_WEBHOOK, pl_mail::effects::webhook::TASK_SEND_WEBHOOK);
-        let reg = TaskRegistry::new()
-            .not_ported(names::PROCESS_MAIL_ACCOUNTS, "x")
-            .with_handlers(&[names::PROCESS_MAIL_ACCOUNTS], |h| h);
+        let reg = TaskRegistry::new().not_ported(names::PROCESS_MAIL_ACCOUNTS, "x").with_handlers(&[names::PROCESS_MAIL_ACCOUNTS], |h| h);
         assert!(reg.is_ported(names::PROCESS_MAIL_ACCOUNTS));
     }
 

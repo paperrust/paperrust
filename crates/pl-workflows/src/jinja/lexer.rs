@@ -41,14 +41,7 @@ pub struct Lexer {
     done: bool,
 }
 
-const OPS2: &[(&str, &str)] = &[
-    ("//", "floordiv"),
-    ("**", "pow"),
-    ("==", "eq"),
-    ("!=", "ne"),
-    (">=", "gteq"),
-    ("<=", "lteq"),
-];
+const OPS2: &[(&str, &str)] = &[("//", "floordiv"), ("**", "pow"), ("==", "eq"), ("!=", "ne"), (">=", "gteq"), ("<=", "lteq")];
 const OPS1: &[(char, &str)] = &[
     ('+', "add"),
     ('-', "sub"),
@@ -75,9 +68,7 @@ const OPS1: &[(char, &str)] = &[
 /// Reverse of the operator table (`reverse_operators`).
 pub fn op_symbol(ty: &str) -> Option<&'static str> {
     OPS2.iter().find(|(_, t)| *t == ty).map(|(s, _)| *s).or_else(|| {
-        const S1: &[&str] = &[
-            "+", "-", "/", "*", "%", "~", "[", "]", "(", ")", "{", "}", ">", "<", "=", ".", ":", "|", ",", ";",
-        ];
+        const S1: &[&str] = &["+", "-", "/", "*", "%", "~", "[", "]", "(", ")", "{", "}", ">", "<", "=", ".", ":", "|", ",", ";"];
         OPS1.iter().position(|(_, t)| *t == ty).map(|i| S1[i])
     })
 }
@@ -250,8 +241,7 @@ impl Lexer {
             text.truncate(end);
         } else if sign != '+' && !is_variable {
             let l_pos = text.iter().rposition(|c| *c == '\n').map(|i| i + 1).unwrap_or(0);
-            if (l_pos > 0 || self.line_starting) && l_pos < text.len() && text[l_pos..].iter().all(|c| is_py_space(*c))
-            {
+            if (l_pos > 0 || self.line_starting) && l_pos < text.len() && text[l_pos..].iter().all(|c| is_py_space(*c)) {
                 text.truncate(l_pos);
             }
         }
@@ -368,9 +358,10 @@ impl Lexer {
             }
         }
         if op.is_none()
-            && let Some((_, t)) = OPS1.iter().find(|(c, _)| self.src[pos] == *c) {
-                op = Some((t, pos + 1));
-            }
+            && let Some((_, t)) = OPS1.iter().find(|(c, _)| self.src[pos] == *c)
+        {
+            op = Some((t, pos + 1));
+        }
         if let Some((ty, end)) = op {
             let c = self.src[pos];
             match c {
@@ -390,10 +381,7 @@ impl Lexer {
             // Operator tokens carry the operator type directly
             return Ok(());
         }
-        Err(JErr::syntax(
-            format!("unexpected char {} at {}", str_repr(&self.src[pos].to_string()), pos),
-            self.lineno,
-        ))
+        Err(JErr::syntax(format!("unexpected char {} at {}", str_repr(&self.src[pos].to_string()), pos), self.lineno))
     }
 
     /// `(\d+_)*\d+` from `at` → end
@@ -434,16 +422,18 @@ impl Lexer {
         // (\.(\d+_)*\d+)? e[+\-]?(\d+_)*\d+
         if self.src.get(p) == Some(&'.')
             && let Some(q) = self.digit_group(p + 1)
-                && let Some(e) = self.exponent(q) {
-                    return Some(e);
-                }
+            && let Some(e) = self.exponent(q)
+        {
+            return Some(e);
+        }
         if let Some(e) = self.exponent(p) {
             return Some(e);
         }
         if self.src.get(p) == Some(&'.')
-            && let Some(q) = self.digit_group(p + 1) {
-                return Some(q);
-            }
+            && let Some(q) = self.digit_group(p + 1)
+        {
+            return Some(q);
+        }
         None
     }
 
@@ -798,10 +788,7 @@ impl TokenStream {
         if !self.current.test(expr) {
             let e = describe_expr(expr);
             if self.current.ty == "eof" {
-                return Err(JErr::syntax(
-                    format!("unexpected end of template, expected {}.", str_repr(&e)),
-                    self.current.lineno,
-                ));
+                return Err(JErr::syntax(format!("unexpected end of template, expected {}.", str_repr(&e)), self.current.lineno));
             }
             return Err(JErr::syntax(
                 format!("expected token {}, got {}", str_repr(&e), str_repr(&describe_token(&self.current))),
@@ -832,8 +819,21 @@ mod tests {
         assert_eq!(
             types,
             vec![
-                "data", "variable_begin", "name", "pipe", "name", "variable_end", "data", "block_begin", "name",
-                "name", "block_end", "data", "block_begin", "name", "block_end"
+                "data",
+                "variable_begin",
+                "name",
+                "pipe",
+                "name",
+                "variable_end",
+                "data",
+                "block_begin",
+                "name",
+                "name",
+                "block_end",
+                "data",
+                "block_begin",
+                "name",
+                "block_end"
             ]
         );
         // lstrip_blocks removes the indentation before {% if %}

@@ -117,10 +117,7 @@ impl Data {
     pub fn require_mapping(&self) -> Result<(), ApiError> {
         match self {
             Data::Json(Value::Object(_)) | Data::Form(_) => Ok(()),
-            Data::Json(v) => Err(ApiError::non_field_error(format!(
-                "Invalid data. Expected a dictionary, but got {}.",
-                py_type_name(v)
-            ))),
+            Data::Json(v) => Err(ApiError::non_field_error(format!("Invalid data. Expected a dictionary, but got {}.", py_type_name(v)))),
         }
     }
 }
@@ -139,11 +136,7 @@ pub fn py_type_name(v: &Value) -> &'static str {
 }
 
 fn media_type(headers: &HeaderMap) -> Option<String> {
-    headers
-        .get(CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
+    headers.get(CONTENT_TYPE).and_then(|v| v.to_str().ok()).map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
 }
 
 fn base_type(ct: &str) -> String {
@@ -299,9 +292,10 @@ pub fn drf_char(v: &Value, allow_blank: bool, max_length: Option<usize>, trim: b
         return Err("This field may not be blank.".into());
     }
     if let Some(max) = max_length
-        && s.chars().count() > max {
-            return Err(format!("Ensure this field has no more than {max} characters."));
-        }
+        && s.chars().count() > max
+    {
+        return Err(format!("Ensure this field has no more than {max} characters."));
+    }
     if s.contains('\0') {
         return Err("Null characters are not allowed.".into());
     }
@@ -322,10 +316,7 @@ pub fn is_valid_email(value: &str) -> bool {
     let user_ok = if user.starts_with('"') && user.ends_with('"') && user.len() >= 2 {
         true
     } else {
-        user.split('.').all(|atom| {
-            !atom.is_empty()
-                && atom.chars().all(|c| c.is_ascii_alphanumeric() || "!#$%&'*+/=?^_`{|}~-".contains(c))
-        })
+        user.split('.').all(|atom| !atom.is_empty() && atom.chars().all(|c| c.is_ascii_alphanumeric() || "!#$%&'*+/=?^_`{|}~-".contains(c)))
     };
     if !user_ok {
         return false;
@@ -357,10 +348,7 @@ pub fn is_valid_username(value: &str) -> bool {
 
 /// Client address for throttling (`REMOTE_ADDR`), if the server provided `ConnectInfo`.
 pub fn remote_addr(parts: &Parts) -> Option<String> {
-    parts
-        .extensions
-        .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
-        .map(|c| c.0.ip().to_string())
+    parts.extensions.get::<axum::extract::ConnectInfo<std::net::SocketAddr>>().map(|c| c.0.ip().to_string())
 }
 
 #[cfg(test)]

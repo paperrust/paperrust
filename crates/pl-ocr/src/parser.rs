@@ -32,14 +32,16 @@ pub trait OcrBackend {
     fn extract_text(&self, sidecar: Option<&Path>, pdf: &Path, mode: Mode) -> Option<String> {
         if let Some(sc) = sidecar {
             // When re-doing OCR, the sidecar contains ONLY the new text
-            if sc.is_file() && mode != Mode::Redo
-                && let Ok(text) = read_file_handle_unicode_errors(sc) {
-                    if !text.contains("[OCR skipped on page") {
-                        tracing::debug!("Using text from sidecar file");
-                        return post_process_text(Some(&text));
-                    }
-                    tracing::debug!("Incomplete sidecar file: discarding.");
+            if sc.is_file()
+                && mode != Mode::Redo
+                && let Ok(text) = read_file_handle_unicode_errors(sc)
+            {
+                if !text.contains("[OCR skipped on page") {
+                    tracing::debug!("Using text from sidecar file");
+                    return post_process_text(Some(&text));
                 }
+                tracing::debug!("Incomplete sidecar file: discarding.");
+            }
         }
         if !pdf.is_file() {
             return None;
@@ -79,14 +81,7 @@ impl RasterisedParser<'_> {
         let (i, o, s) = (path_str(input), path_str(out), path_str(sidecar));
         construct_ocrmypdf_parameters(
             &self.settings,
-            &ArgsRequest {
-                input_file: &i,
-                mime_type: mime,
-                output_file: &o,
-                sidecar_file: &s,
-                safe_fallback,
-                skip_text,
-            },
+            &ArgsRequest { input_file: &i, mime_type: mime, output_file: &o, sidecar_file: &s, safe_fallback, skip_text },
             self.images,
         )
     }
@@ -195,9 +190,7 @@ impl RasterisedParser<'_> {
             Ok(Some(t)) if !t.is_empty() => text = Some(t),
             Ok(_) => needs_fallback = Some("No text was found in the original document".into()),
             Err(OcrError::DigitalSignature) | Err(OcrError::EncryptedPdf) => {
-                tracing::warn!(
-                    "This file is encrypted and/or signed, OCR is impossible. Using any text present in the original file."
-                );
+                tracing::warn!("This file is encrypted and/or signed, OCR is impossible. Using any text present in the original file.");
                 if original_has_text {
                     text = text_original.clone();
                 }
@@ -368,7 +361,8 @@ mod tests {
     }
 
     fn parser<'a>(m: &'a Mock, mode: Mode) -> RasterisedParser<'a> {
-        let mut settings = OcrConfig::new(&OcrSettings { threads_per_worker: 1, ..Default::default() }, &AppConfigOverrides::default()).unwrap();
+        let mut settings =
+            OcrConfig::new(&OcrSettings { threads_per_worker: 1, ..Default::default() }, &AppConfigOverrides::default()).unwrap();
         settings.mode = mode;
         RasterisedParser { settings, tempdir: PathBuf::from("/tmp/pl-ocr-test"), backend: m, images: &NoImg }
     }
@@ -503,10 +497,7 @@ mod tests {
         let m = Mock::with_text(Some(LONG));
         m.ocr_results.borrow_mut().push(Err(OcrError::SubprocessOutput("Ghostscript PDF/A rendering failed".into())));
         let e = parser(&m, Mode::Auto).parse(Path::new("d.pdf"), PDF, true).unwrap_err();
-        assert_eq!(
-            e.message(),
-            "SubprocessOutputError: Ghostscript PDF/A rendering failed. See logs for more information."
-        );
+        assert_eq!(e.message(), "SubprocessOutputError: Ghostscript PDF/A rendering failed. See logs for more information.");
     }
 
     #[test]

@@ -46,7 +46,8 @@ fn verify(method: &Method, path: &str, query: &[(String, String)], headers: &Hea
     let Some(amz) = headers.get("x-amz-date").and_then(|v| v.to_str().ok()) else { return false };
     let Ok(now) = chrono::NaiveDateTime::parse_from_str(amz, "%Y%m%dT%H%M%SZ") else { return false };
     let payload = headers.get("x-amz-content-sha256").and_then(|v| v.to_str().ok()).unwrap_or("");
-    let hs: Vec<(String, String)> = signed.split(';').map(|h| (h.to_string(), headers.get(h).and_then(|v| v.to_str().ok()).unwrap_or("").to_string())).collect();
+    let hs: Vec<(String, String)> =
+        signed.split(';').map(|h| (h.to_string(), headers.get(h).and_then(|v| v.to_str().ok()).unwrap_or("").to_string())).collect();
     let want = pl_guard::backup::s3::authorization(
         &pl_guard::backup::s3::SignInput { method: method.as_str(), path, query, headers: &hs, payload_sha256: payload },
         ACCESS,
@@ -115,7 +116,12 @@ async fn handle(State(b): State<Shared>, req: Request) -> Response {
         }
         (Method::PUT, false) if q("retention").is_some() => {
             let s = String::from_utf8_lossy(&body).to_string();
-            let until = s.split("<RetainUntilDate>").nth(1).and_then(|r| r.split('<').next()).and_then(|d| DateTime::parse_from_rfc3339(d).ok()).map(|d| d.with_timezone(&Utc));
+            let until = s
+                .split("<RetainUntilDate>")
+                .nth(1)
+                .and_then(|r| r.split('<').next())
+                .and_then(|d| DateTime::parse_from_rfc3339(d).ok())
+                .map(|d| d.with_timezone(&Utc));
             let Some(o) = g.objects.get_mut(key) else { return err(StatusCode::NOT_FOUND, "NoSuchKey", "key") };
             if let (Some(old), Some(new)) = (o.retain_until, until)
                 && new < old

@@ -67,7 +67,8 @@ fn rasters(pdfium: &PdfiumRenderer, bench_pages: usize) -> Vec<(String, Raster)>
         let img = image::open(sample(name)).unwrap_or_else(|e| panic!("{name}: {e}"));
         out.push((name.to_string(), Raster::from_dynamic(&img, 300.0)));
     }
-    for (name, dpi) in [("rotated.pdf", 300.0), ("multi-page-mixed.pdf", 300.0), ("single-page-mixed.pdf", 200.0), ("rtl-test.pdf", 300.0)] {
+    for (name, dpi) in [("rotated.pdf", 300.0), ("multi-page-mixed.pdf", 300.0), ("single-page-mixed.pdf", 200.0), ("rtl-test.pdf", 300.0)]
+    {
         let data = std::fs::read(sample(name)).unwrap();
         let doc = pdfium.open(&data).unwrap();
         for i in 0..doc.page_count() {
@@ -89,7 +90,12 @@ fn rasters(pdfium: &PdfiumRenderer, bench_pages: usize) -> Vec<(String, Raster)>
     // Rotated pages: OSD must find the same rotation/confidence.
     let rotated: Vec<(String, Raster)> = out
         .iter()
-        .filter(|(n, _)| n.starts_with("simple.png") || n.starts_with("multi-page-mixed.pdf#0g") || n.starts_with("scan-16p#0") || n.starts_with("scan-16p#4"))
+        .filter(|(n, _)| {
+            n.starts_with("simple.png")
+                || n.starts_with("multi-page-mixed.pdf#0g")
+                || n.starts_with("scan-16p#0")
+                || n.starts_with("scan-16p#4")
+        })
         .flat_map(|(n, r)| [90u16, 180, 270].map(|d| (format!("{n}@{d}"), r.rotate_cw(d))))
         .collect();
     out.extend(rotated);
@@ -140,7 +146,14 @@ fn assert_same(what: &str, names: &[String], a: &[Res], b: &[Res]) {
     let mut bad = Vec::new();
     for ((n, x), y) in names.iter().zip(a).zip(b) {
         if x != y {
-            bad.push(format!("{n}: osd {:?} vs {:?}, words {} vs {}, text eq {}", x.osd, y.osd, x.ocr.words.len(), y.ocr.words.len(), x.ocr.text == y.ocr.text));
+            bad.push(format!(
+                "{n}: osd {:?} vs {:?}, words {} vs {}, text eq {}",
+                x.osd,
+                y.osd,
+                x.ocr.words.len(),
+                y.ocr.words.len(),
+                x.ocr.text == y.ocr.text
+            ));
         }
     }
     assert!(bad.is_empty(), "{what}: {} of {} differ:\n{}", bad.len(), names.len(), bad.join("\n"));
@@ -264,16 +277,19 @@ fn parse_document_same_text_and_archive_content() {
             _ => "image/tiff",
         };
         let mut outs = Vec::new();
-        for (k, engine) in [Box::new(CliPnm(tesseract.clone())) as Box<dyn OcrEngine>, Box::new(tesseract.clone())].into_iter().enumerate() {
+        for (k, engine) in [Box::new(CliPnm(tesseract.clone())) as Box<dyn OcrEngine>, Box::new(tesseract.clone())].into_iter().enumerate()
+        {
             let dir = tempfile::tempdir().unwrap();
             let mut cfg = pl_ocr::OcrConfig::defaults();
             cfg.threads_per_worker = 4;
             cfg.language = "deu+eng".into();
             let backend = NativeOcrmypdf::new(Some(engine), Box::new(pdfium.clone()) as Box<dyn PdfRenderer>, dir.path().join("pages"));
-            let out = parse_document(&backend, &cfg, dir.path(), &doc, mime, true).unwrap_or_else(|e| panic!("{} ({k}): {e}", doc.display()));
+            let out =
+                parse_document(&backend, &cfg, dir.path(), &doc, mime, true).unwrap_or_else(|e| panic!("{} ({k}): {e}", doc.display()));
             let archive = out.archive_path.as_deref().map(|p| content_digest(&std::fs::read(p).unwrap()));
             // no image files left behind
-            let left: Vec<_> = std::fs::read_dir(dir.path().join("pages")).map(|d| d.flatten().map(|e| e.path()).collect()).unwrap_or_default();
+            let left: Vec<_> =
+                std::fs::read_dir(dir.path().join("pages")).map(|d| d.flatten().map(|e| e.path()).collect()).unwrap_or_default();
             assert!(left.is_empty(), "{left:?}");
             outs.push((out.text, archive));
         }

@@ -220,7 +220,15 @@ impl TessLib {
         if omp_levels.is_some() {
             tracing::debug!("libtesseract uses OpenMP; limiting each worker thread to one OpenMP thread");
         }
-        Ok(Self { path: path.to_path_buf(), version, api, omp_levels, pool: Mutex::new(HashMap::new()), init_lock: Mutex::new(false), _lib: lib })
+        Ok(Self {
+            path: path.to_path_buf(),
+            version,
+            api,
+            omp_levels,
+            pool: Mutex::new(HashMap::new()),
+            init_lock: Mutex::new(false),
+            _lib: lib,
+        })
     }
 
     pub fn path(&self) -> &Path {
@@ -369,7 +377,8 @@ impl TessLib {
 
     /// Like `tesseract <image> <base> -l <lang> [--dpi N] [--psm P] -c tessedit_create_tsv=1 -c tessedit_create_txt=1`.
     pub fn recognize(&self, tessdata: Option<&Path>, psm: Option<u8>, raster: &Raster, req: &OcrRequest) -> Result<PageOcr> {
-        let key = PoolKey { tessdata: tessdata.map(Path::to_path_buf), lang: req.languages.clone(), psm: psm.map_or(PSM_AUTO, c_int::from) };
+        let key =
+            PoolKey { tessdata: tessdata.map(Path::to_path_buf), lang: req.languages.clone(), psm: psm.map_or(PSM_AUTO, c_int::from) };
         self.with_instance(&key, |h| {
             let dpi = CString::new(req.dpi.unwrap_or(0).to_string()).unwrap_or_default();
             // SAFETY: valid instance; strings live until the end of the call.
@@ -455,7 +464,9 @@ fn candidates_in(dir: &Path) -> Vec<PathBuf> {
                 .filter_map(|e| e.ok().map(|e| e.path()))
                 .filter(|p| {
                     let n = p.file_name().map(|n| n.to_string_lossy().to_ascii_lowercase()).unwrap_or_default();
-                    n.ends_with(".dll") && (n.starts_with("libtesseract") || (n.starts_with("tesseract") && n[9..].starts_with(|c: char| c.is_ascii_digit())))
+                    n.ends_with(".dll")
+                        && (n.starts_with("libtesseract")
+                            || (n.starts_with("tesseract") && n[9..].starts_with(|c: char| c.is_ascii_digit())))
                 })
                 .collect();
             names.sort();
@@ -481,9 +492,7 @@ fn which(program: &Path) -> Option<PathBuf> {
     }
     let exts: &[&str] = if cfg!(windows) { &["", ".exe"] } else { &[""] };
     std::env::var_os("PATH").and_then(|paths| {
-        std::env::split_paths(&paths).find_map(|d| {
-            exts.iter().map(|e| d.join(format!("{}{e}", program.display()))).find(|p| p.is_file())
-        })
+        std::env::split_paths(&paths).find_map(|d| exts.iter().map(|e| d.join(format!("{}{e}", program.display()))).find(|p| p.is_file()))
     })
 }
 

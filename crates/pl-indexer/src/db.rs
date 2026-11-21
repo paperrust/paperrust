@@ -21,8 +21,7 @@ use sqlx::{PgPool, Row};
 
 use crate::error::Result;
 use crate::record::{
-    BarcodeRecord, CustomFieldRaw, CustomFieldRecord, DocumentRecord, NoteRecord, VersionPick,
-    VersionRow, newest_version,
+    BarcodeRecord, CustomFieldRaw, CustomFieldRecord, DocumentRecord, NoteRecord, VersionPick, VersionRow, newest_version,
 };
 
 /// `_DocumentViewerStream(chunk_size=1000)`.
@@ -41,26 +40,15 @@ pub struct LoadMode {
 
 impl LoadMode {
     /// `document_index reindex` → `rebuild()`: prefetched `versions` for both.
-    pub const REBUILD: LoadMode = LoadMode {
-        content: VersionPick::Prefetch,
-        barcodes: VersionPick::Prefetch,
-        include_deleted_roots: false,
-    };
+    pub const REBUILD: LoadMode =
+        LoadMode { content: VersionPick::Prefetch, barcodes: VersionPick::Prefetch, include_deleted_roots: false };
     /// `WriteBatch.add_or_update_ids`: `annotate_effective_content` (SQL order) +
     /// prefetched `versions__barcodes` (Python order); `Document.objects` (no trash).
-    pub const BATCH_IDS: LoadMode = LoadMode {
-        content: VersionPick::Sql,
-        barcodes: VersionPick::Prefetch,
-        include_deleted_roots: false,
-    };
+    pub const BATCH_IDS: LoadMode = LoadMode { content: VersionPick::Sql, barcodes: VersionPick::Prefetch, include_deleted_roots: false };
     /// `WriteBatch.add_or_update(document)` on an instance without prefetches: both
     /// resolved by query (SQL order); the root is reached through the FK (base
     /// manager, includes trashed roots).
-    pub const SINGLE: LoadMode = LoadMode {
-        content: VersionPick::Sql,
-        barcodes: VersionPick::Sql,
-        include_deleted_roots: true,
-    };
+    pub const SINGLE: LoadMode = LoadMode { content: VersionPick::Sql, barcodes: VersionPick::Sql, include_deleted_roots: true };
 }
 
 fn placeholders(n: usize) -> String {
@@ -81,9 +69,7 @@ pub async fn rebuild_root_ids(pool: &PgPool) -> Result<Vec<i64>> {
     )
     .fetch_all(pool)
     .await?;
-    rows.iter()
-        .map(|r| Ok(i64::from(r.try_get::<i32, _>(0)?)))
-        .collect()
+    rows.iter().map(|r| Ok(i64::from(r.try_get::<i32, _>(0)?))).collect()
 }
 
 /// `root_document_ids(ids)` (over `Document.objects`, i.e. not trashed), sorted.
@@ -114,12 +100,10 @@ pub async fn root_of(pool: &PgPool, id: i64) -> Result<Option<i64>> {
     let Ok(id32) = i32::try_from(id) else {
         return Ok(None);
     };
-    let row = sqlx::query(
-        "SELECT COALESCE(d.root_document_id, d.id) FROM documents_document d WHERE d.id = $1",
-    )
-    .bind(id32)
-    .fetch_optional(pool)
-    .await?;
+    let row = sqlx::query("SELECT COALESCE(d.root_document_id, d.id) FROM documents_document d WHERE d.id = $1")
+        .bind(id32)
+        .fetch_optional(pool)
+        .await?;
     Ok(match row {
         Some(r) => Some(i64::from(r.try_get::<i32, _>(0)?)),
         None => None,
@@ -145,11 +129,7 @@ struct DocRow {
 
 /// Load the index records of the given root documents (order of `root_ids` kept,
 /// missing/filtered ids skipped). Chunked by [`CHUNK_SIZE`].
-pub async fn load_records(
-    pool: &PgPool,
-    root_ids: &[i64],
-    mode: LoadMode,
-) -> Result<Vec<DocumentRecord>> {
+pub async fn load_records(pool: &PgPool, root_ids: &[i64], mode: LoadMode) -> Result<Vec<DocumentRecord>> {
     let mut out = Vec::with_capacity(root_ids.len());
     for chunk in root_ids.chunks(CHUNK_SIZE) {
         out.extend(load_chunk(pool, chunk, mode).await?);
@@ -165,11 +145,7 @@ async fn load_chunk(pool: &PgPool, root_ids: &[i64], mode: LoadMode) -> Result<V
     let ph = placeholders(ids.len());
 
     // --- documents (select_related correspondent, document_type, storage_path)
-    let deleted_filter = if mode.include_deleted_roots {
-        ""
-    } else {
-        "d.deleted_at IS NULL AND "
-    };
+    let deleted_filter = if mode.include_deleted_roots { "" } else { "d.deleted_at IS NULL AND " };
     let sql = format!(
         "SELECT d.id, d.title, d.content, d.checksum, d.original_filename, d.created, \
                 d.modified, d.added, d.archive_serial_number, d.page_count, d.owner_id, \
@@ -242,9 +218,7 @@ async fn load_chunk(pool: &PgPool, root_ids: &[i64], mode: LoadMode) -> Result<V
     }
     let mut tags: HashMap<i64, Vec<String>> = HashMap::new();
     for r in q.fetch_all(pool).await? {
-        tags.entry(i64::from(r.try_get::<i32, _>(0)?))
-            .or_default()
-            .push(r.try_get(1)?);
+        tags.entry(i64::from(r.try_get::<i32, _>(0)?)).or_default().push(r.try_get(1)?);
     }
 
     // --- notes (Note.objects: not deleted; ordering ("created",); notes__user)
@@ -259,13 +233,7 @@ async fn load_chunk(pool: &PgPool, root_ids: &[i64], mode: LoadMode) -> Result<V
     }
     let mut notes: HashMap<i64, Vec<NoteRecord>> = HashMap::new();
     for r in q.fetch_all(pool).await? {
-        notes
-            .entry(i64::from(r.try_get::<i32, _>(0)?))
-            .or_default()
-            .push(NoteRecord {
-                note: r.try_get(1)?,
-                user: r.try_get(2)?,
-            });
+        notes.entry(i64::from(r.try_get::<i32, _>(0)?)).or_default().push(NoteRecord { note: r.try_get(1)?, user: r.try_get(2)? });
     }
 
     // --- custom fields (CustomFieldInstance.objects: not deleted; ordering ("created",))
@@ -300,10 +268,7 @@ async fn load_chunk(pool: &PgPool, root_ids: &[i64], mode: LoadMode) -> Result<V
         };
         cfs.entry(i64::from(r.try_get::<i32, _>(0)?))
             .or_default()
-            .push(CustomFieldRecord {
-                search_value: raw.value_for_search(),
-                name: raw.name,
-            });
+            .push(CustomFieldRecord { search_value: raw.value_for_search(), name: raw.name });
     }
 
     // --- barcodes of the effective document (latest version or the root itself)
@@ -327,10 +292,7 @@ async fn load_chunk(pool: &PgPool, root_ids: &[i64], mode: LoadMode) -> Result<V
     for r in q.fetch_all(pool).await? {
         let owner = i64::from(r.try_get::<i32, _>(0)?);
         if let Some(root) = barcode_owner.get(&owner) {
-            barcodes.entry(*root).or_default().push(BarcodeRecord {
-                value: r.try_get(1)?,
-                format: r.try_get(2)?,
-            });
+            barcodes.entry(*root).or_default().push(BarcodeRecord { value: r.try_get(1)?, format: r.try_get(2)? });
         }
     }
 
@@ -382,10 +344,9 @@ pub async fn view_grantees(pool: &PgPool, pks: &[String]) -> Result<(Grants, Gra
     if pks.is_empty() {
         return Ok((users, groups));
     }
-    for (table, col, target) in [
-        ("guardian_userobjectpermission", "user_id", &mut users),
-        ("guardian_groupobjectpermission", "group_id", &mut groups),
-    ] {
+    for (table, col, target) in
+        [("guardian_userobjectpermission", "user_id", &mut users), ("guardian_groupobjectpermission", "group_id", &mut groups)]
+    {
         let sql = format!(
             "SELECT g.object_pk, g.{col} FROM {table} g \
              JOIN django_content_type ct ON ct.id = g.content_type_id \

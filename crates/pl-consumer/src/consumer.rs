@@ -17,8 +17,8 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use chrono::{DateTime, FixedOffset, NaiveDate, TimeZone, Utc};
-use sea_query::{Expr, Order, PostgresQueryBuilder, Query};
 use pl_core::sqlbind::SqlxBinder as _;
+use sea_query::{Expr, Order, PostgresQueryBuilder, Query};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use sqlx::{PgConnection, PgPool};
@@ -360,14 +360,7 @@ impl Consumer {
                 self.settings.barcodes.clone()
             }
         };
-        let mut st = State {
-            input,
-            metadata: overrides,
-            tmp_dir: tmp.path.clone(),
-            task_id,
-            status_filename,
-            barcodes,
-        };
+        let mut st = State { input, metadata: overrides, tmp_dir: tmp.path.clone(), task_id, status_filename, barcodes };
         // FINDINGS B7: redelivered task (crash/hard abort after the commit of the document,
         // before the task completed) – the document already exists: report as successful instead of
         // ingesting the (meanwhile deleted) file again.
@@ -455,10 +448,7 @@ impl Consumer {
 
     fn write_pending_files(&self, task_id: &str, written: &[PathBuf]) -> std::io::Result<()> {
         let p = self.pending_files_path(task_id);
-        let mut all: Vec<String> = std::fs::read(&p)
-            .ok()
-            .and_then(|b| serde_json::from_slice::<Vec<String>>(&b).ok())
-            .unwrap_or_default();
+        let mut all: Vec<String> = std::fs::read(&p).ok().and_then(|b| serde_json::from_slice::<Vec<String>>(&b).ok()).unwrap_or_default();
         for w in written {
             let s = w.to_string_lossy().into_owned();
             if !all.contains(&s) {
@@ -490,14 +480,14 @@ impl Consumer {
                 .ok()
                 .map(|r| r.to_string_lossy().replace('\\', "/"));
             let referenced = match rel {
-                Some(r) => sqlx::query_scalar::<_, i32>(
-                    "SELECT 1 FROM documents_document WHERE filename = $1 OR archive_filename = $1 LIMIT 1",
-                )
-                .bind(&r)
-                .fetch_optional(&self.pool)
-                .await
-                .map(|x| x.is_some())
-                .unwrap_or(true),
+                Some(r) => {
+                    sqlx::query_scalar::<_, i32>("SELECT 1 FROM documents_document WHERE filename = $1 OR archive_filename = $1 LIMIT 1")
+                        .bind(&r)
+                        .fetch_optional(&self.pool)
+                        .await
+                        .map(|x| x.is_some())
+                        .unwrap_or(true)
+                }
                 None => false,
             };
             if referenced {
@@ -598,11 +588,7 @@ impl Consumer {
         drop(conn);
         if let Some(first) = dups.first() {
             let any_trash = dups.iter().any(|d| d.in_trash);
-            let mut log_msg = format!(
-                "Consuming duplicate {}: {} existing document(s) share the same content.",
-                st.filename(),
-                dups.len()
-            );
+            let mut log_msg = format!("Consuming duplicate {}: {} existing document(s) share the same content.", st.filename(), dups.len());
             if any_trash {
                 log_msg.push_str(" Note: at least one existing document is in the trash.");
             }
@@ -704,10 +690,8 @@ impl Consumer {
             let old = &st.input.original_file;
             let stem = old.file_stem().map(|x| x.to_string_lossy().into_owned()).unwrap_or_default();
             let renamed = old.with_file_name(format!("{stem}-collated.pdf"));
-            let new_file: PathBuf = renamed
-                .components()
-                .filter(|c| c.as_os_str().to_string_lossy() != s.collate_double_sided_subdir_name)
-                .collect();
+            let new_file: PathBuf =
+                renamed.components().filter(|c| c.as_os_str().to_string_lossy() != s.collate_double_sided_subdir_name).collect();
             let r = (|| {
                 if let Some(parent) = new_file.parent() {
                     std::fs::create_dir_all(parent).map_err(|e| StageError::Other(e.to_string()))?;
@@ -719,9 +703,7 @@ impl Consumer {
             return match r {
                 Ok(()) => {
                     tracing::info!(target: "paperless.double_sided", "Collated documents into new file {}", new_file.display());
-                    Err(ConsumeError::Stopped(
-                        "Success. Even numbered pages of double sided scan collated with odd pages".into(),
-                    ))
+                    Err(ConsumeError::Stopped("Success. Even numbered pages of double sided scan collated with odd pages".into()))
                 }
                 Err(e) => Err(ConsumeError::Consumer(e.to_string())),
             };
@@ -758,15 +740,11 @@ impl Consumer {
         let codes = {
             let scanner = self.barcodes.clone();
             let (pdf, dir, scan) = (pdf.clone(), work.path.clone(), b.scan_settings());
-            tokio::task::spawn_blocking(move || scanner.detect(&pdf, &dir, &scan))
-                .await
-                .map_err(|e| ConsumeError::Other(e.to_string()))?
+            tokio::task::spawn_blocking(move || scanner.detect(&pdf, &dir, &scan)).await.map_err(|e| ConsumeError::Other(e.to_string()))?
         };
         let is_asn = |c: &Barcode| c.value.starts_with(&b.barcode_asn_prefix);
         let is_tag = |c: &Barcode| {
-            b.barcode_tag_mapping
-                .iter()
-                .any(|(p, _)| pl_matching::regex_compat::safe_regex_match(p, &c.value, true).is_some())
+            b.barcode_tag_mapping.iter().any(|(p, _)| pl_matching::regex_compat::safe_regex_match(p, &c.value, true).is_some())
         };
         let mut separators: BTreeMap<i64, bool> = BTreeMap::new();
         if b.barcodes_enabled {
@@ -859,21 +837,22 @@ impl Consumer {
             return Err(ConsumeError::Stopped(m.into()));
         }
         if b.barcode_enable_asn
-            && let Some(text) = codes.iter().find(|c| is_asn(c)).map(|c| c.value.clone()) {
-                let digits: String = text[b.barcode_asn_prefix.len()..].trim().chars().filter(|c| c.is_ascii_digit()).collect();
-                match digits.parse::<i64>() {
-                    Ok(asn) => {
-                        let mut conn = self.pool.acquire().await?;
-                        if st.metadata.skip_asn_if_exists && db::find_asn(&mut conn, asn).await?.is_some() {
-                            tracing::info!(target: "paperless.barcodes", "Found ASN in barcode {asn} but skipping because it already exists.");
-                        } else {
-                            tracing::info!(target: "paperless.barcodes", "Found ASN in barcode: {asn}");
-                            st.metadata.asn = Some(asn);
-                        }
+            && let Some(text) = codes.iter().find(|c| is_asn(c)).map(|c| c.value.clone())
+        {
+            let digits: String = text[b.barcode_asn_prefix.len()..].trim().chars().filter(|c| c.is_ascii_digit()).collect();
+            match digits.parse::<i64>() {
+                Ok(asn) => {
+                    let mut conn = self.pool.acquire().await?;
+                    if st.metadata.skip_asn_if_exists && db::find_asn(&mut conn, asn).await?.is_some() {
+                        tracing::info!(target: "paperless.barcodes", "Found ASN in barcode {asn} but skipping because it already exists.");
+                    } else {
+                        tracing::info!(target: "paperless.barcodes", "Found ASN in barcode: {asn}");
+                        st.metadata.asn = Some(asn);
                     }
-                    Err(e) => tracing::warn!(target: "paperless.barcodes", "Failed to parse ASN number because: {e}"),
                 }
+                Err(e) => tracing::warn!(target: "paperless.barcodes", "Failed to parse ASN number because: {e}"),
             }
+        }
         if b.barcode_store_values {
             let v: Vec<StoredBarcode> =
                 codes.iter().map(|c| StoredBarcode { page: c.page + 1, value: c.value.clone(), format: c.format.clone() }).collect();
@@ -1000,11 +979,19 @@ impl Consumer {
                 let produce_archive = parsing.should_produce_archive(&parser, &mt, &wc);
                 let mut out = parsing.parse(&parser, &req, produce_archive)?;
                 tracing::debug!(target: "paperless.consumer", "Generating thumbnail for {fname}...");
-                progress.send(ProgressUpdate { current_progress: 70, message: crate::consumer::msg::GENERATING_THUMBNAIL.into(), ..base.clone() });
+                progress.send(ProgressUpdate {
+                    current_progress: 70,
+                    message: crate::consumer::msg::GENERATING_THUMBNAIL.into(),
+                    ..base.clone()
+                });
                 let thumb = parsing.thumbnail_with_text(&parser, &req, out.archive_path.as_deref(), out.text.as_deref())?;
                 let date_from_text = out.date.is_none();
                 if date_from_text {
-                    progress.send(ProgressUpdate { current_progress: 90, message: crate::consumer::msg::PARSE_DATE.into(), ..base.clone() });
+                    progress.send(ProgressUpdate {
+                        current_progress: 90,
+                        message: crate::consumer::msg::PARSE_DATE.into(),
+                        ..base.clone()
+                    });
                     out.date = dates.detect(&fname, out.text.as_deref().unwrap_or(""));
                 }
                 let pages = parsing.page_count(&parser, &req, out.archive_path.as_deref());
@@ -1045,9 +1032,8 @@ impl Consumer {
         let mut attempt = 0u32;
         let stored = loop {
             attempt += 1;
-            let r = self
-                .store_all(st, &source_file, &mime_type, &parsed, &thumbnail, page_count, classifier.as_deref(), &mut written)
-                .await;
+            let r =
+                self.store_all(st, &source_file, &mime_type, &parsed, &thumbnail, page_count, classifier.as_deref(), &mut written).await;
             match r {
                 Err(e) if e.starts_with(RETRYABLE_MARK) && attempt < db::MAX_ATTEMPTS => {
                     tracing::warn!(target: "paperless.consumer", "Storing {filename} hit a database conflict ({}), retrying", &e[RETRYABLE_MARK.len()..]);
@@ -1135,7 +1121,9 @@ impl Consumer {
                 if let Some(q) = &self.queue {
                     // taken lock: like upstream after 60 s; error (e.g. DB briefly gone): after 5 s
                     let countdown = if r.is_err() { 5.0 } else { 60.0 };
-                    if let Err(e) = q.enqueue("documents.tasks.index_document", Default::default(), index_retry_opts(target, countdown)).await {
+                    if let Err(e) =
+                        q.enqueue("documents.tasks.index_document", Default::default(), index_retry_opts(target, countdown)).await
+                    {
                         // tests/chaos c1 (overall check 2026-11-18): database gone → index *and* enqueue
                         // fail; without a retry the document remained unfindable until the next restart.
                         tracing::error!(target: "paperless.consumer", "Could not schedule index update for {target}: {e}; retrying in the background");
@@ -1188,12 +1176,16 @@ impl Consumer {
             let ctx = crate::templating::document_context(&mut tx, &doc.row).await.map_err(store_err)?;
             let originals = self.settings.originals_dir.clone();
             let opts = &self.settings.templating;
-            let mut generated = pl_templating::generate_unique_filename(&ctx, false, opts, |rel| originals.join(rel).exists())
-                .map_err(store_err)?;
+            let mut generated =
+                pl_templating::generate_unique_filename(&ctx, false, opts, |rel| originals.join(rel).exists()).map_err(store_err)?;
             if generated.len() > MAX_STORED_FILENAME_LENGTH {
                 tracing::warn!(target: "paperless.consumer", "Generated source filename exceeds db path limit, falling back to default naming");
-                generated = pl_templating::generate_filename(&ctx, pl_templating::GenerateOptions { use_format: false, ..Default::default() }, opts)
-                    .map_err(store_err)?;
+                generated = pl_templating::generate_filename(
+                    &ctx,
+                    pl_templating::GenerateOptions { use_format: false, ..Default::default() },
+                    opts,
+                )
+                .map_err(store_err)?;
             }
             let source_path = originals.join(&generated);
             pl_templating::validate_path_in_root(&source_path, &originals).map_err(|e| e.0)?;
@@ -1207,8 +1199,8 @@ impl Consumer {
                 let mut actx = ctx.clone();
                 actx.filename.clone_from(&doc.row.filename);
                 let archive_dir = self.settings.archive_dir.clone();
-                let mut gen_a = pl_templating::generate_unique_filename(&actx, true, opts, |rel| archive_dir.join(rel).exists())
-                    .map_err(store_err)?;
+                let mut gen_a =
+                    pl_templating::generate_unique_filename(&actx, true, opts, |rel| archive_dir.join(rel).exists()).map_err(store_err)?;
                 if gen_a.len() > MAX_STORED_FILENAME_LENGTH {
                     tracing::warn!(target: "paperless.consumer", "Generated archive filename exceeds db path limit, falling back to default naming");
                     gen_a = pl_templating::generate_filename(
@@ -1538,7 +1530,8 @@ impl Consumer {
         // set_correspondent
         if doc.row.correspondent_id.is_none() {
             let cands = db::matchables(conn, &pl_authz::models::CORRESPONDENT, "Correspondent", owner.as_ref()).await?;
-            let found = pl_matching::matching::match_correspondents(&md, &cands, classifier.map(|c| c as &dyn pl_matching::Classifier)).unwrap_or_default();
+            let found = pl_matching::matching::match_correspondents(&md, &cands, classifier.map(|c| c as &dyn pl_matching::Classifier))
+                .unwrap_or_default();
             if let Some(sel) = found.first() {
                 if found.len() > 1 {
                     tracing::debug!(target: "paperless.handlers", "Detected {} potential correspondents, so we've opted for {}", found.len(), sel.name);
@@ -1551,7 +1544,8 @@ impl Consumer {
         // set_document_type
         if doc.row.document_type_id.is_none() {
             let cands = db::matchables(conn, &pl_authz::models::DOCUMENT_TYPE, "DocumentType", owner.as_ref()).await?;
-            let found = pl_matching::matching::match_document_types(&md, &cands, classifier.map(|c| c as &dyn pl_matching::Classifier)).unwrap_or_default();
+            let found = pl_matching::matching::match_document_types(&md, &cands, classifier.map(|c| c as &dyn pl_matching::Classifier))
+                .unwrap_or_default();
             if let Some(sel) = found.first() {
                 if found.len() > 1 {
                     tracing::info!(target: "paperless.handlers", "Detected {} potential document types, so we've opted for {}", found.len(), sel.name);
@@ -1565,7 +1559,8 @@ impl Consumer {
         {
             let current: Vec<i64> = db::document_tags(conn, doc.row.id).await?.into_iter().map(|(i, _)| i).collect();
             let cands = db::matchables(conn, &pl_authz::models::TAG, "Tag", owner.as_ref()).await?;
-            let found = pl_matching::matching::match_tags(&md, &cands, classifier.map(|c| c as &dyn pl_matching::Classifier)).unwrap_or_default();
+            let found =
+                pl_matching::matching::match_tags(&md, &cands, classifier.map(|c| c as &dyn pl_matching::Classifier)).unwrap_or_default();
             let add: Vec<i64> = found.iter().map(|m| m.id).filter(|i| !current.contains(i)).collect();
             if !add.is_empty() {
                 let names: Vec<&str> = found.iter().filter(|m| add.contains(&m.id)).map(|m| m.name.as_str()).collect();
@@ -1576,7 +1571,8 @@ impl Consumer {
         // set_storage_path
         if doc.row.storage_path_id.is_none() {
             let cands = db::matchables(conn, &pl_authz::models::STORAGE_PATH, "StoragePath", owner.as_ref()).await?;
-            let found = pl_matching::matching::match_storage_paths(&md, &cands, classifier.map(|c| c as &dyn pl_matching::Classifier)).unwrap_or_default();
+            let found = pl_matching::matching::match_storage_paths(&md, &cands, classifier.map(|c| c as &dyn pl_matching::Classifier))
+                .unwrap_or_default();
             if let Some(sel) = found.first() {
                 if found.len() > 1 {
                     tracing::info!(target: "paperless.handlers", "Detected {} potential storage paths, so we've opted for {}", found.len(), sel.name);
@@ -1594,7 +1590,12 @@ impl Consumer {
 
     /// `update_filename_and_move_files` after the last `save()`: recompute the file name; if it is
     /// the same, only set `modified`, otherwise move files.
-    pub async fn update_filename_and_move_files(&self, conn: &mut PgConnection, doc: &mut DocInstance, written: &mut Vec<PathBuf>) -> Result<(), sqlx::Error> {
+    pub async fn update_filename_and_move_files(
+        &self,
+        conn: &mut PgConnection,
+        doc: &mut DocInstance,
+        written: &mut Vec<PathBuf>,
+    ) -> Result<(), sqlx::Error> {
         let Some(fresh) = db::load_document(conn, doc.row.id).await? else { return Ok(()) };
         doc.row = fresh;
         let Some(old_filename) = doc.row.filename.clone() else { return Ok(()) };
@@ -1654,9 +1655,9 @@ impl Consumer {
             ("DOCUMENT_WORKING_PATH".to_string(), working_copy.to_string_lossy().into_owned()),
             ("TASK_ID".to_string(), st.task_id.clone().unwrap_or_default()),
         ];
-        self.scripts.run(script, &env).map_err(|e| {
-            self.fail(st, msg::PRE_CONSUME_SCRIPT_ERROR, Some(&format!("Error while executing pre-consume script: {e}")))
-        })
+        self.scripts
+            .run(script, &env)
+            .map_err(|e| self.fail(st, msg::PRE_CONSUME_SCRIPT_ERROR, Some(&format!("Error while executing pre-consume script: {e}"))))
     }
 
     async fn run_post_consume_script(&self, st: &State, doc_id: i64) -> Result<(), ConsumeError> {
@@ -1694,7 +1695,16 @@ impl Consumer {
             ("DOCUMENT_CREATED".to_string(), d.created.format("%Y-%m-%d").to_string()),
             ("DOCUMENT_MODIFIED".to_string(), py_aware_utc(&d.modified)),
             ("DOCUMENT_ADDED".to_string(), py_aware_utc(&d.added)),
-            ("DOCUMENT_FILE_NAME".to_string(), pl_templating::sanitize_filename(&format!("{}{ext}", audit::document_repr(&CreatedAttr::Date(d.created), d.correspondent_id.map(|_| names[1].as_str()), &d.title)), "-")),
+            (
+                "DOCUMENT_FILE_NAME".to_string(),
+                pl_templating::sanitize_filename(
+                    &format!(
+                        "{}{ext}",
+                        audit::document_repr(&CreatedAttr::Date(d.created), d.correspondent_id.map(|_| names[1].as_str()), &d.title)
+                    ),
+                    "-",
+                ),
+            ),
             ("DOCUMENT_SOURCE_PATH".to_string(), src.to_string_lossy().into_owned()),
             ("DOCUMENT_ARCHIVE_PATH".to_string(), arch),
             ("DOCUMENT_THUMBNAIL_PATH".to_string(), s.thumbnail_path(doc_id).to_string_lossy().into_owned()),
@@ -1707,9 +1717,9 @@ impl Consumer {
             ("TASK_ID".to_string(), st.task_id.clone().unwrap_or_default()),
         ];
         drop(conn);
-        self.scripts.run(&script, &env).map_err(|e| {
-            self.fail(st, msg::POST_CONSUME_SCRIPT_ERROR, Some(&format!("Error while executing post-consume script: {e}")))
-        })
+        self.scripts
+            .run(&script, &env)
+            .map_err(|e| self.fail(st, msg::POST_CONSUME_SCRIPT_ERROR, Some(&format!("Error while executing post-consume script: {e}"))))
     }
 }
 
@@ -1772,10 +1782,7 @@ pub async fn create_custom_field_instance(
         .into_table(a("documents_customfieldinstance"))
         .columns([a("created"), a("field_id"), a("document_id"), a(col_name)])
         .values_panic([created.into(), (f.id as i32).into(), (doc_id as i32).into(), expr])
-        .returning(Query::returning().exprs([
-            Expr::col(a("id")).into(),
-            Expr::col(a("value_monetary_amount")).cast_as(a("text")),
-        ]))
+        .returning(Query::returning().exprs([Expr::col(a("id")).into(), Expr::col(a("value_monetary_amount")).cast_as(a("text"))]))
         .to_owned();
     let (sql, v) = q.build_sqlx(PostgresQueryBuilder);
     let row = sqlx::query_with(&sql, v).fetch_one(&mut *conn).await?;
@@ -1948,10 +1955,11 @@ fn copy_with_stats(src: &Path, dst: &Path) -> std::io::Result<()> {
 fn copy_times(src: &Path, dst: &Path) {
     if let Ok(m) = std::fs::metadata(src)
         && let Ok(mt) = m.modified()
-        && let Ok(f) = std::fs::File::options().write(true).open(dst) {
-            let times = std::fs::FileTimes::new().set_modified(mt).set_accessed(m.accessed().unwrap_or(mt));
-            let _ = f.set_times(times);
-        }
+        && let Ok(f) = std::fs::File::options().write(true).open(dst)
+    {
+        let times = std::fs::FileTimes::new().set_modified(mt).set_accessed(m.accessed().unwrap_or(mt));
+        let _ = f.set_times(times);
+    }
 }
 
 /// `_write(source, target)` atomic: copy to a temp file next to the target, then rename.
@@ -2026,12 +2034,8 @@ pub fn sweep_stale_scratch(scratch_dir: &Path, older_than: Duration) -> usize {
         if !is_consumer_workdir(&name) || !e.file_type().is_ok_and(|t| t.is_dir()) {
             continue;
         }
-        let old = e
-            .metadata()
-            .and_then(|m| m.modified())
-            .ok()
-            .and_then(|m| now.duration_since(m).ok())
-            .is_some_and(|age| age >= older_than);
+        let old =
+            e.metadata().and_then(|m| m.modified()).ok().and_then(|m| now.duration_since(m).ok()).is_some_and(|age| age >= older_than);
         if old && std::fs::remove_dir_all(e.path()).is_ok() {
             n += 1;
         }
@@ -2062,8 +2066,7 @@ pub fn cleanup_upload_spool(scratch_dir: &Path, original: &Path) {
     let is_spool = dir.file_name().is_some_and(|n| {
         let n = n.to_string_lossy();
         n.starts_with("tmp") || n.starts_with("paperless-mail-")
-    })
-        && dir.parent().is_some_and(|p| same_dir(p, scratch_dir));
+    }) && dir.parent().is_some_and(|p| same_dir(p, scratch_dir));
     if !is_spool {
         return;
     }
@@ -2128,20 +2131,14 @@ fn clean_with_qpdf(working_copy: &Path) -> Result<(), String> {
     if code == 0 {
         return Ok(());
     }
-    Err(format!(
-        "Command '['qpdf', '--replace-input', {}]' returned non-zero exit status {code}.",
-        py_path_repr(working_copy)
-    ))
+    Err(format!("Command '['qpdf', '--replace-input', {}]' returned non-zero exit status {code}.", py_path_repr(working_copy)))
 }
 
 /// `repr(Path)`: `PosixPath('…')` or `WindowsPath('…')` with `as_posix()` and Python `repr` of the text.
 fn py_path_repr(p: &Path) -> String {
     let posix = p.to_string_lossy().replace('\\', "/");
-    let quoted = if posix.contains('\'') && !posix.contains('"') {
-        format!("\"{posix}\"")
-    } else {
-        format!("'{}'", posix.replace('\'', "\\'"))
-    };
+    let quoted =
+        if posix.contains('\'') && !posix.contains('"') { format!("\"{posix}\"") } else { format!("'{}'", posix.replace('\'', "\\'")) };
     if cfg!(windows) { format!("WindowsPath({quoted})") } else { format!("PosixPath({quoted})") }
 }
 
@@ -2150,9 +2147,19 @@ pub async fn load_barcode_app_config(pool: &PgPool) -> Result<BarcodeAppConfig, 
     use sqlx::Row as _;
     let q = Query::select()
         .columns([
-            a("barcodes_enabled"), a("barcode_enable_tiff_support"), a("barcode_string"), a("barcode_retain_split_pages"),
-            a("barcode_enable_asn"), a("barcode_asn_prefix"), a("barcode_upscale"), a("barcode_dpi"), a("barcode_max_pages"),
-            a("barcode_enable_tag"), a("barcode_tag_mapping"), a("barcode_tag_split"), a("barcode_store_values"),
+            a("barcodes_enabled"),
+            a("barcode_enable_tiff_support"),
+            a("barcode_string"),
+            a("barcode_retain_split_pages"),
+            a("barcode_enable_asn"),
+            a("barcode_asn_prefix"),
+            a("barcode_upscale"),
+            a("barcode_dpi"),
+            a("barcode_max_pages"),
+            a("barcode_enable_tag"),
+            a("barcode_tag_mapping"),
+            a("barcode_tag_split"),
+            a("barcode_store_values"),
         ])
         .from(a("paperless_applicationconfiguration"))
         .order_by(a("id"), Order::Asc)
@@ -2182,10 +2189,23 @@ pub async fn load_app_config(pool: &PgPool) -> Result<pl_ocr::config::AppConfigO
     use sqlx::Row as _;
     let q = Query::select()
         .columns([
-            a("output_type"), a("pages"), a("language"), a("mode"), a("archive_file_generation"), a("image_dpi"),
-            a("unpaper_clean"), a("deskew"), a("rotate_pages"), a("rotate_pages_threshold"), a("max_image_pixels"),
-            a("color_conversion_strategy"), a("user_args"),
-            a("remote_ocr_engine"), a("remote_ocr_api_key"), a("remote_ocr_endpoint"), a("remote_ocr_mode"),
+            a("output_type"),
+            a("pages"),
+            a("language"),
+            a("mode"),
+            a("archive_file_generation"),
+            a("image_dpi"),
+            a("unpaper_clean"),
+            a("deskew"),
+            a("rotate_pages"),
+            a("rotate_pages_threshold"),
+            a("max_image_pixels"),
+            a("color_conversion_strategy"),
+            a("user_args"),
+            a("remote_ocr_engine"),
+            a("remote_ocr_api_key"),
+            a("remote_ocr_endpoint"),
+            a("remote_ocr_mode"),
         ])
         .from(a("paperless_applicationconfiguration"))
         .order_by(a("id"), Order::Asc)
@@ -2331,7 +2351,6 @@ pub(crate) async fn retry_schedule_index(q: Arc<dyn pl_queue::TaskQueue>, target
     tracing::error!(target: "paperless.consumer", "Document {target} could not be added to the search index; run `document_index reindex`");
     false
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -2547,8 +2566,11 @@ mod tests {
         // clean PDF with garbage before it → exit 0, header at the front
         let mut doc = lopdf::Document::with_version("1.4");
         let pages = doc.new_object_id();
-        let page = doc.add_object(lopdf::dictionary! {"Type" => "Page", "Parent" => pages, "MediaBox" => vec![0.into(), 0.into(), 10.into(), 10.into()]});
-        doc.objects.insert(pages, lopdf::Object::Dictionary(lopdf::dictionary! {"Type" => "Pages", "Kids" => vec![page.into()], "Count" => 1}));
+        let page = doc.add_object(
+            lopdf::dictionary! {"Type" => "Page", "Parent" => pages, "MediaBox" => vec![0.into(), 0.into(), 10.into(), 10.into()]},
+        );
+        doc.objects
+            .insert(pages, lopdf::Object::Dictionary(lopdf::dictionary! {"Type" => "Pages", "Kids" => vec![page.into()], "Count" => 1}));
         let cat = doc.add_object(lopdf::dictionary! {"Type" => "Catalog", "Pages" => pages});
         doc.trailer.set("Root", cat);
         let mut bytes = b"JUNK".to_vec();
@@ -2557,10 +2579,12 @@ mod tests {
         // rebuilds the cross-references and ends with exit 3
         let at = bytes.windows(9).rposition(|w| w == b"startxref").unwrap();
         bytes.truncate(at);
-        bytes.extend_from_slice(b"startxref
+        bytes.extend_from_slice(
+            b"startxref
 999999
 %%EOF
-");
+",
+        );
         std::fs::write(&p, &bytes).unwrap();
         let e = clean_with_qpdf(&p).unwrap_err();
         assert!(e.ends_with("exit status 3."), "{e}");

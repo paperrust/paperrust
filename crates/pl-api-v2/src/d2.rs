@@ -13,19 +13,14 @@ pub const PERM_VIEW_DOCUMENT: &str = "documents.view_document";
 
 /// Logged-in user (from the login context).
 pub fn user(p: &Principal) -> V2Result<&User> {
-    p.ext
-        .downcast_ref::<pl_store::AuthExt>()
-        .and_then(|e| e.ctx.user())
-        .ok_or(V2Error(DomainError::Unauthenticated))
+    p.ext.downcast_ref::<pl_store::AuthExt>().and_then(|e| e.ctx.user()).ok_or(V2Error(DomainError::Unauthenticated))
 }
 
 /// Active user with `documents.view_document` (like the document list).
 pub fn require_view_documents(p: &Principal) -> V2Result<&User> {
     let u = user(p)?;
     if !(u.is_active && u.has_perm(PERM_VIEW_DOCUMENT)) {
-        return Err(V2Error(DomainError::Forbidden(
-            "You do not have permission to perform this action.".into(),
-        )));
+        return Err(V2Error(DomainError::Forbidden("You do not have permission to perform this action.".into())));
     }
     Ok(u)
 }
@@ -70,24 +65,14 @@ pub fn setting(key: &str) -> Option<String> {
 
 /// `YYYY-MM-DD`.
 pub fn parse_date(field: &str, v: &str) -> V2Result<NaiveDate> {
-    NaiveDate::parse_from_str(v.trim(), "%Y-%m-%d")
-        .map_err(|_| V2Error(DomainError::field(field, "Expected a date YYYY-MM-DD.")))
+    NaiveDate::parse_from_str(v.trim(), "%Y-%m-%d").map_err(|_| V2Error(DomainError::field(field, "Expected a date YYYY-MM-DD.")))
 }
 
 /// Integer in range.
-pub fn parse_int(
-    field: &str,
-    v: Option<&String>,
-    default: i64,
-    min: i64,
-    max: i64,
-) -> V2Result<i64> {
+pub fn parse_int(field: &str, v: Option<&String>, default: i64, min: i64, max: i64) -> V2Result<i64> {
     let Some(v) = v else { return Ok(default) };
     match v.trim().parse::<i64>() {
         Ok(n) if (min..=max).contains(&n) => Ok(n),
-        _ => Err(V2Error(DomainError::field(
-            field,
-            format!("Expected an integer {min}–{max}."),
-        ))),
+        _ => Err(V2Error(DomainError::field(field, format!("Expected an integer {min}–{max}.")))),
     }
 }

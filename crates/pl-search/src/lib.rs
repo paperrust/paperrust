@@ -17,9 +17,9 @@ pub mod views;
 mod wc;
 
 #[cfg(test)]
-mod testutil;
-#[cfg(test)]
 mod tests_backend;
+#[cfg(test)]
+mod testutil;
 
 pub use backend::{RankedWindow, SearchBackend, SearchHit, SearchMode, SearchSettings, SearchUser};
 pub use error::SearchError;

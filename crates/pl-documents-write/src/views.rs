@@ -16,8 +16,8 @@ use pl_core::AppState;
 
 use crate::audit::{self, RequestMeta};
 use crate::bulk_edit::{self, METHOD_CHOICES, Method, Params, Validated};
-use crate::enqueue::{self, Task};
 use crate::drf::{self, Errors};
+use crate::enqueue::{self, Task};
 use crate::error::{ApiError, ApiResult};
 use crate::perms::{OperationNeeds, has_document_permissions};
 use crate::selection;
@@ -67,10 +67,7 @@ pub fn parse_json_body(headers: &HeaderMap, body: &Bytes) -> ApiResult<Value> {
         // Request._parse: no stream → empty dict
         return Ok(Value::Object(Map::new()));
     }
-    let ct = headers
-        .get(header::CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("");
+    let ct = headers.get(header::CONTENT_TYPE).and_then(|v| v.to_str().ok()).unwrap_or("");
     if !is_json_content_type(ct) {
         return Err(pl_core::ApiError::unsupported_media_type(ct).into());
     }
@@ -468,9 +465,7 @@ async fn reprocess_inner(
         Ok(()) => Ok(ok_result()),
         Err(e) => {
             tracing::warn!("An error occurred performing document reprocess: {e}");
-            Err(ApiError::BadRequestText(
-                "Error performing document reprocess, check logs for more detail.".into(),
-            ))
+            Err(ApiError::BadRequestText("Error performing document reprocess, check logs for more detail.".into()))
         }
     }
 }

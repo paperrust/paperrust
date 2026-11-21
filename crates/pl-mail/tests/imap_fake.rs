@@ -70,11 +70,7 @@ async fn serve(b: Behaviour) -> (u16, Arc<Mutex<Vec<String>>>) {
                         "XOAUTH2" => raw == format!("user={}\x01auth=Bearer {}\x01\x01", b.user, b.pass).into_bytes(),
                         _ => false,
                     };
-                    if ok {
-                        format!("{tag} OK AUTHENTICATE completed\r\n")
-                    } else {
-                        format!("{tag} NO AUTHENTICATE failed\r\n")
-                    }
+                    if ok { format!("{tag} OK AUTHENTICATE completed\r\n") } else { format!("{tag} NO AUTHENTICATE failed\r\n") }
                 }
                 "SELECT" => format!("* 0 EXISTS\r\n* 0 RECENT\r\n{tag} {}\r\n", b.select),
                 "STARTTLS" => format!("{tag} BAD not supported here\r\n"),
@@ -105,12 +101,7 @@ fn account(port: u16, user: &str, pass: &str) -> TestAccount {
 }
 
 fn opts() -> ConnectOptions {
-    ConnectOptions {
-        allow_internal_hosts: true,
-        certificate_file: None,
-        timeout: Duration::from_secs(5),
-        extra_roots: Vec::new(),
-    }
+    ConnectOptions { allow_internal_hosts: true, certificate_file: None, timeout: Duration::from_secs(5), extra_roots: Vec::new() }
 }
 
 async fn run(acc: TestAccount, o: &ConnectOptions) -> Result<(), TestError> {

@@ -14,10 +14,8 @@ pub const MAX_AREAS: usize = 50;
 pub const MAX_RULE_REFS: usize = 200;
 
 /// Colour palette (accent rust first, docs/UI-ZWEITES-DESIGN.md).
-pub const PALETTE: [&str; 10] = [
-    "#B7410E", "#2F6B4F", "#3A5BA0", "#8E5A9B", "#C28A00", "#1F7A8C", "#A23B5B", "#5B6B2F",
-    "#6B4F3A", "#4F5D75",
-];
+pub const PALETTE: [&str; 10] =
+    ["#B7410E", "#2F6B4F", "#3A5BA0", "#8E5A9B", "#C28A00", "#1F7A8C", "#A23B5B", "#5B6B2F", "#6B4F3A", "#4F5D75"];
 
 /// Known icon keys (the UI maps them to icons; others are allowed).
 pub const ICONS: [&str; 16] = [
@@ -97,20 +95,14 @@ impl Rules {
             let mut seen = HashSet::new();
             l.retain(|u| seen.insert(*u));
             if l.len() > MAX_RULE_REFS {
-                return Err(invalid(
-                    &format!("rules.{name}"),
-                    format!("At most {MAX_RULE_REFS} entries."),
-                ));
+                return Err(invalid(&format!("rules.{name}"), format!("At most {MAX_RULE_REFS} entries.")));
             }
         }
         Ok(())
     }
 
     pub fn is_empty(&self) -> bool {
-        self.tags.is_empty()
-            && self.document_types.is_empty()
-            && self.storage_paths.is_empty()
-            && self.correspondents.is_empty()
+        self.tags.is_empty() && self.document_types.is_empty() && self.storage_paths.is_empty() && self.correspondents.is_empty()
     }
 }
 
@@ -179,10 +171,7 @@ fn check_color(c: &str) -> Result<String> {
 
 fn check_icon(i: &str) -> Result<String> {
     let i = i.trim();
-    let ok = !i.is_empty()
-        && i.len() <= 32
-        && i.chars()
-            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
+    let ok = !i.is_empty() && i.len() <= 32 && i.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
     if !ok {
         return Err(invalid("icon", "Expected 1–32 characters a-z, 0-9 or '-'."));
     }
@@ -192,11 +181,7 @@ fn check_icon(i: &str) -> Result<String> {
 impl AreaWrite {
     /// New area at position `pos` (default values for colour/icon/order).
     pub fn values(&self, pos: usize) -> Result<AreaValues> {
-        let name = check_name(
-            self.name
-                .as_deref()
-                .ok_or_else(|| invalid("name", "This field is required."))?,
-        )?;
+        let name = check_name(self.name.as_deref().ok_or_else(|| invalid("name", "This field is required."))?)?;
         let mut rules = self.rules.clone().unwrap_or_default();
         rules.normalize()?;
         Ok(AreaValues {
@@ -260,12 +245,9 @@ impl ResolvedRules {
     /// any-of: a tag OR type OR storage path OR correspondent.
     pub fn matches(&self, d: &DocKeys) -> bool {
         d.tags.iter().any(|t| self.tags.contains(t))
-            || d.document_type
-                .is_some_and(|x| self.document_types.contains(&x))
-            || d.storage_path
-                .is_some_and(|x| self.storage_paths.contains(&x))
-            || d.correspondent
-                .is_some_and(|x| self.correspondents.contains(&x))
+            || d.document_type.is_some_and(|x| self.document_types.contains(&x))
+            || d.storage_path.is_some_and(|x| self.storage_paths.contains(&x))
+            || d.correspondent.is_some_and(|x| self.correspondents.contains(&x))
     }
 }
 
@@ -325,105 +307,54 @@ const CATEGORIES: &[Category] = &[
         en: "Finances",
         icon: "money",
         keywords: &[
-            "bank", "konto", "kredit", "finanz", "depot", "invest", "spar", "hypothek", "account",
-            "loan", "credit", "finance", "mortgage",
+            "bank", "konto", "kredit", "finanz", "depot", "invest", "spar", "hypothek", "account", "loan", "credit", "finance", "mortgage",
         ],
     },
-    Category {
-        de: "Versicherungen",
-        en: "Insurance",
-        icon: "insurance",
-        keywords: &["versicher", "police", "insurance", "policy"],
-    },
-    Category {
-        de: "Steuern",
-        en: "Taxes",
-        icon: "tax",
-        keywords: &["steuer", "tax", "finanzamt", "mwst", "vat"],
-    },
+    Category { de: "Versicherungen", en: "Insurance", icon: "insurance", keywords: &["versicher", "police", "insurance", "policy"] },
+    Category { de: "Steuern", en: "Taxes", icon: "tax", keywords: &["steuer", "tax", "finanzamt", "mwst", "vat"] },
     Category {
         de: "Gesundheit",
         en: "Health",
         icon: "health",
         keywords: &[
-            "gesund", "arzt", "aerzt", "kranken", "spital", "klinik", "apotheke", "zahn",
-            "medizin", "health", "doctor", "medical", "hospital", "pharma", "dental",
+            "gesund", "arzt", "aerzt", "kranken", "spital", "klinik", "apotheke", "zahn", "medizin", "health", "doctor", "medical",
+            "hospital", "pharma", "dental",
         ],
     },
     Category {
         de: "Fahrzeug",
         en: "Vehicle",
         icon: "car",
-        keywords: &[
-            "auto", "fahrzeug", "kfz", "garage", "leasing", "car", "vehicle", "motor",
-        ],
+        keywords: &["auto", "fahrzeug", "kfz", "garage", "leasing", "car", "vehicle", "motor"],
     },
     Category {
         de: "Arbeit",
         en: "Work",
         icon: "work",
-        keywords: &[
-            "arbeit", "lohn", "gehalt", "salaer", "job", "work", "salary", "payroll", "employ",
-        ],
+        keywords: &["arbeit", "lohn", "gehalt", "salaer", "job", "work", "salary", "payroll", "employ"],
     },
     Category {
         de: "Verträge & Abos",
         en: "Contracts & subscriptions",
         icon: "phone",
-        keywords: &[
-            "vertrag",
-            "vertraeg",
-            "abo",
-            "telefon",
-            "handy",
-            "mobil",
-            "internet",
-            "contract",
-            "subscription",
-            "phone",
-            "mobile",
-        ],
+        keywords: &["vertrag", "vertraeg", "abo", "telefon", "handy", "mobil", "internet", "contract", "subscription", "phone", "mobile"],
     },
-    Category {
-        de: "Familie",
-        en: "Family",
-        icon: "family",
-        keywords: &["famil", "kind", "kinder", "family", "child", "kids"],
-    },
+    Category { de: "Familie", en: "Family", icon: "family", keywords: &["famil", "kind", "kinder", "family", "child", "kids"] },
     Category {
         de: "Bildung",
         en: "Education",
         icon: "education",
-        keywords: &[
-            "schul",
-            "studi",
-            "ausbildung",
-            "kurs",
-            "zeugnis",
-            "school",
-            "universit",
-            "course",
-            "education",
-        ],
+        keywords: &["schul", "studi", "ausbildung", "kurs", "zeugnis", "school", "universit", "course", "education"],
     },
 ];
 
 fn fold(s: &str) -> String {
-    s.to_lowercase()
-        .replace('ä', "ae")
-        .replace('ö', "oe")
-        .replace('ü', "ue")
-        .replace('ß', "ss")
+    s.to_lowercase().replace('ä', "ae").replace('ö', "oe").replace('ü', "ue").replace('ß', "ss")
 }
 
 fn hits(name: &str, kw: &str) -> bool {
     let n = fold(name);
-    if kw.chars().count() < 5 {
-        n.split(|c: char| !c.is_alphanumeric())
-            .any(|w| w.starts_with(kw))
-    } else {
-        n.contains(kw)
-    }
+    if kw.chars().count() < 5 { n.split(|c: char| !c.is_alphanumeric()).any(|w| w.starts_with(kw)) } else { n.contains(kw) }
 }
 
 fn count(rules: &ResolvedRules, docs: &[DocKeys]) -> usize {
@@ -463,10 +394,7 @@ pub fn suggest(cands: &[Candidate], docs: &[DocKeys], english: bool) -> Vec<Sugg
         }
     }
     let n_of = |c: &Candidate| per.get(&(c.list, c.id)).copied().unwrap_or(0);
-    let usable: Vec<&Candidate> = cands
-        .iter()
-        .filter(|c| !c.is_inbox && n_of(c) > 0)
-        .collect();
+    let usable: Vec<&Candidate> = cands.iter().filter(|c| !c.is_inbox && n_of(c) > 0).collect();
     let mut used: HashSet<(&str, i64)> = HashSet::new();
     let mut out: Vec<Suggestion> = Vec::new();
     for cat in CATEGORIES {
@@ -491,19 +419,13 @@ pub fn suggest(cands: &[Candidate], docs: &[DocKeys], english: bool) -> Vec<Sugg
                 rules: Some(w),
                 ..Default::default()
             },
-            reason: format!(
-                "{}: {}",
-                if english { "matches" } else { "passt zu" },
-                names.join(", ")
-            ),
+            reason: format!("{}: {}", if english { "matches" } else { "passt zu" }, names.join(", ")),
             document_count: n,
         });
     }
     if out.len() < 4 {
-        let mut tags: Vec<&&Candidate> = usable
-            .iter()
-            .filter(|c| c.list == "tags" && !used.contains(&(c.list, c.id)) && n_of(c) >= 3)
-            .collect();
+        let mut tags: Vec<&&Candidate> =
+            usable.iter().filter(|c| c.list == "tags" && !used.contains(&(c.list, c.id)) && n_of(c) >= 3).collect();
         tags.sort_by(|a, b| n_of(b).cmp(&n_of(a)).then_with(|| a.name.cmp(&b.name)));
         for c in tags {
             if out.len() >= 8 {
@@ -513,19 +435,12 @@ pub fn suggest(cands: &[Candidate], docs: &[DocKeys], english: bool) -> Vec<Sugg
                 area: AreaWrite {
                     name: Some(c.name.chars().take(64).collect()),
                     icon: Some("tag".into()),
-                    rules: Some(Rules {
-                        tags: vec![c.uuid],
-                        ..Default::default()
-                    }),
+                    rules: Some(Rules { tags: vec![c.uuid], ..Default::default() }),
                     ..Default::default()
                 },
                 reason: format!(
                     "{} ({} {})",
-                    if english {
-                        "frequent tag"
-                    } else {
-                        "häufiger Tag"
-                    },
+                    if english { "frequent tag" } else { "häufiger Tag" },
                     n_of(c),
                     if english { "documents" } else { "Dokumente" }
                 ),
@@ -552,10 +467,7 @@ mod tests {
 
     #[test]
     fn validation() {
-        let w: AreaWrite = serde_json::from_value(
-            serde_json::json!({"name":"  Wohnen ","rules":{"tags":[u(1),u(1),u(2)]}}),
-        )
-        .unwrap();
+        let w: AreaWrite = serde_json::from_value(serde_json::json!({"name":"  Wohnen ","rules":{"tags":[u(1),u(1),u(2)]}})).unwrap();
         let v = w.values(1).unwrap();
         assert_eq!(v.name, "Wohnen");
         assert_eq!(v.color, PALETTE[1]);
@@ -571,24 +483,10 @@ mod tests {
             let w: AreaWrite = serde_json::from_value(bad.clone()).unwrap();
             assert!(w.values(0).is_err(), "{bad}");
         }
-        assert!(
-            serde_json::from_value::<AreaWrite>(serde_json::json!({"name":"x","bogus":1})).is_err()
-        );
-        assert!(
-            serde_json::from_value::<AreaWrite>(
-                serde_json::json!({"name":"x","rules":{"labels":[]}})
-            )
-            .is_err()
-        );
+        assert!(serde_json::from_value::<AreaWrite>(serde_json::json!({"name":"x","bogus":1})).is_err());
+        assert!(serde_json::from_value::<AreaWrite>(serde_json::json!({"name":"x","rules":{"labels":[]}})).is_err());
         let many: Vec<Uuid> = (0..201).map(u).collect();
-        let w = AreaWrite {
-            name: Some("x".into()),
-            rules: Some(Rules {
-                tags: many,
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
+        let w = AreaWrite { name: Some("x".into()), rules: Some(Rules { tags: many, ..Default::default() }), ..Default::default() };
         assert!(w.values(0).is_err());
         assert_eq!(Scope::parse(None).unwrap(), Scope::User);
         assert!(Scope::parse(Some("all")).is_err());
@@ -603,77 +501,30 @@ mod tests {
             color: "#000000".into(),
             icon: "home".into(),
             order: 3,
-            rules: Rules {
-                tags: vec![u(1)],
-                ..Default::default()
-            },
+            rules: Rules { tags: vec![u(1)], ..Default::default() },
             created: Utc::now(),
             modified: Utc::now(),
             id: 1,
             user_id: Some(2),
         };
-        let v = AreaWrite {
-            color: Some("#aabbcc".into()),
-            ..Default::default()
-        }
-        .patch(&cur)
-        .unwrap();
-        assert_eq!(
-            (v.name.as_str(), v.color.as_str(), v.icon.as_str(), v.order),
-            ("A", "#AABBCC", "home", 3)
-        );
+        let v = AreaWrite { color: Some("#aabbcc".into()), ..Default::default() }.patch(&cur).unwrap();
+        assert_eq!((v.name.as_str(), v.color.as_str(), v.icon.as_str(), v.order), ("A", "#AABBCC", "home", 3));
         assert_eq!(v.rules.tags, vec![u(1)]);
     }
 
     #[test]
     fn any_of_matching() {
-        let r = ResolvedRules {
-            tags: [1].into(),
-            document_types: [5].into(),
-            correspondents: [9].into(),
-            ..Default::default()
-        };
-        assert!(r.matches(&DocKeys {
-            id: 1,
-            tags: vec![3, 1],
-            ..Default::default()
-        }));
-        assert!(r.matches(&DocKeys {
-            id: 2,
-            document_type: Some(5),
-            ..Default::default()
-        }));
-        assert!(r.matches(&DocKeys {
-            id: 3,
-            correspondent: Some(9),
-            ..Default::default()
-        }));
-        assert!(!r.matches(&DocKeys {
-            id: 4,
-            tags: vec![2],
-            storage_path: Some(1),
-            correspondent: Some(8),
-            ..Default::default()
-        }));
-        assert!(
-            !ResolvedRules::default().matches(&DocKeys {
-                id: 5,
-                tags: vec![1],
-                ..Default::default()
-            }),
-            "leere Regeln treffen nichts"
-        );
+        let r = ResolvedRules { tags: [1].into(), document_types: [5].into(), correspondents: [9].into(), ..Default::default() };
+        assert!(r.matches(&DocKeys { id: 1, tags: vec![3, 1], ..Default::default() }));
+        assert!(r.matches(&DocKeys { id: 2, document_type: Some(5), ..Default::default() }));
+        assert!(r.matches(&DocKeys { id: 3, correspondent: Some(9), ..Default::default() }));
+        assert!(!r.matches(&DocKeys { id: 4, tags: vec![2], storage_path: Some(1), correspondent: Some(8), ..Default::default() }));
+        assert!(!ResolvedRules::default().matches(&DocKeys { id: 5, tags: vec![1], ..Default::default() }), "leere Regeln treffen nichts");
     }
 
     #[test]
     fn suggestions() {
-        let c = |list, id, name: &str, inbox| Candidate {
-            list,
-            id,
-            uuid: u(id as u128),
-            name: name.into(),
-            is_inbox: inbox,
-        };
+        let c = |list, id, name: &str, inbox| Candidate { list, id, uuid: u(id as u128), name: name.into(), is_inbox: inbox };
         let cands = vec![
             c("tags", 1, "Versicherung", false),
             c("tags", 2, "Krankenkasse", false),
@@ -685,55 +536,26 @@ mod tests {
         ];
         let mut docs = Vec::new();
         for i in 0..5 {
-            docs.push(DocKeys {
-                id: i,
-                tags: vec![1, 3],
-                ..Default::default()
-            });
+            docs.push(DocKeys { id: i, tags: vec![1, 3], ..Default::default() });
         }
-        docs.push(DocKeys {
-            id: 10,
-            tags: vec![2],
-            ..Default::default()
-        });
-        docs.push(DocKeys {
-            id: 11,
-            document_type: Some(10),
-            tags: vec![4],
-            ..Default::default()
-        });
+        docs.push(DocKeys { id: 10, tags: vec![2], ..Default::default() });
+        docs.push(DocKeys { id: 11, document_type: Some(10), tags: vec![4], ..Default::default() });
         for i in 20..24 {
-            docs.push(DocKeys {
-                id: i,
-                tags: vec![6],
-                ..Default::default()
-            });
+            docs.push(DocKeys { id: i, tags: vec![6], ..Default::default() });
         }
         let s = suggest(&cands, &docs, false);
         let names: Vec<&str> = s.iter().map(|x| x.area.name.as_deref().unwrap()).collect();
         assert!(names.contains(&"Versicherungen"), "{names:?}");
         assert!(names.contains(&"Gesundheit"), "{names:?}");
-        assert!(
-            names.contains(&"Wohnen"),
-            "Mietvertrag → Wohnen (miete): {names:?}"
-        );
-        assert!(
-            !names.iter().any(|n| n.contains("Steuer")),
-            "ohne Dokumente kein Vorschlag"
-        );
+        assert!(names.contains(&"Wohnen"), "Mietvertrag → Wohnen (miete): {names:?}");
+        assert!(!names.iter().any(|n| n.contains("Steuer")), "ohne Dokumente kein Vorschlag");
         assert!(!names.contains(&"Posteingang"));
-        assert!(
-            names.contains(&"Projekt X"),
-            "häufiger Tag aufgefüllt: {names:?}"
-        );
+        assert!(names.contains(&"Projekt X"), "häufiger Tag aufgefüllt: {names:?}");
         assert!(!names.contains(&"Urlaub"), "weniger als 3 Dokumente");
         assert_eq!(s[0].document_count, 5);
         assert_eq!(s[0].area.order, Some(0));
         assert_eq!(s[0].area.color.as_deref(), Some(PALETTE[0]));
         let en = suggest(&cands, &docs, true);
-        assert!(
-            en.iter()
-                .any(|x| x.area.name.as_deref() == Some("Insurance"))
-        );
+        assert!(en.iter().any(|x| x.area.name.as_deref() == Some("Insurance")));
     }
 }

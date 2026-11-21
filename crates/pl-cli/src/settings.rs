@@ -5,8 +5,8 @@
 //! except with `export --include-secrets`.
 
 use pl_settings::crypto::SecretBox;
-use pl_settings::migration;
 use pl_settings::layer::Source;
+use pl_settings::migration;
 use pl_settings::store::{self, Action, Actor, ApplyOptions, Input};
 
 use crate::ctx::Ctx;
@@ -17,12 +17,7 @@ const USAGE: &str = "settings list [--all] [--category C] | get KEY | set KEY VA
 
 fn actor() -> Actor {
     Actor {
-        user_name: Some(format!(
-            "cli:{}",
-            std::env::var("USERNAME")
-                .or_else(|_| std::env::var("USER"))
-                .unwrap_or_default()
-        )),
+        user_name: Some(format!("cli:{}", std::env::var("USERNAME").or_else(|_| std::env::var("USER")).unwrap_or_default())),
         ..Actor::default()
     }
 }
@@ -49,9 +44,7 @@ fn shown(e: &pl_settings::Entry) -> String {
 
 fn store_err(e: store::StoreError) -> CliError {
     match e {
-        store::StoreError::Unknown(_)
-        | store::StoreError::NotWritable(_)
-        | store::StoreError::Invalid(_) => CliError::Usage(e.to_string()),
+        store::StoreError::Unknown(_) | store::StoreError::NotWritable(_) | store::StoreError::Invalid(_) => CliError::Usage(e.to_string()),
         other => CliError::Command(other.to_string()),
     }
 }
@@ -62,12 +55,7 @@ pub async fn command(args: Vec<String>) -> CliResult {
     };
     let rest = &args[1..];
     let flag = |f: &str| rest.iter().any(|a| a == f);
-    let opt = |f: &str| {
-        rest.iter()
-            .position(|a| a == f)
-            .and_then(|i| rest.get(i + 1))
-            .cloned()
-    };
+    let opt = |f: &str| rest.iter().position(|a| a == f).and_then(|i| rest.get(i + 1)).cloned();
     let positional: Vec<&String> = {
         let mut v = Vec::new();
         let mut skip = false;
@@ -124,25 +112,16 @@ pub async fn command(args: Vec<String>) -> CliResult {
     let env = c.cfg.env.clone();
     match sub {
         "list" | "get" => {
-            let s = store::load_settings(&c.pool, env, &sb, None)
-                .await
-                .map_err(|e| CliError::Command(e.to_string()))?;
+            let s = store::load_settings(&c.pool, env, &sb, None).await.map_err(|e| CliError::Command(e.to_string()))?;
             if sub == "get" {
-                let key = positional
-                    .first()
-                    .ok_or_else(|| CliError::Usage("get KEY".into()))?;
-                let e = s
-                    .get(key)
-                    .ok_or_else(|| CliError::Usage(format!("unknown setting: {key}")))?;
+                let key = positional.first().ok_or_else(|| CliError::Usage("get KEY".into()))?;
+                let e = s.get(key).ok_or_else(|| CliError::Usage(format!("unknown setting: {key}")))?;
                 println!("{}={}", e.def.key, shown(e));
                 println!(
                     "  class {} · source {}{} · {}",
                     e.def.class.as_str(),
                     source_label(e.source),
-                    e.source_detail
-                        .as_ref()
-                        .map(|d| format!(" ({d})"))
-                        .unwrap_or_default(),
+                    e.source_detail.as_ref().map(|d| format!(" ({d})")).unwrap_or_default(),
                     if e.locked { "locked" } else { "editable" }
                 );
                 return Ok(());
@@ -155,51 +134,20 @@ pub async fn command(args: Vec<String>) -> CliResult {
                 if cat.as_deref().is_some_and(|c| c != e.def.category.as_str()) {
                     continue;
                 }
-                println!(
-                    "{:<48} {:<10} {} {}",
-                    e.def.key,
-                    source_label(e.source),
-                    e.def.class.as_str(),
-                    shown(e)
-                );
+                println!("{:<48} {:<10} {} {}", e.def.key, source_label(e.source), e.def.class.as_str(), shown(e));
             }
-            println!(
-                "# rev {} · restart pending: {}",
-                s.rev,
-                s.restart_pending_count()
-            );
+            println!("# rev {} · restart pending: {}", s.rev, s.restart_pending_count());
             Ok(())
         }
         "set" | "reset" => {
-            let key = positional
-                .first()
-                .ok_or_else(|| CliError::Usage(USAGE.into()))?
-                .to_string();
+            let key = positional.first().ok_or_else(|| CliError::Usage(USAGE.into()))?.to_string();
             let input = if sub == "set" {
-                Input::Raw(
-                    positional
-                        .get(1)
-                        .ok_or_else(|| CliError::Usage("set KEY VALUE".into()))?
-                        .to_string(),
-                )
+                Input::Raw(positional.get(1).ok_or_else(|| CliError::Usage("set KEY VALUE".into()))?.to_string())
             } else {
                 Input::Reset
             };
-            let o = ApplyOptions {
-                env: (!flag("--force")).then_some(&env),
-                if_unset: flag("--if-unset"),
-                ..ApplyOptions::default()
-            };
-            let rev = store::apply(
-                &c.pool,
-                &sb,
-                &[(key.clone(), input)],
-                &o,
-                &actor(),
-                Action::Cli,
-            )
-            .await
-            .map_err(store_err)?;
+            let o = ApplyOptions { env: (!flag("--force")).then_some(&env), if_unset: flag("--if-unset"), ..ApplyOptions::default() };
+            let rev = store::apply(&c.pool, &sb, &[(key.clone(), input)], &o, &actor(), Action::Cli).await.map_err(store_err)?;
             println!("{sub} {key} (rev {rev})");
             Ok(())
         }
@@ -207,14 +155,8 @@ pub async fn command(args: Vec<String>) -> CliResult {
             let inc = flag("--include-secrets");
             match opt("--format").as_deref().unwrap_or("json") {
                 "json" => {
-                    let mut conn = c
-                        .pool
-                        .acquire()
-                        .await
-                        .map_err(|e| CliError::Command(e.to_string()))?;
-                    let v = store::export(&mut conn, &sb, inc)
-                        .await
-                        .map_err(|e| CliError::Command(e.to_string()))?;
+                    let mut conn = c.pool.acquire().await.map_err(|e| CliError::Command(e.to_string()))?;
+                    let v = store::export(&mut conn, &sb, inc).await.map_err(|e| CliError::Command(e.to_string()))?;
                     let v = match (inc, opt("--passphrase")) {
                         (true, Some(pass)) => pl_settings::transfer::encrypt(&v, &pass).map_err(CliError::Usage)?,
                         _ => v,
@@ -222,9 +164,7 @@ pub async fn command(args: Vec<String>) -> CliResult {
                     println!("{}", serde_json::to_string_pretty(&v).unwrap_or_default());
                 }
                 "env" => {
-                    let s = store::load_settings(&c.pool, env, &sb, None)
-                        .await
-                        .map_err(|e| CliError::Command(e.to_string()))?;
+                    let s = store::load_settings(&c.pool, env, &sb, None).await.map_err(|e| CliError::Command(e.to_string()))?;
                     print!("{}", store::export_env(&s, inc));
                 }
                 f => return Err(CliError::Usage(format!("unknown format {f} (json|env)"))),
@@ -235,13 +175,9 @@ pub async fn command(args: Vec<String>) -> CliResult {
             Ok(())
         }
         "import" => {
-            let file = positional
-                .first()
-                .ok_or_else(|| CliError::Usage("import FILE [--dry-run]".into()))?;
-            let text = std::fs::read_to_string(file.as_str())
-                .map_err(|e| CliError::Command(format!("{file}: {e}")))?;
-            let doc: serde_json::Value = serde_json::from_str(&text)
-                .map_err(|e| CliError::Command(format!("{file}: {e}")))?;
+            let file = positional.first().ok_or_else(|| CliError::Usage("import FILE [--dry-run]".into()))?;
+            let text = std::fs::read_to_string(file.as_str()).map_err(|e| CliError::Command(format!("{file}: {e}")))?;
+            let doc: serde_json::Value = serde_json::from_str(&text).map_err(|e| CliError::Command(format!("{file}: {e}")))?;
             let doc = if pl_settings::transfer::is_encrypted(&doc) {
                 let pass = opt("--passphrase").ok_or_else(|| CliError::Usage("the file is encrypted: --passphrase P".into()))?;
                 pl_settings::transfer::decrypt(&doc, &pass).map_err(CliError::Command)?
@@ -250,15 +186,11 @@ pub async fn command(args: Vec<String>) -> CliResult {
             };
             let changes = store::import_changes(&doc).map_err(CliError::Command)?;
             if flag("--dry-run") {
-                let s = store::load_settings(&c.pool, env, &sb, None)
-                    .await
-                    .map_err(|e| CliError::Command(e.to_string()))?;
+                let s = store::load_settings(&c.pool, env, &sb, None).await.map_err(|e| CliError::Command(e.to_string()))?;
                 for (k, v) in &changes {
                     let cur = s.get(k).map(shown).unwrap_or_default();
                     let new = match v {
-                        Input::Raw(_) if pl_settings::schema::find(k).is_some_and(|d| d.secret) => {
-                            "***".to_string()
-                        }
+                        Input::Raw(_) if pl_settings::schema::find(k).is_some_and(|d| d.secret) => "***".to_string(),
                         Input::Raw(r) => r.clone(),
                         Input::Json(j) => j.to_string(),
                         Input::Reset => "<reset>".into(),
@@ -268,25 +200,13 @@ pub async fn command(args: Vec<String>) -> CliResult {
                 println!("# dry run, {} change(s), nothing written", changes.len());
                 return Ok(());
             }
-            let rev = store::apply(
-                &c.pool,
-                &sb,
-                &changes,
-                &ApplyOptions::default(),
-                &actor(),
-                Action::Import,
-            )
-            .await
-            .map_err(store_err)?;
+            let rev = store::apply(&c.pool, &sb, &changes, &ApplyOptions::default(), &actor(), Action::Import).await.map_err(store_err)?;
             println!("imported {} setting(s) (rev {rev})", changes.len());
             Ok(())
         }
         "rekey" => {
-            let old = opt("--old-secret-key")
-                .ok_or_else(|| CliError::Usage("rekey --old-secret-key OLD".into()))?;
-            let n = store::rekey(&c.pool, &SecretBox::from_secret_key(&old), &sb, &actor())
-                .await
-                .map_err(store_err)?;
+            let old = opt("--old-secret-key").ok_or_else(|| CliError::Usage("rekey --old-secret-key OLD".into()))?;
+            let n = store::rekey(&c.pool, &SecretBox::from_secret_key(&old), &sb, &actor()).await.map_err(store_err)?;
             println!("re-encrypted {n} secret(s)");
             Ok(())
         }
@@ -325,8 +245,6 @@ pub async fn command(args: Vec<String>) -> CliResult {
             println!("# rev {rev} – the variables can now be removed from the environment (see `settings slim-env`)");
             Ok(())
         }
-        other => Err(CliError::Usage(format!(
-            "unknown subcommand '{other}'. {USAGE}"
-        ))),
+        other => Err(CliError::Usage(format!("unknown subcommand '{other}'. {USAGE}"))),
     }
 }

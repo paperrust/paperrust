@@ -47,8 +47,7 @@ impl SequenceMatcher {
         let n = self.b.len();
         if n >= 200 {
             let ntest = n / 100 + 1;
-            let popular: HashSet<char> =
-                b2j.iter().filter(|(_, idx)| idx.len() > ntest).map(|(c, _)| *c).collect();
+            let popular: HashSet<char> = b2j.iter().filter(|(_, idx)| idx.len() > ntest).map(|(c, _)| *c).collect();
             for c in popular {
                 b2j.remove(&c);
             }

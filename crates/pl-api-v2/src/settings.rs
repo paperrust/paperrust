@@ -45,30 +45,16 @@ pub struct SettingsError {
 
 impl SettingsError {
     pub(crate) fn new(status: StatusCode, code: &'static str, message: impl Into<String>) -> Self {
-        Self {
-            status,
-            code,
-            message: message.into(),
-            fields: None,
-            extra: None,
-        }
+        Self { status, code, message: message.into(), fields: None, extra: None }
     }
     pub(crate) fn forbidden() -> Self {
-        Self::new(
-            StatusCode::FORBIDDEN,
-            "permission_denied",
-            "You do not have permission to perform this action.",
-        )
+        Self::new(StatusCode::FORBIDDEN, "permission_denied", "You do not have permission to perform this action.")
     }
     pub(crate) fn not_found() -> Self {
         Self::new(StatusCode::NOT_FOUND, "not_found", "Not found.")
     }
     pub(crate) fn invalid(fields: Map<String, Value>) -> Self {
-        let mut e = Self::new(
-            StatusCode::UNPROCESSABLE_ENTITY,
-            "invalid",
-            "Invalid value(s).",
-        );
+        let mut e = Self::new(StatusCode::UNPROCESSABLE_ENTITY, "invalid", "Invalid value(s).");
         e.fields = Some(Box::new(fields));
         e
     }
@@ -79,11 +65,7 @@ impl SettingsError {
     }
     pub(crate) fn internal(e: impl std::fmt::Display) -> Self {
         tracing::error!(target: "paperrust.api_v2", "settings: {e}");
-        Self::new(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "internal",
-            "Internal server error.",
-        )
+        Self::new(StatusCode::INTERNAL_SERVER_ERROR, "internal", "Internal server error.")
     }
 }
 
@@ -96,20 +78,13 @@ impl From<StoreError> for SettingsError {
                 let mut e = Self::new(
                     StatusCode::CONFLICT,
                     "not_writable",
-                    format!(
-                        "{} is read at startup – set it via the environment / paperrust.conf.",
-                        pl_settings::schema::display_name(&k)
-                    ),
+                    format!("{} is read at startup – set it via the environment / paperrust.conf.", pl_settings::schema::display_name(&k)),
                 );
                 e.extra = Some(Box::new(("keys", json!([k]))));
                 e
             }
             StoreError::RevConflict { current } => {
-                let mut e = Self::new(
-                    StatusCode::CONFLICT,
-                    "rev_conflict",
-                    "Settings were changed meanwhile – reload.",
-                );
+                let mut e = Self::new(StatusCode::CONFLICT, "rev_conflict", "Settings were changed meanwhile – reload.");
                 e.extra = Some(Box::new(("current_rev", json!(current))));
                 e
             }
@@ -117,10 +92,7 @@ impl From<StoreError> for SettingsError {
                 let mut e = Self::new(
                     StatusCode::CONFLICT,
                     "locked_by_environment",
-                    format!(
-                        "Set via environment, cannot be changed here: {}",
-                        keys.join(", ")
-                    ),
+                    format!("Set via environment, cannot be changed here: {}", keys.join(", ")),
                 );
                 e.extra = Some(Box::new(("keys", json!(keys))));
                 e
@@ -179,9 +151,7 @@ impl Access {
             superuser: active_su,
             view_ac: active_su || has(PERM_VIEW_AC),
             change_ac: active_su || has(PERM_CHANGE_AC),
-            loopback: ext
-                .and_then(|e| e.peer)
-                .is_some_and(|a: SocketAddr| a.ip().is_loopback()),
+            loopback: ext.and_then(|e| e.peer).is_some_and(|a: SocketAddr| a.ip().is_loopback()),
         }
     }
 
@@ -221,10 +191,7 @@ pub(crate) fn handle(state: &AppState) -> SettingsHandle {
     state.service::<SettingsHandle>().unwrap_or_else(|| {
         // Without a mounted holder (tests): environment only; saving still works via the DB.
         let c = state.config();
-        let h = SettingsHandle::without_db(
-            c.env.clone(),
-            pl_settings::crypto::SecretBox::from_secret_key(&c.secret_key),
-        );
+        let h = SettingsHandle::without_db(c.env.clone(), pl_settings::crypto::SecretBox::from_secret_key(&c.secret_key));
         state.set_service(h.clone());
         h
     })
@@ -235,15 +202,8 @@ pub(crate) async fn snapshot(state: &AppState, h: &SettingsHandle) -> R<Settings
 }
 
 pub(crate) fn actor(p: &Principal) -> Actor {
-    let peer = p
-        .ext
-        .downcast_ref::<pl_store::AuthExt>()
-        .and_then(|e| e.peer);
-    Actor {
-        user_id: i32::try_from(p.user_id).ok(),
-        user_name: Some(p.username.clone()),
-        remote_addr: peer.map(|a| a.ip()),
-    }
+    let peer = p.ext.downcast_ref::<pl_store::AuthExt>().and_then(|e| e.peer);
+    Actor { user_id: i32::try_from(p.user_id).ok(), user_name: Some(p.username.clone()), remote_addr: peer.map(|a| a.ip()) }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -314,25 +274,13 @@ fn with_rev(status: StatusCode, body: Value, rev: i64) -> Response {
     if let Ok(h) = HeaderValue::from_str(&format!("\"{rev}\"")) {
         r.headers_mut().insert(header::ETAG, h);
     }
-    r.headers_mut().insert(
-        header::CACHE_CONTROL,
-        HeaderValue::from_static("private, no-cache"),
-    );
+    r.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("private, no-cache"));
     r
 }
 
-fn list_body(
-    state: &AppState,
-    s: &Settings,
-    access: &Access,
-    filter: impl Fn(&Entry) -> bool,
-) -> Value {
-    let items: Vec<Value> = s
-        .entries()
-        .iter()
-        .filter(|e| !e.def.internal && access.can_read(e.def) && filter(e))
-        .map(|e| item(s, e))
-        .collect();
+fn list_body(state: &AppState, s: &Settings, access: &Access, filter: impl Fn(&Entry) -> bool) -> Value {
+    let items: Vec<Value> =
+        s.entries().iter().filter(|e| !e.def.internal && access.can_read(e.def) && filter(e)).map(|e| item(s, e)).collect();
     let supported = pl_settings::restart::supported(&state.config().env);
     json!({
         "rev": s.rev,
@@ -349,11 +297,7 @@ fn list_body(
 // ---------------------------------------------------------------------------------------------
 
 /// `GET /settings?category=&q=&class=&changed=&restart_pending=`
-pub async fn list(
-    State(state): State<AppState>,
-    Caller(p): Caller,
-    Query(q): Query<HashMap<String, String>>,
-) -> R<Response> {
+pub async fn list(State(state): State<AppState>, Caller(p): Caller, Query(q): Query<HashMap<String, String>>) -> R<Response> {
     let access = Access::of(&p);
     if !access.any() {
         return Err(SettingsError::forbidden());
@@ -361,14 +305,8 @@ pub async fn list(
     let h = handle(&state);
     let s = snapshot(&state, &h).await?;
     let cat = q.get("category").filter(|v| !v.is_empty()).cloned();
-    let class = q
-        .get("class")
-        .filter(|v| !v.is_empty())
-        .map(|c| c.to_ascii_uppercase());
-    let needle = q
-        .get("q")
-        .map(|v| v.trim().to_lowercase())
-        .filter(|v| !v.is_empty());
+    let class = q.get("class").filter(|v| !v.is_empty()).map(|c| c.to_ascii_uppercase());
+    let needle = q.get("q").map(|v| v.trim().to_lowercase()).filter(|v| !v.is_empty());
     let only_changed = crate::http::truthy(q.get("changed").map(String::as_str));
     let only_pending = crate::http::truthy(q.get("restart_pending").map(String::as_str));
     let body = list_body(&state, &s, &access, |e| {
@@ -389,15 +327,9 @@ pub async fn list(
 fn schema_etag() -> String {
     use std::hash::{Hash, Hasher};
     let mut h = std::collections::hash_map::DefaultHasher::new();
-    serde_json::to_string(SCHEMA)
-        .unwrap_or_default()
-        .hash(&mut h);
+    serde_json::to_string(SCHEMA).unwrap_or_default().hash(&mut h);
     pl_settings::help_en::HELP_EN.hash(&mut h);
-    format!(
-        "\"schema-{}-{:016x}\"",
-        pl_core::brand::PAPERRUST_VERSION,
-        h.finish()
-    )
+    format!("\"schema-{}-{:016x}\"", pl_core::brand::PAPERRUST_VERSION, h.finish())
 }
 
 /// `GET /settings/schema` (cacheable, ETag).
@@ -407,11 +339,7 @@ pub async fn schema(Caller(p): Caller, headers: HeaderMap) -> R<Response> {
         return Err(SettingsError::forbidden());
     }
     let etag = schema_etag();
-    if headers
-        .get(header::IF_NONE_MATCH)
-        .and_then(|v| v.to_str().ok())
-        .is_some_and(|v| v.split(',').any(|t| t.trim() == etag))
-    {
+    if headers.get(header::IF_NONE_MATCH).and_then(|v| v.to_str().ok()).is_some_and(|v| v.split(',').any(|t| t.trim() == etag)) {
         let mut r = StatusCode::NOT_MODIFIED.into_response();
         if let Ok(v) = HeaderValue::from_str(&etag) {
             r.headers_mut().insert(header::ETAG, v);
@@ -437,41 +365,21 @@ pub async fn schema(Caller(p): Caller, headers: HeaderMap) -> R<Response> {
             v
         })
         .collect();
-    let categories: Vec<&str> = pl_settings::schema::Category::ALL
-        .iter()
-        .map(|c| c.as_str())
-        .collect();
-    let mut r = (
-        StatusCode::OK,
-        axum::Json(json!({"categories": categories, "items": items})),
-    )
-        .into_response();
+    let categories: Vec<&str> = pl_settings::schema::Category::ALL.iter().map(|c| c.as_str()).collect();
+    let mut r = (StatusCode::OK, axum::Json(json!({"categories": categories, "items": items}))).into_response();
     if let Ok(v) = HeaderValue::from_str(&etag) {
         r.headers_mut().insert(header::ETAG, v);
     }
-    r.headers_mut().insert(
-        header::CACHE_CONTROL,
-        HeaderValue::from_static("private, max-age=0, must-revalidate"),
-    );
+    r.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("private, max-age=0, must-revalidate"));
     Ok(r)
 }
 
 /// `GET /settings/{key}`
-pub async fn get_one(
-    State(state): State<AppState>,
-    Caller(p): Caller,
-    Path(key): Path<String>,
-) -> R<Response> {
+pub async fn get_one(State(state): State<AppState>, Caller(p): Caller, Path(key): Path<String>) -> R<Response> {
     let access = Access::of(&p);
-    let def = pl_settings::schema::find(&key)
-        .filter(|d| !d.internal)
-        .ok_or_else(SettingsError::not_found)?;
+    let def = pl_settings::schema::find(&key).filter(|d| !d.internal).ok_or_else(SettingsError::not_found)?;
     if !access.can_read(def) {
-        return Err(if access.any() {
-            SettingsError::not_found()
-        } else {
-            SettingsError::forbidden()
-        });
+        return Err(if access.any() { SettingsError::not_found() } else { SettingsError::forbidden() });
     }
     let h = handle(&state);
     let s = snapshot(&state, &h).await?;
@@ -488,49 +396,32 @@ pub struct PatchBody {
 
 /// Protection against lock-out (§1.4 footnote ²): `DISABLE_REGULAR_LOGIN`/`REDIRECT_LOGIN_TO_SSO` only
 /// if an SSO provider is configured and the saving user has a linked SSO account.
-async fn lockout_check(
-    state: &AppState,
-    s: &Settings,
-    p: &Principal,
-    values: &Map<String, Value>,
-) -> R<()> {
-    let enabling = [
-        "PAPERLESS_DISABLE_REGULAR_LOGIN",
-        "PAPERLESS_REDIRECT_LOGIN_TO_SSO",
-    ]
-    .into_iter()
-    .filter(|k| {
-        values.iter().any(|(vk, v)| {
-            pl_settings::schema::find(vk).is_some_and(|d| d.key == *k)
-                && match v {
-                    Value::Bool(b) => *b,
-                    Value::String(s) => pl_core::config::str_to_bool(s).unwrap_or(false),
-                    _ => false,
-                }
+async fn lockout_check(state: &AppState, s: &Settings, p: &Principal, values: &Map<String, Value>) -> R<()> {
+    let enabling = ["PAPERLESS_DISABLE_REGULAR_LOGIN", "PAPERLESS_REDIRECT_LOGIN_TO_SSO"]
+        .into_iter()
+        .filter(|k| {
+            values.iter().any(|(vk, v)| {
+                pl_settings::schema::find(vk).is_some_and(|d| d.key == *k)
+                    && match v {
+                        Value::Bool(b) => *b,
+                        Value::String(s) => pl_core::config::str_to_bool(s).unwrap_or(false),
+                        _ => false,
+                    }
+            })
         })
-    })
-    .collect::<Vec<_>>();
+        .collect::<Vec<_>>();
     if enabling.is_empty() {
         return Ok(());
     }
     let providers: Option<Value> = values
         .iter()
-        .find(|(k, _)| {
-            pl_settings::schema::find(k)
-                .is_some_and(|d| d.key == "PAPERLESS_SOCIALACCOUNT_PROVIDERS")
-        })
+        .find(|(k, _)| pl_settings::schema::find(k).is_some_and(|d| d.key == "PAPERLESS_SOCIALACCOUNT_PROVIDERS"))
         .map(|(_, v)| match v {
             Value::String(s) => serde_json::from_str(s).unwrap_or(Value::Null),
             other => other.clone(),
         })
-        .or_else(|| {
-            s.value("PAPERLESS_SOCIALACCOUNT_PROVIDERS")
-                .and_then(|v| serde_json::from_str(v).ok())
-        });
-    let has_provider = providers
-        .as_ref()
-        .and_then(Value::as_object)
-        .is_some_and(|o| !o.is_empty());
+        .or_else(|| s.value("PAPERLESS_SOCIALACCOUNT_PROVIDERS").and_then(|v| serde_json::from_str(v).ok()));
+    let has_provider = providers.as_ref().and_then(Value::as_object).is_some_and(|o| !o.is_empty());
     let linked: bool = sqlx::query_scalar(
         "SELECT to_regclass('public.socialaccount_socialaccount') IS NOT NULL
            AND EXISTS (SELECT 1 FROM socialaccount_socialaccount WHERE user_id = $1)",
@@ -555,12 +446,7 @@ async fn lockout_check(
 }
 
 /// `PATCH /settings` `{"values":{KEY:value,…},"expected_rev":N}` – atomic.
-pub async fn patch(
-    State(state): State<AppState>,
-    Caller(p): Caller,
-    headers: HeaderMap,
-    V2Json(body): V2Json<PatchBody>,
-) -> R<Response> {
+pub async fn patch(State(state): State<AppState>, Caller(p): Caller, headers: HeaderMap, V2Json(body): V2Json<PatchBody>) -> R<Response> {
     let access = Access::of(&p);
     if !access.any() {
         return Err(SettingsError::forbidden());
@@ -584,40 +470,20 @@ pub async fn patch(
             return Err(SettingsError::forbidden());
         }
         if def.key == "PAPERLESS_APP_LOGO" && !v.is_null() {
-            return Err(SettingsError::field(
-                k,
-                "Upload the logo with PUT /rs/api/v2/settings/app_logo (multipart).",
-            ));
+            return Err(SettingsError::field(k, "Upload the logo with PUT /rs/api/v2/settings/app_logo (multipart)."));
         }
-        let input = if v.is_null() {
-            Input::Reset
-        } else {
-            Input::Json(v.clone())
-        };
+        let input = if v.is_null() { Input::Reset } else { Input::Json(v.clone()) };
         changes.push((def.key.to_string(), input));
     }
     let expected = match body.expected_rev {
         Some(r) => Some(r),
-        None => crate::http::if_match(&headers)
-            .map_err(|_| SettingsError::field("If-Match", "Expected the settings rev."))?,
+        None => crate::http::if_match(&headers).map_err(|_| SettingsError::field("If-Match", "Expected the settings rev."))?,
     };
     let h = handle(&state);
     let s = snapshot(&state, &h).await?;
     lockout_check(&state, &s, &p, &body.values).await?;
-    let opts = ApplyOptions {
-        expected_rev: expected,
-        env: Some(h.env()),
-        if_unset: false,
-    };
-    let rev = store::apply(
-        state.db(),
-        h.secret_box(),
-        &changes,
-        &opts,
-        &actor(&p),
-        Action::Set,
-    )
-    .await?;
+    let opts = ApplyOptions { expected_rev: expected, env: Some(h.env()), if_unset: false };
+    let rev = store::apply(state.db(), h.secret_box(), &changes, &opts, &actor(&p), Action::Set).await?;
     finish_write(&state, &h, &access, &changes, rev).await
 }
 
@@ -666,86 +532,42 @@ async fn patch_desktop(state: &AppState, access: &Access, values: &Map<String, V
         m.insert("values".into(), json!([outcome.error.unwrap_or_else(|| "rejected by the desktop app".into())]));
         return Err(SettingsError::invalid(m));
     }
-    Ok((
-        StatusCode::ACCEPTED,
-        axum::Json(json!({"applied": true, "restarting": outcome.restart})),
-    )
-        .into_response())
+    Ok((StatusCode::ACCEPTED, axum::Json(json!({"applied": true, "restarting": outcome.restart}))).into_response())
 }
 
-async fn finish_write(
-    state: &AppState,
-    h: &SettingsHandle,
-    access: &Access,
-    changes: &[(String, Input)],
-    rev: i64,
-) -> R<Response> {
+async fn finish_write(state: &AppState, h: &SettingsHandle, access: &Access, changes: &[(String, Input)], rev: i64) -> R<Response> {
     // own process immediately (the others via NOTIFY)
     if let Err(e) = h.reload(state.db()).await {
         tracing::warn!(error = %e, "settings reload after write failed");
     }
     let s = snapshot(state, h).await?;
-    let keys: Vec<&str> = changes
-        .iter()
-        .filter_map(|(k, _)| pl_settings::schema::find(k).map(|d| d.key))
-        .collect();
+    let keys: Vec<&str> = changes.iter().filter_map(|(k, _)| pl_settings::schema::find(k).map(|d| d.key)).collect();
     let mut body = list_body(state, &s, access, |e| keys.contains(&e.def.key));
-    let reindex = s
-        .entries()
-        .iter()
-        .any(|e| keys.contains(&e.def.key) && e.def.reindex);
+    let reindex = s.entries().iter().any(|e| keys.contains(&e.def.key) && e.def.reindex);
     body["reindex_suggested"] = json!(reindex);
     Ok(with_rev(StatusCode::OK, body, rev.max(s.rev)))
 }
 
 /// `DELETE /settings/{key}` – back to default (delete DB row or set AC column to NULL).
-pub async fn reset(
-    State(state): State<AppState>,
-    Caller(p): Caller,
-    headers: HeaderMap,
-    Path(key): Path<String>,
-) -> R<Response> {
+pub async fn reset(State(state): State<AppState>, Caller(p): Caller, headers: HeaderMap, Path(key): Path<String>) -> R<Response> {
     let access = Access::of(&p);
-    let def = pl_settings::schema::find(&key)
-        .filter(|d| !d.internal)
-        .ok_or_else(SettingsError::not_found)?;
+    let def = pl_settings::schema::find(&key).filter(|d| !d.internal).ok_or_else(SettingsError::not_found)?;
     if !access.can_write(def) {
-        return Err(if access.can_read(def) {
-            SettingsError::forbidden()
-        } else {
-            SettingsError::not_found()
-        });
+        return Err(if access.can_read(def) { SettingsError::forbidden() } else { SettingsError::not_found() });
     }
-    let expected = crate::http::if_match(&headers)
-        .map_err(|_| SettingsError::field("If-Match", "Expected the settings rev."))?;
+    let expected = crate::http::if_match(&headers).map_err(|_| SettingsError::field("If-Match", "Expected the settings rev."))?;
     let h = handle(&state);
     if def.key == "PAPERLESS_APP_LOGO" {
         remove_logo_file(&state).await;
     }
     let changes = vec![(def.key.to_string(), Input::Reset)];
-    let opts = ApplyOptions {
-        expected_rev: expected,
-        env: Some(h.env()),
-        if_unset: false,
-    };
-    let rev = store::apply(
-        state.db(),
-        h.secret_box(),
-        &changes,
-        &opts,
-        &actor(&p),
-        Action::Reset,
-    )
-    .await?;
+    let opts = ApplyOptions { expected_rev: expected, env: Some(h.env()), if_unset: false };
+    let rev = store::apply(state.db(), h.secret_box(), &changes, &opts, &actor(&p), Action::Reset).await?;
     finish_write(&state, &h, &access, &changes, rev).await
 }
 
 /// `GET /settings/history?key=&cursor=&limit=`
-pub async fn history(
-    State(state): State<AppState>,
-    Caller(p): Caller,
-    Query(q): Query<HashMap<String, String>>,
-) -> R<Response> {
+pub async fn history(State(state): State<AppState>, Caller(p): Caller, Query(q): Query<HashMap<String, String>>) -> R<Response> {
     let access = Access::of(&p);
     if !access.any() {
         return Err(SettingsError::forbidden());
@@ -754,8 +576,7 @@ pub async fn history(
         None => None,
         Some(k) if k.starts_with("AC:") => Some(k.clone()),
         Some(k) => {
-            let d = pl_settings::schema::find(k)
-                .ok_or_else(|| SettingsError::field("key", "Unknown setting."))?;
+            let d = pl_settings::schema::find(k).ok_or_else(|| SettingsError::field("key", "Unknown setting."))?;
             Some(match d.ac_field {
                 Some(f) => format!("AC:{f}"),
                 None => d.key.to_string(),
@@ -763,24 +584,14 @@ pub async fn history(
         }
     };
     let cursor = q.get("cursor").and_then(|c| c.parse::<i64>().ok());
-    let limit = q
-        .get("limit")
-        .and_then(|l| l.parse::<i64>().ok())
-        .unwrap_or(50)
-        .clamp(1, 500);
-    let mut conn = state
-        .db()
-        .acquire()
-        .await
-        .map_err(SettingsError::internal)?;
+    let limit = q.get("limit").and_then(|l| l.parse::<i64>().ok()).unwrap_or(50).clamp(1, 500);
+    let mut conn = state.db().acquire().await.map_err(SettingsError::internal)?;
     // Non-superuser: only AC entries (same view as the list)
     let mut out = Vec::new();
     let mut before = cursor;
     let mut next = None;
     loop {
-        let rows = store::history_list(&mut conn, key.as_deref(), before, limit)
-            .await
-            .map_err(SettingsError::internal)?;
+        let rows = store::history_list(&mut conn, key.as_deref(), before, limit).await.map_err(SettingsError::internal)?;
         let n = rows.len();
         for r in rows {
             before = Some(r.id);
@@ -801,9 +612,7 @@ pub async fn history(
             break;
         }
     }
-    Ok(crate::http::json(
-        &json!({"items": out, "next_cursor": next.map(|n| n.to_string())}),
-    ))
+    Ok(crate::http::json(&json!({"items": out, "next_cursor": next.map(|n| n.to_string())})))
 }
 
 #[derive(Debug, Deserialize)]
@@ -813,11 +622,7 @@ pub struct RestartBody {
 }
 
 /// `POST /settings/restart` `{"password":"…"}` – orderly shutdown with exit code 75.
-pub async fn restart(
-    State(state): State<AppState>,
-    Caller(p): Caller,
-    V2Json(body): V2Json<RestartBody>,
-) -> R<Response> {
+pub async fn restart(State(state): State<AppState>, Caller(p): Caller, V2Json(body): V2Json<RestartBody>) -> R<Response> {
     let access = Access::of(&p);
     if !access.superuser {
         return Err(SettingsError::forbidden());
@@ -837,25 +642,14 @@ pub async fn restart(
         tokio::time::sleep(std::time::Duration::from_millis(300)).await;
         pl_settings::restart::request("api");
     });
-    Ok((
-        StatusCode::ACCEPTED,
-        axum::Json(json!({"restarting": true, "exit_code": pl_settings::restart::EXIT_CODE})),
-    )
-        .into_response())
+    Ok((StatusCode::ACCEPTED, axum::Json(json!({"restarting": true, "exit_code": pl_settings::restart::EXIT_CODE}))).into_response())
 }
 
 pub(crate) fn confirm_password(p: &Principal, password: Option<&str>) -> R<()> {
     let Some(pw) = password.filter(|p| !p.is_empty()) else {
-        return Err(SettingsError::field(
-            "password",
-            "Please confirm with your password.",
-        ));
+        return Err(SettingsError::field("password", "Please confirm with your password."));
     };
-    let user = p
-        .ext
-        .downcast_ref::<pl_store::AuthExt>()
-        .and_then(|e| e.ctx.user.clone())
-        .ok_or_else(SettingsError::forbidden)?;
+    let user = p.ext.downcast_ref::<pl_store::AuthExt>().and_then(|e| e.ctx.user.clone()).ok_or_else(SettingsError::forbidden)?;
     if !pl_authz::hashers::check_password(pw, &user.password) {
         return Err(SettingsError::field("password", "Wrong password."));
     }
@@ -867,13 +661,11 @@ pub(crate) fn confirm_password(p: &Principal, password: Option<&str>) -> R<()> {
 // ---------------------------------------------------------------------------------------------
 
 async fn remove_logo_file(state: &AppState) {
-    let cur: Option<Option<String>> = sqlx::query_scalar(
-        "SELECT app_logo FROM paperless_applicationconfiguration ORDER BY id LIMIT 1",
-    )
-    .fetch_optional(state.db())
-    .await
-    .ok()
-    .flatten();
+    let cur: Option<Option<String>> = sqlx::query_scalar("SELECT app_logo FROM paperless_applicationconfiguration ORDER BY id LIMIT 1")
+        .fetch_optional(state.db())
+        .await
+        .ok()
+        .flatten();
     if let Some(Some(name)) = cur.filter(|n| n.as_ref().is_some_and(|n| !n.is_empty()))
         && let Some(p) = crate::settings_logo::media_path(&state.config().media_root, &name)
     {
@@ -882,29 +674,17 @@ async fn remove_logo_file(state: &AppState) {
 }
 
 /// `PUT /settings/app_logo` (multipart, field `app_logo`).
-pub async fn put_logo(
-    State(state): State<AppState>,
-    Caller(p): Caller,
-    mut mp: Multipart,
-) -> R<Response> {
+pub async fn put_logo(State(state): State<AppState>, Caller(p): Caller, mut mp: Multipart) -> R<Response> {
     let access = Access::of(&p);
-    let def =
-        pl_settings::schema::find("PAPERLESS_APP_LOGO").ok_or_else(SettingsError::not_found)?;
+    let def = pl_settings::schema::find("PAPERLESS_APP_LOGO").ok_or_else(SettingsError::not_found)?;
     if !access.can_write(def) {
         return Err(SettingsError::forbidden());
     }
     let mut file: Option<(String, Vec<u8>)> = None;
-    while let Some(field) = mp
-        .next_field()
-        .await
-        .map_err(|e| SettingsError::field("app_logo", format!("Invalid upload: {e}")))?
-    {
+    while let Some(field) = mp.next_field().await.map_err(|e| SettingsError::field("app_logo", format!("Invalid upload: {e}")))? {
         if field.name() == Some("app_logo") {
             let name = field.file_name().unwrap_or("logo").to_string();
-            let data = field
-                .bytes()
-                .await
-                .map_err(|e| SettingsError::field("app_logo", format!("Invalid upload: {e}")))?;
+            let data = field.bytes().await.map_err(|e| SettingsError::field("app_logo", format!("Invalid upload: {e}")))?;
             file = Some((name, data.to_vec()));
         }
     }
@@ -912,38 +692,14 @@ pub async fn put_logo(
         return Err(SettingsError::field("app_logo", "No file was submitted."));
     };
     let h = handle(&state);
-    let max_pixels = h
-        .load()
-        .env()
-        .int("PAPERLESS_MAX_IMAGE_PIXELS")
-        .ok()
-        .flatten();
-    let (clean_name, bytes) = crate::settings_logo::validate(&name, &data, max_pixels)
-        .map_err(|m| SettingsError::field("app_logo", m))?;
+    let max_pixels = h.load().env().int("PAPERLESS_MAX_IMAGE_PIXELS").ok().flatten();
+    let (clean_name, bytes) = crate::settings_logo::validate(&name, &data, max_pixels).map_err(|m| SettingsError::field("app_logo", m))?;
     let media = state.config().media_root.clone();
-    let stored = crate::settings_logo::store(&media, &clean_name, &bytes)
-        .await
-        .map_err(SettingsError::internal)?;
+    let stored = crate::settings_logo::store(&media, &clean_name, &bytes).await.map_err(SettingsError::internal)?;
     remove_logo_file(&state).await;
-    let changes = vec![(
-        def.key.to_string(),
-        Input::Json(Value::String(stored.clone())),
-    )];
-    let opts = ApplyOptions {
-        expected_rev: None,
-        env: None,
-        if_unset: false,
-    };
-    match store::apply(
-        state.db(),
-        h.secret_box(),
-        &changes,
-        &opts,
-        &actor(&p),
-        Action::Set,
-    )
-    .await
-    {
+    let changes = vec![(def.key.to_string(), Input::Json(Value::String(stored.clone())))];
+    let opts = ApplyOptions { expected_rev: None, env: None, if_unset: false };
+    match store::apply(state.db(), h.secret_box(), &changes, &opts, &actor(&p), Action::Set).await {
         Ok(rev) => finish_write(&state, &h, &access, &changes, rev).await,
         Err(e) => {
             if let Some(p) = crate::settings_logo::media_path(&media, &stored) {
@@ -976,12 +732,7 @@ mod tests {
     use super::*;
 
     fn access(su: bool, view: bool, change: bool, lo: bool) -> Access {
-        Access {
-            superuser: su,
-            view_ac: view || su,
-            change_ac: change || su,
-            loopback: lo,
-        }
+        Access { superuser: su, view_ac: view || su, change_ac: change || su, loopback: lo }
     }
 
     #[test]
@@ -995,12 +746,7 @@ mod tests {
         let su_lo = access(true, false, false, true);
         assert!(su_lo.can_read(desk) && su_lo.can_write(desk));
         let viewer = access(false, true, false, true);
-        assert!(
-            viewer.can_read(lang)
-                && !viewer.can_write(lang)
-                && !viewer.can_read(host)
-                && !viewer.can_read(desk)
-        );
+        assert!(viewer.can_read(lang) && !viewer.can_write(lang) && !viewer.can_read(host) && !viewer.can_read(desk));
         let changer = access(false, true, true, false);
         assert!(changer.can_write(lang) && !changer.can_write(host));
         let nobody = access(false, false, false, true);
@@ -1011,44 +757,24 @@ mod tests {
     fn store_errors_map_to_codes() {
         let e: SettingsError = StoreError::RevConflict { current: 4 }.into();
         assert_eq!((e.status, e.code), (StatusCode::CONFLICT, "rev_conflict"));
-        let e: SettingsError =
-            StoreError::LockedByEnvironment(vec!["PAPERLESS_EMAIL_HOST".into()]).into();
-        assert_eq!(
-            (e.status, e.code),
-            (StatusCode::CONFLICT, "locked_by_environment")
-        );
-        let e: SettingsError = StoreError::Invalid(vec![pl_settings::value::ValueError {
-            key: "K".into(),
-            message: "bad".into(),
-        }])
-        .into();
-        assert_eq!(
-            (e.status, e.code),
-            (StatusCode::UNPROCESSABLE_ENTITY, "invalid")
-        );
+        let e: SettingsError = StoreError::LockedByEnvironment(vec!["PAPERLESS_EMAIL_HOST".into()]).into();
+        assert_eq!((e.status, e.code), (StatusCode::CONFLICT, "locked_by_environment"));
+        let e: SettingsError = StoreError::Invalid(vec![pl_settings::value::ValueError { key: "K".into(), message: "bad".into() }]).into();
+        assert_eq!((e.status, e.code), (StatusCode::UNPROCESSABLE_ENTITY, "invalid"));
         assert_eq!(e.fields.unwrap()["K"][0], "bad");
     }
 
     #[test]
     fn secrets_never_in_items() {
-        let env = pl_core::config::Env::from_pairs([
-            ("PAPERLESS_EMAIL_HOST_PASSWORD", "hunter2"),
-            ("PAPERLESS_AI_LLM_API_KEY", "sk-x"),
-        ]);
+        let env = pl_core::config::Env::from_pairs([("PAPERLESS_EMAIL_HOST_PASSWORD", "hunter2"), ("PAPERLESS_AI_LLM_API_KEY", "sk-x")]);
         let s = Settings::build(&pl_settings::layer::Layers::new(env), 0, None);
         for k in ["PAPERLESS_EMAIL_HOST_PASSWORD", "PAPERLESS_AI_LLM_API_KEY"] {
             let v = item(&s, s.get(k).unwrap());
-            assert!(
-                !v.to_string().contains("hunter2") && !v.to_string().contains("sk-x"),
-                "{v}"
-            );
+            assert!(!v.to_string().contains("hunter2") && !v.to_string().contains("sk-x"), "{v}");
             assert_eq!(v["is_set"], true);
             assert_eq!(v["value"], Value::Null);
         }
         let v = item(&s, s.get("PAPERLESS_EMAIL_PORT").unwrap());
-        assert_eq!(
-            (v["value"].clone(), v["is_set"].clone(), v["source"].clone()),
-            (json!(25), json!(false), json!("default"))
-        );
+        assert_eq!((v["value"].clone(), v["is_set"].clone(), v["source"].clone()), (json!(25), json!(false), json!("default")));
     }
 }

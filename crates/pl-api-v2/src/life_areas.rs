@@ -21,15 +21,9 @@ use crate::error::{V2Error, V2Result};
 use crate::http::{Caller, V2Json, json, json_with_rev};
 
 pub fn routes(r: axum::Router<AppState>) -> axum::Router<AppState> {
-    r.route(
-        "/life-areas",
-        get(list).put(replace).post(create).delete(delete_scope),
-    )
-    .route("/life-areas/suggestions", get(suggestions))
-    .route(
-        "/life-areas/{uuid}",
-        get(one).patch(patch).delete(delete_one),
-    )
+    r.route("/life-areas", get(list).put(replace).post(create).delete(delete_scope))
+        .route("/life-areas/suggestions", get(suggestions))
+        .route("/life-areas/{uuid}", get(one).patch(patch).delete(delete_one))
 }
 
 fn scope_of(q: &HashMap<String, String>) -> V2Result<Scope> {
@@ -43,28 +37,19 @@ fn may_write(p: &Principal, scope: Scope) -> V2Result<()> {
         return Err(V2Error(DomainError::Forbidden("Inactive user.".into())));
     }
     if scope == Scope::Instance && !u.is_superuser {
-        return Err(V2Error(DomainError::Forbidden(
-            "Only superusers can change the default life areas.".into(),
-        )));
+        return Err(V2Error(DomainError::Forbidden("Only superusers can change the default life areas.".into())));
     }
     Ok(())
 }
 
-pub async fn list(
-    State(state): State<AppState>,
-    Caller(p): Caller,
-    Query(q): Query<HashMap<String, String>>,
-) -> V2Result<Response> {
+pub async fn list(State(state): State<AppState>, Caller(p): Caller, Query(q): Query<HashMap<String, String>>) -> V2Result<Response> {
     d2::ensure(&state).await?;
     let pool = state.db();
     let (items, source) = match q.get("scope") {
         None => store::effective_areas(pool, p.user_id).await.map_err(tl)?,
         Some(_) => {
             let s = scope_of(&q)?;
-            (
-                store::list_areas(pool, s, p.user_id).await.map_err(tl)?,
-                s.as_str(),
-            )
+            (store::list_areas(pool, s, p.user_id).await.map_err(tl)?, s.as_str())
         }
     };
     Ok(json(&json!({ "items": items, "source": source })))
@@ -89,23 +74,17 @@ pub async fn replace(
     let mut vals = Vec::with_capacity(body.items.len());
     for (i, w) in body.items.iter().enumerate() {
         let v = w.values(i).map_err(|e| prefix(e, i))?;
-        store::check_rules_visible(state.db(), &v.rules, &vis)
-            .await
-            .map_err(|e| prefix(e, i))?;
+        store::check_rules_visible(state.db(), &v.rules, &vis).await.map_err(|e| prefix(e, i))?;
         vals.push((w.uuid, v));
     }
-    let items = store::replace_areas(state.db(), scope, p.user_id, &vals)
-        .await
-        .map_err(tl)?;
+    let items = store::replace_areas(state.db(), scope, p.user_id, &vals).await.map_err(tl)?;
     Ok(json(&json!({ "items": items, "source": scope.as_str() })))
 }
 
 /// Field error of a list entry as `items[i].field`.
 fn prefix(e: pl_timeline::TimelineError, i: usize) -> V2Error {
     match e {
-        pl_timeline::TimelineError::Invalid(f, m) => {
-            V2Error(DomainError::field(&format!("items[{i}].{f}"), m))
-        }
+        pl_timeline::TimelineError::Invalid(f, m) => V2Error(DomainError::field(&format!("items[{i}].{f}"), m)),
         other => tl(other),
     }
 }
@@ -119,17 +98,10 @@ pub async fn create(
     let scope = scope_of(&q)?;
     may_write(&p, scope)?;
     d2::ensure(&state).await?;
-    let pos = store::list_areas(state.db(), scope, p.user_id)
-        .await
-        .map_err(tl)?
-        .len();
+    let pos = store::list_areas(state.db(), scope, p.user_id).await.map_err(tl)?.len();
     let v = w.values(pos).map_err(tl)?;
-    store::check_rules_visible(state.db(), &v.rules, &d2::visibility(&p)?)
-        .await
-        .map_err(tl)?;
-    let a = store::insert_area(state.db(), scope, p.user_id, &v)
-        .await
-        .map_err(tl)?;
+    store::check_rules_visible(state.db(), &v.rules, &d2::visibility(&p)?).await.map_err(tl)?;
+    let a = store::insert_area(state.db(), scope, p.user_id, &v).await.map_err(tl)?;
     Ok(json_with_rev(StatusCode::CREATED, &a, None))
 }
 
@@ -141,35 +113,22 @@ pub async fn delete_scope(
     let scope = scope_of(&q)?;
     may_write(&p, scope)?;
     d2::ensure(&state).await?;
-    store::delete_scope(state.db(), scope, p.user_id)
-        .await
-        .map_err(tl)?;
+    store::delete_scope(state.db(), scope, p.user_id).await.map_err(tl)?;
     Ok(StatusCode::NO_CONTENT.into_response())
 }
 
 /// Visible area (own or default), otherwise 404.
-async fn visible_area(
-    state: &AppState,
-    p: &Principal,
-    uuid: &str,
-) -> V2Result<pl_timeline::areas::Area> {
+async fn visible_area(state: &AppState, p: &Principal, uuid: &str) -> V2Result<pl_timeline::areas::Area> {
     let u = Uuid::parse_str(uuid).map_err(|_| V2Error(DomainError::NotFound))?;
     d2::ensure(state).await?;
-    let a = store::get_area(state.db(), u)
-        .await
-        .map_err(tl)?
-        .ok_or(V2Error(DomainError::NotFound))?;
+    let a = store::get_area(state.db(), u).await.map_err(tl)?.ok_or(V2Error(DomainError::NotFound))?;
     match a.user_id {
         Some(owner) if owner != p.user_id => Err(V2Error(DomainError::NotFound)),
         _ => Ok(a),
     }
 }
 
-pub async fn one(
-    State(state): State<AppState>,
-    Caller(p): Caller,
-    Path(uuid): Path<String>,
-) -> V2Result<Response> {
+pub async fn one(State(state): State<AppState>, Caller(p): Caller, Path(uuid): Path<String>) -> V2Result<Response> {
     let a = visible_area(&state, &p, &uuid).await?;
     Ok(json(&a))
 }
@@ -187,30 +146,20 @@ pub async fn patch(
     }
     let v = w.patch(&a).map_err(tl)?;
     if w.rules.is_some() {
-        store::check_rules_visible(state.db(), &v.rules, &d2::visibility(&p)?)
-            .await
-            .map_err(tl)?;
+        store::check_rules_visible(state.db(), &v.rules, &d2::visibility(&p)?).await.map_err(tl)?;
     }
     let a = store::update_area(state.db(), a.id, &v).await.map_err(tl)?;
     Ok(json(&a))
 }
 
-pub async fn delete_one(
-    State(state): State<AppState>,
-    Caller(p): Caller,
-    Path(uuid): Path<String>,
-) -> V2Result<Response> {
+pub async fn delete_one(State(state): State<AppState>, Caller(p): Caller, Path(uuid): Path<String>) -> V2Result<Response> {
     let a = visible_area(&state, &p, &uuid).await?;
     may_write(&p, a.scope)?;
     store::delete_area(state.db(), a.id).await.map_err(tl)?;
     Ok(StatusCode::NO_CONTENT.into_response())
 }
 
-pub async fn suggestions(
-    State(state): State<AppState>,
-    Caller(p): Caller,
-    Query(q): Query<HashMap<String, String>>,
-) -> V2Result<Response> {
+pub async fn suggestions(State(state): State<AppState>, Caller(p): Caller, Query(q): Query<HashMap<String, String>>) -> V2Result<Response> {
     d2::require_view_documents(&p)?;
     let english = match q.get("lang").map(|s| s.trim()) {
         None | Some("de") | Some("") => false,

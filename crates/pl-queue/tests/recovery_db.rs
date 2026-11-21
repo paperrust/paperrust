@@ -94,11 +94,8 @@ async fn worker_backs_off_and_recreates_missing_table() {
     sqlx::raw_sql("DROP VIEW paperrust_task_queue").execute(&pool).await.unwrap();
     let end = tokio::time::Instant::now() + Duration::from_secs(40);
     loop {
-        let exists: bool = sqlx::query("SELECT to_regclass('paperrust_task_queue') IS NOT NULL AS e")
-            .fetch_one(&pool)
-            .await
-            .unwrap()
-            .get("e");
+        let exists: bool =
+            sqlx::query("SELECT to_regclass('paperrust_task_queue') IS NOT NULL AS e").fetch_one(&pool).await.unwrap().get("e");
         if exists {
             break;
         }

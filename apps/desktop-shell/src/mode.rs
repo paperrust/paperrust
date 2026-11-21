@@ -146,10 +146,7 @@ impl UiPrefs {
 
 /// Profile IDs are folder names: only `[0-9a-z]`, 1–32 characters.
 pub fn valid_profile_id(id: &str) -> bool {
-    (1..=32).contains(&id.len())
-        && id
-            .bytes()
-            .all(|b| b.is_ascii_digit() || b.is_ascii_lowercase())
+    (1..=32).contains(&id.len()) && id.bytes().all(|b| b.is_ascii_digit() || b.is_ascii_lowercase())
 }
 
 pub fn new_profile_id(existing: &[Profile]) -> String {
@@ -163,19 +160,9 @@ pub fn new_profile_id(existing: &[Profile]) -> String {
 
 /// Display name: trimmed, without control characters, at most 60 characters; empty → host of the address.
 pub fn clean_name(name: &str, url: &str) -> String {
-    let n: String = name
-        .chars()
-        .filter(|c| !c.is_control())
-        .collect::<String>()
-        .trim()
-        .chars()
-        .take(60)
-        .collect();
+    let n: String = name.chars().filter(|c| !c.is_control()).collect::<String>().trim().chars().take(60).collect();
     if n.is_empty() {
-        tauri::Url::parse(url)
-            .ok()
-            .and_then(|u| u.host_str().map(str::to_string))
-            .unwrap_or_else(|| "Server".into())
+        tauri::Url::parse(url).ok().and_then(|u| u.host_str().map(str::to_string)).unwrap_or_else(|| "Server".into())
     } else {
         n
     }
@@ -195,19 +182,13 @@ impl AppConfig {
         let mut seen = std::collections::HashSet::new();
         self.profiles.retain_mut(|p| {
             if !valid_profile_id(&p.id) || !seen.insert(p.id.clone()) {
-                notes.push(format!(
-                    "Profil mit ungültiger/doppelter ID {:?} ignoriert",
-                    p.id
-                ));
+                notes.push(format!("Profil mit ungültiger/doppelter ID {:?} ignoriert", p.id));
                 return false;
             }
             match remote::parse_server_url(&p.url) {
                 Ok(u) => {
                     if !u.https && u.scope == remote::HostScope::Public {
-                        notes.push(format!(
-                            "Profil {}: http zu öffentlicher Adresse nicht erlaubt – ignoriert",
-                            p.id
-                        ));
+                        notes.push(format!("Profil {}: http zu öffentlicher Adresse nicht erlaubt – ignoriert", p.id));
                         return false;
                     }
                     p.url = u.base;
@@ -218,8 +199,7 @@ impl AppConfig {
                 }
             }
             p.name = clean_name(&p.name, &p.url);
-            p.extra_origins
-                .retain(|o| remote::parse_origin(o).is_some_and(|n| &n == o));
+            p.extra_origins.retain(|o| remote::parse_origin(o).is_some_and(|n| &n == o));
             p.tls_pin = p.tls_pin.trim().to_ascii_lowercase();
             if !p.tls_pin.is_empty() && !remote::valid_pin(&p.tls_pin) {
                 notes.push(format!("Profil {}: tls_pin ungültig – entfernt", p.id));
@@ -228,11 +208,7 @@ impl AppConfig {
             true
         });
         if !self.profiles.iter().any(|p| p.id == self.active_profile) {
-            self.active_profile = self
-                .profiles
-                .first()
-                .map(|p| p.id.clone())
-                .unwrap_or_default();
+            self.active_profile = self.profiles.first().map(|p| p.id.clone()).unwrap_or_default();
         }
         notes
     }
@@ -251,13 +227,10 @@ impl AppConfig {
     }
 
     pub fn save(&self, path: &Path) -> Result<(), String> {
-        let text = format!(
-            "# PaperRust Desktop – Betriebsart und Server-Profile (docs/REMOTE-APP.md). Keine Geheimnisse.\n{}",
-            self.to_toml()?
-        );
+        let text =
+            format!("# PaperRust Desktop – Betriebsart und Server-Profile (docs/REMOTE-APP.md). Keine Geheimnisse.\n{}", self.to_toml()?);
         let tmp = path.with_extension("toml.tmp");
-        paperrust_desktop::config::write_private(&tmp, text.as_bytes())
-            .map_err(|e| format!("{} schreiben: {e}", tmp.display()))?;
+        paperrust_desktop::config::write_private(&tmp, text.as_bytes()).map_err(|e| format!("{} schreiben: {e}", tmp.display()))?;
         std::fs::rename(&tmp, path).map_err(|e| format!("{} ersetzen: {e}", path.display()))
     }
 
@@ -304,15 +277,8 @@ pub enum Start {
 /// Decision at startup. `env_mode` = `PAPERRUST_DESKTOP_MODE`; `managed_local` = first start answered via
 /// environment (`PAPERRUST_DESKTOP_ADMIN_*`/`_IMPORT*`); `local_data` = `desktop.toml` or
 /// `pgdata/` present (installation from before the remote app → stays local, without a question).
-pub fn decide(
-    cfg: Option<&AppConfig>,
-    env_mode: Option<Mode>,
-    managed_local: bool,
-    local_data: bool,
-) -> Start {
-    let m = env_mode
-        .or(cfg.map(|c| c.mode))
-        .or_else(|| (managed_local || local_data).then_some(Mode::Local));
+pub fn decide(cfg: Option<&AppConfig>, env_mode: Option<Mode>, managed_local: bool, local_data: bool) -> Start {
+    let m = env_mode.or(cfg.map(|c| c.mode)).or_else(|| (managed_local || local_data).then_some(Mode::Local));
     match m {
         Some(Mode::Local) => Start::Local,
         Some(Mode::Remote) => Start::Remote,
@@ -347,22 +313,13 @@ mod tests {
             mode: Mode::Remote,
             active_profile: "a1b2c3".into(),
             profiles: vec![p, profile("x9", "http://192.168.1.20:8000/")],
-            updates: crate::update::UpdateSettings {
-                channel: crate::update::Channel::Beta,
-                interval_hours: 12,
-                ..Default::default()
-            },
-            ui: UiPrefs {
-                design: "modern".into(),
-            },
+            updates: crate::update::UpdateSettings { channel: crate::update::Channel::Beta, interval_hours: 12, ..Default::default() },
+            ui: UiPrefs { design: "modern".into() },
         };
         let text = cfg.to_toml().unwrap();
         assert!(text.contains("[ui]") && text.contains("design = \"modern\""), "{text}");
         assert!(text.contains("[[profile]]"), "{text}");
-        assert!(
-            text.contains("[updates]") && text.contains("channel = \"beta\""),
-            "{text}"
-        );
+        assert!(text.contains("[updates]") && text.contains("channel = \"beta\""), "{text}");
         assert!(text.contains("mode = \"remote\""));
         let (back, notes) = AppConfig::parse(&text).unwrap();
         assert!(notes.is_empty(), "{notes:?}");
@@ -379,28 +336,36 @@ mod tests {
 
     #[test]
     fn ui_design_lenient() {
-        let (c, _) = AppConfig::parse("mode = \"local\"
+        let (c, _) = AppConfig::parse(
+            "mode = \"local\"
 [ui]
 design = \"modern\"
-").unwrap();
+",
+        )
+        .unwrap();
         assert_eq!(c.ui.design(), crate::design::Design::Modern);
-        let (c, _) = AppConfig::parse("mode = \"local\"
+        let (c, _) = AppConfig::parse(
+            "mode = \"local\"
 [ui]
 design = \"bunt\"
-").unwrap();
+",
+        )
+        .unwrap();
         assert_eq!(c.ui.design(), crate::design::Design::Classic, "unbekannt = klassisch");
-        let (c, _) = AppConfig::parse("mode = \"local\"
-").unwrap();
+        let (c, _) = AppConfig::parse(
+            "mode = \"local\"
+",
+        )
+        .unwrap();
         assert_eq!(c.ui.design(), crate::design::Design::Classic);
         assert!(!c.to_toml().unwrap().contains("[ui]"), "ohne Wahl kein [ui]");
     }
 
     #[test]
     fn missing_fields_get_defaults() {
-        let (c, notes) = AppConfig::parse(
-            "mode = \"remote\"\n[[profile]]\nid = \"abc\"\nname = \"\"\nurl = \"https://Docs.Example.ch\"\nzukunft = 1\n",
-        )
-        .unwrap();
+        let (c, notes) =
+            AppConfig::parse("mode = \"remote\"\n[[profile]]\nid = \"abc\"\nname = \"\"\nurl = \"https://Docs.Example.ch\"\nzukunft = 1\n")
+                .unwrap();
         assert!(notes.is_empty());
         let p = &c.profiles[0];
         assert_eq!(c.active_profile, "abc", "aktives Profil ergänzt");
@@ -445,10 +410,7 @@ extra_origins = ["https://sso.example", "https://sso.example/pfad", "javascript:
         assert_eq!(c.profiles[0].id, "ok3");
         assert_eq!(c.active_profile, "ok3");
         assert!(c.profiles[0].tls_pin.is_empty());
-        assert_eq!(
-            c.profiles[0].extra_origins,
-            vec!["https://sso.example".to_string()]
-        );
+        assert_eq!(c.profiles[0].extra_origins, vec!["https://sso.example".to_string()]);
         assert_eq!(notes.len(), 4, "{notes:?}");
     }
 
@@ -472,22 +434,12 @@ extra_origins = ["https://sso.example", "https://sso.example/pfad", "javascript:
 
     #[test]
     fn start_decision() {
-        let remote = AppConfig {
-            mode: Mode::Remote,
-            ..AppConfig::default()
-        };
+        let remote = AppConfig { mode: Mode::Remote, ..AppConfig::default() };
         assert_eq!(decide(None, None, false, false), Start::FirstRun);
-        assert_eq!(
-            decide(None, None, false, true),
-            Start::Local,
-            "alte Installation"
-        );
+        assert_eq!(decide(None, None, false, true), Start::Local, "alte Installation");
         assert_eq!(decide(None, None, true, false), Start::Local, "verwaltet");
         assert_eq!(decide(Some(&remote), None, false, true), Start::Remote);
-        assert_eq!(
-            decide(Some(&remote), Some(Mode::Local), false, false),
-            Start::Local
-        );
+        assert_eq!(decide(Some(&remote), Some(Mode::Local), false, false), Start::Local);
         assert_eq!(decide(None, Some(Mode::Remote), true, true), Start::Remote);
         assert_eq!(Mode::parse(" Remote "), Some(Mode::Remote));
         assert_eq!(Mode::parse("x"), None);

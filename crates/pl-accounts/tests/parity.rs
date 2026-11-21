@@ -115,7 +115,8 @@ async fn send(side: &Side<'_>, method: &str, path: &str, jar: &Jar, form: Option
     match side {
         Side::Django => {
             let client = reqwest::Client::builder().redirect(reqwest::redirect::Policy::none()).build().unwrap();
-            let mut rb = client.request(reqwest::Method::from_bytes(method.as_bytes()).unwrap(), format!("{DJANGO}{path}")).header("Host", HOST);
+            let mut rb =
+                client.request(reqwest::Method::from_bytes(method.as_bytes()).unwrap(), format!("{DJANGO}{path}")).header("Host", HOST);
             if !cookie.is_empty() {
                 rb = rb.header("Cookie", cookie);
             }
@@ -262,7 +263,13 @@ async fn fresh_jar(side: &Side<'_>) -> (Jar, String) {
 }
 
 /// POST with own jar on both sides (CSRF token per side), comparison of the responses.
-async fn same_post(app: &Router, case: &str, path: &str, form: &[(&str, &str)], extra: &[(&str, &str)]) -> (Vec<String>, (Resp, Jar), (Resp, Jar)) {
+async fn same_post(
+    app: &Router,
+    case: &str,
+    path: &str,
+    form: &[(&str, &str)],
+    extra: &[(&str, &str)],
+) -> (Vec<String>, (Resp, Jar), (Resp, Jar)) {
     clear_rl().await;
     let (mut dj, dt) = fresh_jar(&Side::Django).await;
     let (mut rj, rt) = fresh_jar(&Side::Rust(app)).await;
@@ -365,7 +372,11 @@ async fn accounts_parity() {
         let (v, _, _) = same_post(&app, case, "/accounts/login/", &form, &[]).await;
         check!(v);
     }
-    for (case, path) in [("post.next", "/accounts/login/?next=/documents/"), ("post.evil_next", "/accounts/login/?next=https://evil.example/x"), ("post.slashes", "/accounts/login/?next=///evil.example")] {
+    for (case, path) in [
+        ("post.next", "/accounts/login/?next=/documents/"),
+        ("post.evil_next", "/accounts/login/?next=https://evil.example/x"),
+        ("post.slashes", "/accounts/login/?next=///evil.example"),
+    ] {
         let (v, _, _) = same_post(&app, case, path, &[("login", "alice"), ("password", "alice")], &[]).await;
         check!(v);
     }
@@ -384,7 +395,15 @@ async fn accounts_parity() {
             let (jar, t) = if cookie { fresh_jar(&side).await } else { (Jar::default(), String::new()) };
             let tok = if token == "VALID" { t } else { token.clone() };
             let ex: Vec<(&str, &str)> = origin.map(|o| vec![("Origin", o)]).unwrap_or_default();
-            let r = send(&side, "POST", "/accounts/login/", &jar, Some(&[("csrfmiddlewaretoken", &tok), ("login", "admin"), ("password", "wrong")]), &ex).await;
+            let r = send(
+                &side,
+                "POST",
+                "/accounts/login/",
+                &jar,
+                Some(&[("csrfmiddlewaretoken", &tok), ("login", "admin"), ("password", "wrong")]),
+                &ex,
+            )
+            .await;
             results.push((r, jar));
         }
         let (d, dj) = &results[0];
@@ -406,7 +425,15 @@ async fn accounts_parity() {
     {
         // Rust login → Django API
         let (mut rj, rt) = fresh_jar(&Side::Rust(&app)).await;
-        let r = send(&Side::Rust(&app), "POST", "/accounts/login/", &rj, Some(&[("csrfmiddlewaretoken", &rt), ("login", "alice"), ("password", "alice")]), &[]).await;
+        let r = send(
+            &Side::Rust(&app),
+            "POST",
+            "/accounts/login/",
+            &rj,
+            Some(&[("csrfmiddlewaretoken", &rt), ("login", "alice"), ("password", "alice")]),
+            &[],
+        )
+        .await;
         rj.update(&r);
         let api = send(&Side::Django, "GET", "/api/ui_settings/", &rj, None, &[]).await;
         if api.status != 200 || !api.body.contains("\"username\":\"alice\"") {
@@ -434,13 +461,32 @@ async fn accounts_parity() {
     {
         // Django login → Rust recognizes user; Rust logout ends Django session
         let (mut dj, dt) = fresh_jar(&Side::Django).await;
-        let d = send(&Side::Django, "POST", "/accounts/login/", &dj, Some(&[("csrfmiddlewaretoken", &dt), ("login", "bob"), ("password", "bob")]), &[]).await;
+        let d = send(
+            &Side::Django,
+            "POST",
+            "/accounts/login/",
+            &dj,
+            Some(&[("csrfmiddlewaretoken", &dt), ("login", "bob"), ("password", "bob")]),
+            &[],
+        )
+        .await;
         dj.update(&d);
         let r = send(&Side::Rust(&app), "GET", "/accounts/login/?next=/documents/", &dj, None, &[]).await;
         if r.status != 302 || r.header("location") != Some("/documents/") || !r.authenticated {
             fails.push(format!("session.django_to_rust: {} {:?}", r.status, r.header("location")));
         }
-        let lo = send(&Side::Rust(&app), "POST", "/accounts/logout/", &dj, Some(&[("csrfmiddlewaretoken", &csrf_from(&send(&Side::Django, "GET", "/accounts/password/reset/", &dj, None, &[]).await.body))]), &[]).await;
+        let lo = send(
+            &Side::Rust(&app),
+            "POST",
+            "/accounts/logout/",
+            &dj,
+            Some(&[(
+                "csrfmiddlewaretoken",
+                &csrf_from(&send(&Side::Django, "GET", "/accounts/password/reset/", &dj, None, &[]).await.body),
+            )]),
+            &[],
+        )
+        .await;
         if lo.status != 302 {
             fails.push(format!("session.rust_logout_post: {}", lo.status));
         }
@@ -457,7 +503,15 @@ async fn accounts_parity() {
         let mut pair = Vec::new();
         for side in [Side::Django, Side::Rust(&app)] {
             let (mut j, t) = fresh_jar(&side).await;
-            let r = send(&side, "POST", "/accounts/login/", &j, Some(&[("csrfmiddlewaretoken", &t), ("login", "carol"), ("password", "carol")]), &[]).await;
+            let r = send(
+                &side,
+                "POST",
+                "/accounts/login/",
+                &j,
+                Some(&[("csrfmiddlewaretoken", &t), ("login", "carol"), ("password", "carol")]),
+                &[],
+            )
+            .await;
             j.update(&r);
             // MFA bypass: intermediate state is not logged in
             let api = send(&Side::Django, "GET", "/api/ui_settings/", &j, None, &[]).await;
@@ -477,13 +531,23 @@ async fn accounts_parity() {
         for (i, side) in [Side::Django, Side::Rust(&app)].into_iter().enumerate() {
             let j = &pair[i].0;
             let t = csrf_from(&pair[i].1.body);
-            wrong.push(send(&side, "POST", "/accounts/2fa/authenticate/", j, Some(&[("csrfmiddlewaretoken", &t), ("code", "000000")]), &[]).await);
+            wrong.push(
+                send(&side, "POST", "/accounts/2fa/authenticate/", j, Some(&[("csrfmiddlewaretoken", &t), ("code", "000000")]), &[]).await,
+            );
         }
         check!(diff("mfa.wrong", &wrong[0], &wrong[1], &pair[0].0).into_iter().filter(|l| !l.contains("cookies")).collect());
         // correct code at Rust, the same code afterwards at Django → used up (shared cache)
         let code = totp_now();
         let rt = csrf_from(&wrong[1].body);
-        let ok = send(&Side::Rust(&app), "POST", "/accounts/2fa/authenticate/", &pair[1].0, Some(&[("csrfmiddlewaretoken", &rt), ("code", &code)]), &[]).await;
+        let ok = send(
+            &Side::Rust(&app),
+            "POST",
+            "/accounts/2fa/authenticate/",
+            &pair[1].0,
+            Some(&[("csrfmiddlewaretoken", &rt), ("code", &code)]),
+            &[],
+        )
+        .await;
         if ok.status != 302 || ok.header("location") != Some("/dashboard") || !ok.authenticated {
             fails.push(format!("mfa.ok: {} {:?}", ok.status, ok.header("location")));
         }
@@ -495,17 +559,38 @@ async fn accounts_parity() {
             fails.push(format!("mfa.session_to_django: {}", api.status));
         }
         let dt = csrf_from(&wrong[0].body);
-        let replay = send(&Side::Django, "POST", "/accounts/2fa/authenticate/", &pair[0].0, Some(&[("csrfmiddlewaretoken", &dt), ("code", &code)]), &[]).await;
+        let replay = send(
+            &Side::Django,
+            "POST",
+            "/accounts/2fa/authenticate/",
+            &pair[0].0,
+            Some(&[("csrfmiddlewaretoken", &dt), ("code", &code)]),
+            &[],
+        )
+        .await;
         if replay.status != 200 || !replay.body.contains("Incorrect code.") {
             fails.push(format!("mfa.replay_blocked: Django accepted a code already used in Rust ({})", replay.status));
         }
         // redeem recovery code (first code of the seed) at Django intermediate state via Rust
-        let codes = pl_auth_api::totp::generate_recovery_codes("00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff0011223344556677");
-        let rc = send(&Side::Rust(&app), "POST", "/accounts/2fa/authenticate/", &pair[0].0, Some(&[("csrfmiddlewaretoken", &csrf_from(&replay.body)), ("code", &codes[0])]), &[]).await;
+        let codes =
+            pl_auth_api::totp::generate_recovery_codes("00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff0011223344556677");
+        let rc = send(
+            &Side::Rust(&app),
+            "POST",
+            "/accounts/2fa/authenticate/",
+            &pair[0].0,
+            Some(&[("csrfmiddlewaretoken", &csrf_from(&replay.body)), ("code", &codes[0])]),
+            &[],
+        )
+        .await;
         if rc.status != 302 {
             fails.push(format!("mfa.recovery_code_cross: {}", rc.status));
         }
-        let (mask,): (serde_json::Value,) = sqlx::query_as("SELECT data->'used_mask' FROM mfa_authenticator WHERE user_id=5 AND type='recovery_codes'").fetch_one(&db).await.unwrap();
+        let (mask,): (serde_json::Value,) =
+            sqlx::query_as("SELECT data->'used_mask' FROM mfa_authenticator WHERE user_id=5 AND type='recovery_codes'")
+                .fetch_one(&db)
+                .await
+                .unwrap();
         if mask != serde_json::json!(1) {
             fails.push(format!("mfa.recovery_mask: {mask}"));
         }
@@ -517,17 +602,41 @@ async fn accounts_parity() {
     {
         let (mut rj, mut rt) = fresh_jar(&Side::Rust(&app)).await;
         for _ in 0..5 {
-            let r = send(&Side::Rust(&app), "POST", "/accounts/login/", &rj, Some(&[("csrfmiddlewaretoken", &rt), ("login", "admin"), ("password", "nope")]), &[]).await;
+            let r = send(
+                &Side::Rust(&app),
+                "POST",
+                "/accounts/login/",
+                &rj,
+                Some(&[("csrfmiddlewaretoken", &rt), ("login", "admin"), ("password", "nope")]),
+                &[],
+            )
+            .await;
             rj.update(&r);
             rt = csrf_from(&r.body);
         }
         // sixth attempt – even with the correct password – blocked at Django
         let (dj, dt) = fresh_jar(&Side::Django).await;
-        let d = send(&Side::Django, "POST", "/accounts/login/", &dj, Some(&[("csrfmiddlewaretoken", &dt), ("login", "Admin"), ("password", "admin")]), &[]).await;
+        let d = send(
+            &Side::Django,
+            "POST",
+            "/accounts/login/",
+            &dj,
+            Some(&[("csrfmiddlewaretoken", &dt), ("login", "Admin"), ("password", "admin")]),
+            &[],
+        )
+        .await;
         if !d.body.contains("Too many failed login attempts") {
             fails.push(format!("bruteforce.shared_django: {}", d.status));
         }
-        let r = send(&Side::Rust(&app), "POST", "/accounts/login/", &rj, Some(&[("csrfmiddlewaretoken", &rt), ("login", "admin"), ("password", "admin")]), &[]).await;
+        let r = send(
+            &Side::Rust(&app),
+            "POST",
+            "/accounts/login/",
+            &rj,
+            Some(&[("csrfmiddlewaretoken", &rt), ("login", "admin"), ("password", "admin")]),
+            &[],
+        )
+        .await;
         if !r.body.contains(common::en("auth.error.too_many")) || r.status != 200 {
             fails.push(format!("bruteforce.rust: {}", r.status));
         }
@@ -542,16 +651,51 @@ async fn accounts_parity() {
         let hist: Vec<f64> = (0..30).map(|i| now - i as f64).collect();
         let client = redis::Client::open("redis://127.0.0.1:63799").unwrap();
         let mut c = client.get_multiplexed_async_connection().await.unwrap();
-        let _: () = redis::cmd("SET").arg("w3ref:1:allauth:rl:allauth.account:login:ip:127.0.0.1").arg(pl_auth_api::django_cache::pickle_float_list(&hist)).arg("EX").arg(60).query_async(&mut c).await.unwrap();
+        let _: () = redis::cmd("SET")
+            .arg("w3ref:1:allauth:rl:allauth.account:login:ip:127.0.0.1")
+            .arg(pl_auth_api::django_cache::pickle_float_list(&hist))
+            .arg("EX")
+            .arg(60)
+            .query_async(&mut c)
+            .await
+            .unwrap();
         // prefill the Rust side separately (own cache; keys carry the time window since 2026-11-15)
-        pl_accounts::cache::Cache::new(&state).set("allauth:rl:allauth.account:login:60s:ip:127.0.0.1", &pl_auth_api::django_cache::pickle_float_list(&hist), 60).await.unwrap();
-        let last = send(&Side::Rust(&app), "POST", "/accounts/login/", &rj, Some(&[("csrfmiddlewaretoken", &rt), ("login", "x"), ("password", "x")]), &[]).await.status;
+        pl_accounts::cache::Cache::new(&state)
+            .set("allauth:rl:allauth.account:login:60s:ip:127.0.0.1", &pl_auth_api::django_cache::pickle_float_list(&hist), 60)
+            .await
+            .unwrap();
+        let last = send(
+            &Side::Rust(&app),
+            "POST",
+            "/accounts/login/",
+            &rj,
+            Some(&[("csrfmiddlewaretoken", &rt), ("login", "x"), ("password", "x")]),
+            &[],
+        )
+        .await
+        .status;
         let (dj, dt) = fresh_jar(&Side::Django).await;
-        let d = send(&Side::Django, "POST", "/accounts/login/", &dj, Some(&[("csrfmiddlewaretoken", &dt), ("login", "y"), ("password", "x")]), &[]).await;
+        let d = send(
+            &Side::Django,
+            "POST",
+            "/accounts/login/",
+            &dj,
+            Some(&[("csrfmiddlewaretoken", &dt), ("login", "y"), ("password", "x")]),
+            &[],
+        )
+        .await;
         if last != 429 || d.status != 429 {
             fails.push(format!("ratelimit.login_429: rust={last} django={}", d.status));
         }
-        let r = send(&Side::Rust(&app), "POST", "/accounts/login/", &rj, Some(&[("csrfmiddlewaretoken", &rt), ("login", "y"), ("password", "x")]), &[]).await;
+        let r = send(
+            &Side::Rust(&app),
+            "POST",
+            "/accounts/login/",
+            &rj,
+            Some(&[("csrfmiddlewaretoken", &rt), ("login", "y"), ("password", "x")]),
+            &[],
+        )
+        .await;
         check!(diff("ratelimit.429_body", &d, &r, &Jar::default()).into_iter().filter(|l| !l.contains("cookies")).collect());
         n += 1;
     }
@@ -570,7 +714,8 @@ async fn accounts_parity() {
         if r.status != 302 {
             fails.push(format!("reset.known rust status {}", r.status));
         }
-        let mut files: Vec<_> = std::fs::read_dir(&mail_dir).map(|d| d.filter_map(Result::ok).map(|e| e.path()).collect()).unwrap_or_default();
+        let mut files: Vec<_> =
+            std::fs::read_dir(&mail_dir).map(|d| d.filter_map(Result::ok).map(|e| e.path()).collect()).unwrap_or_default();
         files.sort();
         if files.len() < before + 2 {
             fails.push(format!("reset.mails: expected 2 new mails, got {}", files.len().saturating_sub(before)));
@@ -578,11 +723,20 @@ async fn accounts_parity() {
             let dmail = std::fs::read_to_string(&files[files.len() - 2]).unwrap_or_default();
             let rmail = std::fs::read_to_string(&files[files.len() - 1]).unwrap_or_default();
             // Own mail texts: header lines (without subject/date) equal, text from the own catalog
-            let head = |m: &str| m.lines().take_while(|l| !l.is_empty()).filter(|l| !l.starts_with("Date:") && !l.starts_with("Subject:") && !l.starts_with(' ')).map(str::to_string).collect::<Vec<_>>();
+            let head = |m: &str| {
+                m.lines()
+                    .take_while(|l| !l.is_empty())
+                    .filter(|l| !l.starts_with("Date:") && !l.starts_with("Subject:") && !l.starts_with(' '))
+                    .map(str::to_string)
+                    .collect::<Vec<_>>()
+            };
             if head(&dmail) != head(&rmail) {
                 fails.push(format!("reset.mail_headers differ\n--django--\n{dmail}\n--rust--\n{rmail}"));
             }
-            if !rmail.contains(common::en("auth.mail.reset_subject")) || !rmail.contains(common::en("auth.mail.reset_text")) || !rmail.contains("bob") {
+            if !rmail.contains(common::en("auth.mail.reset_subject"))
+                || !rmail.contains(common::en("auth.mail.reset_text"))
+                || !rmail.contains("bob")
+            {
                 fails.push(format!("reset.mail_body (own text)\n{rmail}"));
             }
             let link_re = regex::Regex::new(r"http://127\.0\.0\.1:8120(/accounts/password/reset/key/[^\s]+)").unwrap();
@@ -593,7 +747,12 @@ async fn accounts_parity() {
                 fails.push(format!("reset.rust_token_in_django: {} {:?} ({rlink})", viaj.status, viaj.header("location")));
             }
             let viar = send(&Side::Rust(&app), "GET", &dlink, &Jar::default(), None, &[]).await;
-            check!(diff("reset.django_token_in_rust", &viaj, &viar, &Jar::default()).into_iter().filter(|l| !l.contains("cookies") && !l.contains("location")).collect());
+            check!(
+                diff("reset.django_token_in_rust", &viaj, &viar, &Jar::default())
+                    .into_iter()
+                    .filter(|l| !l.contains("cookies") && !l.contains("location"))
+                    .collect()
+            );
             // form after redirect + new password (too short, then valid) in Rust
             let mut rj = Jar::default();
             rj.update(&viar);
@@ -605,17 +764,53 @@ async fn accounts_parity() {
             let dform = send(&Side::Django, "GET", viaj.header("location").unwrap_or(""), &dj, None, &[]).await;
             dj.update(&dform);
             check!(diff("reset.form", &dform, &form, &rj).into_iter().filter(|l| !l.contains("cookies")).collect());
-            let short = send(&Side::Rust(&app), "POST", &loc, &rj, Some(&[("csrfmiddlewaretoken", &csrf_from(&form.body)), ("password1", "abc"), ("password2", "abc")]), &[]).await;
+            let short = send(
+                &Side::Rust(&app),
+                "POST",
+                &loc,
+                &rj,
+                Some(&[("csrfmiddlewaretoken", &csrf_from(&form.body)), ("password1", "abc"), ("password2", "abc")]),
+                &[],
+            )
+            .await;
             let dj_csrf = csrf_from(&dform.body);
-            let dshort = send(&Side::Django, "POST", viaj.header("location").unwrap_or(""), &dj, Some(&[("csrfmiddlewaretoken", &dj_csrf), ("password1", "abc"), ("password2", "abc")]), &[]).await;
+            let dshort = send(
+                &Side::Django,
+                "POST",
+                viaj.header("location").unwrap_or(""),
+                &dj,
+                Some(&[("csrfmiddlewaretoken", &dj_csrf), ("password1", "abc"), ("password2", "abc")]),
+                &[],
+            )
+            .await;
             check!(diff("reset.too_short", &dshort, &short, &rj).into_iter().filter(|l| !l.contains("cookies")).collect());
-            let done = send(&Side::Rust(&app), "POST", &loc, &rj, Some(&[("csrfmiddlewaretoken", &csrf_from(&short.body)), ("password1", "bob-new-pass-2026"), ("password2", "bob-new-pass-2026")]), &[]).await;
+            let done = send(
+                &Side::Rust(&app),
+                "POST",
+                &loc,
+                &rj,
+                Some(&[
+                    ("csrfmiddlewaretoken", &csrf_from(&short.body)),
+                    ("password1", "bob-new-pass-2026"),
+                    ("password2", "bob-new-pass-2026"),
+                ]),
+                &[],
+            )
+            .await;
             if done.status != 302 || done.header("location") != Some("/accounts/password/reset/key/done/") {
                 fails.push(format!("reset.done: {} {:?}", done.status, done.header("location")));
             }
             // Django accepts the new password; the link is invalid afterwards
             let (dj2, dt2) = fresh_jar(&Side::Django).await;
-            let login = send(&Side::Django, "POST", "/accounts/login/", &dj2, Some(&[("csrfmiddlewaretoken", &dt2), ("login", "bob"), ("password", "bob-new-pass-2026")]), &[]).await;
+            let login = send(
+                &Side::Django,
+                "POST",
+                "/accounts/login/",
+                &dj2,
+                Some(&[("csrfmiddlewaretoken", &dt2), ("login", "bob"), ("password", "bob-new-pass-2026")]),
+                &[],
+            )
+            .await;
             if login.status != 302 {
                 fails.push(format!("reset.django_login_new_pw: {}", login.status));
             }
@@ -641,7 +836,14 @@ async fn accounts_parity() {
         check!(v);
     }
     {
-        let (v, (d, _), (r, rj)) = same_post(&app, "signup.ok", "/accounts/signup/", &[("username", "w3signup"), ("password1", "x-very-long-pass-1"), ("password2", "x-very-long-pass-1")], &[]).await;
+        let (v, (d, _), (r, rj)) = same_post(
+            &app,
+            "signup.ok",
+            "/accounts/signup/",
+            &[("username", "w3signup"), ("password1", "x-very-long-pass-1"), ("password2", "x-very-long-pass-1")],
+            &[],
+        )
+        .await;
         // Django creates w3signup, Rust then fails with "already exists" – check separately
         let _ = v;
         if d.status != 302 {
@@ -654,7 +856,20 @@ async fn accounts_parity() {
         sqlx::query("DELETE FROM auth_user WHERE username = 'w3signup'").execute(&db).await.unwrap();
         clear_rl().await;
         let (mut rj, rt) = fresh_jar(&Side::Rust(&app)).await;
-        let r = send(&Side::Rust(&app), "POST", "/accounts/signup/", &rj, Some(&[("csrfmiddlewaretoken", &rt), ("username", "w3signup"), ("password1", "x-very-long-pass-1"), ("password2", "x-very-long-pass-1")]), &[]).await;
+        let r = send(
+            &Side::Rust(&app),
+            "POST",
+            "/accounts/signup/",
+            &rj,
+            Some(&[
+                ("csrfmiddlewaretoken", &rt),
+                ("username", "w3signup"),
+                ("password1", "x-very-long-pass-1"),
+                ("password2", "x-very-long-pass-1"),
+            ]),
+            &[],
+        )
+        .await;
         rj.update(&r);
         if r.status != 302 || r.header("location") != Some("/dashboard") {
             fails.push(format!("signup.rust_ok {} {:?}", r.status, r.header("location")));
@@ -691,7 +906,15 @@ async fn login_with_rehash_keeps_session() {
     clear_rl().await;
     let mut fails = Vec::new();
     let (mut rj, rt) = fresh_jar(&Side::Rust(&app)).await;
-    let r = send(&Side::Rust(&app), "POST", "/accounts/login/", &rj, Some(&[("csrfmiddlewaretoken", &rt), ("login", "alice"), ("password", "alice")]), &[]).await;
+    let r = send(
+        &Side::Rust(&app),
+        "POST",
+        "/accounts/login/",
+        &rj,
+        Some(&[("csrfmiddlewaretoken", &rt), ("login", "alice"), ("password", "alice")]),
+        &[],
+    )
+    .await;
     rj.update(&r);
     if r.status != 302 {
         fails.push(format!("login {}", r.status));

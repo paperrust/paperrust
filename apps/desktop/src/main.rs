@@ -16,10 +16,7 @@ use std::process::ExitCode;
 
 use paperrust_desktop::layout::InstallLayout;
 use paperrust_desktop::paths::AppPaths;
-use paperrust_desktop::supervisor::{
-    AdminPrompt, Event, Opened, SetupChoice, SetupOptions, Supervisor, detect_setup,
-    setup_from_env,
-};
+use paperrust_desktop::supervisor::{AdminPrompt, Event, Opened, SetupChoice, SetupOptions, Supervisor, detect_setup, setup_from_env};
 use paperrust_desktop::{DesktopError, Result};
 
 #[derive(Debug, PartialEq, Eq)]
@@ -77,8 +74,7 @@ fn console_line(prompt: &str) -> Option<String> {
     eprint!("{prompt}");
     let _ = std::io::stderr().flush();
     let mut s = String::new();
-    (std::io::stdin().lock().read_line(&mut s).ok()? > 0)
-        .then(|| s.trim_end_matches(['\r', '\n']).to_string())
+    (std::io::stdin().lock().read_line(&mut s).ok()? > 0).then(|| s.trim_end_matches(['\r', '\n']).to_string())
 }
 
 impl AdminPrompt for ConsolePrompt {
@@ -91,27 +87,17 @@ impl AdminPrompt for ConsolePrompt {
              Datenordner mit SQLite oder Datenbank-URL – wird erkannt)"
         );
         if o.can_migrate_db {
-            eprintln!(
-                "            3 = bestehende paperless-ngx-Datenbank übernehmen (URL von Hand)"
-            );
+            eprintln!("            3 = bestehende paperless-ngx-Datenbank übernehmen (URL von Hand)");
         }
         match console_line("Auswahl [1]: ")?.trim() {
             "2" => loop {
-                let input = console_line(
-                    "Quelle (Export, paperless-Ordner, data-Ordner oder sqlite:///…/postgres://…): ",
-                )?;
+                let input = console_line("Quelle (Export, paperless-Ordner, data-Ordner oder sqlite:///…/postgres://…): ")?;
                 match detect_setup(&input, None) {
-                    Ok(SetupChoice::MigrateDb {
-                        source_url,
-                        media_dir: None,
-                    }) => {
-                        let media = console_line(
-                            "Alter Medienordner (MEDIA_ROOT, leer = Dateien nicht übernehmen): ",
-                        )?;
+                    Ok(SetupChoice::MigrateDb { source_url, media_dir: None }) => {
+                        let media = console_line("Alter Medienordner (MEDIA_ROOT, leer = Dateien nicht übernehmen): ")?;
                         break Some(SetupChoice::MigrateDb {
                             source_url,
-                            media_dir: (!media.trim().is_empty())
-                                .then(|| PathBuf::from(media.trim())),
+                            media_dir: (!media.trim().is_empty()).then(|| PathBuf::from(media.trim())),
                         });
                     }
                     Ok(c) => {
@@ -128,10 +114,8 @@ impl AdminPrompt for ConsolePrompt {
                 }
             },
             "3" if o.can_migrate_db => {
-                let source_url =
-                    console_line("Quelle (z. B. sqlite:///C:/paperless/data/db.sqlite3): ")?;
-                let media =
-                    console_line("Alter Medienordner (MEDIA_ROOT, leer = später kopieren): ")?;
+                let source_url = console_line("Quelle (z. B. sqlite:///C:/paperless/data/db.sqlite3): ")?;
+                let media = console_line("Alter Medienordner (MEDIA_ROOT, leer = später kopieren): ")?;
                 Some(SetupChoice::MigrateDb {
                     source_url: source_url.trim().to_string(),
                     media_dir: (!media.trim().is_empty()).then(|| PathBuf::from(media.trim())),
@@ -169,11 +153,7 @@ async fn signals() {
     #[cfg(windows)]
     {
         use tokio::signal::windows;
-        let (Ok(mut close), Ok(mut shut), Ok(mut brk)) = (
-            windows::ctrl_close(),
-            windows::ctrl_shutdown(),
-            windows::ctrl_break(),
-        ) else {
+        let (Ok(mut close), Ok(mut shut), Ok(mut brk)) = (windows::ctrl_close(), windows::ctrl_shutdown(), windows::ctrl_break()) else {
             let _ = tokio::signal::ctrl_c().await;
             return;
         };
@@ -187,10 +167,7 @@ async fn signals() {
     #[cfg(unix)]
     {
         use tokio::signal::unix::{SignalKind, signal};
-        let (Ok(mut term), Ok(mut hup)) = (
-            signal(SignalKind::terminate()),
-            signal(SignalKind::hangup()),
-        ) else {
+        let (Ok(mut term), Ok(mut hup)) = (signal(SignalKind::terminate()), signal(SignalKind::hangup())) else {
             let _ = tokio::signal::ctrl_c().await;
             return;
         };
@@ -207,8 +184,7 @@ async fn real_main(cmd: Cmd) -> Result<i32> {
     paths.ensure_dirs()?;
     // Open the log only after the single-instance lock (and rotate): `paths`, `stop` or a
     // second start would otherwise rotate away the desktop.log of the running instance (smoke test D1).
-    let layout = InstallLayout::from_current_exe()
-        .map_err(|e| DesktopError::Other(format!("Programmpfad: {e}")))?;
+    let layout = InstallLayout::from_current_exe().map_err(|e| DesktopError::Other(format!("Programmpfad: {e}")))?;
     if cmd == Cmd::Paths {
         println!("Daten:        {}", paths.home.display());
         println!("Konfiguration {}", paths.config_file.display());
@@ -216,12 +192,7 @@ async fn real_main(cmd: Cmd) -> Result<i32> {
         println!("Installation: {}", layout.root.display());
         println!("PostgreSQL:   {}", layout.pg_bin.display());
         println!("Server:       {}", layout.server_bin.display());
-        let opt = |p: &Option<PathBuf>| {
-            p.as_ref().map_or_else(
-                || "– (nicht gefunden)".to_string(),
-                |p| p.display().to_string(),
-            )
-        };
+        let opt = |p: &Option<PathBuf>| p.as_ref().map_or_else(|| "– (nicht gefunden)".to_string(), |p| p.display().to_string());
         println!("routes.toml:  {}", opt(&layout.routes_file));
         println!("Oberfläche:   {}", opt(&layout.static_dir));
         println!("Tesseract:    {}", opt(&layout.tesseract));
@@ -250,20 +221,15 @@ async fn real_main(cmd: Cmd) -> Result<i32> {
                 eprintln!("PaperRust beendet.");
                 Ok(0)
             }
-            StopOutcome::TimedOut => Err(DesktopError::Other(
-                "PaperRust hat sich nach 120 s nicht beendet (logs/desktop.log prüfen)".into(),
-            )),
+            StopOutcome::TimedOut => {
+                Err(DesktopError::Other("PaperRust hat sich nach 120 s nicht beendet (logs/desktop.log prüfen)".into()))
+            }
         };
     }
     // Backup with the app running: the instance backs up itself (like tray "Sicherung jetzt").
     if let Cmd::Backup(None) = &cmd {
         // `None` = app is not running: back up here below.
-        if let Some(dir) = paperrust_desktop::supervisor::request_live_backup(
-            &paths,
-            std::time::Duration::from_secs(6 * 3600),
-        )
-        .await?
-        {
+        if let Some(dir) = paperrust_desktop::supervisor::request_live_backup(&paths, std::time::Duration::from_secs(6 * 3600)).await? {
             eprintln!("Sicherung (laufende Instanz) fertig: {}", dir.display());
             return Ok(0);
         }
@@ -272,8 +238,7 @@ async fn real_main(cmd: Cmd) -> Result<i32> {
     let run_dir = paths.run.clone();
     let sup = match Supervisor::open(paths, layout)? {
         Opened::Ready(s) => {
-            let log = paperrust_desktop::logs::init(&s.paths.logs)
-                .map_err(|e| DesktopError::Other(format!("Log öffnen: {e}")))?;
+            let log = paperrust_desktop::logs::init(&s.paths.logs).map_err(|e| DesktopError::Other(format!("Log öffnen: {e}")))?;
             tracing::info!(log = %log.display(), home = %s.paths.home.display(), "PaperRust Desktop {}", env!("CARGO_PKG_VERSION"));
             if s.config_created {
                 tracing::info!(file = %s.paths.config_file.display(), "neue Desktop-Konfiguration erzeugt");
@@ -289,9 +254,7 @@ async fn real_main(cmd: Cmd) -> Result<i32> {
                     open_browser(&login_or_plain(&run_dir, &u));
                     Ok(0)
                 }
-                (_, u) => Err(DesktopError::AlreadyRunning(
-                    u.unwrap_or_else(|| "startet gerade".into()),
-                )),
+                (_, u) => Err(DesktopError::AlreadyRunning(u.unwrap_or_else(|| "startet gerade".into()))),
             };
         }
     };
@@ -309,8 +272,7 @@ async fn real_main(cmd: Cmd) -> Result<i32> {
                 other => tracing::info!(event = ?other, "Status"),
             };
             let stop_file = sup.paths.stop_request_file();
-            sup.run(&ConsolePrompt, &on_event, shutdown_requested(stop_file))
-                .await?;
+            sup.run(&ConsolePrompt, &on_event, shutdown_requested(stop_file)).await?;
             Ok(0)
         }
         Cmd::Backup(target) => {
@@ -349,11 +311,7 @@ fn main() -> ExitCode {
     {
         eprintln!("paperrust-desktop: Job-Objekt: {e} (Kindprozesse überleben einen Absturz)");
     }
-    let rt = match tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(2)
-        .enable_all()
-        .build()
-    {
+    let rt = match tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build() {
         Ok(rt) => rt,
         Err(e) => {
             eprintln!("paperrust-desktop: Laufzeit: {e}");
@@ -382,20 +340,11 @@ mod tests {
     fn cli() {
         assert_eq!(p(&[]).unwrap(), Cmd::Run { browser: true });
         assert_eq!(p(&["run"]).unwrap(), Cmd::Run { browser: true });
-        assert_eq!(
-            p(&["run", "--no-browser"]).unwrap(),
-            Cmd::Run { browser: false }
-        );
+        assert_eq!(p(&["run", "--no-browser"]).unwrap(), Cmd::Run { browser: false });
         assert_eq!(p(&["--no-browser"]).unwrap(), Cmd::Run { browser: false });
         assert_eq!(p(&["backup"]).unwrap(), Cmd::Backup(None));
-        assert_eq!(
-            p(&["backup", "D:/b"]).unwrap(),
-            Cmd::Backup(Some(PathBuf::from("D:/b")))
-        );
-        assert_eq!(
-            p(&["manage", "document_importer", "x"]).unwrap(),
-            Cmd::Manage(vec!["document_importer".into(), "x".into()])
-        );
+        assert_eq!(p(&["backup", "D:/b"]).unwrap(), Cmd::Backup(Some(PathBuf::from("D:/b"))));
+        assert_eq!(p(&["manage", "document_importer", "x"]).unwrap(), Cmd::Manage(vec!["document_importer".into(), "x".into()]));
         assert_eq!(p(&["paths"]).unwrap(), Cmd::Paths);
         assert_eq!(p(&["stop"]).unwrap(), Cmd::Stop);
         assert!(p(&["stop", "x"]).is_err());

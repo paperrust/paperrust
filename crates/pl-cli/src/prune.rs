@@ -6,10 +6,10 @@
 
 use sqlx::Row;
 
+use crate::CliResult;
 use crate::args;
 use crate::ctx::Ctx;
 use crate::export::descriptor;
-use crate::CliResult;
 
 pub async fn command(argv: Vec<String>) -> CliResult {
     args::parse(&argv, &[args::PROGRESS], 0)?;
@@ -41,13 +41,11 @@ pub async fn prune(c: &Ctx) -> CliResult<Vec<(String, i64)>> {
             continue;
         };
         let Some(oid) = object_id.filter(|v| *v != 0) else { continue };
-        let exists: bool = sqlx::query_scalar(&format!(
-            "SELECT EXISTS (SELECT 1 FROM \"{}\" WHERE \"{}\"::text = $1)",
-            model.table, model.pk_column
-        ))
-        .bind(oid.to_string())
-        .fetch_one(&mut *tx)
-        .await?;
+        let exists: bool =
+            sqlx::query_scalar(&format!("SELECT EXISTS (SELECT 1 FROM \"{}\" WHERE \"{}\"::text = $1)", model.table, model.pk_column))
+                .bind(oid.to_string())
+                .fetch_one(&mut *tx)
+                .await?;
         if !exists {
             sqlx::query("DELETE FROM auditlog_logentry WHERE id = $1").bind(id).execute(&mut *tx).await?;
             let name = if model.object_name.is_empty() { label.clone() } else { model.object_name.clone() };

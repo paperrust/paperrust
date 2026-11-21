@@ -67,9 +67,7 @@ fn base62(bytes: &[u8; 32]) -> String {
 
 /// Formally valid (prefix + 43 base62 characters)? Invalid forms are rejected without DB access.
 pub fn is_well_formed(token: &str) -> bool {
-    token
-        .strip_prefix(PREFIX)
-        .is_some_and(|b| b.len() == BODY_LEN && b.bytes().all(|c| c.is_ascii_alphanumeric()))
+    token.strip_prefix(PREFIX).is_some_and(|b| b.len() == BODY_LEN && b.bytes().all(|c| c.is_ascii_alphanumeric()))
 }
 
 /// `sha256(token)` as 64 hex characters (stored form).
@@ -134,10 +132,7 @@ pub async fn create(db: &PgPool, user_id: i64, name: &str) -> Result<(Device, St
     .bind(hash(&token))
     .fetch_one(db)
     .await?;
-    Ok((
-        Device { uuid: row.0, user_id, name: name.to_string(), created: row.1, last_used: None, revoked_at: None },
-        token,
-    ))
+    Ok((Device { uuid: row.0, user_id, name: name.to_string(), created: row.1, last_used: None, revoked_at: None }, token))
 }
 
 /// All **non-revoked** devices of a user (newest first).

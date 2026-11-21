@@ -1,10 +1,10 @@
 //! History per workflow (`paperrust_workflow_run`): list with cursor pagination (newest first),
 //! counters, cleanup.
 
+use axum::body::Bytes;
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::Response;
-use axum::body::Bytes;
 use pl_consumer::workflow_ext;
 use pl_core::AppState;
 use serde_json::{Value, json};
@@ -30,7 +30,11 @@ pub async fn list(State(st): State<AppState>, who: Who, Path(id): Path<String>, 
     let id = common::path_id(&id)?;
     let limit = match q.limit.as_deref() {
         None | Some("") => DEFAULT_PAGE,
-        Some(s) => s.parse::<i64>().ok().filter(|n| (1..=MAX_PAGE).contains(n)).ok_or_else(|| AErr::field("limit", &format!("Ensure this value is between 1 and {MAX_PAGE}.")))?,
+        Some(s) => s
+            .parse::<i64>()
+            .ok()
+            .filter(|n| (1..=MAX_PAGE).contains(n))
+            .ok_or_else(|| AErr::field("limit", &format!("Ensure this value is between 1 and {MAX_PAGE}.")))?,
     };
     let cursor = match q.cursor.as_deref() {
         None | Some("") => None,
@@ -72,13 +76,16 @@ pub async fn list(State(st): State<AppState>, who: Who, Path(id): Path<String>, 
     let doc_ids: Vec<i64> = rows.iter().filter_map(|r| r.try_get::<Option<i32>, _>(2).ok().flatten().map(i64::from)).collect();
     let visible = common::permitted_docs(&mut conn, user, "view_document", &doc_ids).await?;
     let ids32: Vec<i32> = visible.iter().filter_map(|i| i32::try_from(*i).ok()).collect();
-    let titles: std::collections::HashMap<i64, (String, bool)> = sqlx::query("SELECT id, title, deleted_at IS NOT NULL FROM documents_document WHERE id = ANY($1)")
-        .bind(&ids32)
-        .fetch_all(&mut *conn)
-        .await?
-        .into_iter()
-        .filter_map(|r| Some((i64::from(r.try_get::<i32, _>(0).ok()?), (r.try_get::<String, _>(1).ok()?, r.try_get::<bool, _>(2).ok()?))))
-        .collect();
+    let titles: std::collections::HashMap<i64, (String, bool)> =
+        sqlx::query("SELECT id, title, deleted_at IS NOT NULL FROM documents_document WHERE id = ANY($1)")
+            .bind(&ids32)
+            .fetch_all(&mut *conn)
+            .await?
+            .into_iter()
+            .filter_map(|r| {
+                Some((i64::from(r.try_get::<i32, _>(0).ok()?), (r.try_get::<String, _>(1).ok()?, r.try_get::<bool, _>(2).ok()?)))
+            })
+            .collect();
     let mut items = Vec::with_capacity(rows.len());
     for r in rows {
         let at: chrono::DateTime<chrono::Utc> = r.try_get(3)?;

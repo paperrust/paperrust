@@ -97,12 +97,7 @@ impl PendingActions {
 /// does not allow other JSON values).
 pub fn clean_passwords(v: &Value) -> Vec<String> {
     match v {
-        Value::Array(items) => items
-            .iter()
-            .filter_map(Value::as_str)
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect(),
+        Value::Array(items) => items.iter().filter_map(Value::as_str).map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect(),
         _ => Vec::new(),
     }
 }
@@ -219,7 +214,6 @@ async fn execute(deps: &PasswordRemovalDeps, action_id: i64, target: i64) -> Res
     tracing::error!(target: LOG, "Workflow action {action_id} could not unlock document {doc_id} with any configured value");
     Ok(())
 }
-
 
 #[cfg(test)]
 mod tests {

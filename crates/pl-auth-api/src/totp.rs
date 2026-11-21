@@ -165,10 +165,7 @@ pub fn validate_totp_code(secret: &str, code: &str) -> Result<bool, BadSecret> {
 }
 
 pub fn unix_now() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
 }
 
 /// `urllib.parse.quote(s, safe)`: UTF-8 percent-encoding, unreserved `A-Za-z0-9_.-~` kept.
@@ -187,11 +184,7 @@ pub fn py_quote(s: &str, safe: &str) -> String {
 
 /// `DefaultMFAAdapter.get_totp_label`: email, else username, else `str(user)` (= username).
 pub fn totp_label(email: &str, username: &str) -> String {
-    if !email.is_empty() {
-        email.to_string()
-    } else {
-        username.to_string()
-    }
+    if !email.is_empty() { email.to_string() } else { username.to_string() }
 }
 
 /// Issuer: `PAPERRUST_MFA_TOTP_ISSUER` (aliases `PAPERLESS_*`), non-empty, else [`TOTP_ISSUER`].
@@ -208,12 +201,7 @@ pub fn build_totp_url(label: &str, secret: &str) -> String {
 }
 
 pub fn build_totp_url_with_issuer(label: &str, secret: &str, issuer: &str) -> String {
-    format!(
-        "otpauth://totp/{}?secret={}&issuer={}",
-        py_quote(label, "/"),
-        py_quote(secret, ""),
-        py_quote(issuer, "")
-    )
+    format!("otpauth://totp/{}?secret={}&issuer={}", py_quote(label, "/"), py_quote(secret, ""), py_quote(issuer, ""))
 }
 
 /// `RecoveryCodes.generate_seed`: `secrets.token_hex(40)`.
@@ -251,12 +239,7 @@ pub fn unused_recovery_codes(data: &serde_json::Value) -> Vec<String> {
     }
     let seed = data.get("seed").and_then(|v| v.as_str()).unwrap_or("");
     let used = data.get("used_mask").and_then(|v| v.as_u64()).unwrap_or(0);
-    generate_recovery_codes(seed)
-        .into_iter()
-        .enumerate()
-        .filter(|(i, _)| used & (1u64 << i) == 0)
-        .map(|(_, c)| c)
-        .collect()
+    generate_recovery_codes(seed).into_iter().enumerate().filter(|(i, _)| used & (1u64 << i) == 0).map(|(_, c)| c).collect()
 }
 
 #[cfg(test)]
@@ -292,7 +275,9 @@ mod tests {
             let v = hotp_value(&secret, t / 30).unwrap();
             assert_eq!(v, expected8 % 1_000_000, "t={t}");
             assert!(validate_totp_code_at(&secret, &format_hotp_value(v), t).unwrap());
-            assert!(validate_totp_code_at(&secret, &format!(" {}-{} ", &format_hotp_value(v)[..3], &format_hotp_value(v)[3..]), t).unwrap());
+            assert!(
+                validate_totp_code_at(&secret, &format!(" {}-{} ", &format_hotp_value(v)[..3], &format_hotp_value(v)[3..]), t).unwrap()
+            );
         }
         assert!(validate_totp_code_at("not base32!", "123456", 59).is_err());
     }
@@ -303,10 +288,7 @@ mod tests {
             build_totp_url_with_issuer("test@example.com", "ABC", TOTP_ISSUER),
             "otpauth://totp/test%40example.com?secret=ABC&issuer=PaperRust"
         );
-        assert_eq!(
-            build_totp_url_with_issuer("a", "B", "Mein Archiv"),
-            "otpauth://totp/a?secret=B&issuer=Mein%20Archiv"
-        );
+        assert_eq!(build_totp_url_with_issuer("a", "B", "Mein Archiv"), "otpauth://totp/a?secret=B&issuer=Mein%20Archiv");
         assert_eq!(py_quote("Jöran Müller/x", "/"), "J%C3%B6ran%20M%C3%BCller/x");
         assert_eq!(totp_label("", "admin"), "admin");
     }

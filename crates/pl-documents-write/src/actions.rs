@@ -411,10 +411,7 @@ async fn edit_pdf_inner(
     if let Some(pc) = doc.page_count.filter(|n| *n != 0)
         && let Some(op) = operations.iter().find(|o| o.page > pc)
     {
-        return Err(ApiError::Validation(drf::non_field(format!(
-            "Page {} is out of bounds for document with {pc} pages.",
-            op.page
-        ))));
+        return Err(ApiError::Validation(drf::non_field(format!("Page {} is out of bounds for document with {pc} pages.", op.page))));
     }
     let params = PdfParams::EditPdf { operations, delete_original, update_document, include_metadata };
     if !has_document_permissions(&mut conn, user, &ids, params.needs()).await? {
@@ -531,9 +528,7 @@ async fn merge_as_versions_inner(
             .fetch_one(&mut *conn)
             .await?;
     if sources_have_versions {
-        return Err(ApiError::Validation(drf::non_field(
-            "Documents with existing versions cannot be merged into another document.",
-        )));
+        return Err(ApiError::Validation(drf::non_field("Documents with existing versions cannot be merged into another document.")));
     }
     let needs = OperationNeeds { ownership: true, delete_document: true, ..Default::default() };
     if !has_document_permissions(&mut conn, user, &ids, needs).await? {
@@ -569,13 +564,12 @@ pub async fn merge_as_versions(
     .await
     .map_err(|e| e.to_string())?;
     let table = if native { "paperrust_document" } else { "documents_document" };
-    let locked: Vec<i32> = sqlx::query_scalar(&format!(
-        "SELECT id FROM {table} WHERE id = ANY($1) AND deleted_at IS NULL ORDER BY id FOR UPDATE"
-    ))
-    .bind(&ids32)
-    .fetch_all(&mut *tx)
-    .await
-    .map_err(|e| e.to_string())?;
+    let locked: Vec<i32> =
+        sqlx::query_scalar(&format!("SELECT id FROM {table} WHERE id = ANY($1) AND deleted_at IS NULL ORDER BY id FOR UPDATE"))
+            .bind(&ids32)
+            .fetch_all(&mut *tx)
+            .await
+            .map_err(|e| e.to_string())?;
     let mut by_id: HashMap<i64, pl_consumer::db::DocRow> = HashMap::new();
     for id in locked {
         if let Some(d) = docs::load_global(&mut tx, i64::from(id)).await.map_err(|e| e.to_string())? {
@@ -632,15 +626,15 @@ pub async fn merge_as_versions(
     }
     let now = docs::now_micros();
     match take_asn {
-        Some(a) => sqlx::query(
-            "UPDATE documents_document SET modified = $2, archive_serial_number = $3 WHERE id = $1 AND deleted_at IS NULL",
-        )
-        .bind(root.id as i32)
-        .bind(now)
-        .bind(a)
-        .execute(&mut *tx)
-        .await
-        .map_err(|e| e.to_string())?,
+        Some(a) => {
+            sqlx::query("UPDATE documents_document SET modified = $2, archive_serial_number = $3 WHERE id = $1 AND deleted_at IS NULL")
+                .bind(root.id as i32)
+                .bind(now)
+                .bind(a)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| e.to_string())?
+        }
         None => sqlx::query("UPDATE documents_document SET modified = $2 WHERE id = $1 AND deleted_at IS NULL")
             .bind(root.id as i32)
             .bind(now)
@@ -694,10 +688,7 @@ mod tests {
         assert_eq!(char_field(&json!(true), false, None), Err(drf::msg("Not a valid string.")));
         assert_eq!(char_field(&json!([1]), false, None), Err(drf::msg("Not a valid string.")));
         assert_eq!(char_field(&Value::Null, true, None), Err(drf::msg(drf::NULL)));
-        assert_eq!(
-            char_field(&json!("x".repeat(65)), true, Some(64)),
-            Err(drf::msg("Ensure this field has no more than 64 characters."))
-        );
+        assert_eq!(char_field(&json!("x".repeat(65)), true, Some(64)), Err(drf::msg("Ensure this field has no more than 64 characters.")));
         assert_eq!(char_field(&json!("a\u{0}b"), false, None), Err(drf::msg("Null characters are not allowed.")));
     }
 

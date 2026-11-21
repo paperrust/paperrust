@@ -74,10 +74,7 @@ pub async fn serve_logo(State(state): State<AppState>) -> Response {
         if !path.starts_with(&logo_root) || !path.is_file() {
             return compat::django_404();
         }
-        let name = path
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_default();
+        let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
         (path, name, false)
     };
     let mut opened = match serve::open(Some(&path)).await {
@@ -100,10 +97,7 @@ pub async fn serve_logo(State(state): State<AppState>) -> Response {
         Err(_) => return compat::internal("logo", "reopen failed"),
     };
     let mut r = docfile::file_response(opened, mime);
-    let base = std::path::Path::new(&name)
-        .file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_default();
+    let base = std::path::Path::new(&name).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
     if let Some(cd) = naming::django_content_disposition(true, &base)
         && let Ok(v) = HeaderValue::from_str(&cd)
     {
@@ -114,12 +108,7 @@ pub async fn serve_logo(State(state): State<AppState>) -> Response {
 
 /// GET /favicon.ico
 pub async fn favicon(State(state): State<AppState>) -> Response {
-    let path = state
-        .config()
-        .static_root
-        .join("paperless")
-        .join("img")
-        .join("favicon.ico");
+    let path = state.config().static_root.join("paperless").join("img").join("favicon.ico");
     match serve::open(Some(&path)).await {
         Ok(f) => {
             let mut r = docfile::file_response(f, "image/x-icon");

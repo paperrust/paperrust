@@ -58,10 +58,11 @@ pub fn post_process_text(text: Option<&str>) -> Option<String> {
         let t = b.trim_end_matches(' ').len();
         b.truncate(t);
     } else if let Some(body) = b.strip_suffix('\n')
-        && body.ends_with(' ') {
-            let t = body.trim_end_matches(' ').len();
-            b = format!("{}\n", &body[..t]);
-        }
+        && body.ends_with(' ')
+    {
+        let t = body.trim_end_matches(' ').len();
+        b = format!("{}\n", &body[..t]);
+    }
     // 4. strip() + \0 -> " "
     let result = b.trim_matches(py_isspace).replace('\0', " ");
     if result.is_empty() { None } else { Some(result) }

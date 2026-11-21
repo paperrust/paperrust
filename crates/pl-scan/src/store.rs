@@ -98,7 +98,14 @@ pub async fn get_scanner(pool: &PgPool, id: i64) -> Result<Option<Scanner>, sqlx
 }
 
 /// Create; `None` if the address is already known.
-pub async fn insert_scanner(pool: &PgPool, name: &str, base_url: &str, uuid: Option<&str>, model: Option<&str>, created_by: i64) -> Result<Option<Scanner>, sqlx::Error> {
+pub async fn insert_scanner(
+    pool: &PgPool,
+    name: &str,
+    base_url: &str,
+    uuid: Option<&str>,
+    model: Option<&str>,
+    created_by: i64,
+) -> Result<Option<Scanner>, sqlx::Error> {
     ensure(pool).await?;
     let row = sqlx::query(&format!(
         "INSERT INTO paperrust_scanner (name, base_url, uuid, model, created_by) VALUES ($1, $2, $3, $4, $5)
@@ -174,7 +181,13 @@ pub async fn list_devices(pool: &PgPool) -> Result<Vec<Device>, sqlx::Error> {
 }
 
 /// Create → (device, plaintext token). The plaintext is returned only here.
-pub async fn insert_device(pool: &PgPool, name: &str, owner_id: i64, allowed_ips: &str, created_by: i64) -> Result<(Device, String), sqlx::Error> {
+pub async fn insert_device(
+    pool: &PgPool,
+    name: &str,
+    owner_id: i64,
+    allowed_ips: &str,
+    created_by: i64,
+) -> Result<(Device, String), sqlx::Error> {
     ensure(pool).await?;
     let tok = token::generate();
     let id: i64 = sqlx::query_scalar(
@@ -207,7 +220,12 @@ pub async fn revoke_device(pool: &PgPool, id: i64) -> Result<bool, sqlx::Error> 
 /// Delete permanently (revoked only).
 pub async fn delete_device(pool: &PgPool, id: i64) -> Result<bool, sqlx::Error> {
     ensure(pool).await?;
-    Ok(sqlx::query("DELETE FROM paperrust_scan_device WHERE id = $1 AND revoked_at IS NOT NULL").bind(id).execute(pool).await?.rows_affected() > 0)
+    Ok(sqlx::query("DELETE FROM paperrust_scan_device WHERE id = $1 AND revoked_at IS NOT NULL")
+        .bind(id)
+        .execute(pool)
+        .await?
+        .rows_affected()
+        > 0)
 }
 
 /// Device as the SMTP intake needs it.

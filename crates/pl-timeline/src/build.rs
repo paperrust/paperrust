@@ -117,27 +117,16 @@ pub fn parse_item_id(s: &str) -> Option<(Uuid, DateKind, NaiveDate)> {
     if it.next().is_some() {
         return None;
     }
-    Some((
-        Uuid::parse_str(u).ok()?,
-        DateKind::parse(k)?,
-        NaiveDate::parse_from_str(d, "%Y%m%d").ok()?,
-    ))
+    Some((Uuid::parse_str(u).ok()?, DateKind::parse(k)?, NaiveDate::parse_from_str(d, "%Y%m%d").ok()?))
 }
 
 /// All entries (merged, with spans and state), unfiltered, sorted by date.
 /// The caller produces `created` entries as [`DateRow`] with `Source::Created`.
-pub fn items(
-    docs: &HashMap<i64, DocRow>,
-    rows: &[DateRow],
-    states: &HashMap<String, ItemState>,
-) -> Vec<Item> {
+pub fn items(docs: &HashMap<i64, DocRow>, rows: &[DateRow], states: &HashMap<String, ItemState>) -> Vec<Item> {
     let mut groups: BTreeMap<(i64, DateKind, NaiveDate), Vec<&DateRow>> = BTreeMap::new();
     for r in rows {
         if docs.contains_key(&r.doc_id) {
-            groups
-                .entry((r.doc_id, r.kind, r.date))
-                .or_default()
-                .push(r);
+            groups.entry((r.doc_id, r.kind, r.date)).or_default().push(r);
         }
     }
     let mut valid_from: HashMap<i64, NaiveDate> = HashMap::new();
@@ -152,22 +141,14 @@ pub fn items(
     let mut out = Vec::with_capacity(groups.len());
     for ((doc_id, kind, date), mut g) in groups {
         g.sort_by(|a, b| {
-            a.source.rank().cmp(&b.source.rank()).then(
-                b.confidence
-                    .partial_cmp(&a.confidence)
-                    .unwrap_or(std::cmp::Ordering::Equal),
-            )
+            a.source.rank().cmp(&b.source.rank()).then(b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal))
         });
         let best = g[0];
         let mut sources: Vec<Source> = g.iter().map(|r| r.source).collect();
         sources.dedup();
         let d = &docs[&doc_id];
         let span = kind.has_span().then(|| {
-            let start = valid_from
-                .get(&doc_id)
-                .copied()
-                .filter(|s| *s <= date)
-                .or(Some(d.created).filter(|c| *c <= date))?;
+            let start = valid_from.get(&doc_id).copied().filter(|s| *s <= date).or(Some(d.created).filter(|c| *c <= date))?;
             Some(Span { start, end: date })
         });
         let id = item_id(d.uuid, kind, date);
@@ -193,31 +174,17 @@ pub fn items(
                 document_type: d.document_type.clone(),
             },
             amount: d.amount.clone(),
-            state: StateOut {
-                done: st.done_at.is_some(),
-                done_at: st.done_at,
-                snoozed_until: st.snoozed_until,
-            },
+            state: StateOut { done: st.done_at.is_some(), done_at: st.done_at, snoozed_until: st.snoozed_until },
             doc_id,
         });
     }
-    out.sort_by(|a, b| {
-        (a.date, &a.document.title, a.doc_id, a.kind).cmp(&(
-            b.date,
-            &b.document.title,
-            b.doc_id,
-            b.kind,
-        ))
-    });
+    out.sort_by(|a, b| (a.date, &a.document.title, a.doc_id, a.kind).cmp(&(b.date, &b.document.title, b.doc_id, b.kind)));
     out
 }
 
 /// Does the entry (date or span) lie in [from, to]?
 pub fn in_range(i: &Item, from: NaiveDate, to: NaiveDate) -> bool {
-    (i.date >= from && i.date <= to)
-        || i.span
-            .as_ref()
-            .is_some_and(|s| s.start <= to && s.end >= from)
+    (i.date >= from && i.date <= to) || i.span.as_ref().is_some_and(|s| s.start <= to && s.end >= from)
 }
 
 /// An area with resolved rules.
@@ -249,35 +216,17 @@ pub struct TimelineQuery {
 
 /// Area key of a document (UUIDs of the matching areas, otherwise `other`).
 pub fn area_keys(areas: &[LaneArea], d: &DocKeys) -> Vec<String> {
-    let v: Vec<String> = areas
-        .iter()
-        .filter(|a| a.rules.matches(d))
-        .map(|a| a.area.uuid.to_string())
-        .collect();
-    if v.is_empty() {
-        vec!["other".to_string()]
-    } else {
-        v
-    }
+    let v: Vec<String> = areas.iter().filter(|a| a.rules.matches(d)).map(|a| a.area.uuid.to_string()).collect();
+    if v.is_empty() { vec!["other".to_string()] } else { v }
 }
 
 /// Build lanes. Returns: (lanes, truncated).
-pub fn lanes(
-    all: Vec<Item>,
-    docs: &HashMap<i64, DocRow>,
-    areas: &[LaneArea],
-    q: &TimelineQuery,
-) -> (Vec<Lane>, bool) {
+pub fn lanes(all: Vec<Item>, docs: &HashMap<i64, DocRow>, areas: &[LaneArea], q: &TimelineQuery) -> (Vec<Lane>, bool) {
     let want = |key: &str| q.lanes.as_ref().is_none_or(|l| l.contains(key));
     let mut keep: Vec<Item> = all
         .into_iter()
-        .filter(|i| {
-            q.kinds.as_ref().is_none_or(|k| k.contains(&i.kind)) && in_range(i, q.from, q.to)
-        })
-        .filter(|i| {
-            docs.get(&i.doc_id)
-                .is_some_and(|d| area_keys(areas, &d.keys).iter().any(|k| want(k)))
-        })
+        .filter(|i| q.kinds.as_ref().is_none_or(|k| k.contains(&i.kind)) && in_range(i, q.from, q.to))
+        .filter(|i| docs.get(&i.doc_id).is_some_and(|d| area_keys(areas, &d.keys).iter().any(|k| want(k))))
         .collect();
     let truncated = keep.len() > q.limit;
     keep.truncate(q.limit);
@@ -289,35 +238,13 @@ pub fn lanes(
         if !want(&key) {
             continue;
         }
-        let items: Vec<Item> = keep
-            .iter()
-            .filter(|i| {
-                docs.get(&i.doc_id)
-                    .is_some_and(|d| a.rules.matches(&d.keys))
-            })
-            .cloned()
-            .collect();
-        out.push(Lane {
-            key,
-            area: Some(a.area.clone()),
-            count: items.len(),
-            items,
-        });
+        let items: Vec<Item> = keep.iter().filter(|i| docs.get(&i.doc_id).is_some_and(|d| a.rules.matches(&d.keys))).cloned().collect();
+        out.push(Lane { key, area: Some(a.area.clone()), count: items.len(), items });
     }
     if want("other") {
-        let items: Vec<Item> = keep
-            .into_iter()
-            .filter(|i| {
-                docs.get(&i.doc_id)
-                    .is_some_and(|d| !areas.iter().any(|a| a.rules.matches(&d.keys)))
-            })
-            .collect();
-        out.push(Lane {
-            key: "other".into(),
-            area: None,
-            count: items.len(),
-            items,
-        });
+        let items: Vec<Item> =
+            keep.into_iter().filter(|i| docs.get(&i.doc_id).is_some_and(|d| !areas.iter().any(|a| a.rules.matches(&d.keys)))).collect();
+        out.push(Lane { key: "other".into(), area: None, count: items.len(), items });
     }
     (out, truncated)
 }
@@ -357,12 +284,7 @@ pub fn upcoming(
             {
                 return None;
             }
-            Some(Upcoming {
-                overdue: i.date < today,
-                days_left: (i.date - today).num_days(),
-                areas: keys,
-                item: i,
-            })
+            Some(Upcoming { overdue: i.date < today, days_left: (i.date - today).num_days(), areas: keys, item: i })
         })
         .collect()
 }
@@ -383,11 +305,7 @@ mod tests {
                 uuid: Uuid::from_u128(id as u128),
                 title: format!("Doc {id}"),
                 created,
-                keys: DocKeys {
-                    id,
-                    tags,
-                    ..Default::default()
-                },
+                keys: DocKeys { id, tags, ..Default::default() },
                 correspondent: None,
                 document_type: None,
                 amount: None,
@@ -396,17 +314,7 @@ mod tests {
     }
 
     fn row(doc_id: i64, kind: DateKind, date: NaiveDate, source: Source, conf: f32) -> DateRow {
-        DateRow {
-            doc_id,
-            kind,
-            date,
-            source,
-            confidence: conf,
-            field: None,
-            phrase: None,
-            page: None,
-            reminder: None,
-        }
+        DateRow { doc_id, kind, date, source, confidence: conf, field: None, phrase: None, page: None, reminder: None }
     }
 
     fn area(n: u128, order: i64, tags: &[i64]) -> LaneArea {
@@ -424,10 +332,7 @@ mod tests {
                 id: n as i64,
                 user_id: None,
             },
-            rules: ResolvedRules {
-                tags: tags.iter().copied().collect(),
-                ..Default::default()
-            },
+            rules: ResolvedRules { tags: tags.iter().copied().collect(), ..Default::default() },
         }
     }
 
@@ -436,47 +341,21 @@ mod tests {
         let u = Uuid::from_u128(7);
         let id = item_id(u, DateKind::CancelBy, d(2026, 3, 9));
         assert_eq!(id, format!("{u}.cancel_by.20260309"));
-        assert_eq!(
-            parse_item_id(&id),
-            Some((u, DateKind::CancelBy, d(2026, 3, 9)))
-        );
-        for bad in [
-            "x",
-            "x.due.20260101",
-            &format!("{u}.nope.20260101"),
-            &format!("{u}.due.2026"),
-            &format!("{u}.due.20260101.x"),
-        ] {
+        assert_eq!(parse_item_id(&id), Some((u, DateKind::CancelBy, d(2026, 3, 9))));
+        for bad in ["x", "x.due.20260101", &format!("{u}.nope.20260101"), &format!("{u}.due.2026"), &format!("{u}.due.20260101.x")] {
             assert!(parse_item_id(bad).is_none(), "{bad}");
         }
     }
 
     #[test]
     fn merge_spans_and_states() {
-        let docs: HashMap<i64, DocRow> = [
-            doc(1, d(2026, 1, 10), vec![5]),
-            doc(2, d(2026, 5, 1), vec![]),
-        ]
-        .into_iter()
-        .collect();
+        let docs: HashMap<i64, DocRow> = [doc(1, d(2026, 1, 10), vec![5]), doc(2, d(2026, 5, 1), vec![])].into_iter().collect();
         let mut rows = vec![
             row(1, DateKind::Due, d(2026, 2, 1), Source::Content, 0.8),
             row(1, DateKind::Due, d(2026, 2, 1), Source::CustomField, 1.0),
-            row(
-                1,
-                DateKind::ValidUntil,
-                d(2027, 1, 9),
-                Source::CustomField,
-                1.0,
-            ),
+            row(1, DateKind::ValidUntil, d(2027, 1, 9), Source::CustomField, 1.0),
             row(2, DateKind::ValidFrom, d(2026, 6, 1), Source::Content, 0.9),
-            row(
-                2,
-                DateKind::ValidUntil,
-                d(2028, 5, 31),
-                Source::Content,
-                0.9,
-            ),
+            row(2, DateKind::ValidUntil, d(2028, 5, 31), Source::Content, 0.9),
             row(2, DateKind::WarrantyUntil, d(2020, 1, 1), Source::User, 1.0),
             row(99, DateKind::Due, d(2026, 2, 1), Source::Content, 0.8), // invisible
         ];
@@ -484,10 +363,7 @@ mod tests {
         let mut states = HashMap::new();
         states.insert(
             item_id(Uuid::from_u128(1), DateKind::Due, d(2026, 2, 1)),
-            ItemState {
-                done_at: Some(Utc::now()),
-                snoozed_until: None,
-            },
+            ItemState { done_at: Some(Utc::now()), snoozed_until: None },
         );
         let it = items(&docs, &rows, &states);
         assert_eq!(it.len(), 5);
@@ -496,31 +372,11 @@ mod tests {
         assert_eq!(due.sources, vec![Source::CustomField, Source::Content]);
         assert_eq!(due.phrase.as_deref(), Some("fällig am 01.02.2026"));
         assert!(due.state.done);
-        let vu1 = it
-            .iter()
-            .find(|i| i.doc_id == 1 && i.kind == DateKind::ValidUntil)
-            .unwrap();
-        assert_eq!(
-            vu1.span,
-            Some(Span {
-                start: d(2026, 1, 10),
-                end: d(2027, 1, 9)
-            }),
-            "Spanne ab created"
-        );
-        let vu2 = it
-            .iter()
-            .find(|i| i.doc_id == 2 && i.kind == DateKind::ValidUntil)
-            .unwrap();
-        assert_eq!(
-            vu2.span.as_ref().unwrap().start,
-            d(2026, 6, 1),
-            "Spanne ab valid_from"
-        );
-        let w = it
-            .iter()
-            .find(|i| i.kind == DateKind::WarrantyUntil)
-            .unwrap();
+        let vu1 = it.iter().find(|i| i.doc_id == 1 && i.kind == DateKind::ValidUntil).unwrap();
+        assert_eq!(vu1.span, Some(Span { start: d(2026, 1, 10), end: d(2027, 1, 9) }), "Spanne ab created");
+        let vu2 = it.iter().find(|i| i.doc_id == 2 && i.kind == DateKind::ValidUntil).unwrap();
+        assert_eq!(vu2.span.as_ref().unwrap().start, d(2026, 6, 1), "Spanne ab valid_from");
+        let w = it.iter().find(|i| i.kind == DateKind::WarrantyUntil).unwrap();
         assert_eq!(w.span, None, "Ende vor Beginn → keine Spanne");
         // span overlaps the area, date lies outside
         assert!(in_range(vu2, d(2027, 1, 1), d(2027, 12, 31)));
@@ -537,65 +393,29 @@ mod tests {
         ]
         .into_iter()
         .collect();
-        let rows: Vec<DateRow> = docs
-            .iter()
-            .map(|(id, dr)| row(*id, DateKind::Created, dr.created, Source::Created, 1.0))
-            .collect();
+        let rows: Vec<DateRow> = docs.iter().map(|(id, dr)| row(*id, DateKind::Created, dr.created, Source::Created, 1.0)).collect();
         let areas = vec![area(2, 1, &[6]), area(1, 0, &[5])];
-        let q = TimelineQuery {
-            from: d(2026, 1, 1),
-            to: d(2026, 12, 31),
-            kinds: None,
-            lanes: None,
-            limit: 100,
-        };
+        let q = TimelineQuery { from: d(2026, 1, 1), to: d(2026, 12, 31), kinds: None, lanes: None, limit: 100 };
         let (l, t) = lanes(items(&docs, &rows, &HashMap::new()), &docs, &areas, &q);
         assert!(!t);
         assert_eq!(
             l.iter().map(|x| x.key.as_str()).collect::<Vec<_>>(),
-            vec![
-                areas[1].area.uuid.to_string(),
-                areas[0].area.uuid.to_string(),
-                "other".into()
-            ]
+            vec![areas[1].area.uuid.to_string(), areas[0].area.uuid.to_string(), "other".into()]
         );
-        assert_eq!(
-            l[0].items.iter().map(|i| i.doc_id).collect::<Vec<_>>(),
-            vec![1, 3]
-        );
-        assert_eq!(
-            l[1].items.iter().map(|i| i.doc_id).collect::<Vec<_>>(),
-            vec![2, 3],
-            "Dokument in zwei Bereichen"
-        );
-        assert_eq!(
-            l[2].items.iter().map(|i| i.doc_id).collect::<Vec<_>>(),
-            vec![4]
-        );
+        assert_eq!(l[0].items.iter().map(|i| i.doc_id).collect::<Vec<_>>(), vec![1, 3]);
+        assert_eq!(l[1].items.iter().map(|i| i.doc_id).collect::<Vec<_>>(), vec![2, 3], "Dokument in zwei Bereichen");
+        assert_eq!(l[2].items.iter().map(|i| i.doc_id).collect::<Vec<_>>(), vec![4]);
         // only other
-        let q2 = TimelineQuery {
-            lanes: Some(["other".to_string()].into()),
-            ..q.clone()
-        };
+        let q2 = TimelineQuery { lanes: Some(["other".to_string()].into()), ..q.clone() };
         let (l, _) = lanes(items(&docs, &rows, &HashMap::new()), &docs, &areas, &q2);
         assert_eq!(l.len(), 1);
         // boundary
-        let q3 = TimelineQuery {
-            limit: 2,
-            ..q.clone()
-        };
+        let q3 = TimelineQuery { limit: 2, ..q.clone() };
         let (l, t) = lanes(items(&docs, &rows, &HashMap::new()), &docs, &areas, &q3);
         assert!(t);
-        assert_eq!(
-            l.iter().map(|x| x.count).sum::<usize>(),
-            2,
-            "Dok 1 (A1) + Dok 2 (A2)"
-        );
+        assert_eq!(l.iter().map(|x| x.count).sum::<usize>(), 2, "Dok 1 (A1) + Dok 2 (A2)");
         // kinds
-        let q4 = TimelineQuery {
-            kinds: Some([DateKind::Due].into()),
-            ..q
-        };
+        let q4 = TimelineQuery { kinds: Some([DateKind::Due].into()), ..q };
         let (l, _) = lanes(items(&docs, &rows, &HashMap::new()), &docs, &areas, &q4);
         assert!(l.iter().all(|x| x.items.is_empty()));
     }
@@ -603,118 +423,37 @@ mod tests {
     #[test]
     fn upcoming_filters() {
         let today = d(2026, 11, 10);
-        let docs: HashMap<i64, DocRow> = [
-            doc(1, d(2026, 1, 1), vec![5]),
-            doc(2, d(2026, 1, 1), vec![]),
-        ]
-        .into_iter()
-        .collect();
+        let docs: HashMap<i64, DocRow> = [doc(1, d(2026, 1, 1), vec![5]), doc(2, d(2026, 1, 1), vec![])].into_iter().collect();
         let rows = vec![
             row(1, DateKind::Due, d(2026, 11, 30), Source::CustomField, 1.0),
             row(1, DateKind::CancelBy, d(2026, 11, 1), Source::Content, 0.9), // overdue
-            row(
-                1,
-                DateKind::ValidFrom,
-                d(2026, 11, 20),
-                Source::Content,
-                0.9,
-            ), // no deadline
+            row(1, DateKind::ValidFrom, d(2026, 11, 20), Source::Content, 0.9), // no deadline
             row(2, DateKind::Due, d(2027, 3, 1), Source::User, 1.0),          // too far
-            row(
-                2,
-                DateKind::WarrantyUntil,
-                d(2026, 12, 1),
-                Source::Content,
-                0.9,
-            ), // snoozed
-            row(
-                2,
-                DateKind::ValidUntil,
-                d(2026, 12, 2),
-                Source::Content,
-                0.9,
-            ), // done
+            row(2, DateKind::WarrantyUntil, d(2026, 12, 1), Source::Content, 0.9), // snoozed
+            row(2, DateKind::ValidUntil, d(2026, 12, 2), Source::Content, 0.9), // done
             row(1, DateKind::Created, d(2026, 11, 15), Source::Created, 1.0),
         ];
         let mut states = HashMap::new();
         states.insert(
             item_id(Uuid::from_u128(2), DateKind::WarrantyUntil, d(2026, 12, 1)),
-            ItemState {
-                done_at: None,
-                snoozed_until: Some(d(2026, 11, 20)),
-            },
+            ItemState { done_at: None, snoozed_until: Some(d(2026, 11, 20)) },
         );
         states.insert(
             item_id(Uuid::from_u128(2), DateKind::ValidUntil, d(2026, 12, 2)),
-            ItemState {
-                done_at: Some(Utc::now()),
-                snoozed_until: None,
-            },
+            ItemState { done_at: Some(Utc::now()), snoozed_until: None },
         );
         let areas = vec![area(1, 0, &[5])];
-        let up = upcoming(
-            items(&docs, &rows, &states),
-            &docs,
-            &areas,
-            today,
-            60,
-            30,
-            None,
-            false,
-        );
-        let got: Vec<(i64, DateKind, bool, i64)> = up
-            .iter()
-            .map(|u| (u.item.doc_id, u.item.kind, u.overdue, u.days_left))
-            .collect();
-        assert_eq!(
-            got,
-            vec![
-                (1, DateKind::CancelBy, true, -9),
-                (1, DateKind::Due, false, 20)
-            ]
-        );
+        let up = upcoming(items(&docs, &rows, &states), &docs, &areas, today, 60, 30, None, false);
+        let got: Vec<(i64, DateKind, bool, i64)> = up.iter().map(|u| (u.item.doc_id, u.item.kind, u.overdue, u.days_left)).collect();
+        assert_eq!(got, vec![(1, DateKind::CancelBy, true, -9), (1, DateKind::Due, false, 20)]);
         assert_eq!(up[0].areas, vec![areas[0].area.uuid.to_string()]);
-        let all = upcoming(
-            items(&docs, &rows, &states),
-            &docs,
-            &areas,
-            today,
-            60,
-            0,
-            None,
-            true,
-        );
-        assert_eq!(
-            all.len(),
-            2,
-            "Erledigte mit include_done, Überfällige ohne overdue_days: {all:?}"
-        );
+        let all = upcoming(items(&docs, &rows, &states), &docs, &areas, today, 60, 0, None, true);
+        assert_eq!(all.len(), 2, "Erledigte mit include_done, Überfällige ohne overdue_days: {all:?}");
         let other: HashSet<String> = ["other".to_string()].into();
-        let o = upcoming(
-            items(&docs, &rows, &states),
-            &docs,
-            &areas,
-            today,
-            60,
-            30,
-            Some(&other),
-            true,
-        );
-        assert_eq!(
-            o.iter().map(|u| u.item.kind).collect::<Vec<_>>(),
-            vec![DateKind::ValidUntil]
-        );
+        let o = upcoming(items(&docs, &rows, &states), &docs, &areas, today, 60, 30, Some(&other), true);
+        assert_eq!(o.iter().map(|u| u.item.kind).collect::<Vec<_>>(), vec![DateKind::ValidUntil]);
         // visible again after snoozing
-        let later = upcoming(
-            items(&docs, &rows, &states),
-            &docs,
-            &areas,
-            d(2026, 11, 21),
-            60,
-            0,
-            None,
-            false,
-        );
+        let later = upcoming(items(&docs, &rows, &states), &docs, &areas, d(2026, 11, 21), 60, 0, None, false);
         assert!(later.iter().any(|u| u.item.kind == DateKind::WarrantyUntil));
     }
 }

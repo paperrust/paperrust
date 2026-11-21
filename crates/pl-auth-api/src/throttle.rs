@@ -32,10 +32,7 @@ pub fn parse_rate(rate: &str) -> Option<Rate> {
         'd' => 86400.0,
         _ => return None,
     };
-    Some(Rate {
-        num_requests,
-        duration,
-    })
+    Some(Rate { num_requests, duration })
 }
 
 /// The configured `login` rate (`Config::token_throttle_rate`, i.e. `PAPERLESS_TOKEN_THROTTLE_RATE`

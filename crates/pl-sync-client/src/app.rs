@@ -57,8 +57,7 @@ fn is_device_name(part: &str) -> bool {
             let mut it = s.chars();
             let head: String = it.by_ref().take(3).collect();
             let tail: Vec<char> = it.collect();
-            (head == "COM" || head == "LPT")
-                && matches!(tail.as_slice(), [c] if c.is_ascii_digit() || matches!(c, '¹' | '²' | '³'))
+            (head == "COM" || head == "LPT") && matches!(tail.as_slice(), [c] if c.is_ascii_digit() || matches!(c, '¹' | '²' | '³'))
         }
     }
 }
@@ -192,7 +191,11 @@ pub fn classic_page(server_url: Option<&str>) -> GwResponse {
 pub fn redirect(to: &str) -> GwResponse {
     GwResponse {
         status: 302,
-        headers: vec![("location".into(), to.into()), ("cache-control".into(), "no-store".into()), ("x-paperrust-source".into(), "local".into())],
+        headers: vec![
+            ("location".into(), to.into()),
+            ("cache-control".into(), "no-store".into()),
+            ("x-paperrust-source".into(), "local".into()),
+        ],
         body: vec![],
     }
 }
@@ -356,8 +359,21 @@ mod tests {
         for p in ["/documents/12/details", "/documents", "/settings", "/mail", "/", "/saved-views/3", "/documents%2012"] {
             assert!(is_classic_path(p), "{p}");
         }
-        for p in ["/rs/app/", "/rs/app", "/rs/api/v2/x", "/api/documents/", "/local/status", "/accounts/login/", "/ws/status/",
-                  "/%61pi/token/", "/a/../api/", "//evil.example", "/x\\y", "/c:/x", "documents"] {
+        for p in [
+            "/rs/app/",
+            "/rs/app",
+            "/rs/api/v2/x",
+            "/api/documents/",
+            "/local/status",
+            "/accounts/login/",
+            "/ws/status/",
+            "/%61pi/token/",
+            "/a/../api/",
+            "//evil.example",
+            "/x\\y",
+            "/c:/x",
+            "documents",
+        ] {
             assert!(!is_classic_path(p), "{p}");
         }
     }

@@ -16,7 +16,7 @@ use sqlx::PgPool;
 
 use crate::body::{as_object, parse_body};
 use crate::ctx::{self, MailUser};
-use crate::drf::{self, CharConv, Errors, FieldError, Got, REQUIRED, OPTIONAL, OPTIONAL_NULL, raw};
+use crate::drf::{self, CharConv, Errors, FieldError, Got, OPTIONAL, OPTIONAL_NULL, REQUIRED, raw};
 use crate::error::{ApiError, ApiResult, json_response};
 use crate::imap::{self, BeforeLogin, ConnectOptions, TestAccount, TestError};
 use crate::listing::{self, ReqInfo};
@@ -88,9 +88,7 @@ pub async fn get_object(db: &PgPool, user: &MailUser, method: &Method, raw_pk: &
     if !visible.contains(&pk) {
         return Err(ApiError::not_found_model(MAIL_ACCOUNT.object_name));
     }
-    let row = fetch(db, pk)
-        .await?
-        .ok_or_else(|| ApiError::not_found_model(MAIL_ACCOUNT.object_name))?;
+    let row = fetch(db, pk).await?.ok_or_else(|| ApiError::not_found_model(MAIL_ACCOUNT.object_name))?;
     let ct = perms::content_type_id(db, MAIL_ACCOUNT).await?;
     perms::check_object_permission(db, user, method, MAIL_ACCOUNT, ct, row.id, row.owner_id).await?;
     Ok(row)
@@ -161,13 +159,12 @@ fn field<T>(
 }
 
 async fn name_exists(db: &PgPool, name: &str, exclude: Option<i32>) -> ApiResult<bool> {
-    let row: Option<(i32,)> = sqlx::query_as(
-        "SELECT 1 FROM paperless_mail_mailaccount WHERE name = $1 AND ($2::int IS NULL OR id <> $2) LIMIT 1",
-    )
-    .bind(name)
-    .bind(exclude)
-    .fetch_optional(db)
-    .await?;
+    let row: Option<(i32,)> =
+        sqlx::query_as("SELECT 1 FROM paperless_mail_mailaccount WHERE name = $1 AND ($2::int IS NULL OR id <> $2) LIMIT 1")
+            .bind(name)
+            .bind(exclude)
+            .fetch_optional(db)
+            .await?;
     Ok(row.is_some())
 }
 
@@ -212,9 +209,7 @@ pub async fn validate(
     let char256 = drf::CharOpts { allow_blank: false, max_length: Some(256) };
     let imap_server = nn(field(&mut e, data, "imap_server", REQUIRED, partial, |v| drf::char_field(v, char256)));
     let imap_port = nn(field(&mut e, data, "imap_port", REQUIRED, partial, |v| drf::integer_field(v, None, None)));
-    let imap_security = nn(field(&mut e, data, "imap_security", OPTIONAL, partial, |v| {
-        drf::choice_field(v, &[1, 2, 3])
-    }));
+    let imap_security = nn(field(&mut e, data, "imap_security", OPTIONAL, partial, |v| drf::choice_field(v, &[1, 2, 3])));
     let username = nn(field(&mut e, data, "username", REQUIRED, partial, |v| drf::char_field(v, char256)));
     // ObfuscatedPasswordField: CharField empty check, to_internal_value = raw value
     let password = nn(field(&mut e, data, "password", REQUIRED, partial, |v| {
@@ -245,9 +240,7 @@ pub async fn validate(
         },
     };
     let set_permissions = crate::util::set_permissions_field(db, &mut e, data, partial).await;
-    let account_type = nn(field(&mut e, data, "account_type", OPTIONAL, partial, |v| {
-        drf::choice_field(v, &[1, 2, 3])
-    }));
+    let account_type = nn(field(&mut e, data, "account_type", OPTIONAL, partial, |v| drf::choice_field(v, &[1, 2, 3])));
     let expiration = field(&mut e, data, "expiration", OPTIONAL_NULL, partial, |v| drf::datetime_field(v, tz));
 
     if !e.is_empty() {
@@ -304,23 +297,17 @@ async fn list(State(st): State<AppState>, info: ReqInfo, user: MailUser) -> ApiR
     let ct = perms::content_type_id(db, MAIL_ACCOUNT).await?;
     let (cond, binds) = crate::util::visible_where(&user, "a", MAIL_ACCOUNT, 1);
     let count_sql = format!("SELECT COUNT(*) FROM paperless_mail_mailaccount a WHERE {cond}");
-    let count: (i64,) = crate::util::bind_vis(sqlx::query_as(&count_sql), &user, binds, MAIL_ACCOUNT, ct)
-        .fetch_one(db)
-        .await?;
+    let count: (i64,) = crate::util::bind_vis(sqlx::query_as(&count_sql), &user, binds, MAIL_ACCOUNT, ct).fetch_one(db).await?;
     let page = listing::paginate(&info, count.0)?;
     let sql = format!(
         "SELECT {COLS} FROM paperless_mail_mailaccount a WHERE {cond} ORDER BY a.id ASC LIMIT {} OFFSET {}",
         page.size,
         page.offset()
     );
-    let rows: Vec<AccountRow> = crate::util::bind_vis(sqlx::query_as(&sql), &user, binds, MAIL_ACCOUNT, ct)
-        .fetch_all(db)
-        .await?;
+    let rows: Vec<AccountRow> = crate::util::bind_vis(sqlx::query_as(&sql), &user, binds, MAIL_ACCOUNT, ct).fetch_all(db).await?;
     let all_ids = if info.api_version < 10 {
         let sql = format!("SELECT a.id FROM paperless_mail_mailaccount a WHERE {cond} ORDER BY a.id ASC");
-        let ids: Vec<(i32,)> = crate::util::bind_vis(sqlx::query_as(&sql), &user, binds, MAIL_ACCOUNT, ct)
-            .fetch_all(db)
-            .await?;
+        let ids: Vec<(i32,)> = crate::util::bind_vis(sqlx::query_as(&sql), &user, binds, MAIL_ACCOUNT, ct).fetch_all(db).await?;
         Some(ids.into_iter().map(|r| r.0).collect())
     } else {
         None
@@ -340,13 +327,7 @@ async fn retrieve(State(st): State<AppState>, info: ReqInfo, user: MailUser, Pat
 }
 
 /// POST /api/mail_accounts/
-async fn create(
-    State(st): State<AppState>,
-    info: ReqInfo,
-    user: MailUser,
-    headers: HeaderMap,
-    body: Bytes,
-) -> ApiResult<Response> {
+async fn create(State(st): State<AppState>, info: ReqInfo, user: MailUser, headers: HeaderMap, body: Bytes) -> ApiResult<Response> {
     let db = &st.inner.db;
     perms::require_model_perm(db, &user, &Method::POST, MAIL_ACCOUNT).await?;
     let data = as_object(parse_body(&headers, &body)?)?;
@@ -388,13 +369,25 @@ async fn create(
     .bind(name)
     .bind(s(&inp.imap_server, ""))
     .bind(port)
-    .bind(match inp.imap_security { Got::Set(v) => v, Got::Skip => 2 })
+    .bind(match inp.imap_security {
+        Got::Set(v) => v,
+        Got::Skip => 2,
+    })
     .bind(s(&inp.username, ""))
     .bind(password)
-    .bind(match inp.is_token { Got::Set(v) => v, Got::Skip => false })
+    .bind(match inp.is_token {
+        Got::Set(v) => v,
+        Got::Skip => false,
+    })
     .bind(s(&inp.character_set, "UTF-8"))
-    .bind(match inp.account_type { Got::Set(v) => v, Got::Skip => 1 })
-    .bind(match inp.expiration { Got::Set(v) => v, Got::Skip => None })
+    .bind(match inp.account_type {
+        Got::Set(v) => v,
+        Got::Skip => 1,
+    })
+    .bind(match inp.expiration {
+        Got::Set(v) => v,
+        Got::Skip => None,
+    })
     .bind(owner)
     .fetch_one(&mut *tx)
     .await?;
@@ -408,7 +401,15 @@ async fn create(
     Ok(json_response(StatusCode::CREATED, &represent_one(db, &user, &info, &row).await?))
 }
 
-async fn update_impl(st: AppState, info: ReqInfo, user: MailUser, id: String, headers: HeaderMap, body: Bytes, method: Method) -> ApiResult<Response> {
+async fn update_impl(
+    st: AppState,
+    info: ReqInfo,
+    user: MailUser,
+    id: String,
+    headers: HeaderMap,
+    body: Bytes,
+    method: Method,
+) -> ApiResult<Response> {
     let db = &st.inner.db;
     let partial = method == Method::PATCH;
     perms::require_model_perm(db, &user, &method, MAIL_ACCOUNT).await?;
@@ -447,17 +448,39 @@ async fn update_impl(st: AppState, info: ReqInfo, user: MailUser, id: String, he
             return Err(unique_together_error());
         }
     }
-    if let Got::Set(v) = &inp.name { row.name = v.clone(); }
-    if let Got::Set(v) = &inp.imap_server { row.imap_server = v.clone(); }
-    if let Got::Set(v) = inp.imap_port { row.imap_port = Some(port_i32(v)?); }
-    if let Got::Set(v) = inp.imap_security { row.imap_security = v; }
-    if let Got::Set(v) = &inp.username { row.username = v.clone(); }
-    if let Got::Set(v) = &password { row.password = v.text.clone(); }
-    if let Got::Set(v) = &inp.character_set { row.character_set = v.clone(); }
-    if let Got::Set(v) = inp.is_token { row.is_token = v; }
-    if let Got::Set(v) = inp.owner { row.owner_id = v; }
-    if let Got::Set(v) = inp.account_type { row.account_type = v; }
-    if let Got::Set(v) = inp.expiration { row.expiration = v; }
+    if let Got::Set(v) = &inp.name {
+        row.name = v.clone();
+    }
+    if let Got::Set(v) = &inp.imap_server {
+        row.imap_server = v.clone();
+    }
+    if let Got::Set(v) = inp.imap_port {
+        row.imap_port = Some(port_i32(v)?);
+    }
+    if let Got::Set(v) = inp.imap_security {
+        row.imap_security = v;
+    }
+    if let Got::Set(v) = &inp.username {
+        row.username = v.clone();
+    }
+    if let Got::Set(v) = &password {
+        row.password = v.text.clone();
+    }
+    if let Got::Set(v) = &inp.character_set {
+        row.character_set = v.clone();
+    }
+    if let Got::Set(v) = inp.is_token {
+        row.is_token = v;
+    }
+    if let Got::Set(v) = inp.owner {
+        row.owner_id = v;
+    }
+    if let Got::Set(v) = inp.account_type {
+        row.account_type = v;
+    }
+    if let Got::Set(v) = inp.expiration {
+        row.expiration = v;
+    }
     // instance.save(): all columns
     sqlx::query(
         "UPDATE paperless_mail_mailaccount SET name = $2, imap_server = $3, imap_port = $4, \
@@ -483,12 +506,26 @@ async fn update_impl(st: AppState, info: ReqInfo, user: MailUser, id: String, he
 }
 
 /// PUT /api/mail_accounts/{id}/
-async fn update(State(st): State<AppState>, info: ReqInfo, user: MailUser, Path(id): Path<String>, headers: HeaderMap, body: Bytes) -> ApiResult<Response> {
+async fn update(
+    State(st): State<AppState>,
+    info: ReqInfo,
+    user: MailUser,
+    Path(id): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> ApiResult<Response> {
     update_impl(st, info, user, id, headers, body, Method::PUT).await
 }
 
 /// PATCH /api/mail_accounts/{id}/
-async fn partial_update(State(st): State<AppState>, info: ReqInfo, user: MailUser, Path(id): Path<String>, headers: HeaderMap, body: Bytes) -> ApiResult<Response> {
+async fn partial_update(
+    State(st): State<AppState>,
+    info: ReqInfo,
+    user: MailUser,
+    Path(id): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> ApiResult<Response> {
     update_impl(st, info, user, id, headers, body, Method::PATCH).await
 }
 
@@ -570,18 +607,30 @@ async fn test(State(st): State<AppState>, info: ReqInfo, user: MailUser, headers
     if !pw.is_str {
         return Err(field_error("password", "Not a valid string."));
     }
-    let mut expiration = match inp.expiration { Got::Set(v) => v, Got::Skip => None };
+    let mut expiration = match inp.expiration {
+        Got::Set(v) => v,
+        Got::Skip => None,
+    };
     let port = match inp.imap_port {
         Got::Set(p) => p,
         Got::Skip => return Err(field_error("imap_port", "This field is required.")),
     };
     let is_token = matches!(inp.is_token, Got::Set(true));
     let mut acc = TestAccount {
-        imap_server: match &inp.imap_server { Got::Set(s) => s.clone(), Got::Skip => String::new() },
+        imap_server: match &inp.imap_server {
+            Got::Set(s) => s.clone(),
+            Got::Skip => String::new(),
+        },
         // Ports outside u16: upstream OverflowError on connect → 500; PaperRust 400
         imap_port: u16::try_from(port).map_err(|_| field_error("imap_port", "Ensure this value is between 0 and 65535."))?,
-        imap_security: match inp.imap_security { Got::Set(v) => v, Got::Skip => 2 },
-        username: match &inp.username { Got::Set(s) => s.clone(), Got::Skip => String::new() },
+        imap_security: match inp.imap_security {
+            Got::Set(v) => v,
+            Got::Skip => 2,
+        },
+        username: match &inp.username {
+            Got::Set(s) => s.clone(),
+            Got::Skip => String::new(),
+        },
         password: pw.text.clone(),
         is_token,
     };
@@ -605,11 +654,8 @@ async fn test(State(st): State<AppState>, info: ReqInfo, user: MailUser, headers
         extra_roots: crate::util::test_extra_roots(),
     };
     let needs_refresh = same_target && is_token && expiration.is_some_and(|e| e < Utc::now());
-    let stored = existing.as_ref().map(|a| oauth::StoredAccount {
-        id: a.id,
-        account_type: a.account_type,
-        refresh_token: a.refresh_token.clone(),
-    });
+    let stored =
+        existing.as_ref().map(|a| oauth::StoredAccount { id: a.id, account_type: a.account_type, refresh_token: a.refresh_token.clone() });
     let db2 = db.clone();
     let result = imap::test_connection(acc, &opts, |mut acc| async move {
         if !needs_refresh {
@@ -690,17 +736,65 @@ async fn process(State(st): State<AppState>, _info: ReqInfo, user: MailUser, Pat
 pub fn routes() -> Vec<pl_core::ApiRoute> {
     use axum::routing::{delete, get, patch, post, put};
     use pl_core::ApiRoute;
-    use pl_core::route::{drf_view, ALLOW_MODEL_DETAIL, ALLOW_MODEL_LIST, ALLOW_POST_ONLY};
+    use pl_core::route::{ALLOW_MODEL_DETAIL, ALLOW_MODEL_LIST, ALLOW_POST_ONLY, drf_view};
     const SRC: &str = "src/paperless_mail/views.py::MailAccountViewSet";
     vec![
-        ApiRoute { id: "mail_accounts.list", method: Method::GET, path: "/api/mail_accounts/", upstream: "src/paperless_mail/views.py::MailAccountViewSet.list", handler: drf_view(get(list), ALLOW_MODEL_LIST) },
-        ApiRoute { id: "mail_accounts.create", method: Method::POST, path: "/api/mail_accounts/", upstream: "src/paperless_mail/views.py::MailAccountViewSet.create", handler: drf_view(post(create), ALLOW_MODEL_LIST) },
-        ApiRoute { id: "mail_accounts.test", method: Method::POST, path: "/api/mail_accounts/test/", upstream: "src/paperless_mail/views.py::MailAccountViewSet.test", handler: drf_view(post(test), ALLOW_POST_ONLY) },
-        ApiRoute { id: "mail_accounts.retrieve", method: Method::GET, path: "/api/mail_accounts/{id}/", upstream: SRC, handler: drf_view(get(retrieve), ALLOW_MODEL_DETAIL) },
-        ApiRoute { id: "mail_accounts.update", method: Method::PUT, path: "/api/mail_accounts/{id}/", upstream: SRC, handler: drf_view(put(update), ALLOW_MODEL_DETAIL) },
-        ApiRoute { id: "mail_accounts.partial_update", method: Method::PATCH, path: "/api/mail_accounts/{id}/", upstream: SRC, handler: drf_view(patch(partial_update), ALLOW_MODEL_DETAIL) },
-        ApiRoute { id: "mail_accounts.destroy", method: Method::DELETE, path: "/api/mail_accounts/{id}/", upstream: SRC, handler: drf_view(delete(destroy), ALLOW_MODEL_DETAIL) },
-        ApiRoute { id: "mail_accounts.process", method: Method::POST, path: "/api/mail_accounts/{id}/process/", upstream: "src/paperless_mail/views.py::MailAccountViewSet.process", handler: drf_view(post(process), ALLOW_POST_ONLY) },
+        ApiRoute {
+            id: "mail_accounts.list",
+            method: Method::GET,
+            path: "/api/mail_accounts/",
+            upstream: "src/paperless_mail/views.py::MailAccountViewSet.list",
+            handler: drf_view(get(list), ALLOW_MODEL_LIST),
+        },
+        ApiRoute {
+            id: "mail_accounts.create",
+            method: Method::POST,
+            path: "/api/mail_accounts/",
+            upstream: "src/paperless_mail/views.py::MailAccountViewSet.create",
+            handler: drf_view(post(create), ALLOW_MODEL_LIST),
+        },
+        ApiRoute {
+            id: "mail_accounts.test",
+            method: Method::POST,
+            path: "/api/mail_accounts/test/",
+            upstream: "src/paperless_mail/views.py::MailAccountViewSet.test",
+            handler: drf_view(post(test), ALLOW_POST_ONLY),
+        },
+        ApiRoute {
+            id: "mail_accounts.retrieve",
+            method: Method::GET,
+            path: "/api/mail_accounts/{id}/",
+            upstream: SRC,
+            handler: drf_view(get(retrieve), ALLOW_MODEL_DETAIL),
+        },
+        ApiRoute {
+            id: "mail_accounts.update",
+            method: Method::PUT,
+            path: "/api/mail_accounts/{id}/",
+            upstream: SRC,
+            handler: drf_view(put(update), ALLOW_MODEL_DETAIL),
+        },
+        ApiRoute {
+            id: "mail_accounts.partial_update",
+            method: Method::PATCH,
+            path: "/api/mail_accounts/{id}/",
+            upstream: SRC,
+            handler: drf_view(patch(partial_update), ALLOW_MODEL_DETAIL),
+        },
+        ApiRoute {
+            id: "mail_accounts.destroy",
+            method: Method::DELETE,
+            path: "/api/mail_accounts/{id}/",
+            upstream: SRC,
+            handler: drf_view(delete(destroy), ALLOW_MODEL_DETAIL),
+        },
+        ApiRoute {
+            id: "mail_accounts.process",
+            method: Method::POST,
+            path: "/api/mail_accounts/{id}/process/",
+            upstream: "src/paperless_mail/views.py::MailAccountViewSet.process",
+            handler: drf_view(post(process), ALLOW_POST_ONLY),
+        },
     ]
 }
 

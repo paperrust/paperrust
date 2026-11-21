@@ -68,12 +68,7 @@ fn gray_data(r: &Raster) -> Cow<'_, [u8]> {
     if ch == 1 {
         return Cow::Borrowed(&r.data);
     }
-    Cow::Owned(
-        r.data
-            .chunks_exact(ch)
-            .map(|p| if ch >= 3 { luma(p[0], p[1], p[2]) } else { p[0] })
-            .collect(),
-    )
+    Cow::Owned(r.data.chunks_exact(ch).map(|p| if ch >= 3 { luma(p[0], p[1], p[2]) } else { p[0] }).collect())
 }
 
 /// Color image without color (all pixels R≈G≈B, deviation ≤ 2) → 1 channel (smaller archive).
@@ -338,11 +333,7 @@ fn rotate_n(r: &Raster, degrees: f64, threads: usize) -> Raster {
                 let inside = x0 >= 0 && y0 >= 0 && x0 + 1 < wi && y0 + 1 < hi;
                 for k in 0..ch {
                     let p = |x: i64, y: i64| -> u32 {
-                        if x < 0 || y < 0 || x >= wi || y >= hi {
-                            255
-                        } else {
-                            u32::from(src[(y as usize * w + x as usize) * ch + k])
-                        }
+                        if x < 0 || y < 0 || x >= wi || y >= hi { 255 } else { u32::from(src[(y as usize * w + x as usize) * ch + k]) }
                     };
                     let (p00, p10, p01, p11) = if inside {
                         let i = (y0 as usize * w + x0 as usize) * ch + k;
@@ -628,10 +619,8 @@ pub fn clean_mask_with(r: &Raster, filters: CleanFilters) -> CleanMask {
         let aspect = cw / chh;
         let fill = comp.len() as f64 / ((x1 - x0 + 1) * (y1 - y0 + 1)) as f64;
         let (ccx, ccy) = (((x0 + x1 + 1) * bs / 2) as f64, ((y0 + y1 + 1) * bs / 2) as f64);
-        let in_margin =
-            ccx < 0.08 * w as f64 || ccx > 0.92 * w as f64 || ccy < 0.08 * h as f64 || ccy > 0.92 * h as f64;
-        if in_margin && (4.0..=10.0).contains(&cw) && (4.0..=10.0).contains(&chh) && (0.75..=1.33).contains(&aspect) && fill >= 0.55
-        {
+        let in_margin = ccx < 0.08 * w as f64 || ccx > 0.92 * w as f64 || ccy < 0.08 * h as f64 || ccy > 0.92 * h as f64;
+        if in_margin && (4.0..=10.0).contains(&cw) && (4.0..=10.0).contains(&chh) && (0.75..=1.33).contains(&aspect) && fill >= 0.55 {
             rep.holes += 1;
             // Release the surroundings (±2 blocks) for the point flood.
             for by in y0.saturating_sub(2)..=(y1 + 2).min(bh - 1) {
@@ -873,8 +862,8 @@ pub(crate) mod testpage {
                     let gw = rng.range(px(5.0), px(9.0));
                     let kind = rng.range(0, 10);
                     let (top, bot) = match kind {
-                        0 | 1 => (y - px(6.0), y + px(10.0)),  // ascender
-                        2 => (y, y + px(15.0)),                // descender
+                        0 | 1 => (y - px(6.0), y + px(10.0)), // ascender
+                        2 => (y, y + px(15.0)),               // descender
                         _ => (y, y + px(10.0)),
                     };
                     // glyph as frame + stroke (not fully filled)
@@ -1079,7 +1068,9 @@ mod tests {
     /// Gap E6: `unpaper_args` switches off sub-steps.
     #[test]
     fn unpaper_args_disable_filters() {
-        let (f, ignored) = CleanFilters::from_unpaper_args("--layout none --no-noisefilter --no-grayfilter --mask-scan-size 100 --foo 3 --no-border-align");
+        let (f, ignored) = CleanFilters::from_unpaper_args(
+            "--layout none --no-noisefilter --no-grayfilter --mask-scan-size 100 --foo 3 --no-border-align",
+        );
         assert_eq!(f, CleanFilters { border: true, holes: true, gray: false, specks: false });
         assert_eq!(ignored, vec!["--foo".to_string()]);
         let (f, ignored) = CleanFilters::from_unpaper_args("--no-border-scan --no-blackfilter");

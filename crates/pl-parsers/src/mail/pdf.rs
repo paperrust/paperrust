@@ -73,7 +73,8 @@ fn escape(s: &str) -> String {
 pub fn clean_html(text: &str) -> String {
     static LINK: OnceLock<Regex> = OnceLock::new();
     let re = LINK.get_or_init(|| {
-        Regex::new(r"(?i)\b(?:https?://|www\.)[^\s<>&]+(?:&amp;[^\s<>&]+)*|\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b").expect("static regex")
+        Regex::new(r"(?i)\b(?:https?://|www\.)[^\s<>&]+(?:&amp;[^\s<>&]+)*|\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b")
+            .expect("static regex")
     });
     let esc = escape(text);
     let linked = re.replace_all(&esc, |c: &regex::Captures<'_>| {
@@ -114,7 +115,9 @@ pub fn mail_to_html(mail: &MailMessage, tz: Tz) -> String {
     let mut h = String::from("<!doctype html><html><head><meta charset=\"UTF-8\"></head><body>");
     h.push_str("<table style=\"width:100%;background-color:#e2e8f0;border-collapse:collapse\" cellpadding=\"4\">");
     let from_label = if from.is_empty() { "" } else { "From" };
-    h.push_str(&format!("<tr><td {label}>{from_label}</td><td style=\"width:55%\">{from}</td><td style=\"text-align:right;width:30%\">{date}</td></tr>"));
+    h.push_str(&format!(
+        "<tr><td {label}>{from_label}</td><td style=\"width:55%\">{from}</td><td style=\"text-align:right;width:30%\">{date}</td></tr>"
+    ));
     for (lab, val, style) in [
         ("Subject", &subject, "font-weight:bold"),
         ("To", &to, "font-size:9pt"),
@@ -128,7 +131,9 @@ pub fn mail_to_html(mail: &MailMessage, tz: Tz) -> String {
         h.push_str(&format!("<tr><td {label}>{lab}</td><td colspan=\"2\" style=\"{style}\">{val}</td></tr>"));
     }
     h.push_str("</table>");
-    h.push_str("<p style=\"border-top:1px solid #000000;border-bottom:1px solid #000000;background-color:#e2e8f0;font-size:1pt\">&nbsp;</p>");
+    h.push_str(
+        "<p style=\"border-top:1px solid #000000;border-bottom:1px solid #000000;background-color:#e2e8f0;font-size:1pt\">&nbsp;</p>",
+    );
     h.push_str(&format!("<div>{content}</div>"));
     h.push_str("</body></html>");
     h
@@ -235,7 +240,12 @@ pub fn merge_pdfs(inputs: &[Vec<u8>]) -> Result<Vec<u8>> {
         }
         for (id, obj) in doc.objects {
             // old catalogs and page trees are replaced
-            let skip = obj.as_dict().ok().and_then(|d| d.get(b"Type").ok()).and_then(|t| t.as_name().ok()).is_some_and(|n| n == b"Catalog" || n == b"Pages");
+            let skip = obj
+                .as_dict()
+                .ok()
+                .and_then(|d| d.get(b"Type").ok())
+                .and_then(|t| t.as_name().ok())
+                .is_some_and(|n| n == b"Catalog" || n == b"Pages");
             if !skip {
                 out.objects.insert(id, obj);
             }
@@ -329,7 +339,12 @@ mod tests {
 
     #[test]
     fn mht_has_cid_parts() {
-        let a = MailAttachment { filename: "logo.png".into(), content_id: "logo@x".into(), content_type: "image/png".into(), payload: vec![1, 2, 3] };
+        let a = MailAttachment {
+            filename: "logo.png".into(),
+            content_id: "logo@x".into(),
+            content_type: "image/png".into(),
+            payload: vec![1, 2, 3],
+        };
         let m = String::from_utf8(build_mht("<img src=\"cid:logo@x\"><script>a</script>", &[a])).unwrap();
         assert!(m.contains("Content-ID: <logo@x>"));
         assert!(m.contains("Content-Type: image/png"));

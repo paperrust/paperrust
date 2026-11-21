@@ -1,3 +1,4 @@
 [toolchain]
-channel = "stable"
+# Pinned: same compiler as the release builds and the Docker image (rust:1.99); bump deliberately.
+channel = "1.99"
 components = ["rustfmt", "clippy"]

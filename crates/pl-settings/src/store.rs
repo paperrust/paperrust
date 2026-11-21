@@ -28,10 +28,7 @@ pub const NOTIFY_CHANNEL: &str = "paperrust_settings";
 /// Placeholder for secrets in history/export/logs.
 pub const MASK: &str = "***";
 /// Migrations of this crate (registration: `pl_cli::migrate::paperrust_migrations`).
-pub const MIGRATION_0001: (&str, &str) = (
-    "pl_settings.0001_paperrust_setting",
-    include_str!("../migrations/0001_paperrust_setting.sql"),
-);
+pub const MIGRATION_0001: (&str, &str) = ("pl_settings.0001_paperrust_setting", include_str!("../migrations/0001_paperrust_setting.sql"));
 
 /// Who changes (for history and `updated_by`).
 #[derive(Debug, Clone, Default)]
@@ -125,18 +122,16 @@ pub async fn current_rev(conn: &mut PgConnection) -> Result<i64, sqlx::Error> {
     if !installed(conn).await? {
         return Ok(0);
     }
-    sqlx::query_scalar(
-        "SELECT CASE WHEN is_called THEN last_value ELSE 0 END FROM paperrust_setting_rev",
-    )
-    .fetch_one(&mut *conn)
-    .await
+    sqlx::query_scalar("SELECT CASE WHEN is_called THEN last_value ELSE 0 END FROM paperrust_setting_rev").fetch_one(&mut *conn).await
 }
 
 /// Is the migration installed?
 pub async fn installed(conn: &mut PgConnection) -> Result<bool, sqlx::Error> {
-    sqlx::query_scalar("SELECT to_regclass('public.paperrust_setting') IS NOT NULL AND to_regclass('public.paperrust_setting_rev') IS NOT NULL")
-        .fetch_one(&mut *conn)
-        .await
+    sqlx::query_scalar(
+        "SELECT to_regclass('public.paperrust_setting') IS NOT NULL AND to_regclass('public.paperrust_setting_rev') IS NOT NULL",
+    )
+    .fetch_one(&mut *conn)
+    .await
 }
 
 /// Installs the migration (idempotent).
@@ -147,19 +142,15 @@ pub async fn migrate(conn: &mut PgConnection) -> Result<(), sqlx::Error> {
 
 /// All rows of `paperrust_setting` (secrets decrypted; different `SECRET_KEY` →
 /// [`DbValue::Unreadable`] + warning). Unknown keys are skipped.
-pub async fn load_db(
-    conn: &mut PgConnection,
-    sb: &SecretBox,
-) -> Result<BTreeMap<String, DbEntry>, sqlx::Error> {
+pub async fn load_db(conn: &mut PgConnection, sb: &SecretBox) -> Result<BTreeMap<String, DbEntry>, sqlx::Error> {
     let mut out = BTreeMap::new();
     if !installed(conn).await? {
         return Ok(out);
     }
-    let rows = sqlx::query(
-        "SELECT key, value, secret_ct, secret_kid, rev, updated_at, updated_by_name FROM paperrust_setting ORDER BY key",
-    )
-    .fetch_all(&mut *conn)
-    .await?;
+    let rows =
+        sqlx::query("SELECT key, value, secret_ct, secret_kid, rev, updated_at, updated_by_name FROM paperrust_setting ORDER BY key")
+            .fetch_all(&mut *conn)
+            .await?;
     for r in rows {
         let key: String = r.try_get(0)?;
         let value: Option<String> = r.try_get(1)?;
@@ -176,40 +167,18 @@ pub async fn load_db(
             },
             (None, None) => continue,
         };
-        out.insert(
-            key,
-            DbEntry {
-                value: v,
-                rev: r.try_get(4)?,
-                updated_at: r.try_get(5)?,
-                updated_by: r.try_get(6)?,
-            },
-        );
+        out.insert(key, DbEntry { value: v, rev: r.try_get(4)?, updated_at: r.try_get(5)?, updated_by: r.try_get(6)? });
     }
     Ok(out)
 }
 
 /// Loads all layers (environment + `paperrust_setting` + ApplicationConfiguration) and the state.
-pub async fn load_layers(
-    conn: &mut PgConnection,
-    env: Env,
-    sb: &SecretBox,
-) -> Result<(Layers, i64), sqlx::Error> {
+pub async fn load_layers(conn: &mut PgConnection, env: Env, sb: &SecretBox) -> Result<(Layers, i64), sqlx::Error> {
     let rev = current_rev(conn).await?;
     let db = load_db(conn, sb).await?;
     let ac = appconfig::load(conn).await?;
-    let desktop = crate::desktop::control_dir(&env)
-        .map(|d| crate::desktop::read_values(&d))
-        .unwrap_or_default();
-    Ok((
-        Layers {
-            env,
-            db,
-            ac,
-            desktop,
-        },
-        rev,
-    ))
+    let desktop = crate::desktop::control_dir(&env).map(|d| crate::desktop::read_values(&d)).unwrap_or_default();
+    Ok((Layers { env, db, ac, desktop }, rev))
 }
 
 /// Loads a snapshot.
@@ -225,23 +194,15 @@ pub async fn load_settings(
     // but old values arose – the notification after the COMMIT then counted as "unchanged" and
     // subscribers/live overlay stayed on the old values.
     let mut tx = pool.begin().await?;
-    sqlx::query("SELECT pg_advisory_xact_lock_shared(hashtext('paperrust_setting'))")
-        .execute(&mut *tx)
-        .await?;
+    sqlx::query("SELECT pg_advisory_xact_lock_shared(hashtext('paperrust_setting'))").execute(&mut *tx).await?;
     let (layers, rev) = load_layers(&mut tx, env, sb).await?;
     tx.commit().await?;
     Ok(Settings::build(&layers, rev, boot))
 }
 
 enum Planned {
-    Row {
-        def: &'static SettingDef,
-        raw: Option<String>,
-    },
-    Ac {
-        def: &'static SettingDef,
-        value: Value,
-    },
+    Row { def: &'static SettingDef, raw: Option<String> },
+    Ac { def: &'static SettingDef, value: Value },
 }
 
 impl std::fmt::Debug for Planned {
@@ -255,13 +216,7 @@ impl std::fmt::Debug for Planned {
 }
 
 fn mask(def: &SettingDef, v: Option<&str>) -> Option<String> {
-    v.map(|v| {
-        if def.secret {
-            MASK.to_string()
-        } else {
-            v.to_string()
-        }
-    })
+    v.map(|v| if def.secret { MASK.to_string() } else { v.to_string() })
 }
 
 fn plan(changes: &[(String, Input)], env: Option<&Env>) -> Result<Vec<Planned>, StoreError> {
@@ -293,11 +248,7 @@ fn plan(changes: &[(String, Input)], env: Option<&Env>) -> Result<Vec<Planned>, 
         }
         if let Some(env) = env {
             // Rule N: process environment locks (file does not).
-            if def
-                .env_names()
-                .iter()
-                .any(|n| env.origin_exact(n) == Some(pl_core::config::EnvOrigin::Process))
-            {
+            if def.env_names().iter().any(|n| env.origin_exact(n) == Some(pl_core::config::EnvOrigin::Process)) {
                 locked.push(def.key.to_string());
                 continue;
             }
@@ -341,48 +292,34 @@ pub async fn apply(
 ) -> Result<i64, StoreError> {
     let planned = plan(changes, opts.env)?;
     let mut tx = pool.begin().await?;
-    sqlx::query("SELECT pg_advisory_xact_lock(hashtext('paperrust_setting'))")
-        .execute(&mut *tx)
-        .await?;
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtext('paperrust_setting'))").execute(&mut *tx).await?;
     let current = current_rev(&mut tx).await?;
     if let Some(exp) = opts.expected_rev
         && exp != current
     {
         return Err(StoreError::RevConflict { current });
     }
-    let rev: i64 = sqlx::query_scalar("SELECT nextval('paperrust_setting_rev')")
-        .fetch_one(&mut *tx)
-        .await?;
+    let rev: i64 = sqlx::query_scalar("SELECT nextval('paperrust_setting_rev')").fetch_one(&mut *tx).await?;
     let mut keys = Vec::new();
     let mut ac_changes: Vec<(&'static SettingDef, Value)> = Vec::new();
     for p in &planned {
         match p {
             Planned::Row { def, raw } => {
-                let old: Option<(Option<String>, Option<Vec<u8>>)> = sqlx::query_as(
-                    "SELECT value, secret_ct FROM paperrust_setting WHERE key = $1 FOR UPDATE",
-                )
-                .bind(def.key)
-                .fetch_optional(&mut *tx)
-                .await?;
+                let old: Option<(Option<String>, Option<Vec<u8>>)> =
+                    sqlx::query_as("SELECT value, secret_ct FROM paperrust_setting WHERE key = $1 FOR UPDATE")
+                        .bind(def.key)
+                        .fetch_optional(&mut *tx)
+                        .await?;
                 if opts.if_unset && old.is_some() {
                     continue;
                 }
-                let old_value = old.as_ref().map(|(v, ct)| {
-                    if ct.is_some() {
-                        MASK.to_string()
-                    } else {
-                        v.clone().unwrap_or_default()
-                    }
-                });
+                let old_value = old.as_ref().map(|(v, ct)| if ct.is_some() { MASK.to_string() } else { v.clone().unwrap_or_default() });
                 match raw {
                     None => {
                         if old.is_none() {
                             continue;
                         }
-                        sqlx::query("DELETE FROM paperrust_setting WHERE key = $1")
-                            .bind(def.key)
-                            .execute(&mut *tx)
-                            .await?;
+                        sqlx::query("DELETE FROM paperrust_setting WHERE key = $1").bind(def.key).execute(&mut *tx).await?;
                     }
                     Some(v) => {
                         let (value, ct, kid) = if def.secret {
@@ -408,15 +345,8 @@ pub async fn apply(
                         .await?;
                     }
                 }
-                history(
-                    &mut tx,
-                    def.key,
-                    old_value,
-                    mask(def, raw.as_deref()),
-                    if raw.is_none() { Action::Reset } else { action },
-                    actor,
-                )
-                .await?;
+                history(&mut tx, def.key, old_value, mask(def, raw.as_deref()), if raw.is_none() { Action::Reset } else { action }, actor)
+                    .await?;
                 keys.push(def.key.to_string());
             }
             Planned::Ac { def, value } => ac_changes.push((def, value.clone())),
@@ -425,11 +355,7 @@ pub async fn apply(
     if !ac_changes.is_empty() {
         let current_row = appconfig::load(&mut tx).await?;
         if opts.if_unset {
-            ac_changes.retain(|(d, _)| {
-                current_row
-                    .as_ref()
-                    .is_none_or(|r| r.get(d.ac_field.unwrap_or_default()).is_null())
-            });
+            ac_changes.retain(|(d, _)| current_row.as_ref().is_none_or(|r| r.get(d.ac_field.unwrap_or_default()).is_null()));
         }
         let old = appconfig::write(&mut tx, &ac_changes).await?;
         for ((def, new), old) in ac_changes.iter().zip(old) {
@@ -437,23 +363,11 @@ pub async fn apply(
                 if v.is_null() {
                     None
                 } else {
-                    Some(if def.secret {
-                        MASK.to_string()
-                    } else {
-                        appconfig::to_env_string(v).unwrap_or_default()
-                    })
+                    Some(if def.secret { MASK.to_string() } else { appconfig::to_env_string(v).unwrap_or_default() })
                 }
             };
             let key = format!("AC:{}", def.ac_field.unwrap_or_default());
-            history(
-                &mut tx,
-                &key,
-                fmt(&old),
-                fmt(new),
-                if new.is_null() { Action::Reset } else { action },
-                actor,
-            )
-            .await?;
+            history(&mut tx, &key, fmt(&old), fmt(new), if new.is_null() { Action::Reset } else { action }, actor).await?;
             keys.push(def.key.to_string());
         }
     }
@@ -544,20 +458,14 @@ pub async fn history_list(
 
 /// Export of all DB values (`paperrust_setting` + AC columns, §2.7). Secrets only with
 /// `include_secrets` in plain text, otherwise `{"secret":true,"is_set":…}`.
-pub async fn export(
-    conn: &mut PgConnection,
-    sb: &SecretBox,
-    include_secrets: bool,
-) -> Result<Value, sqlx::Error> {
+pub async fn export(conn: &mut PgConnection, sb: &SecretBox, include_secrets: bool) -> Result<Value, sqlx::Error> {
     let rev = current_rev(conn).await?;
     let db = load_db(conn, sb).await?;
     let mut settings = Map::new();
     for (k, e) in &db {
         let Some(def) = find(k) else { continue };
         let v = match (&e.value, def.secret, include_secrets) {
-            (DbValue::Plain(v), false, _) | (DbValue::Plain(v), true, true) => {
-                Value::String(v.clone())
-            }
+            (DbValue::Plain(v), false, _) | (DbValue::Plain(v), true, true) => Value::String(v.clone()),
             (DbValue::Plain(_), true, false) => json!({"secret": true, "is_set": true}),
             (DbValue::Unreadable, _, _) => {
                 json!({"secret": true, "is_set": true, "unreadable": true})
@@ -573,43 +481,25 @@ pub async fn export(
             if v.is_null() {
                 continue;
             }
-            ac.insert(
-                f.to_string(),
-                if def.secret && !include_secrets {
-                    json!({"secret": true, "is_set": true})
-                } else {
-                    v.clone()
-                },
-            );
+            ac.insert(f.to_string(), if def.secret && !include_secrets { json!({"secret": true, "is_set": true}) } else { v.clone() });
         }
     }
-    Ok(
-        json!({"format": "paperrust-settings", "version": 1, "rev": rev, "settings": settings, "appconfig": ac}),
-    )
+    Ok(json!({"format": "paperrust-settings", "version": 1, "rev": rev, "settings": settings, "appconfig": ac}))
 }
 
 /// `KEY=value` lines (way back to paperless-ngx, §5 no. 5). Secrets only with `include_secrets`.
 pub fn export_env(settings: &Settings, include_secrets: bool) -> String {
     let mut out = String::from("# PaperRust settings export (database values)\n");
     for e in settings.entries() {
-        if !matches!(
-            e.source,
-            crate::layer::Source::Db | crate::layer::Source::AppConfig
-        ) {
+        if !matches!(e.source, crate::layer::Source::Db | crate::layer::Source::AppConfig) {
             continue;
         }
         let Some(v) = &e.value else { continue };
         if e.def.secret && !include_secrets {
-            out.push_str(&format!(
-                "# {}=*** (secret, use --include-secrets)\n",
-                e.def.key
-            ));
+            out.push_str(&format!("# {}=*** (secret, use --include-secrets)\n", e.def.key));
             continue;
         }
-        let q = v
-            .replace('\\', "\\\\")
-            .replace('"', "\\\"")
-            .replace('\n', "\\n");
+        let q = v.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n");
         out.push_str(&format!("{}=\"{q}\"\n", e.def.key));
     }
     out
@@ -632,9 +522,7 @@ pub fn import_changes(doc: &Value) -> Result<Vec<(String, Input)>, String> {
     }
     if let Some(m) = doc.get("appconfig").and_then(Value::as_object) {
         for (f, v) in m {
-            let def = appconfig::defs()
-                .find(|d| d.ac_field == Some(f.as_str()))
-                .ok_or_else(|| format!("unknown appconfig field {f}"))?;
+            let def = appconfig::defs().find(|d| d.ac_field == Some(f.as_str())).ok_or_else(|| format!("unknown appconfig field {f}"))?;
             if v.get("secret").is_some() && !matches!(def.ty, crate::schema::Ty::Json { .. }) {
                 continue;
             }
@@ -646,25 +534,16 @@ pub fn import_changes(doc: &Value) -> Result<Vec<(String, Input)>, String> {
 
 /// Re-encrypts all secrets from `old` to `new` (`manage settings rekey`). Returns: number of
 /// re-keyed rows; ones that cannot be decrypted stay unchanged (warning).
-pub async fn rekey(
-    pool: &PgPool,
-    old: &SecretBox,
-    new: &SecretBox,
-    actor: &Actor,
-) -> Result<usize, StoreError> {
+pub async fn rekey(pool: &PgPool, old: &SecretBox, new: &SecretBox, actor: &Actor) -> Result<usize, StoreError> {
     let mut tx = pool.begin().await?;
-    sqlx::query("SELECT pg_advisory_xact_lock(hashtext('paperrust_setting'))")
-        .execute(&mut *tx)
-        .await?;
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtext('paperrust_setting'))").execute(&mut *tx).await?;
     let rows: Vec<(String, Vec<u8>, Option<String>)> =
         sqlx::query_as("SELECT key, secret_ct, secret_kid FROM paperrust_setting WHERE secret_ct IS NOT NULL FOR UPDATE")
             .fetch_all(&mut *tx)
             .await?;
     let mut n = 0;
     let mut keys = Vec::new();
-    let rev: i64 = sqlx::query_scalar("SELECT nextval('paperrust_setting_rev')")
-        .fetch_one(&mut *tx)
-        .await?;
+    let rev: i64 = sqlx::query_scalar("SELECT nextval('paperrust_setting_rev')").fetch_one(&mut *tx).await?;
     for (key, ct, kid) in rows {
         if kid.as_deref() == Some(new.kid()) {
             continue;
@@ -678,15 +557,7 @@ pub async fn rekey(
                     .bind(rev)
                     .execute(&mut *tx)
                     .await?;
-                history(
-                    &mut tx,
-                    &key,
-                    Some(MASK.into()),
-                    Some(MASK.into()),
-                    Action::Rekey,
-                    actor,
-                )
-                .await?;
+                history(&mut tx, &key, Some(MASK.into()), Some(MASK.into()), Action::Rekey, actor).await?;
                 keys.push(key);
                 n += 1;
             }
@@ -712,26 +583,12 @@ mod tests {
 
     #[test]
     fn plan_rejects_bootstrap_locked_and_invalid() {
-        assert!(matches!(
-            plan(&[("PAPERLESS_DBHOST".into(), Input::Raw("x".into()))], None),
-            Err(StoreError::NotWritable(_))
-        ));
-        assert!(matches!(
-            plan(&[("NOPE".into(), Input::Raw("x".into()))], None),
-            Err(StoreError::Unknown(_))
-        ));
+        assert!(matches!(plan(&[("PAPERLESS_DBHOST".into(), Input::Raw("x".into()))], None), Err(StoreError::NotWritable(_))));
+        assert!(matches!(plan(&[("NOPE".into(), Input::Raw("x".into()))], None), Err(StoreError::Unknown(_))));
         let env = Env::from_pairs([("PAPERRUST_EMAIL_HOST", "smtp")]);
-        let e = plan(
-            &[("PAPERLESS_EMAIL_HOST".into(), Input::Raw("x".into()))],
-            Some(&env),
-        )
-        .unwrap_err();
+        let e = plan(&[("PAPERLESS_EMAIL_HOST".into(), Input::Raw("x".into()))], Some(&env)).unwrap_err();
         assert_eq!(e.code(), "locked_by_environment");
-        let e = plan(
-            &[("PAPERLESS_EMAIL_PORT".into(), Input::Json(json!("abc")))],
-            None,
-        )
-        .unwrap_err();
+        let e = plan(&[("PAPERLESS_EMAIL_PORT".into(), Input::Json(json!("abc")))], None).unwrap_err();
         assert_eq!(e.code(), "invalid");
         // File does not lock
         let fenv = Env::from_pairs_with_file(
@@ -739,31 +596,11 @@ mod tests {
             std::path::Path::new("p"),
             [("PAPERLESS_EMAIL_HOST".to_string(), "f".to_string())],
         );
-        assert!(
-            plan(
-                &[("PAPERLESS_EMAIL_HOST".into(), Input::Raw("x".into()))],
-                Some(&fenv)
-            )
-            .is_ok()
-        );
+        assert!(plan(&[("PAPERLESS_EMAIL_HOST".into(), Input::Raw("x".into()))], Some(&fenv)).is_ok());
         // AC: environment does not lock, serializer rules apply
         let env = Env::from_pairs([("PAPERLESS_OCR_PAGES", "3")]);
-        assert!(
-            plan(
-                &[("PAPERLESS_OCR_PAGES".into(), Input::Json(json!(2)))],
-                Some(&env)
-            )
-            .is_ok()
-        );
-        assert_eq!(
-            plan(
-                &[("PAPERLESS_OCR_PAGES".into(), Input::Json(json!(0)))],
-                Some(&env)
-            )
-            .unwrap_err()
-            .code(),
-            "invalid"
-        );
+        assert!(plan(&[("PAPERLESS_OCR_PAGES".into(), Input::Json(json!(2)))], Some(&env)).is_ok());
+        assert_eq!(plan(&[("PAPERLESS_OCR_PAGES".into(), Input::Json(json!(0)))], Some(&env)).unwrap_err().code(), "invalid");
     }
 
     #[test]

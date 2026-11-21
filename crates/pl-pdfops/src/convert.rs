@@ -409,7 +409,8 @@ pub fn convert_from_tiff_to_pdf(tiff_path: &Path, target_directory: &Path) -> Re
     let data = std::fs::read(tiff_path)?;
     let info = pl_ocr::imageinfo::probe(&data).map_err(|e| PdfOpsError::Value(e.to_string()))?;
     // maybe_override_pixel_limit + Pillow bomb check
-    let limit = pl_ocr::imageinfo::pil_pixel_limit(pl_envlive::var("PAPERLESS_MAX_IMAGE_PIXELS").and_then(|v| v.trim().parse::<i64>().ok()));
+    let limit =
+        pl_ocr::imageinfo::pil_pixel_limit(pl_envlive::var("PAPERLESS_MAX_IMAGE_PIXELS").and_then(|v| v.trim().parse::<i64>().ok()));
     info.decompression_bomb_check(limit).map_err(|e| PdfOpsError::Value(e.to_string()))?;
     let mut frames = pl_ocr::native::decode_frames(&data, &info).map_err(|e| PdfOpsError::Value(e.to_string()))?;
     // img2pdf: dpi and Orientation per single image (gap E18)
@@ -566,7 +567,12 @@ mod tests {
             let s = image_stream(&d, pages[0]);
             assert_eq!(s.dict.get(b"Filter").unwrap().as_name().unwrap(), b"DCTDecode", "{name}");
             assert_eq!(
-                s.dict.get(b"DecodeParms").ok().and_then(|p| p.as_dict().ok()).and_then(|p| p.get(b"ColorTransform").ok()).and_then(|v| v.as_i64().ok()),
+                s.dict
+                    .get(b"DecodeParms")
+                    .ok()
+                    .and_then(|p| p.as_dict().ok())
+                    .and_then(|p| p.get(b"ColorTransform").ok())
+                    .and_then(|v| v.as_i64().ok()),
                 ct,
                 "{name}"
             );

@@ -79,7 +79,11 @@ pub async fn limit_or_429(ctx: &Ctx, action: &str) -> R<Option<Response>> {
         return Ok(Some(crate::web::forbidden()));
     };
     let ip = Some(ip);
-    if ratelimit::consume(&ctx.cache, action, Settings::rate_limits(action), &subject_ip(&ip), false).await.map_err(|e| Internal(e.0))?.is_none() {
+    if ratelimit::consume(&ctx.cache, action, Settings::rate_limits(action), &subject_ip(&ip), false)
+        .await
+        .map_err(|e| Internal(e.0))?
+        .is_none()
+    {
         let mut r = html(StatusCode::TOO_MANY_REQUESTS, ratelimit::HTML_429.into());
         r.headers_mut().insert(axum::http::header::CONTENT_TYPE, axum::http::HeaderValue::from_static("text/html"));
         return Ok(Some(r));
@@ -175,7 +179,9 @@ async fn clean_with_password(ctx: &mut Ctx, login: &str, password: &str) -> R<Re
     let key = format!("{}:{}", ctx.host(), login.to_lowercase());
     let Some(ip) = ctx.client_ip()? else { return Err(Internal("Unable to determine client IP address".into())) };
     let subj = Subject { ip: Some(&ip), key: Some(&key), user_id: None };
-    let usage = ratelimit::consume(&ctx.cache, "login_failed", Settings::rate_limits("login_failed"), &subj, false).await.map_err(|e| Internal(e.0))?;
+    let usage = ratelimit::consume(&ctx.cache, "login_failed", Settings::rate_limits("login_failed"), &subj, false)
+        .await
+        .map_err(|e| Internal(e.0))?;
     let Some(usage) = usage else {
         return Ok(Err(tr!(ctx.lang, "auth.error.too_many").to_string()));
     };
@@ -273,7 +279,10 @@ async fn mfa_view(ctx: &mut Ctx) -> R<Response> {
         } else {
             match clean_code(ctx, uid, &code).await? {
                 Ok((auth_id, auth_type)) => {
-                    sqlx::query("UPDATE mfa_authenticator SET last_used_at = now() WHERE id = $1").bind(auth_id).execute(ctx.st.db()).await?;
+                    sqlx::query("UPDATE mfa_authenticator SET last_used_at = now() WHERE id = $1")
+                        .bind(auth_id)
+                        .execute(ctx.st.db())
+                        .await?;
                     flow::record_authentication(ctx, "mfa", &[("id", json!(auth_id)), ("type", Value::from(auth_type))]);
                     if let Some(Value::Object(st)) = login.state.get_mut("stages")
                         && let Some(Value::Object(o)) = st.get_mut("mfa_authenticate")
@@ -296,7 +305,11 @@ async fn clean_code(ctx: &mut Ctx, uid: i64, code: &str) -> R<Result<(i64, Strin
     let key = format!("mfa-auth-user-{uid}");
     let Some(ip) = ctx.client_ip()? else { return Err(Internal("Unable to determine client IP address".into())) };
     let subj = Subject { ip: Some(&ip), key: Some(&key), user_id: None };
-    if ratelimit::consume(&ctx.cache, "login_failed", Settings::rate_limits("login_failed"), &subj, false).await.map_err(|e| Internal(e.0))?.is_none() {
+    if ratelimit::consume(&ctx.cache, "login_failed", Settings::rate_limits("login_failed"), &subj, false)
+        .await
+        .map_err(|e| Internal(e.0))?
+        .is_none()
+    {
         return Ok(Err(tr!(ctx.lang, "auth.error.too_many").to_string()));
     }
     let rows: Vec<(i64, String, Value)> =
@@ -328,7 +341,8 @@ async fn clean_code(ctx: &mut Ctx, uid: i64, code: &str) -> R<Result<(i64, Strin
 /// `RecoveryCodes.validate_code` (row locked, set bit in `used_mask`).
 async fn validate_recovery_code(ctx: &Ctx, id: i64, code: &str) -> R<bool> {
     let mut tx = ctx.st.db().begin().await?;
-    let row: Option<(Value,)> = sqlx::query_as("SELECT data FROM mfa_authenticator WHERE id = $1 FOR UPDATE").bind(id).fetch_optional(&mut *tx).await?;
+    let row: Option<(Value,)> =
+        sqlx::query_as("SELECT data FROM mfa_authenticator WHERE id = $1 FOR UPDATE").bind(id).fetch_optional(&mut *tx).await?;
     let Some((mut data,)) = row else { return Ok(false) };
     if let Some(Value::Array(migrated)) = data.get("migrated_codes").cloned() {
         let pos = migrated.iter().position(|c| c.as_str() == Some(code));

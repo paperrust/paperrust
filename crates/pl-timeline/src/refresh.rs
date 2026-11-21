@@ -34,10 +34,7 @@ pub async fn refresh_document(pool: &PgPool, dp: &DateParse, doc_id: i64) -> Res
     };
     let found = extract(&content, Some(created), dp);
     let mut tx = pool.begin().await?;
-    sqlx::query("DELETE FROM paperrust_doc_date WHERE document_id = $1 AND source = 'content'")
-        .bind(id)
-        .execute(&mut *tx)
-        .await?;
+    sqlx::query("DELETE FROM paperrust_doc_date WHERE document_id = $1 AND source = 'content'").bind(id).execute(&mut *tx).await?;
     for f in &found {
         sqlx::query(
             "INSERT INTO paperrust_doc_date (document_id, kind, date, source, confidence, phrase, page)
@@ -70,9 +67,7 @@ pub async fn refresh_document(pool: &PgPool, dp: &DateParse, doc_id: i64) -> Res
 /// optionally only within `within` (SQL subquery with column `id`).
 pub async fn stale_ids(pool: &PgPool, within: Option<&str>, limit: i64) -> Result<Vec<i64>> {
     ensure(pool).await?;
-    let filter = within
-        .map(|w| format!("AND d.id IN (SELECT v.id FROM ({w}) AS v(id))"))
-        .unwrap_or_default();
+    let filter = within.map(|w| format!("AND d.id IN (SELECT v.id FROM ({w}) AS v(id))")).unwrap_or_default();
     Ok(sqlx::query_scalar(&format!(
         "SELECT d.id::int8 FROM documents_document d LEFT JOIN paperrust_doc_date_state s ON s.document_id = d.id
           WHERE d.deleted_at IS NULL AND d.root_document_id IS NULL
@@ -86,12 +81,7 @@ pub async fn stale_ids(pool: &PgPool, within: Option<&str>, limit: i64) -> Resul
 }
 
 /// Re-detect up to `limit` outdated documents; number of detected documents.
-pub async fn refresh_stale(
-    pool: &PgPool,
-    dp: &DateParse,
-    within: Option<&str>,
-    limit: i64,
-) -> Result<usize> {
+pub async fn refresh_stale(pool: &PgPool, dp: &DateParse, within: Option<&str>, limit: i64) -> Result<usize> {
     let ids = stale_ids(pool, within, limit).await?;
     let mut n = 0;
     for id in ids {
@@ -125,20 +115,14 @@ impl Drop for Running {
 
 /// Backfill: all outdated (with `force`: all) root documents. `None` if a
 /// backfill is already running in this process.
-pub async fn backfill(
-    pool: &PgPool,
-    dp: &DateParse,
-    force: bool,
-) -> Result<Option<BackfillReport>> {
+pub async fn backfill(pool: &PgPool, dp: &DateParse, force: bool) -> Result<Option<BackfillReport>> {
     if RUNNING.swap(true, Ordering::SeqCst) {
         return Ok(None);
     }
     let _guard = Running;
     ensure(pool).await?;
     if force {
-        sqlx::query("DELETE FROM paperrust_doc_date_state")
-            .execute(pool)
-            .await?;
+        sqlx::query("DELETE FROM paperrust_doc_date_state").execute(pool).await?;
     }
     let mut rep = BackfillReport::default();
     loop {

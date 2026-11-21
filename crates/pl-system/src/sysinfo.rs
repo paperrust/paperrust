@@ -210,9 +210,7 @@ pub fn storage(path: &Path) -> Result<(u64, u64), String> {
         let wide: Vec<u16> = path.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
         let (mut avail, mut total, mut free) = (0u64, 0u64, 0u64);
         // SAFETY: NUL-terminated wide string and valid out pointers.
-        let ok = unsafe {
-            windows_sys::Win32::Storage::FileSystem::GetDiskFreeSpaceExW(wide.as_ptr(), &mut avail, &mut total, &mut free)
-        };
+        let ok = unsafe { windows_sys::Win32::Storage::FileSystem::GetDiskFreeSpaceExW(wide.as_ptr(), &mut avail, &mut total, &mut free) };
         if ok == 0 {
             return Err(std::io::Error::last_os_error().to_string());
         }
@@ -251,11 +249,7 @@ pub fn fromtimestamp_local(mtime_ns: i128) -> Option<NaiveDateTime> {
 
 fn round_half_even(x: f64) -> f64 {
     let r = x.round();
-    if (x - x.trunc()).abs() == 0.5 {
-        2.0 * (x / 2.0).round()
-    } else {
-        r
-    }
+    if (x - x.trunc()).abs() == 0.5 { 2.0 * (x / 2.0).round() } else { r }
 }
 
 /// `make_aware(naive)` in the Django current time zone (`TIME_ZONE`), `is_dst=None` semantics

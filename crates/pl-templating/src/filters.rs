@@ -7,22 +7,69 @@
 use minijinja::value::{Rest, Value, ValueKind};
 use minijinja::{Error, State};
 
-use crate::localize::{format_localized, load_locale, DateValue};
-use crate::methods::{char_slice, py_capitalize, py_replace, PyArgs};
-use crate::pystr::{django_slugify, parse_date, parse_datetime, py_isspace, py_strip, py_strip_chars, py_str_repr};
+use crate::localize::{DateValue, format_localized, load_locale};
+use crate::methods::{PyArgs, char_slice, py_capitalize, py_replace};
+use crate::pystr::{django_slugify, parse_date, parse_datetime, py_isspace, py_str_repr, py_strip, py_strip_chars};
 use crate::pyvalue::{
-    as_num, as_pystr, check_len, invalid, is_placeholder, py_repr, py_str, py_type, strftime_value, Num, PyDate,
-    PyDateTime,
+    Num, PyDate, PyDateTime, as_num, as_pystr, check_len, invalid, is_placeholder, py_repr, py_str, py_type, strftime_value,
 };
-use crate::strftime::{strftime, TzInfo};
+use crate::strftime::{TzInfo, strftime};
 
 /// Names of the built-in Jinja2 filters (3.1.6) – authoritative for the "No filter named" check.
 pub const JINJA2_FILTERS: &[&str] = &[
-    "abs", "attr", "batch", "capitalize", "center", "count", "d", "default", "dictsort", "e", "escape",
-    "filesizeformat", "first", "float", "forceescape", "format", "groupby", "indent", "int", "items", "join",
-    "last", "length", "list", "lower", "map", "max", "min", "pprint", "random", "reject", "rejectattr",
-    "replace", "reverse", "round", "safe", "select", "selectattr", "slice", "sort", "string", "striptags", "sum",
-    "title", "tojson", "trim", "truncate", "unique", "upper", "urlencode", "urlize", "wordcount", "wordwrap",
+    "abs",
+    "attr",
+    "batch",
+    "capitalize",
+    "center",
+    "count",
+    "d",
+    "default",
+    "dictsort",
+    "e",
+    "escape",
+    "filesizeformat",
+    "first",
+    "float",
+    "forceescape",
+    "format",
+    "groupby",
+    "indent",
+    "int",
+    "items",
+    "join",
+    "last",
+    "length",
+    "list",
+    "lower",
+    "map",
+    "max",
+    "min",
+    "pprint",
+    "random",
+    "reject",
+    "rejectattr",
+    "replace",
+    "reverse",
+    "round",
+    "safe",
+    "select",
+    "selectattr",
+    "slice",
+    "sort",
+    "string",
+    "striptags",
+    "sum",
+    "title",
+    "tojson",
+    "trim",
+    "truncate",
+    "unique",
+    "upper",
+    "urlencode",
+    "urlize",
+    "wordcount",
+    "wordwrap",
     "xmlattr",
 ];
 
@@ -31,10 +78,45 @@ pub const PAPERLESS_FILTERS: &[&str] = &["get_cf_value", "datetime", "slugify", 
 
 /// Jinja2-Tests (3.1.6).
 pub const JINJA2_TESTS: &[&str] = &[
-    "boolean", "callable", "defined", "divisibleby", "eq", "equalto", "escaped", "even", "false", "filter",
-    "float", "ge", "gt", "greaterthan", "in", "integer", "iterable", "le", "lower", "lessthan", "lt", "mapping",
-    "ne", "none", "number", "odd", "sameas", "sequence", "string", "test", "true", "undefined", "upper", "==",
-    "!=", "<", "<=", ">", ">=",
+    "boolean",
+    "callable",
+    "defined",
+    "divisibleby",
+    "eq",
+    "equalto",
+    "escaped",
+    "even",
+    "false",
+    "filter",
+    "float",
+    "ge",
+    "gt",
+    "greaterthan",
+    "in",
+    "integer",
+    "iterable",
+    "le",
+    "lower",
+    "lessthan",
+    "lt",
+    "mapping",
+    "ne",
+    "none",
+    "number",
+    "odd",
+    "sameas",
+    "sequence",
+    "string",
+    "test",
+    "true",
+    "undefined",
+    "upper",
+    "==",
+    "!=",
+    "<",
+    "<=",
+    ">",
+    ">=",
 ];
 
 /// minijinja filters/tests that do not exist in Jinja2 (are removed).
@@ -49,17 +131,13 @@ pub const MINIJINJA_ONLY_TESTS: &[&str] = &["startingwith", "endingwith", "safe"
 pub fn f_datetime(value: Value, rest: Rest<Value>) -> Result<Value, Error> {
     let args = PyArgs::new(&rest)?;
     args.check("format_datetime", &["format"])?;
-    let fmt = args
-        .get(0, "format")
-        .ok_or_else(|| invalid("format_datetime() missing 1 required positional argument: 'format'"))?;
+    let fmt = args.get(0, "format").ok_or_else(|| invalid("format_datetime() missing 1 required positional argument: 'format'"))?;
     let fmt = py_str(&fmt)?;
     if value.as_str().is_some() || is_placeholder(&value) {
         let s = as_pystr(&value).unwrap_or_default();
         let parsed = match parse_datetime(&s).map_err(invalid)? {
             Some(dt) => Some(strftime(&dt.naive, dt.offset.map(TzInfo::Fixed).unwrap_or(TzInfo::Naive), &fmt)),
-            None => parse_date(&s)
-                .map_err(invalid)?
-                .map(|d| strftime(&d.and_time(chrono::NaiveTime::MIN), TzInfo::Naive, &fmt)),
+            None => parse_date(&s).map_err(invalid)?.map(|d| strftime(&d.and_time(chrono::NaiveTime::MIN), TzInfo::Naive, &fmt)),
         };
         return match parsed {
             Some(r) => Ok(Value::from(r)),
@@ -88,12 +166,9 @@ pub fn f_slugify(value: Value) -> Result<Value, Error> {
 pub fn f_localize_date(value: Value, rest: Rest<Value>) -> Result<Value, Error> {
     let args = PyArgs::new(&rest)?;
     args.check("localize_date", &["format", "locale"])?;
-    let format = args
-        .get(0, "format")
-        .ok_or_else(|| invalid("localize_date() missing 2 required positional arguments: 'format' and 'locale'"))?;
-    let locale = args
-        .get(1, "locale")
-        .ok_or_else(|| invalid("localize_date() missing 1 required positional argument: 'locale'"))?;
+    let format =
+        args.get(0, "format").ok_or_else(|| invalid("localize_date() missing 2 required positional arguments: 'format' and 'locale'"))?;
+    let locale = args.get(1, "locale").ok_or_else(|| invalid("localize_date() missing 1 required positional argument: 'locale'"))?;
     if value.is_undefined() {
         return Err(Error::from(minijinja::ErrorKind::UndefinedError));
     }
@@ -103,12 +178,7 @@ pub fn f_localize_date(value: Value, rest: Rest<Value>) -> Result<Value, Error> 
     if value.as_str().is_some() || is_placeholder(&value) {
         let s = as_pystr(&value).unwrap_or_default();
         match parse_datetime(&s).map_err(invalid)? {
-            Some(dt) => {
-                parsed = Some(DateValue::DateTime(
-                    dt.naive,
-                    dt.offset.unwrap_or_else(|| chrono::Offset::fix(&chrono::Utc)),
-                ))
-            }
+            Some(dt) => parsed = Some(DateValue::DateTime(dt.naive, dt.offset.unwrap_or_else(|| chrono::Offset::fix(&chrono::Utc)))),
             None => is_none = true,
         }
     }
@@ -133,9 +203,7 @@ pub fn f_localize_date(value: Value, rest: Rest<Value>) -> Result<Value, Error> 
 pub fn f_get_cf_value(value: Value, rest: Rest<Value>) -> Result<Value, Error> {
     let args = PyArgs::new(&rest)?;
     args.check("get_cf_value", &["name", "default"])?;
-    let name = args
-        .get(0, "name")
-        .ok_or_else(|| invalid("get_cf_value() missing 1 required positional argument: 'name'"))?;
+    let name = args.get(0, "name").ok_or_else(|| invalid("get_cf_value() missing 1 required positional argument: 'name'"))?;
     let default = args.get(1, "default").unwrap_or(Value::from(()));
     if value.is_undefined() {
         return Err(Error::from(minijinja::ErrorKind::UndefinedError));
@@ -383,14 +451,17 @@ pub fn f_int(value: Value, rest: Rest<Value>) -> Result<Value, Error> {
         } else {
             digits
         };
-        if (2..=36).contains(&base) && !digits.is_empty()
-            && let Ok(i) = i128::from_str_radix(&digits, base) {
-                return Ok(Value::from(if neg { -i } else { i }));
-            }
+        if (2..=36).contains(&base)
+            && !digits.is_empty()
+            && let Ok(i) = i128::from_str_radix(&digits, base)
+        {
+            return Ok(Value::from(if neg { -i } else { i }));
+        }
         if let Ok(f) = py_strip(s).parse::<f64>()
-            && f.is_finite() {
-                return Ok(Value::from(f.trunc() as i128));
-            }
+            && f.is_finite()
+        {
+            return Ok(Value::from(f.trunc() as i128));
+        }
         return Ok(default);
     }
     match as_num(&value) {
@@ -571,12 +642,7 @@ pub fn percent_format(fmt: &str, args: &PyArgs) -> Result<String, Error> {
             continue;
         }
         let value = match &key {
-            Some(k) => args
-                .kwargs()
-                .iter()
-                .find(|(n, _)| n == k)
-                .map(|(_, v)| v.clone())
-                .ok_or_else(|| invalid(format!("'{k}'")))?,
+            Some(k) => args.kwargs().iter().find(|(n, _)| n == k).map(|(_, v)| v.clone()).ok_or_else(|| invalid(format!("'{k}'")))?,
             None => {
                 let v = pos.get(idx).cloned().ok_or_else(|| invalid("not enough arguments for format string"))?;
                 idx += 1;
@@ -665,11 +731,8 @@ pub fn f_filesizeformat(value: Value, rest: Rest<Value>) -> Result<Value, Error>
         None => py_str(&value)?.trim().parse::<f64>().map_err(|_| invalid("could not convert string to float"))?,
     };
     let base: f64 = if binary { 1024.0 } else { 1000.0 };
-    let prefixes = if binary {
-        ["KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"]
-    } else {
-        ["kB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
-    };
+    let prefixes =
+        if binary { ["KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"] } else { ["kB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"] };
     if bytes == 1.0 {
         return Ok(Value::from("1 Byte"));
     }
@@ -725,9 +788,7 @@ pub fn f_striptags(value: Value) -> Result<Value, Error> {
     }
     let collapsed: Vec<&str> = out.split(py_isspace).filter(|x| !x.is_empty()).collect();
     let joined = collapsed.join(" ");
-    Ok(Value::from(
-        joined.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&#39;", "'").replace("&amp;", "&"),
-    ))
+    Ok(Value::from(joined.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&#39;", "'").replace("&amp;", "&")))
 }
 
 /// Jinja2-Test `callable`.

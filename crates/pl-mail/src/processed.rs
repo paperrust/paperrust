@@ -100,13 +100,9 @@ async fn filters(db: &PgPool, info: &ReqInfo) -> ApiResult<(Option<i32>, Option<
                 "rule": ["Select a valid choice. That choice is not one of the available choices."]
             }))
         };
-        let id = pyval::parse_py_int(r)
-            .and_then(|i| i32::try_from(i).ok())
-            .ok_or_else(invalid)?;
-        let exists: Option<(i32,)> = sqlx::query_as("SELECT id FROM paperless_mail_mailrule WHERE id = $1")
-            .bind(id)
-            .fetch_optional(db)
-            .await?;
+        let id = pyval::parse_py_int(r).and_then(|i| i32::try_from(i).ok()).ok_or_else(invalid)?;
+        let exists: Option<(i32,)> =
+            sqlx::query_as("SELECT id FROM paperless_mail_mailrule WHERE id = $1").bind(id).fetch_optional(db).await?;
         if exists.is_none() {
             return Err(invalid());
         }
@@ -125,9 +121,8 @@ async fn list(State(st): State<AppState>, info: ReqInfo, user: MailUser) -> ApiR
     let (vis, binds) = crate::util::visible_where(&user, "p", PROCESSED_MAIL, 3);
     let cond = format!("($1::int IS NULL OR p.rule_id = $1) AND ($2::text IS NULL OR p.status = $2) AND {vis}");
     let count_sql = format!("SELECT COUNT(*) FROM paperless_mail_processedmail p WHERE {cond}");
-    let count: (i64,) = crate::util::bind_vis(sqlx::query_as(&count_sql).bind(rule).bind(&status), &user, binds, PROCESSED_MAIL, ct)
-        .fetch_one(db)
-        .await?;
+    let count: (i64,) =
+        crate::util::bind_vis(sqlx::query_as(&count_sql).bind(rule).bind(&status), &user, binds, PROCESSED_MAIL, ct).fetch_one(db).await?;
     let page = listing::paginate(&info, count.0)?;
     let order = order_by(info.param("ordering"));
     let sql = format!(
@@ -136,15 +131,11 @@ async fn list(State(st): State<AppState>, info: ReqInfo, user: MailUser) -> ApiR
         page.offset()
     );
     let rows: Vec<ProcessedRow> =
-        crate::util::bind_vis(sqlx::query_as(&sql).bind(rule).bind(&status), &user, binds, PROCESSED_MAIL, ct)
-            .fetch_all(db)
-            .await?;
+        crate::util::bind_vis(sqlx::query_as(&sql).bind(rule).bind(&status), &user, binds, PROCESSED_MAIL, ct).fetch_all(db).await?;
     let all_ids = if info.api_version < 10 {
         let sql = format!("SELECT p.id FROM paperless_mail_processedmail p WHERE {cond} ORDER BY {order}");
         let ids: Vec<(i32,)> =
-            crate::util::bind_vis(sqlx::query_as(&sql).bind(rule).bind(&status), &user, binds, PROCESSED_MAIL, ct)
-                .fetch_all(db)
-                .await?;
+            crate::util::bind_vis(sqlx::query_as(&sql).bind(rule).bind(&status), &user, binds, PROCESSED_MAIL, ct).fetch_all(db).await?;
         Some(ids.into_iter().map(|r| r.0).collect())
     } else {
         None
@@ -204,31 +195,44 @@ async fn bulk_delete(State(st): State<AppState>, _info: ReqInfo, user: MailUser,
         }
     }
     let ids: Vec<i32> = ids.into_iter().filter_map(|i| i32::try_from(i).ok()).collect();
-    let existing: Vec<(i32,)> = sqlx::query_as("SELECT id FROM paperless_mail_processedmail WHERE id = ANY($1)")
-        .bind(&ids)
-        .fetch_all(db)
-        .await?;
+    let existing: Vec<(i32,)> =
+        sqlx::query_as("SELECT id FROM paperless_mail_processedmail WHERE id = ANY($1)").bind(&ids).fetch_all(db).await?;
     let existing: Vec<i32> = existing.into_iter().map(|r| r.0).collect();
     let permitted = perms::permitted_among(db, &user, PROCESSED_MAIL, "delete_processedmail", &existing).await?;
     if existing.iter().any(|i| !permitted.contains(i)) {
         return Err(ApiError::Html(StatusCode::FORBIDDEN, "Insufficient permissions"));
     }
-    sqlx::query("DELETE FROM paperless_mail_processedmail WHERE id = ANY($1)")
-        .bind(&existing)
-        .execute(db)
-        .await?;
+    sqlx::query("DELETE FROM paperless_mail_processedmail WHERE id = ANY($1)").bind(&existing).execute(db).await?;
     Ok(json_response(StatusCode::OK, &json!({"result": "OK", "deleted_mail_ids": mail_ids})))
 }
 
 pub fn routes() -> Vec<pl_core::ApiRoute> {
     use axum::routing::{get, post};
     use pl_core::ApiRoute;
-    use pl_core::route::{drf_view, ALLOW_POST_ONLY, ALLOW_READ_ONLY};
+    use pl_core::route::{ALLOW_POST_ONLY, ALLOW_READ_ONLY, drf_view};
     const SRC: &str = "src/paperless_mail/views.py::ProcessedMailViewSet";
     vec![
-        ApiRoute { id: "processed_mail.list", method: Method::GET, path: "/api/processed_mail/", upstream: SRC, handler: drf_view(get(list), ALLOW_READ_ONLY) },
-        ApiRoute { id: "processed_mail.bulk_delete", method: Method::POST, path: "/api/processed_mail/bulk_delete/", upstream: "src/paperless_mail/views.py::ProcessedMailViewSet.bulk_delete", handler: drf_view(post(bulk_delete), ALLOW_POST_ONLY) },
-        ApiRoute { id: "processed_mail.retrieve", method: Method::GET, path: "/api/processed_mail/{id}/", upstream: SRC, handler: drf_view(get(retrieve), ALLOW_READ_ONLY) },
+        ApiRoute {
+            id: "processed_mail.list",
+            method: Method::GET,
+            path: "/api/processed_mail/",
+            upstream: SRC,
+            handler: drf_view(get(list), ALLOW_READ_ONLY),
+        },
+        ApiRoute {
+            id: "processed_mail.bulk_delete",
+            method: Method::POST,
+            path: "/api/processed_mail/bulk_delete/",
+            upstream: "src/paperless_mail/views.py::ProcessedMailViewSet.bulk_delete",
+            handler: drf_view(post(bulk_delete), ALLOW_POST_ONLY),
+        },
+        ApiRoute {
+            id: "processed_mail.retrieve",
+            method: Method::GET,
+            path: "/api/processed_mail/{id}/",
+            upstream: SRC,
+            handler: drf_view(get(retrieve), ALLOW_READ_ONLY),
+        },
     ]
 }
 

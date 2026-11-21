@@ -105,12 +105,7 @@ async fn read_routes_match_django() {
                 let ds = d.status().as_u16();
                 let dct = d.headers().get("content-type").and_then(|v| v.to_str().ok()).unwrap_or("").to_string();
                 let db = d.text().await.unwrap_or_default();
-                let mut req = Request::builder()
-                    .uri(url)
-                    .header("host", HOST)
-                    .header("accept", &accept)
-                    .body(Body::empty())
-                    .unwrap();
+                let mut req = Request::builder().uri(url).header("host", HOST).header("accept", &accept).body(Body::empty()).unwrap();
                 req.extensions_mut().insert(mu.clone());
                 let r = router.clone().oneshot(req).await.unwrap();
                 let rs = r.status().as_u16();
@@ -119,9 +114,7 @@ async fn read_routes_match_django() {
                 let rb = String::from_utf8_lossy(&rb).into_owned();
                 compared += 1;
                 if ds != rs || db != rb || dct != rct {
-                    diffs.push(format!(
-                        "{name} v{version} {url}\n  django {ds} {dct} {db}\n  rust   {rs} {rct} {rb}"
-                    ));
+                    diffs.push(format!("{name} v{version} {url}\n  django {ds} {dct} {db}\n  rust   {rs} {rct} {rb}"));
                 }
             }
         }

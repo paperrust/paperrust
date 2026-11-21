@@ -33,13 +33,8 @@ impl ObjectModel {
 
 macro_rules! model {
     ($name:ident, $app:literal, $model:literal, $obj:literal, $table:literal, $soft:literal) => {
-        pub const $name: ObjectModel = ObjectModel {
-            app_label: $app,
-            model_name: $model,
-            object_name: $obj,
-            table: $table,
-            soft_delete: $soft,
-        };
+        pub const $name: ObjectModel =
+            ObjectModel { app_label: $app, model_name: $model, object_name: $obj, table: $table, soft_delete: $soft };
     };
 }
 

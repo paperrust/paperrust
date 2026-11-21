@@ -8,8 +8,8 @@
 // transaction of the ingestion).
 
 use chrono::{DateTime, NaiveDate, Utc};
-use sea_query::{Alias, Expr, Func, Order, PostgresQueryBuilder, Query, SelectStatement, SimpleExpr};
 use pl_core::sqlbind::SqlxBinder as _;
+use sea_query::{Alias, Expr, Func, Order, PostgresQueryBuilder, Query, SelectStatement, SimpleExpr};
 use serde_json::Value;
 use sqlx::{PgConnection, Row};
 
@@ -36,10 +36,7 @@ pub(crate) async fn fetch_all(conn: &mut PgConnection, q: &SelectStatement) -> R
     sqlx::query_with(&sql, vals).fetch_all(conn).await
 }
 
-pub(crate) async fn fetch_optional(
-    conn: &mut PgConnection,
-    q: &SelectStatement,
-) -> Result<Option<sqlx::postgres::PgRow>, sqlx::Error> {
+pub(crate) async fn fetch_optional(conn: &mut PgConnection, q: &SelectStatement) -> Result<Option<sqlx::postgres::PgRow>, sqlx::Error> {
     let (sql, vals) = q.build_sqlx(PostgresQueryBuilder);
     sqlx::query_with(&sql, vals).fetch_optional(conn).await
 }
@@ -92,10 +89,7 @@ pub async fn lock_documents_sorted(conn: &mut PgConnection, ids: &[i64]) -> Resu
     if ids32.is_empty() {
         return Ok(());
     }
-    let sql = format!(
-        "SELECT id FROM {} WHERE id = ANY($1) ORDER BY id FOR NO KEY UPDATE",
-        pl_authz::grants::document_row_table()
-    );
+    let sql = format!("SELECT id FROM {} WHERE id = ANY($1) ORDER BY id FOR NO KEY UPDATE", pl_authz::grants::document_row_table());
     sqlx::query(&sql).bind(&ids32).execute(&mut *conn).await?;
     Ok(())
 }
@@ -170,10 +164,30 @@ pub struct DocRow {
 }
 
 const DOC_COLS: &[&str] = &[
-    "id", "title", "content", "mime_type", "checksum", "archive_checksum", "page_count", "created", "modified", "added",
-    "filename", "archive_filename", "original_filename", "archive_serial_number", "correspondent_id",
-    "document_type_id", "storage_path_id", "owner_id", "root_document_id", "version_label", "version_index",
-    "deleted_at", "restored_at", "transaction_id",
+    "id",
+    "title",
+    "content",
+    "mime_type",
+    "checksum",
+    "archive_checksum",
+    "page_count",
+    "created",
+    "modified",
+    "added",
+    "filename",
+    "archive_filename",
+    "original_filename",
+    "archive_serial_number",
+    "correspondent_id",
+    "document_type_id",
+    "storage_path_id",
+    "owner_id",
+    "root_document_id",
+    "version_label",
+    "version_index",
+    "deleted_at",
+    "restored_at",
+    "transaction_id",
 ];
 
 fn opt_i(r: &sqlx::postgres::PgRow, c: &str) -> Result<Option<i64>, sqlx::Error> {
@@ -338,11 +352,7 @@ pub async fn find_duplicates(conn: &mut PgConnection, checksum: &str) -> Result<
     let q = Query::select()
         .columns([a("id"), a("title"), a("original_filename"), a("filename"), a("deleted_at")])
         .from(a("documents_document"))
-        .cond_where(
-            sea_query::Cond::any()
-                .add(Expr::col(a("checksum")).eq(checksum))
-                .add(Expr::col(a("archive_checksum")).eq(checksum)),
-        )
+        .cond_where(sea_query::Cond::any().add(Expr::col(a("checksum")).eq(checksum)).add(Expr::col(a("archive_checksum")).eq(checksum)))
         .order_by(a("created"), Order::Desc)
         .to_owned();
     let rows = fetch_all(conn, &q).await?;
@@ -373,10 +383,7 @@ pub async fn find_asn(conn: &mut PgConnection, asn: i64) -> Result<Option<(i64, 
         .limit(1)
         .to_owned();
     Ok(match fetch_optional(conn, &q).await? {
-        Some(r) => Some((
-            i64::from(r.try_get::<i32, _>("id")?),
-            r.try_get::<Option<DateTime<Utc>>, _>("deleted_at")?.is_some(),
-        )),
+        Some(r) => Some((i64::from(r.try_get::<i32, _>("id")?), r.try_get::<Option<DateTime<Utc>>, _>("deleted_at")?.is_some())),
         None => None,
     })
 }

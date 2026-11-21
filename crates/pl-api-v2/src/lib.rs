@@ -88,16 +88,8 @@ impl<S: Send + Sync> FromRequestParts<S> for V2 {
 }
 
 /// Kinds with their own list under `/rs/api/v2/<plural>`.
-pub const LIST_KINDS: [Kind; 8] = [
-    Kind::Tag,
-    Kind::Correspondent,
-    Kind::DocumentType,
-    Kind::StoragePath,
-    Kind::CustomField,
-    Kind::SavedView,
-    Kind::User,
-    Kind::Group,
-];
+pub const LIST_KINDS: [Kind; 8] =
+    [Kind::Tag, Kind::Correspondent, Kind::DocumentType, Kind::StoragePath, Kind::CustomField, Kind::SavedView, Kind::User, Kind::Group];
 
 /// Kinds that v2 can write (transitionally via the v1 handlers). Not storage paths: their
 /// v1 write routes still run via Django (template validation, routes.toml).

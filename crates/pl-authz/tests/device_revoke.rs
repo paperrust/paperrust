@@ -39,10 +39,12 @@ async fn password_change_revokes_device_tokens_of_that_user_only() {
     // without the table: nothing to revoke, no error
     assert_eq!(device::revoke_all_for_user(&db, 1).await.expect("no table"), 0);
 
-    sqlx::raw_sql("CREATE TABLE auth_user (id serial PRIMARY KEY); INSERT INTO auth_user DEFAULT VALUES; INSERT INTO auth_user DEFAULT VALUES;")
-        .execute(&db)
-        .await
-        .expect("auth_user");
+    sqlx::raw_sql(
+        "CREATE TABLE auth_user (id serial PRIMARY KEY); INSERT INTO auth_user DEFAULT VALUES; INSERT INTO auth_user DEFAULT VALUES;",
+    )
+    .execute(&db)
+    .await
+    .expect("auth_user");
     device::migrations::apply(&db).await.expect("migration");
 
     let (_, a1) = device::create(&db, 1, "phone").await.expect("a1");

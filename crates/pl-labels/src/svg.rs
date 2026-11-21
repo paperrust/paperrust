@@ -25,7 +25,15 @@ pub fn write(page: &Page) -> String {
     for p in &page.prims {
         match p {
             Prim::Outline { x, y, w, h, r } => {
-                let _ = write!(outlines, r#"<rect x="{}" y="{}" width="{}" height="{}" rx="{}"/>"#, num(*x), num(*y), num(*w), num(*h), num(*r));
+                let _ = write!(
+                    outlines,
+                    r#"<rect x="{}" y="{}" width="{}" height="{}" rx="{}"/>"#,
+                    num(*x),
+                    num(*y),
+                    num(*w),
+                    num(*h),
+                    num(*r)
+                );
             }
             Prim::Line { x1, y1, x2, y2 } => {
                 let _ = write!(lines, r#"<line x1="{}" y1="{}" x2="{}" y2="{}"/>"#, num(*x1), num(*y1), num(*x2), num(*y2));

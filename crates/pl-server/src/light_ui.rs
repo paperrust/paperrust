@@ -57,9 +57,7 @@ impl Variant {
     }
     /// Content (from disk on first access); `None` if the file has gone missing in the meantime.
     fn bytes(&self) -> Option<&bytes::Bytes> {
-        self.cell
-            .get_or_init(|| self.path.as_ref().and_then(|p| std::fs::read(p).ok()).map(bytes::Bytes::from))
-            .as_ref()
+        self.cell.get_or_init(|| self.path.as_ref().and_then(|p| std::fs::read(p).ok()).map(bytes::Bytes::from)).as_ref()
     }
 }
 
@@ -127,11 +125,7 @@ impl LightUi {
             } else {
                 // others: metadata only; ETag from modification time and size (whitenoise style)
                 let Ok(md) = std::fs::metadata(p) else { continue };
-                let mtime = md
-                    .modified()
-                    .ok()
-                    .and_then(|m| m.duration_since(std::time::UNIX_EPOCH).ok())
-                    .map_or(0, |d| d.as_nanos());
+                let mtime = md.modified().ok().and_then(|m| m.duration_since(std::time::UNIX_EPOCH).ok()).map_or(0, |d| d.as_nanos());
                 (format!("\"{mtime:x}-{:x}\"", md.len()), Variant::lazy(None, p.clone()))
             };
             let mut variants = vec![plain];
@@ -161,8 +155,13 @@ impl LightUi {
             let html = String::from_utf8_lossy(cur).into_owned();
             let Some(i) = html.find("</head>") else { continue };
             let mut out = html;
-            out.insert_str(i, &format!("{tags}
-"));
+            out.insert_str(
+                i,
+                &format!(
+                    "{tags}
+"
+                ),
+            );
             let plain = out.into_bytes();
             a.etag = format!("\"{:016x}-{:x}\"", fnv64(&plain), plain.len());
             a.variants = vec![Variant::loaded(None, plain)];
@@ -180,10 +179,7 @@ impl LightUi {
 
 /// Directory per configuration; `None` = switched off.
 pub fn configured_dir(get: impl Fn(&str) -> Option<String>, static_root: &Path) -> Option<PathBuf> {
-    let off = matches!(
-        get("PAPERRUST_LIGHT_UI").map(|v| v.trim().to_ascii_lowercase()).as_deref(),
-        Some("off" | "false" | "0" | "no")
-    );
+    let off = matches!(get("PAPERRUST_LIGHT_UI").map(|v| v.trim().to_ascii_lowercase()).as_deref(), Some("off" | "false" | "0" | "no"));
     if off {
         return None;
     }
@@ -266,7 +262,10 @@ fn serve(a: &Asset, method: &Method, req: &HeaderMap) -> Response {
             Ok((s, e)) => {
                 *r.status_mut() = StatusCode::PARTIAL_CONTENT;
                 let h = r.headers_mut();
-                h.insert(header::CONTENT_RANGE, HeaderValue::from_str(&format!("bytes {s}-{e}/{len}")).unwrap_or(HeaderValue::from_static("")));
+                h.insert(
+                    header::CONTENT_RANGE,
+                    HeaderValue::from_str(&format!("bytes {s}-{e}/{len}")).unwrap_or(HeaderValue::from_static("")),
+                );
                 h.insert(header::CONTENT_LENGTH, HeaderValue::from(e - s + 1));
                 if !head {
                     *r.body_mut() = Body::from(plain.slice(s as usize..=e as usize));
@@ -275,7 +274,10 @@ fn serve(a: &Asset, method: &Method, req: &HeaderMap) -> Response {
             }
             Err(()) => {
                 *r.status_mut() = StatusCode::RANGE_NOT_SATISFIABLE;
-                r.headers_mut().insert(header::CONTENT_RANGE, HeaderValue::from_str(&format!("bytes */{len}")).unwrap_or(HeaderValue::from_static("")));
+                r.headers_mut().insert(
+                    header::CONTENT_RANGE,
+                    HeaderValue::from_str(&format!("bytes */{len}")).unwrap_or(HeaderValue::from_static("")),
+                );
                 r
             }
         };
@@ -307,7 +309,9 @@ fn login_redirect(path_and_query: &str) -> Response {
     let next: String = path_and_query
         .bytes()
         .map(|c| match c {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'!' | b'~' | b'*' | b'\'' | b'(' | b')' => (c as char).to_string(),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'!' | b'~' | b'*' | b'\'' | b'(' | b')' => {
+                (c as char).to_string()
+            }
             _ => format!("%{c:02X}"),
         })
         .collect();
@@ -336,7 +340,10 @@ async fn handle(ui: Arc<LightUi>, state: AppState, req: Request) -> Response {
     }
     let rel = path.strip_prefix(PREFIX).unwrap_or("").trim_start_matches('/');
     // File (without `..`, without index.html directly – it goes through login like every SPA route)
-    if !rel.is_empty() && rel != "index.html" && rel != MODERN_ENTRY && !rel.split('/').any(|s| s == ".." || s.is_empty())
+    if !rel.is_empty()
+        && rel != "index.html"
+        && rel != MODERN_ENTRY
+        && !rel.split('/').any(|s| s == ".." || s.is_empty())
         && let Some(a) = ui.files.get(rel)
     {
         return serve(a, &method, req.headers());
@@ -540,8 +547,10 @@ mod tests {
         assert_ne!(a.etag, before);
         assert_eq!(a.variants.len(), 1);
         let body = String::from_utf8(a.variants[0].bytes().unwrap().to_vec()).unwrap();
-        assert!(body.contains("content=\"local\">
-</head>"));
+        assert!(body.contains(
+            "content=\"local\">
+</head>"
+        ));
         // empty: nothing to do
         ui.inject_head("");
     }

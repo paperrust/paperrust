@@ -19,8 +19,7 @@ type HmacSha256 = Hmac<Sha256>;
 pub const SESSION_KEY_SALT: &str = "django.contrib.sessions.SessionStore";
 
 /// Key salt of `AbstractBaseUser._get_session_auth_hash`.
-pub const SESSION_AUTH_HASH_SALT: &str =
-    "django.contrib.auth.models.AbstractBaseUser.get_session_auth_hash";
+pub const SESSION_AUTH_HASH_SALT: &str = "django.contrib.auth.models.AbstractBaseUser.get_session_auth_hash";
 
 /// Upper bound for decompressed signed payloads (protection only; Django has none).
 const MAX_DECOMPRESSED: u64 = 16 * 1024 * 1024;
@@ -138,19 +137,11 @@ pub enum SignError {
 pub fn unsign<'a>(signed: &'a str, salt: &str, key: &str) -> Result<&'a str, SignError> {
     let (value, sig) = signed.rsplit_once(':').ok_or(SignError::NoSeparator)?;
     let expected = signature(salt, value, key);
-    if constant_time_eq(sig.as_bytes(), expected.as_bytes()) {
-        Ok(value)
-    } else {
-        Err(SignError::BadSignature)
-    }
+    if constant_time_eq(sig.as_bytes(), expected.as_bytes()) { Ok(value) } else { Err(SignError::BadSignature) }
 }
 
 /// `TimestampSigner.unsign(value, max_age=None)`: returns (value, timestamp).
-pub fn unsign_timestamped<'a>(
-    signed: &'a str,
-    salt: &str,
-    key: &str,
-) -> Result<(&'a str, i64), SignError> {
+pub fn unsign_timestamped<'a>(signed: &'a str, salt: &str, key: &str) -> Result<(&'a str, i64), SignError> {
     let value = unsign(signed, salt, key)?;
     let (value, ts) = value.rsplit_once(':').ok_or(SignError::NoSeparator)?;
     let ts = b62_decode(ts).ok_or(SignError::BadTimestamp)?;
@@ -168,10 +159,7 @@ pub fn loads(signed: &str, salt: &str, key: &str) -> Result<serde_json::Value, S
     let mut data = b64_decode(b64).ok_or(SignError::BadPayload)?;
     if compressed {
         let mut out = Vec::new();
-        flate2::read::ZlibDecoder::new(&data[..])
-            .take(MAX_DECOMPRESSED)
-            .read_to_end(&mut out)
-            .map_err(|_| SignError::BadPayload)?;
+        flate2::read::ZlibDecoder::new(&data[..]).take(MAX_DECOMPRESSED).read_to_end(&mut out).map_err(|_| SignError::BadPayload)?;
         data = out;
     }
     // JSONSerializer.loads: json.loads(data.decode("latin-1"))
@@ -208,10 +196,7 @@ pub fn encode_session(json: &str, secret_key: &str, timestamp: i64) -> String {
 }
 
 /// Session decode as `SessionBase.decode`: any error yields an empty session (`{}`).
-pub fn decode_session(
-    session_data: &str,
-    secret_key: &str,
-) -> serde_json::Map<String, serde_json::Value> {
+pub fn decode_session(session_data: &str, secret_key: &str) -> serde_json::Map<String, serde_json::Value> {
     match loads(session_data, SESSION_KEY_SALT, secret_key) {
         Ok(serde_json::Value::Object(m)) => m,
         Ok(_) => serde_json::Map::new(),
@@ -303,10 +288,7 @@ mod tests {
 
     #[test]
     fn session_auth_hash_vector() {
-        assert_eq!(
-            session_auth_hash("pbkdf2_sha256$1000000$abc$def", "test-secret"),
-            VEC_SESSION_AUTH_HASH
-        );
+        assert_eq!(session_auth_hash("pbkdf2_sha256$1000000$abc$def", "test-secret"), VEC_SESSION_AUTH_HASH);
     }
 
     #[test]
@@ -321,14 +303,8 @@ mod tests {
     fn decode_known_session() {
         let m = decode_session(VEC_SESSION_DATA, "test-secret");
         assert_eq!(m.get("_auth_user_id").and_then(|v| v.as_str()), Some("1"));
-        assert_eq!(
-            m.get("_auth_user_backend").and_then(|v| v.as_str()),
-            Some("django.contrib.auth.backends.ModelBackend")
-        );
-        assert_eq!(
-            m.get("_auth_user_hash").and_then(|v| v.as_str()),
-            Some(VEC_SESSION_AUTH_HASH)
-        );
+        assert_eq!(m.get("_auth_user_backend").and_then(|v| v.as_str()), Some("django.contrib.auth.backends.ModelBackend"));
+        assert_eq!(m.get("_auth_user_hash").and_then(|v| v.as_str()), Some(VEC_SESSION_AUTH_HASH));
     }
 
     #[test]
@@ -365,8 +341,7 @@ mod tests {
         assert_eq!(python_json_dumps(&v), want);
     }
 
-    pub(crate) const VEC_SESSION_AUTH_HASH: &str =
-        include_str!("testvectors/session_auth_hash.txt");
+    pub(crate) const VEC_SESSION_AUTH_HASH: &str = include_str!("testvectors/session_auth_hash.txt");
     pub(crate) const VEC_SESSION_JSON: &str = include_str!("testvectors/session_json.txt");
     pub(crate) const VEC_SESSION_DATA: &str = include_str!("testvectors/session_data.txt");
     pub(crate) const VEC_SIGNED_PLAIN: &str = include_str!("testvectors/signed_plain.txt");

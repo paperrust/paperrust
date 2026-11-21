@@ -94,19 +94,13 @@ pub fn parse_server_url(input: &str) -> Result<ServerUrl, String> {
     if t.is_empty() {
         return Err("Bitte die Adresse des Servers angeben.".into());
     }
-    let with_scheme = if t.contains("://") {
-        t.to_string()
-    } else {
-        format!("https://{t}")
-    };
+    let with_scheme = if t.contains("://") { t.to_string() } else { format!("https://{t}") };
     let u = Url::parse(&with_scheme).map_err(|e| format!("Ungültige Adresse: {e}"))?;
     let https = match u.scheme() {
         "https" => true,
         "http" => false,
         s => {
-            return Err(format!(
-                "Nur https:// (oder http:// im eigenen Netz), nicht {s}://."
-            ));
+            return Err(format!("Nur https:// (oder http:// im eigenen Netz), nicht {s}://."));
         }
     };
     if !u.username().is_empty() || u.password().is_some() {
@@ -158,19 +152,12 @@ pub fn http_policy(u: &ServerUrl) -> Result<bool, String> {
 
 /// SHA-256 as hex (lower case, without separator) – format of `tls_pin`.
 pub fn sha256_hex(data: &[u8]) -> String {
-    Sha256::digest(data)
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect()
+    Sha256::digest(data).iter().map(|b| format!("{b:02x}")).collect()
 }
 
 /// Display fingerprint as in the browser/`openssl x509 -fingerprint -sha256` (AA:BB:…).
 pub fn fingerprint(der: &[u8]) -> String {
-    Sha256::digest(der)
-        .iter()
-        .map(|b| format!("{b:02X}"))
-        .collect::<Vec<_>>()
-        .join(":")
+    Sha256::digest(der).iter().map(|b| format!("{b:02X}")).collect::<Vec<_>>().join(":")
 }
 
 pub fn valid_pin(pin: &str) -> bool {
@@ -246,14 +233,7 @@ fn der_time(t: &[u8]) -> String {
         s.to_string()
     };
     if full.len() >= 12 && full.is_ascii() {
-        format!(
-            "{}-{}-{} {}:{} UTC",
-            &full[..4],
-            &full[4..6],
-            &full[6..8],
-            &full[8..10],
-            &full[10..12]
-        )
+        format!("{}-{}-{} {}:{} UTC", &full[..4], &full[4..6], &full[6..8], &full[8..10], &full[10..12])
     } else {
         full
     }
@@ -300,14 +280,13 @@ pub fn spki_pin(der: &[u8]) -> Option<String> {
 }
 
 /// PEM (WebView2 `ToPemEncoding`) → DER of the first certificate.
+// Only the Windows WebView2 path (wv2.rs) calls this outside tests.
+#[cfg_attr(not(windows), allow(dead_code))]
 pub fn pem_to_der(pem: &str) -> Option<Vec<u8>> {
     use base64::Engine;
     let start = pem.find("-----BEGIN CERTIFICATE-----")? + "-----BEGIN CERTIFICATE-----".len();
     let end = start + pem[start..].find("-----END CERTIFICATE-----")?;
-    let b64: String = pem[start..end]
-        .chars()
-        .filter(|c| !c.is_whitespace())
-        .collect();
+    let b64: String = pem[start..end].chars().filter(|c| !c.is_whitespace()).collect();
     base64::engine::general_purpose::STANDARD.decode(b64).ok()
 }
 
@@ -383,27 +362,18 @@ pub fn classify_error(text: &str, is_connect: bool, is_timeout: bool) -> FetchEr
     let t = text.to_ascii_lowercase();
     if let Some(i) = t.find("invalid peer certificate") {
         let kind = &t[i..];
-        let k =
-            if kind.contains("expired") || kind.contains("notvalidyet") || kind.contains("revoked")
-            {
-                TlsKind::Expired
-            } else if kind.contains("unknownissuer")
-                || kind.contains("selfsigned")
-                || kind.contains("unknown issuer")
-            {
-                TlsKind::Untrusted
-            } else if kind.contains("notvalidforname") || kind.contains("not valid for name") {
-                TlsKind::Name
-            } else {
-                TlsKind::Other
-            };
+        let k = if kind.contains("expired") || kind.contains("notvalidyet") || kind.contains("revoked") {
+            TlsKind::Expired
+        } else if kind.contains("unknownissuer") || kind.contains("selfsigned") || kind.contains("unknown issuer") {
+            TlsKind::Untrusted
+        } else if kind.contains("notvalidforname") || kind.contains("not valid for name") {
+            TlsKind::Name
+        } else {
+            TlsKind::Other
+        };
         return FetchError::Tls(k, text.to_string());
     }
-    if is_connect || is_timeout {
-        FetchError::Connect(text.to_string())
-    } else {
-        FetchError::Other(text.to_string())
-    }
+    if is_connect || is_timeout { FetchError::Connect(text.to_string()) } else { FetchError::Other(text.to_string()) }
 }
 
 /// Real HTTP queries to a server (without cookies, without redirects).
@@ -430,18 +400,11 @@ impl Fetcher {
         if pin.is_some() {
             b = b.danger_accept_invalid_certs(true).tls_info(true);
         }
-        Ok(Self {
-            client: b.build().map_err(|e| e.to_string())?,
-            base,
-            pin,
-        })
+        Ok(Self { client: b.build().map_err(|e| e.to_string())?, base, pin })
     }
 
     pub async fn get(&self, path: &str) -> Result<Resp, FetchError> {
-        let url = self
-            .base
-            .join(path)
-            .map_err(|e| FetchError::Other(e.to_string()))?;
+        let url = self.base.join(path).map_err(|e| FetchError::Other(e.to_string()))?;
         let r = self
             .client
             .get(url)
@@ -450,11 +413,7 @@ impl Fetcher {
             .await
             .map_err(|e| classify_error(&chain(&e), e.is_connect(), e.is_timeout()))?;
         if let Some(pin) = &self.pin {
-            let got = r
-                .extensions()
-                .get::<reqwest::tls::TlsInfo>()
-                .and_then(|t| t.peer_certificate())
-                .and_then(spki_pin);
+            let got = r.extensions().get::<reqwest::tls::TlsInfo>().and_then(|t| t.peer_certificate()).and_then(spki_pin);
             match got {
                 Some(g) if &g == pin => {}
                 // http (no TLS) with pin: not possible, pins exist only for https.
@@ -466,21 +425,11 @@ impl Fetcher {
             }
         }
         let status = r.status().as_u16();
-        let hv = |n: &str| {
-            r.headers()
-                .get(n)
-                .and_then(|v| v.to_str().ok())
-                .map(str::to_string)
-        };
+        let hv = |n: &str| r.headers().get(n).and_then(|v| v.to_str().ok()).map(str::to_string);
         let content_type = hv("content-type").unwrap_or_default();
         let x_version = hv("x-version");
         let body = r.text().await.unwrap_or_default();
-        Ok(Resp {
-            status,
-            content_type,
-            body: body.chars().take(64 * 1024).collect(),
-            x_version,
-        })
+        Ok(Resp { status, content_type, body: body.chars().take(64 * 1024).collect(), x_version })
     }
 
     /// Fetch the server's certificate (without check) – for the confirmation dialog.
@@ -538,10 +487,7 @@ impl std::fmt::Display for DetectError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Fetch(e) => e.fmt(f),
-            Self::Unknown(why) => write!(
-                f,
-                "Unter dieser Adresse läuft kein PaperRust- oder paperless-ngx-Server ({why})."
-            ),
+            Self::Unknown(why) => write!(f, "Unter dieser Adresse läuft kein PaperRust- oder paperless-ngx-Server ({why})."),
         }
     }
 }
@@ -550,9 +496,7 @@ fn json(r: &Resp) -> Option<serde_json::Value> {
     if !r.content_type.to_ascii_lowercase().contains("json") {
         return None;
     }
-    serde_json::from_str::<serde_json::Value>(&r.body)
-        .ok()
-        .filter(serde_json::Value::is_object)
+    serde_json::from_str::<serde_json::Value>(&r.body).ok().filter(serde_json::Value::is_object)
 }
 
 fn ngx_note(version: Option<&str>) -> Option<String> {
@@ -562,8 +506,7 @@ fn ngx_note(version: Option<&str>) -> Option<String> {
 }
 
 fn clean_version(v: Option<&str>) -> Option<String> {
-    v.map(|s| s.trim().trim_start_matches(['v', 'V']).to_string())
-        .filter(|s| !s.is_empty() && s != "0.0.0")
+    v.map(|s| s.trim().trim_start_matches(['v', 'V']).to_string()).filter(|s| !s.is_empty() && s != "0.0.0")
 }
 
 /// Detection (REMOTE-APP §3.2), in this order:
@@ -575,22 +518,13 @@ fn clean_version(v: Option<&str>) -> Option<String> {
 ///
 /// Connection/certificate errors of the first query abort immediately.
 pub async fn detect<G: Get + Sync>(g: &G) -> Result<Detected, DetectError> {
-    let v2 = g
-        .get("rs/api/v2/server")
-        .await
-        .map_err(DetectError::Fetch)?;
+    let v2 = g.get("rs/api/v2/server").await.map_err(DetectError::Fetch)?;
     if v2.status == 200
         && let Some(j) = json(&v2)
     {
-        let version = j.get("version").and_then(|v| v.as_str()).or_else(|| {
-            j.pointer("/paperrust/current_version")
-                .and_then(|v| v.as_str())
-        });
-        return Ok(Detected {
-            flavor: Flavor::Paperrust,
-            version: clean_version(version),
-            note: None,
-        });
+        let version =
+            j.get("version").and_then(|v| v.as_str()).or_else(|| j.pointer("/paperrust/current_version").and_then(|v| v.as_str()));
+        return Ok(Detected { flavor: Flavor::Paperrust, version: clean_version(version), note: None });
     }
     let mut seen = vec![format!("rs/api/v2/server → {}", v2.status)];
     match g.get("api/remote_version/").await {
@@ -606,13 +540,8 @@ pub async fn detect<G: Get + Sync>(g: &G) -> Result<Detected, DetectError> {
                     });
                 }
                 if j.get("version").is_some() {
-                    let v = clean_version(j.get("version").and_then(|v| v.as_str()))
-                        .or_else(|| clean_version(r.x_version.as_deref()));
-                    return Ok(Detected {
-                        note: ngx_note(v.as_deref()),
-                        flavor: Flavor::Ngx,
-                        version: v,
-                    });
+                    let v = clean_version(j.get("version").and_then(|v| v.as_str())).or_else(|| clean_version(r.x_version.as_deref()));
+                    return Ok(Detected { note: ngx_note(v.as_deref()), flavor: Flavor::Ngx, version: v });
                 }
             }
             seen.push(format!("api/remote_version/ → {}", r.status));
@@ -622,18 +551,14 @@ pub async fn detect<G: Get + Sync>(g: &G) -> Result<Detected, DetectError> {
         }
         Err(e) => seen.push(format!("api/remote_version/ → {e}")),
     }
-    let r = g
-        .get("api/ui_settings/")
-        .await
-        .map_err(DetectError::Fetch)?;
+    let r = g.get("api/ui_settings/").await.map_err(DetectError::Fetch)?;
     if let Some(j) = json(&r) {
         let drf = matches!(r.status, 401 | 403) && j.get("detail").is_some_and(|d| d.is_string());
         if drf || (r.status == 200 && j.get("settings").is_some()) {
             let v = clean_version(r.x_version.as_deref());
             return Ok(Detected {
-                note: ngx_note(v.as_deref()).or(Some(
-                    "Version erst nach der Anmeldung bekannt (paperless-ngx < 2.x wird nicht geprüft).".into(),
-                )),
+                note: ngx_note(v.as_deref())
+                    .or(Some("Version erst nach der Anmeldung bekannt (paperless-ngx < 2.x wird nicht geprüft).".into())),
                 flavor: Flavor::Ngx,
                 version: v,
             });
@@ -671,10 +596,7 @@ mod tests {
         assert_eq!(u.origin, "https://docs.example.ch");
         assert!(u.https && u.scope == HostScope::Public && !u.idn);
         let u = ok(" https://Example.ch:8443/paperless ");
-        assert_eq!(
-            u.base, "https://example.ch:8443/paperless/",
-            "Unterpfad bleibt Teil der Basis"
-        );
+        assert_eq!(u.base, "https://example.ch:8443/paperless/", "Unterpfad bleibt Teil der Basis");
         assert_eq!(u.origin, "https://example.ch:8443");
         assert_eq!(ok("https://example.ch:443/").origin, "https://example.ch");
         // IDN → punycode
@@ -734,21 +656,13 @@ mod tests {
 
     #[test]
     fn origins() {
-        assert_eq!(
-            parse_origin("https://sso.example.ch/realms/x"),
-            Some("https://sso.example.ch".into())
-        );
+        assert_eq!(parse_origin("https://sso.example.ch/realms/x"), Some("https://sso.example.ch".into()));
         assert_eq!(parse_origin("http://sso.example.ch"), None);
         assert_eq!(parse_origin("javascript:alert(1)"), None);
     }
 
     fn resp(status: u16, ct: &str, body: &str) -> Resp {
-        Resp {
-            status,
-            content_type: ct.into(),
-            body: body.into(),
-            x_version: None,
-        }
+        Resp { status, content_type: ct.into(), body: body.into(), x_version: None }
     }
 
     /// Recorded responses (2026-11-09): PaperRust 0.1.0 (standalone, :8191) and
@@ -761,11 +675,7 @@ mod tests {
                 "application/json",
                 r#"{"version":"0.0.0","update_available":false,"paperrust":{"current_version":"0.1.0","latest_version":null,"status":"unknown","releases_url":"https://github.com/x/y/releases"}}"#,
             ),
-            "api/ui_settings/" => resp(
-                401,
-                "application/json",
-                r#"{"detail":"Authentication credentials were not provided."}"#,
-            ),
+            "api/ui_settings/" => resp(401, "application/json", r#"{"detail":"Authentication credentials were not provided."}"#),
             _ => resp(404, "text/html", ""),
         })
     }
@@ -773,16 +683,8 @@ mod tests {
     fn ngx342(path: &str) -> Result<Resp, FetchError> {
         Ok(match path {
             "rs/api/v2/server" => resp(302, "text/html; charset=utf-8", ""),
-            "api/remote_version/" => resp(
-                200,
-                "application/json",
-                r#"{"version":"v3.4.2","update_available":false}"#,
-            ),
-            "api/ui_settings/" => resp(
-                401,
-                "application/json",
-                r#"{"detail":"Authentication credentials were not provided."}"#,
-            ),
+            "api/remote_version/" => resp(200, "application/json", r#"{"version":"v3.4.2","update_available":false}"#),
+            "api/ui_settings/" => resp(401, "application/json", r#"{"detail":"Authentication credentials were not provided."}"#),
             _ => resp(404, "text/html", ""),
         })
     }
@@ -815,11 +717,7 @@ mod tests {
     fn detects_paperrust_v2() {
         let d = run(|p: &str| {
             if p == "rs/api/v2/server" {
-                Ok(resp(
-                    200,
-                    "application/json",
-                    r#"{"product":"paperrust","version":"0.2.0"}"#,
-                ))
+                Ok(resp(200, "application/json", r#"{"product":"paperrust","version":"0.2.0"}"#))
             } else {
                 panic!("nach v2 nichts mehr abfragen: {p}")
             }
@@ -837,14 +735,9 @@ mod tests {
         assert!(d.note.is_none());
         // older version, remote_version only with login → detected via ui_settings
         let d = run(|p: &str| match p {
-            "api/remote_version/" | "api/ui_settings/" => Ok(Resp {
-                x_version: Some("1.17.4".into()),
-                ..resp(
-                    401,
-                    "application/json",
-                    r#"{"detail":"Anmeldedaten fehlen."}"#,
-                )
-            }),
+            "api/remote_version/" | "api/ui_settings/" => {
+                Ok(Resp { x_version: Some("1.17.4".into()), ..resp(401, "application/json", r#"{"detail":"Anmeldedaten fehlen."}"#) })
+            }
             _ => Ok(resp(404, "text/html", "")),
         })
         .unwrap();
@@ -869,49 +762,28 @@ mod tests {
     fn fetch_errors_stop_detection() {
         let e = run(|_p: &str| Err(FetchError::Connect("refused".into()))).unwrap_err();
         assert!(matches!(e, DetectError::Fetch(FetchError::Connect(_))));
-        let e = run(|p: &str| {
-            if p == "rs/api/v2/server" {
-                Ok(resp(404, "text/html", ""))
-            } else {
-                Err(FetchError::PinMismatch { got: "x".into() })
-            }
-        })
-        .unwrap_err();
-        assert!(matches!(
-            e,
-            DetectError::Fetch(FetchError::PinMismatch { .. })
-        ));
+        let e =
+            run(
+                |p: &str| {
+                    if p == "rs/api/v2/server" { Ok(resp(404, "text/html", "")) } else { Err(FetchError::PinMismatch { got: "x".into() }) }
+                },
+            )
+            .unwrap_err();
+        assert!(matches!(e, DetectError::Fetch(FetchError::PinMismatch { .. })));
     }
 
     #[test]
     fn rustls_error_texts() {
         let c = |t: &str| classify_error(t, true, false);
         assert!(matches!(
-            c(
-                "error sending request: client error (Connect): invalid peer certificate: UnknownIssuer"
-            ),
+            c("error sending request: client error (Connect): invalid peer certificate: UnknownIssuer"),
             FetchError::Tls(TlsKind::Untrusted, _)
         ));
-        assert!(matches!(
-            c("invalid peer certificate: Expired"),
-            FetchError::Tls(TlsKind::Expired, _)
-        ));
-        assert!(matches!(
-            c("invalid peer certificate: ExpiredContext { time: .. }"),
-            FetchError::Tls(TlsKind::Expired, _)
-        ));
-        assert!(matches!(
-            c("invalid peer certificate: NotValidForNameContext { expected: .. }"),
-            FetchError::Tls(TlsKind::Name, _)
-        ));
-        assert!(matches!(
-            c("tcp connect error: refused"),
-            FetchError::Connect(_)
-        ));
-        assert!(matches!(
-            classify_error("x", false, false),
-            FetchError::Other(_)
-        ));
+        assert!(matches!(c("invalid peer certificate: Expired"), FetchError::Tls(TlsKind::Expired, _)));
+        assert!(matches!(c("invalid peer certificate: ExpiredContext { time: .. }"), FetchError::Tls(TlsKind::Expired, _)));
+        assert!(matches!(c("invalid peer certificate: NotValidForNameContext { expected: .. }"), FetchError::Tls(TlsKind::Name, _)));
+        assert!(matches!(c("tcp connect error: refused"), FetchError::Connect(_)));
+        assert!(matches!(classify_error("x", false, false), FetchError::Other(_)));
     }
 
     fn self_signed(name: &str, days_valid: i64) -> (Vec<u8>, Vec<u8>) {
@@ -920,11 +792,7 @@ mod tests {
         p.distinguished_name.push(rcgen::DnType::CommonName, name);
         let now = std::time::SystemTime::now();
         let off = std::time::Duration::from_secs(days_valid.unsigned_abs() * 86_400);
-        let t = if days_valid >= 0 {
-            now + off
-        } else {
-            now - off
-        };
+        let t = if days_valid >= 0 { now + off } else { now - off };
         p.not_after = t.into();
         p.not_before = (now - std::time::Duration::from_secs(2 * 86_400 * 400)).into();
         let cert = p.self_signed(&key).unwrap();
@@ -936,11 +804,7 @@ mod tests {
         // Test certificate generated at runtime (rcgen), REMOTE-APP §8.
         let (der, spki) = self_signed("nas.local", 30);
         let c = cert_info(&der).unwrap();
-        assert_eq!(
-            c.spki_sha256,
-            sha256_hex(&spki),
-            "Pin = SHA-256 des SubjectPublicKeyInfo"
-        );
+        assert_eq!(c.spki_sha256, sha256_hex(&spki), "Pin = SHA-256 des SubjectPublicKeyInfo");
         assert!(valid_pin(&c.spki_sha256));
         assert_eq!(c.subject_cn, "nas.local");
         assert_eq!(c.issuer_cn, "nas.local");
@@ -951,13 +815,10 @@ mod tests {
         let (der2, _) = self_signed("nas.local", 30);
         assert_ne!(spki_pin(&der2).unwrap(), c.spki_sha256);
         // PEM (WebView2) → DER
-        let pem = format!(
-            "-----BEGIN CERTIFICATE-----\n{}\n-----END CERTIFICATE-----\n",
-            {
-                use base64::Engine;
-                base64::engine::general_purpose::STANDARD.encode(&der)
-            }
-        );
+        let pem = format!("-----BEGIN CERTIFICATE-----\n{}\n-----END CERTIFICATE-----\n", {
+            use base64::Engine;
+            base64::engine::general_purpose::STANDARD.encode(&der)
+        });
         assert_eq!(pem_to_der(&pem).unwrap(), der);
         assert!(cert_info(b"\x30\x03\x02\x01").is_none());
         assert!(cert_info(&[]).is_none());

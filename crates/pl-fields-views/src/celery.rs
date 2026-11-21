@@ -16,9 +16,7 @@ pub const BUILD_SHARE_LINK_BUNDLE: &str = "documents.tasks.build_share_link_bund
 pub const PROCESS_CF_SELECT_UPDATE: &str = "documents.signals.handlers.process_cf_select_update";
 
 pub fn build_share_link_bundle_request(bundle_id: i64) -> TaskRequest {
-    TaskRequest::new(BUILD_SHARE_LINK_BUNDLE)
-        .kwarg("bundle_id", bundle_id)
-        .trigger_source(trigger_source::MANUAL)
+    TaskRequest::new(BUILD_SHARE_LINK_BUNDLE).kwarg("bundle_id", bundle_id).trigger_source(trigger_source::MANUAL)
 }
 
 pub async fn enqueue_build_share_link_bundle(state: &AppState, bundle_id: i64) -> ApiResult<()> {

@@ -126,10 +126,7 @@ pub async fn check(db: &DbConfig) -> Result<(), String> {
     let Some(raw) = db.require_auth.as_deref() else { return Ok(()) };
     let allowed = parse(raw)?;
     if matches!(db.sslmode.as_str(), "require" | "verify-ca" | "verify-full") {
-        return Err(format!(
-            "PAPERRUST_DB_REQUIRE_AUTH cannot be checked with sslmode={} (the probe runs without TLS)",
-            db.sslmode
-        ));
+        return Err(format!("PAPERRUST_DB_REQUIRE_AUTH cannot be checked with sslmode={} (the probe runs without TLS)", db.sslmode));
     }
     let port = db.port.unwrap_or(5432);
     let host = db.host.clone().unwrap_or_else(|| "localhost".into());

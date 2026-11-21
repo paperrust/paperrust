@@ -90,11 +90,12 @@ async fn backend_pid(conn: &mut PgConnection) -> i32 {
 /// Waits until `pid` waits for a lock (at most 10 s).
 async fn wait_until_blocked(pool: &PgPool, pid: i32) {
     for _ in 0..200 {
-        let waiting: bool = sqlx::query_scalar("SELECT coalesce(bool_or(wait_event_type = 'Lock'), false) FROM pg_stat_activity WHERE pid = $1")
-            .bind(pid)
-            .fetch_one(pool)
-            .await
-            .expect("activity");
+        let waiting: bool =
+            sqlx::query_scalar("SELECT coalesce(bool_or(wait_event_type = 'Lock'), false) FROM pg_stat_activity WHERE pid = $1")
+                .bind(pid)
+                .fetch_one(pool)
+                .await
+                .expect("activity");
         if waiting {
             return;
         }
@@ -151,7 +152,11 @@ async fn b4_control_unsorted_update_deadlocks() {
     let pool = fresh_db(&server, name, 6).await;
     let ids = live_doc_ids(&pool).await;
     for id in ids.iter().rev() {
-        sqlx::query("UPDATE documents_document SET modified = modified WHERE id = $1").bind(*id as i32).execute(&pool).await.expect("rewrite");
+        sqlx::query("UPDATE documents_document SET modified = modified WHERE id = $1")
+            .bind(*id as i32)
+            .execute(&pool)
+            .await
+            .expect("rewrite");
     }
     let min = ids[0];
     let tag = new_tag(&pool, "fix2-b4c").await;
@@ -194,7 +199,11 @@ async fn b4_touch_modified_vs_bulk_edit_no_deadlock() {
     let ids = live_doc_ids(&pool).await;
     // Reverse the table order: rewrite descending, one by one (new row versions at the end)
     for id in ids.iter().rev() {
-        sqlx::query("UPDATE documents_document SET modified = modified WHERE id = $1").bind(*id as i32).execute(&pool).await.expect("rewrite");
+        sqlx::query("UPDATE documents_document SET modified = modified WHERE id = $1")
+            .bind(*id as i32)
+            .execute(&pool)
+            .await
+            .expect("rewrite");
     }
     let (min, max) = (ids[0], ids[ids.len() - 1]);
     let tag = new_tag(&pool, "fix2-b4").await;
@@ -323,7 +332,8 @@ async fn b6_coalesce_pending_bulk_update() {
     let mut holder = pool.begin().await.expect("holder");
     sqlx::query("SELECT id FROM paperrust_task_queue WHERE task_id = 't-pending' FOR UPDATE").execute(&mut *holder).await.expect("hold");
     let mut tx = pool.begin().await.expect("tx");
-    let r = tokio::time::timeout(Duration::from_secs(5), pl_documents_write::coalesce::try_merge(&mut tx, &[9])).await.expect("wartet nicht");
+    let r =
+        tokio::time::timeout(Duration::from_secs(5), pl_documents_write::coalesce::try_merge(&mut tx, &[9])).await.expect("wartet nicht");
     assert_eq!(r.expect("merge"), None);
     drop(tx);
     drop(holder);

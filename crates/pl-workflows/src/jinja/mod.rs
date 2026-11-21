@@ -46,20 +46,107 @@ impl JErr {
 /// Jinja default filters (`jinja2.filters.FILTERS`) + paperless (`get_cf_value`, `datetime`,
 /// `slugify`, `localize_date`).
 pub const FILTERS: &[&str] = &[
-    "abs", "attr", "batch", "capitalize", "center", "count", "d", "default", "dictsort", "e", "escape",
-    "filesizeformat", "first", "float", "forceescape", "format", "groupby", "indent", "int", "items", "join",
-    "last", "length", "list", "lower", "map", "max", "min", "pprint", "random", "reject", "rejectattr", "replace",
-    "reverse", "round", "safe", "select", "selectattr", "slice", "sort", "string", "striptags", "sum", "title",
-    "tojson", "trim", "truncate", "unique", "upper", "urlencode", "urlize", "wordcount", "wordwrap", "xmlattr",
-    "get_cf_value", "datetime", "slugify", "localize_date",
+    "abs",
+    "attr",
+    "batch",
+    "capitalize",
+    "center",
+    "count",
+    "d",
+    "default",
+    "dictsort",
+    "e",
+    "escape",
+    "filesizeformat",
+    "first",
+    "float",
+    "forceescape",
+    "format",
+    "groupby",
+    "indent",
+    "int",
+    "items",
+    "join",
+    "last",
+    "length",
+    "list",
+    "lower",
+    "map",
+    "max",
+    "min",
+    "pprint",
+    "random",
+    "reject",
+    "rejectattr",
+    "replace",
+    "reverse",
+    "round",
+    "safe",
+    "select",
+    "selectattr",
+    "slice",
+    "sort",
+    "string",
+    "striptags",
+    "sum",
+    "title",
+    "tojson",
+    "trim",
+    "truncate",
+    "unique",
+    "upper",
+    "urlencode",
+    "urlize",
+    "wordcount",
+    "wordwrap",
+    "xmlattr",
+    "get_cf_value",
+    "datetime",
+    "slugify",
+    "localize_date",
 ];
 
 /// `jinja2.tests.TESTS`
 pub const TESTS: &[&str] = &[
-    "!=", "<", "<=", "==", ">", ">=", "boolean", "callable", "defined", "divisibleby", "eq", "equalto", "escaped",
-    "even", "false", "filter", "float", "ge", "greaterthan", "gt", "in", "integer", "iterable", "le", "lessthan",
-    "lower", "lt", "mapping", "ne", "none", "number", "odd", "sameas", "sequence", "string", "test", "true",
-    "undefined", "upper",
+    "!=",
+    "<",
+    "<=",
+    "==",
+    ">",
+    ">=",
+    "boolean",
+    "callable",
+    "defined",
+    "divisibleby",
+    "eq",
+    "equalto",
+    "escaped",
+    "even",
+    "false",
+    "filter",
+    "float",
+    "ge",
+    "greaterthan",
+    "gt",
+    "in",
+    "integer",
+    "iterable",
+    "le",
+    "lessthan",
+    "lower",
+    "lt",
+    "mapping",
+    "ne",
+    "none",
+    "number",
+    "odd",
+    "sameas",
+    "sequence",
+    "string",
+    "test",
+    "true",
+    "undefined",
+    "upper",
 ];
 
 /// `jinja2.defaults.DEFAULT_NAMESPACE`
@@ -108,10 +195,9 @@ pub fn validate_template(text: &str) -> Result<(), TemplateError> {
         match e.kind {
             JKind::Syntax => TemplateError::Invalid(format!("Template syntax error: {}", e.msg)),
             JKind::ParseAssertion => TemplateError::Invalid(format!("Template assertion error: {}", e.msg)),
-            JKind::CompileAssertion => TemplateError::Invalid(format!(
-                "Template assertion error: {}\n  File \"<introspection>\", line {}",
-                e.msg, e.lineno
-            )),
+            JKind::CompileAssertion => {
+                TemplateError::Invalid(format!("Template assertion error: {}\n  File \"<introspection>\", line {}", e.msg, e.lineno))
+            }
             JKind::Internal => TemplateError::Internal(e.msg),
         }
     };
@@ -122,10 +208,7 @@ pub fn validate_template(text: &str) -> Result<(), TemplateError> {
     if !unknown.is_empty() {
         unknown.sort();
         let names: Vec<&str> = unknown.iter().map(|s| s.as_str()).collect();
-        return Err(TemplateError::Invalid(format!(
-            "Template references unknown placeholders: {}",
-            names.join(", ")
-        )));
+        return Err(TemplateError::Invalid(format!("Template references unknown placeholders: {}", names.join(", "))));
     }
     Ok(())
 }

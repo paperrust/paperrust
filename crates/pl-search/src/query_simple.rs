@@ -29,8 +29,7 @@ pub fn normalize_search_text(text: &str) -> String {
 /// (Constant pattern, always compiles; `None` only keeps this panic-free.)
 pub fn cjk_re() -> Option<&'static Regex> {
     static RE: OnceLock<Option<Regex>> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"[\p{Han}\p{Hiragana}\p{Katakana}\p{Hangul}ーｰ〆ﾞﾟ]+").ok())
-        .as_ref()
+    RE.get_or_init(|| Regex::new(r"[\p{Han}\p{Hiragana}\p{Katakana}\p{Hangul}ーｰ〆ﾞﾟ]+").ok()).as_ref()
 }
 
 /// `_has_cjk`.
@@ -54,23 +53,15 @@ pub fn extract_cjk_text(text: &str) -> String {
 /// tantivy-py `Index.parse_query(query, default_field_names)`:
 /// `QueryParser::for_index(index, fields)` (disjunction by default, no
 /// regexes), unknown/non-indexed field -> error.
-pub fn tantivy_parse_query(
-    index: &Index,
-    query: &str,
-    fields: &[&str],
-) -> Result<Box<dyn Query>, SearchError> {
+pub fn tantivy_parse_query(index: &Index, query: &str, fields: &[&str]) -> Result<Box<dyn Query>, SearchError> {
     let schema = index.schema();
     let mut default_fields = Vec::with_capacity(fields.len());
     for name in fields {
-        let field = schema
-            .get_field(name)
-            .map_err(|e| SearchError::Internal(e.to_string()))?;
+        let field = schema.get_field(name).map_err(|e| SearchError::Internal(e.to_string()))?;
         default_fields.push(field);
     }
     let parser = QueryParser::for_index(index, default_fields);
-    parser
-        .parse_query(query)
-        .map_err(|e| SearchError::Internal(e.to_string()))
+    parser.parse_query(query).map_err(|e| SearchError::Internal(e.to_string()))
 }
 
 /// `_build_cjk_query`.
@@ -127,28 +118,15 @@ fn simple_field_boost(field: &str) -> f32 {
 }
 
 /// `_build_simple_token_query`.
-fn build_simple_token_query(
-    index: &Index,
-    fields: &[&str],
-    token: &str,
-    allow_infix: bool,
-) -> Result<Box<dyn Query>, SearchError> {
+fn build_simple_token_query(index: &Index, fields: &[&str], token: &str, allow_infix: bool) -> Result<Box<dyn Query>, SearchError> {
     let escaped = py_regex_escape(token);
-    let pattern = if allow_infix {
-        format!(".*{escaped}.*")
-    } else {
-        format!(r"({escaped}.*|.*[\x20-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e]{escaped}.*)")
-    };
+    let pattern =
+        if allow_infix { format!(".*{escaped}.*") } else { format!(r"({escaped}.*|.*[\x20-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e]{escaped}.*)") };
     let schema = index.schema();
     let mut field_queries: Vec<(Occur, Box<dyn Query>)> = Vec::new();
     for name in fields {
-        let field = schema
-            .get_field(name)
-            .map_err(|e| SearchError::Internal(e.to_string()))?;
-        let mut q: Box<dyn Query> = Box::new(
-            RegexQuery::from_pattern(&pattern, field)
-                .map_err(|e| SearchError::Internal(e.to_string()))?,
-        );
+        let field = schema.get_field(name).map_err(|e| SearchError::Internal(e.to_string()))?;
+        let mut q: Box<dyn Query> = Box::new(RegexQuery::from_pattern(&pattern, field).map_err(|e| SearchError::Internal(e.to_string()))?);
         let boost = simple_field_boost(name);
         if boost > 1.0 {
             q = Box::new(BoostQuery::new(q, boost));
@@ -172,10 +150,7 @@ pub fn parse_simple_query(
         let mut token_queries = Vec::with_capacity(tokens.len());
         for token in &tokens {
             let allow_infix = single || !is_decimal(token);
-            token_queries.push((
-                Occur::Must,
-                build_simple_token_query(index, fields, token, allow_infix)?,
-            ));
+            token_queries.push((Occur::Must, build_simple_token_query(index, fields, token, allow_infix)?));
         }
         clauses.push((Occur::Should, any_of(token_queries)));
     }
@@ -190,22 +165,13 @@ pub fn parse_simple_query(
 
 /// `parse_simple_text_highlight_query`. Errors map to upstream's `ValueError`
 /// (caller falls back to the user query).
-pub fn parse_simple_text_highlight_query(
-    index: &Index,
-    raw_query: &str,
-) -> Result<Box<dyn Query>, SearchError> {
-    let stripped: String = raw_query
-        .chars()
-        .map(|c| if c == '-' || c == '+' { ' ' } else { c })
-        .collect();
+pub fn parse_simple_text_highlight_query(index: &Index, raw_query: &str) -> Result<Box<dyn Query>, SearchError> {
+    let stripped: String = raw_query.chars().map(|c| if c == '-' || c == '+' { ' ' } else { c }).collect();
     let tokens = simple_search_tokens(&stripped);
     if tokens.is_empty() {
         return Ok(Box::new(EmptyQuery));
     }
-    let quoted: Vec<String> = tokens
-        .iter()
-        .map(|t| format!("\"{}\"", t.replace('\\', "\\\\").replace('"', "\\\"")))
-        .collect();
+    let quoted: Vec<String> = tokens.iter().map(|t| format!("\"{}\"", t.replace('\\', "\\\\").replace('"', "\\\""))).collect();
     tantivy_parse_query(index, &quoted.join(" "), &["content"])
 }
 

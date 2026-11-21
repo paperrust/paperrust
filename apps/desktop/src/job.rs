@@ -59,10 +59,7 @@ pub fn open_external(target: &str) {
             c
         };
         // Job without BREAKAWAY_OK (app itself started in a foreign job): start normally.
-        cmd()
-            .creation_flags(win::CREATE_BREAKAWAY_FROM_JOB)
-            .spawn()
-            .or_else(|_| cmd().spawn())
+        cmd().creation_flags(win::CREATE_BREAKAWAY_FROM_JOB).spawn().or_else(|_| cmd().spawn())
     };
     #[cfg(target_os = "macos")]
     let r = std::process::Command::new("open").arg(target).spawn();
@@ -84,7 +81,10 @@ fn redact_query(target: &str) -> &str {
 mod redact_tests {
     #[test]
     fn query_is_stripped() {
-        assert_eq!(super::redact_query("http://127.0.0.1:58080/rs/desktop/login?token=abc&next=%2F"), "http://127.0.0.1:58080/rs/desktop/login");
+        assert_eq!(
+            super::redact_query("http://127.0.0.1:58080/rs/desktop/login?token=abc&next=%2F"),
+            "http://127.0.0.1:58080/rs/desktop/login"
+        );
         assert_eq!(super::redact_query("/home/x/folder"), "/home/x/folder");
     }
 }
@@ -158,8 +158,7 @@ pub(crate) mod win {
                 return Err(io::Error::last_os_error());
             }
             let mut info = ExtendedLimitInformation::default();
-            info.basic.limit_flags =
-                JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_BREAKAWAY_OK;
+            info.basic.limit_flags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_BREAKAWAY_OK;
             let ok = SetInformationJobObject(
                 job,
                 JOB_OBJECT_EXTENDED_LIMIT_INFORMATION_CLASS,
@@ -212,16 +211,10 @@ mod tests {
     fn job_kills_member_when_closed() {
         use std::os::windows::io::AsRawHandle;
         use std::time::{Duration, Instant};
-        assert_eq!(
-            std::mem::size_of::<super::win::ExtendedLimitInformation>(),
-            144
-        );
+        assert_eq!(std::mem::size_of::<super::win::ExtendedLimitInformation>(), 144);
         let job = super::win::create_kill_on_close_job().unwrap();
-        let mut child = std::process::Command::new("cmd")
-            .args(["/C", "ping -n 60 127.0.0.1 >NUL"])
-            .stdin(std::process::Stdio::null())
-            .spawn()
-            .unwrap();
+        let mut child =
+            std::process::Command::new("cmd").args(["/C", "ping -n 60 127.0.0.1 >NUL"]).stdin(std::process::Stdio::null()).spawn().unwrap();
         super::win::assign(job, child.as_raw_handle().cast()).unwrap();
         assert!(child.try_wait().unwrap().is_none());
         super::win::close(job);
@@ -230,10 +223,7 @@ mod tests {
             if child.try_wait().unwrap().is_some() {
                 break;
             }
-            assert!(
-                start.elapsed() < Duration::from_secs(10),
-                "Kind lebt nach Schließen des Jobs weiter"
-            );
+            assert!(start.elapsed() < Duration::from_secs(10), "Kind lebt nach Schließen des Jobs weiter");
             std::thread::sleep(Duration::from_millis(100));
         }
     }

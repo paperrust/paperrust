@@ -32,12 +32,9 @@ pub fn column(field: &str) -> Option<(Col, Option<f64>)> {
     use Col::*;
     Some(match field {
         "output_type" => (Varchar(8), None),
-        "pages"
-        | "image_dpi"
-        | "barcode_dpi"
-        | "barcode_max_pages"
-        | "llm_embedding_chunk_size"
-        | "llm_request_timeout" => (SmallInt, Some(1.0)),
+        "pages" | "image_dpi" | "barcode_dpi" | "barcode_max_pages" | "llm_embedding_chunk_size" | "llm_request_timeout" => {
+            (SmallInt, Some(1.0))
+        }
         "llm_context_size" => (Int, Some(1.0)),
         "language"
         | "color_conversion_strategy"
@@ -65,9 +62,7 @@ pub fn column(field: &str) -> Option<(Col, Option<f64>)> {
         "app_logo" => (Varchar(100), None),
         "remote_ocr_api_key" | "llm_api_key" | "llm_embedding_api_key" => (Varchar(1024), None),
         "remote_ocr_endpoint" | "llm_endpoint" | "llm_embedding_endpoint" => (Varchar(256), None),
-        "llm_backend" | "llm_embedding_backend" | "llm_model" | "llm_embedding_model" => {
-            (Varchar(128), None)
-        }
+        "llm_backend" | "llm_embedding_backend" | "llm_model" | "llm_embedding_model" => (Varchar(128), None),
         _ => return None,
     })
 }
@@ -134,81 +129,46 @@ pub struct AcResolved {
 
 /// `app_config.x or settings.X` or `x if x is not None else settings.X`. `env_value` is the
 /// value from environment/file (already `Env::get` semantics), `default` the default.
-pub fn resolve(
-    def: &SettingDef,
-    column: &Value,
-    env_value: Option<&str>,
-    default: Option<&str>,
-) -> AcResolved {
+pub fn resolve(def: &SettingDef, column: &Value, env_value: Option<&str>, default: Option<&str>) -> AcResolved {
     if column_wins(def, column) {
-        return AcResolved {
-            value: to_env_string(column),
-            from_column: true,
-            column: column.clone(),
-        };
+        return AcResolved { value: to_env_string(column), from_column: true, column: column.clone() };
     }
-    AcResolved {
-        value: env_value.or(default).map(String::from),
-        from_column: false,
-        column: column.clone(),
-    }
+    AcResolved { value: env_value.or(default).map(String::from), from_column: false, column: column.clone() }
 }
 
 /// Typed API value → column value, checked like the v1 serializer. `Value::Null` sets the
 /// column to NULL (= "reset", afterwards the environment applies).
 pub fn validate(def: &SettingDef, v: &Value) -> Result<Value, crate::value::ValueError> {
     let field = def.ac_field.unwrap_or_default();
-    let e = |m: String| crate::value::ValueError {
-        key: def.key.to_string(),
-        message: m,
-    };
+    let e = |m: String| crate::value::ValueError { key: def.key.to_string(), message: m };
     if v.is_null() {
         return Ok(Value::Null);
     }
     let (col, min) = column(field).ok_or_else(|| e(format!("unknown column {field}")))?;
     let out = match col {
-        Col::Bool => Value::Bool(
-            v.as_bool()
-                .ok_or_else(|| e("Must be a valid boolean.".into()))?,
-        ),
+        Col::Bool => Value::Bool(v.as_bool().ok_or_else(|| e("Must be a valid boolean.".into()))?),
         Col::SmallInt | Col::Int => {
-            let i = v
-                .as_i64()
-                .ok_or_else(|| e("A valid integer is required.".into()))?;
-            let max = if col == Col::SmallInt {
-                32767
-            } else {
-                2_147_483_647
-            };
+            let i = v.as_i64().ok_or_else(|| e("A valid integer is required.".into()))?;
+            let max = if col == Col::SmallInt { 32767 } else { 2_147_483_647 };
             if let Some(m) = min.filter(|m| (i as f64) < *m) {
-                return Err(e(format!(
-                    "Ensure this value is greater than or equal to {m}."
-                )));
+                return Err(e(format!("Ensure this value is greater than or equal to {m}.")));
             }
             if i > max {
-                return Err(e(format!(
-                    "Ensure this value is less than or equal to {max}."
-                )));
+                return Err(e(format!("Ensure this value is less than or equal to {max}.")));
             }
             Value::from(i)
         }
         Col::Float => {
-            let f = v
-                .as_f64()
-                .ok_or_else(|| e("A valid number is required.".into()))?;
+            let f = v.as_f64().ok_or_else(|| e("A valid number is required.".into()))?;
             if let Some(m) = min.filter(|m| f < *m) {
-                return Err(e(format!(
-                    "Ensure this value is greater than or equal to {m}."
-                )));
+                return Err(e(format!("Ensure this value is greater than or equal to {m}.")));
             }
             v.clone()
         }
         Col::Varchar(n) => {
             let s = v.as_str().ok_or_else(|| e("Not a valid string.".into()))?;
             if s.chars().count() > n {
-                return Err(e(format!(
-                    "Ensure this field has no more than {n} characters."
-                )));
+                return Err(e(format!("Ensure this field has no more than {n} characters.")));
             }
             if let Ty::Choice { choices } = def.ty
                 && !s.is_empty()
@@ -231,19 +191,14 @@ pub fn validate(def: &SettingDef, v: &Value) -> Result<Value, crate::value::Valu
 /// Reads the (first) row like `ApplicationConfiguration.objects.all().first()`; `None` if
 /// there is no row or no table.
 pub async fn load(conn: &mut PgConnection) -> Result<Option<AcRow>, sqlx::Error> {
-    let has: bool = sqlx::query_scalar(
-        "SELECT to_regclass('public.paperless_applicationconfiguration') IS NOT NULL",
-    )
-    .fetch_one(&mut *conn)
-    .await?;
+    let has: bool =
+        sqlx::query_scalar("SELECT to_regclass('public.paperless_applicationconfiguration') IS NOT NULL").fetch_one(&mut *conn).await?;
     if !has {
         return Ok(None);
     }
-    let row: Option<Value> = sqlx::query_scalar(
-        "SELECT to_jsonb(c) FROM paperless_applicationconfiguration c ORDER BY c.id LIMIT 1",
-    )
-    .fetch_optional(&mut *conn)
-    .await?;
+    let row: Option<Value> = sqlx::query_scalar("SELECT to_jsonb(c) FROM paperless_applicationconfiguration c ORDER BY c.id LIMIT 1")
+        .fetch_optional(&mut *conn)
+        .await?;
     Ok(row.map(|v| {
         let mut values = match v {
             Value::Object(m) => m,
@@ -256,15 +211,10 @@ pub async fn load(conn: &mut PgConnection) -> Result<Option<AcRow>, sqlx::Error>
 
 /// Sets columns (already checked with [`validate`]) in the same transaction; creates the row like
 /// `get_or_create(pk=1)` if it is missing. Returns the old values (for the history).
-pub async fn write(
-    conn: &mut PgConnection,
-    changes: &[(&'static SettingDef, Value)],
-) -> Result<Vec<Value>, sqlx::Error> {
-    let id: Option<i64> = sqlx::query_scalar(
-        "SELECT id::bigint FROM paperless_applicationconfiguration ORDER BY id LIMIT 1 FOR UPDATE",
-    )
-    .fetch_optional(&mut *conn)
-    .await?;
+pub async fn write(conn: &mut PgConnection, changes: &[(&'static SettingDef, Value)]) -> Result<Vec<Value>, sqlx::Error> {
+    let id: Option<i64> = sqlx::query_scalar("SELECT id::bigint FROM paperless_applicationconfiguration ORDER BY id LIMIT 1 FOR UPDATE")
+        .fetch_optional(&mut *conn)
+        .await?;
     let id = match id {
         Some(id) => id,
         None => {
@@ -280,13 +230,12 @@ pub async fn write(
         let Some((col, _)) = column(field) else {
             continue;
         };
-        let before: Option<Value> = sqlx::query_scalar(&format!(
-            "SELECT to_jsonb({field}) FROM paperless_applicationconfiguration WHERE id = $1"
-        ))
-        .bind(id)
-        .fetch_optional(&mut *conn)
-        .await?
-        .flatten();
+        let before: Option<Value> =
+            sqlx::query_scalar(&format!("SELECT to_jsonb({field}) FROM paperless_applicationconfiguration WHERE id = $1"))
+                .bind(id)
+                .fetch_optional(&mut *conn)
+                .await?
+                .flatten();
         old.push(before.unwrap_or(Value::Null));
         let cast = match col {
             Col::Bool => "boolean",
@@ -298,20 +247,12 @@ pub async fn write(
         };
         // `field` comes from the static schema (no user input).
         let sql = if col == Col::Jsonb {
-            format!(
-                "UPDATE paperless_applicationconfiguration SET {field} = $1::jsonb WHERE id = $2"
-            )
+            format!("UPDATE paperless_applicationconfiguration SET {field} = $1::jsonb WHERE id = $2")
         } else {
-            format!(
-                "UPDATE paperless_applicationconfiguration SET {field} = ($1::jsonb #>> '{{}}')::{cast} WHERE id = $2"
-            )
+            format!("UPDATE paperless_applicationconfiguration SET {field} = ($1::jsonb #>> '{{}}')::{cast} WHERE id = $2")
         };
         let bind: Option<Value> = if v.is_null() { None } else { Some(v.clone()) };
-        sqlx::query(&sql)
-            .bind(bind)
-            .bind(id)
-            .execute(&mut *conn)
-            .await?;
+        sqlx::query(&sql).bind(bind).bind(id).execute(&mut *conn).await?;
     }
     Ok(old)
 }
@@ -340,36 +281,16 @@ mod tests {
         assert_eq!(r.value.as_deref(), Some("5"));
 
         let lang = find_ac("language").unwrap();
-        assert_eq!(
-            resolve(lang, &json!(""), Some("deu"), Some("eng"))
-                .value
-                .as_deref(),
-            Some("deu")
-        );
-        assert_eq!(
-            resolve(lang, &json!(""), None, Some("eng"))
-                .value
-                .as_deref(),
-            Some("eng")
-        );
-        assert_eq!(
-            resolve(lang, &json!("deu+eng"), Some("deu"), Some("eng"))
-                .value
-                .as_deref(),
-            Some("deu+eng")
-        );
+        assert_eq!(resolve(lang, &json!(""), Some("deu"), Some("eng")).value.as_deref(), Some("deu"));
+        assert_eq!(resolve(lang, &json!(""), None, Some("eng")).value.as_deref(), Some("eng"));
+        assert_eq!(resolve(lang, &json!("deu+eng"), Some("deu"), Some("eng")).value.as_deref(), Some("deu+eng"));
 
         let up = find_ac("barcode_upscale").unwrap();
         assert!(!resolve(up, &json!(0.0), None, Some("0.0")).from_column);
         let map = find_ac("barcode_tag_mapping").unwrap();
         assert!(!resolve(map, &json!({}), None, None).from_column);
         assert!(resolve(map, &json!({"a": "b"}), None, None).from_column);
-        assert_eq!(
-            resolve(map, &json!({"a": "b"}), None, None)
-                .value
-                .as_deref(),
-            Some(r#"{"a":"b"}"#)
-        );
+        assert_eq!(resolve(map, &json!({"a": "b"}), None, None).value.as_deref(), Some(r#"{"a":"b"}"#));
     }
 
     #[test]

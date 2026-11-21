@@ -78,12 +78,7 @@ pub struct Negotiation {
 
 impl Default for Negotiation {
     fn default() -> Self {
-        Self {
-            renderer: Renderer::Json,
-            accepted_media_type: "application/json".into(),
-            version: ApiVersion::V10,
-            indent: None,
-        }
+        Self { renderer: Renderer::Json, accepted_media_type: "application/json".into(), version: ApiVersion::V10, indent: None }
     }
 }
 
@@ -241,10 +236,8 @@ fn accept_list(headers: &HeaderMap) -> Vec<String> {
 /// `Could not satisfy the request Accept header.`; version not allowed → 406
 /// `Invalid version in "Accept" header.`.
 pub fn negotiate(headers: &HeaderMap, query: &QueryParams) -> Result<Negotiation, ApiError> {
-    let mut renderers: Vec<(Renderer, MediaType)> = vec![
-        (Renderer::Json, MediaType::parse("application/json")),
-        (Renderer::BrowsableApi, MediaType::parse("text/html")),
-    ];
+    let mut renderers: Vec<(Renderer, MediaType)> =
+        vec![(Renderer::Json, MediaType::parse("application/json")), (Renderer::BrowsableApi, MediaType::parse("text/html"))];
     if let Some(fmt) = query.get("format").filter(|f| !f.is_empty()) {
         renderers.retain(|(r, _)| match r {
             Renderer::Json => fmt == "json",
@@ -308,10 +301,7 @@ pub fn negotiate(headers: &HeaderMap, query: &QueryParams) -> Result<Negotiation
         return Err(ApiError::invalid_version());
     };
     let indent = if renderer == Renderer::Json {
-        amt.param("indent")
-            .and_then(crate::pagination::python_int)
-            .map(|i| i.clamp(0, 8) as usize)
-            .filter(|i| *i != 0)
+        amt.param("indent").and_then(crate::pagination::python_int).map(|i| i.clamp(0, 8) as usize).filter(|i| *i != 0)
     } else {
         None
     };

@@ -41,13 +41,7 @@ pub struct ApiRoute {
 
 impl ApiRoute {
     /// Convenient constructor (equivalent to the struct literal).
-    pub fn new(
-        id: &'static str,
-        method: Method,
-        path: &'static str,
-        upstream: &'static str,
-        handler: MethodRouter<AppState>,
-    ) -> Self {
+    pub fn new(id: &'static str, method: Method, path: &'static str, upstream: &'static str, handler: MethodRouter<AppState>) -> Self {
         Self { id, method, path, upstream, handler }
     }
 
@@ -98,8 +92,7 @@ pub struct RouteFlags {
     pub accepts_multipart: bool,
 }
 
-static ROUTE_FLAGS: LazyLock<RwLock<HashMap<&'static str, RouteFlags>>> =
-    LazyLock::new(|| RwLock::new(HashMap::new()));
+static ROUTE_FLAGS: LazyLock<RwLock<HashMap<&'static str, RouteFlags>>> = LazyLock::new(|| RwLock::new(HashMap::new()));
 
 fn update_flags(id: &'static str, f: impl FnOnce(&mut RouteFlags)) {
     let mut m = match ROUTE_FLAGS.write() {
@@ -130,21 +123,8 @@ pub const ALLOW_POST_ONLY: &str = "POST, OPTIONS";
 /// Builds the `Allow` value like DRF from a set of methods: order by Django's
 /// `http_method_names`, `HEAD` automatically with `GET`, `OPTIONS` always.
 pub fn allow_value(methods: &[Method]) -> String {
-    let order = [
-        Method::GET,
-        Method::POST,
-        Method::PUT,
-        Method::PATCH,
-        Method::DELETE,
-        Method::HEAD,
-        Method::OPTIONS,
-        Method::TRACE,
-    ];
-    let has = |m: &Method| {
-        methods.contains(m)
-            || (*m == Method::HEAD && methods.contains(&Method::GET))
-            || *m == Method::OPTIONS
-    };
+    let order = [Method::GET, Method::POST, Method::PUT, Method::PATCH, Method::DELETE, Method::HEAD, Method::OPTIONS, Method::TRACE];
+    let has = |m: &Method| methods.contains(m) || (*m == Method::HEAD && methods.contains(&Method::GET)) || *m == Method::OPTIONS;
     order.iter().filter(|m| has(m)).map(|m| m.as_str()).collect::<Vec<_>>().join(", ")
 }
 
@@ -222,10 +202,7 @@ mod tests {
     #[test]
     fn allow_like_drf() {
         assert_eq!(allow_value(&[Method::GET, Method::POST]), ALLOW_MODEL_LIST);
-        assert_eq!(
-            allow_value(&[Method::DELETE, Method::PATCH, Method::PUT, Method::GET]),
-            ALLOW_MODEL_DETAIL
-        );
+        assert_eq!(allow_value(&[Method::DELETE, Method::PATCH, Method::PUT, Method::GET]), ALLOW_MODEL_DETAIL);
         assert_eq!(allow_value(&[Method::GET]), ALLOW_READ_ONLY);
         assert_eq!(allow_value(&[Method::POST]), ALLOW_POST_ONLY);
     }

@@ -30,8 +30,7 @@ fn u16le(d: &[u8], o: usize) -> Option<u16> {
     d.get(o..o + 2).map(|b| u16::from_le_bytes([b[0], b[1]]))
 }
 fn u32le(d: &[u8], o: usize) -> Option<u32> {
-    d.get(o..o + 4)
-        .map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+    d.get(o..o + 4).map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]))
 }
 fn u64le(d: &[u8], o: usize) -> Option<u64> {
     d.get(o..o + 8).map(|b| {
@@ -84,9 +83,7 @@ impl<'a> ZipArchive<'a> {
             return Err(ParseError::LimitExceeded(format!("zip entries {count}")));
         }
         let cd_start = usize::try_from(cd_off).map_err(|_| bad("cd offset"))?;
-        let cd_end = cd_start
-            .checked_add(usize::try_from(cd_size).map_err(|_| bad("cd size"))?)
-            .ok_or_else(|| bad("cd size"))?;
+        let cd_end = cd_start.checked_add(usize::try_from(cd_size).map_err(|_| bad("cd size"))?).ok_or_else(|| bad("cd size"))?;
         if cd_end > data.len() {
             return Err(bad("central directory outside file"));
         }
@@ -134,22 +131,10 @@ impl<'a> ZipArchive<'a> {
                     q += 4 + sz;
                 }
             }
-            entries.push(ZipEntry {
-                name,
-                method,
-                flags,
-                compressed_size: csize,
-                uncompressed_size: usize_,
-                local_header_offset: lho,
-            });
+            entries.push(ZipEntry { name, method, flags, compressed_size: csize, uncompressed_size: usize_, local_header_offset: lho });
             p += 46 + nlen + elen + clen;
         }
-        Ok(Self {
-            data,
-            entries,
-            limits: limits.clone(),
-            used: Cell::new(0),
-        })
+        Ok(Self { data, entries, limits: limits.clone(), used: Cell::new(0) })
     }
 
     pub fn by_name(&self, name: &str) -> Option<&ZipEntry> {
@@ -161,9 +146,7 @@ impl<'a> ZipArchive<'a> {
     }
 
     pub fn read(&self, name: &str) -> Result<Vec<u8>> {
-        let e = self
-            .by_name(name)
-            .ok_or_else(|| bad(&format!("missing entry {name}")))?;
+        let e = self.by_name(name).ok_or_else(|| bad(&format!("missing entry {name}")))?;
         self.read_entry(e)
     }
 
@@ -187,56 +170,35 @@ impl<'a> ZipArchive<'a> {
         let start = lho + 30 + nlen + elen;
         let csize = usize::try_from(e.compressed_size).map_err(|_| bad("size"))?;
         let end = start.checked_add(csize).ok_or_else(|| bad("size"))?;
-        let comp = self
-            .data
-            .get(start..end.min(self.data.len()))
-            .ok_or_else(|| bad("entry data outside file"))?;
+        let comp = self.data.get(start..end.min(self.data.len())).ok_or_else(|| bad("entry data outside file"))?;
         if end > self.data.len() {
             return Err(bad("truncated entry"));
         }
-        let remaining_total = self
-            .limits
-            .max_total_uncompressed
-            .saturating_sub(self.used.get());
+        let remaining_total = self.limits.max_total_uncompressed.saturating_sub(self.used.get());
         let max = self.limits.max_entry_size.min(remaining_total);
         let out = match e.method {
             0 => {
                 if comp.len() as u64 > max {
-                    return Err(ParseError::LimitExceeded(format!(
-                        "zip entry {} too large",
-                        e.name
-                    )));
+                    return Err(ParseError::LimitExceeded(format!("zip entry {} too large", e.name)));
                 }
                 comp.to_vec()
             }
             8 => {
                 let mut dec = flate2::read::DeflateDecoder::new(comp).take(max + 1);
-                let mut out =
-                    Vec::with_capacity((e.uncompressed_size.min(max) as usize).min(64 << 20));
-                dec.read_to_end(&mut out)
-                    .map_err(|err| bad(&format!("inflate {}: {err}", e.name)))?;
+                let mut out = Vec::with_capacity((e.uncompressed_size.min(max) as usize).min(64 << 20));
+                dec.read_to_end(&mut out).map_err(|err| bad(&format!("inflate {}: {err}", e.name)))?;
                 if out.len() as u64 > max {
-                    return Err(ParseError::LimitExceeded(format!(
-                        "zip entry {} decompresses beyond limit",
-                        e.name
-                    )));
+                    return Err(ParseError::LimitExceeded(format!("zip entry {} decompresses beyond limit", e.name)));
                 }
                 out
             }
             m => {
-                return Err(ParseError::Unsupported(format!(
-                    "zip compression method {m}"
-                )));
+                return Err(ParseError::Unsupported(format!("zip compression method {m}")));
             }
         };
         let n = out.len() as u64;
-        if n >= self.limits.ratio_check_min
-            && n / (comp.len() as u64).max(1) > self.limits.max_compression_ratio
-        {
-            return Err(ParseError::LimitExceeded(format!(
-                "zip entry {} compression ratio too high",
-                e.name
-            )));
+        if n >= self.limits.ratio_check_min && n / (comp.len() as u64).max(1) > self.limits.max_compression_ratio {
+            return Err(ParseError::LimitExceeded(format!("zip entry {} compression ratio too high", e.name)));
         }
         self.used.set(self.used.get() + n);
         Ok(out)
@@ -286,10 +248,7 @@ mod tests {
     #[test]
     fn entry_limit() {
         let z = stored_zip("a.txt", b"hallo welt");
-        let l = Limits {
-            max_entry_size: 4,
-            ..Limits::default()
-        };
+        let l = Limits { max_entry_size: 4, ..Limits::default() };
         let a = ZipArchive::open(&z, &l).unwrap();
         assert!(matches!(a.read("a.txt"), Err(ParseError::LimitExceeded(_))));
     }

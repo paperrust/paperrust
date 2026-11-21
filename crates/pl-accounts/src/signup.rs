@@ -23,9 +23,9 @@ use serde_json::Value;
 use crate::auth;
 use crate::flow::{self, Login};
 use crate::page;
+use crate::tr;
 use crate::views::{limit_or_429, not_allowed, redirect_authenticated, run};
 use crate::web::{Ctx, R};
-use crate::tr;
 
 /// paperless `CustomAccountAdapter.is_open_for_signup`.
 pub async fn is_open(ctx: &Ctx) -> R<bool> {
@@ -71,7 +71,10 @@ async fn signup_view(ctx: &mut Ctx) -> R<Response> {
         } else if !pl_auth_api::http::is_valid_username(&username) {
             add("username", tr!(l, "auth.error.username_invalid").to_string());
         } else {
-            let (n,): (i64,) = sqlx::query_as("SELECT count(*) FROM auth_user WHERE UPPER(username::text) = UPPER($1)").bind(&username).fetch_one(ctx.st.db()).await?;
+            let (n,): (i64,) = sqlx::query_as("SELECT count(*) FROM auth_user WHERE UPPER(username::text) = UPPER($1)")
+                .bind(&username)
+                .fetch_one(ctx.st.db())
+                .await?;
             if n > 0 {
                 add("username", tr!(l, "auth.error.username_taken").to_string());
             } else {

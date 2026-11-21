@@ -20,10 +20,10 @@
 
 use std::time::Duration;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::config::{AiConfig, EmbeddingBackend};
-use crate::llm::{pinned_client, validate_and_pin, LlmError, PLACEHOLDER_API_KEY};
+use crate::llm::{LlmError, PLACEHOLDER_API_KEY, pinned_client, validate_and_pin};
 
 /// llama_index `DEFAULT_EMBED_BATCH_SIZE` / `OpenAILikeEmbedding(embed_batch_size=10)`.
 pub const EMBED_BATCH_SIZE: usize = 10;
@@ -43,9 +43,7 @@ pub struct Embedder {
 impl Embedder {
     /// upstream `get_embedding_model(config)`.
     pub fn from_config(c: &AiConfig) -> Result<Self, LlmError> {
-        let b = c
-            .llm_embedding_backend
-            .ok_or_else(|| LlmError::InvalidConfig("Unsupported embedding backend: None".into()))?;
+        let b = c.llm_embedding_backend.ok_or_else(|| LlmError::InvalidConfig("Unsupported embedding backend: None".into()))?;
         let nz = |o: &Option<String>| o.clone().filter(|s| !s.is_empty());
         let (endpoint, model) = match b {
             EmbeddingBackend::OpenAiLike => (
@@ -114,10 +112,7 @@ impl Embedder {
             }
             _ => {
                 let input: Vec<String> = texts.iter().map(|t| t.replace('\n', " ")).collect();
-                (
-                    format!("{}/embeddings", self.endpoint),
-                    json!({"input": input, "model": self.model, "encoding_format": "base64"}),
-                )
+                (format!("{}/embeddings", self.endpoint), json!({"input": input, "model": self.model, "encoding_format": "base64"}))
             }
         }
     }

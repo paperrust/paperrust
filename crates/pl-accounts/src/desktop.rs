@@ -266,11 +266,7 @@ mod tests {
     }
 
     fn req(peer: &str, query: &str) -> Request<Body> {
-        let mut r = Request::builder()
-            .uri(format!("{PATH}?{query}"))
-            .header("host", "127.0.0.1:58080")
-            .body(Body::empty())
-            .unwrap();
+        let mut r = Request::builder().uri(format!("{PATH}?{query}")).header("host", "127.0.0.1:58080").body(Body::empty()).unwrap();
         r.extensions_mut().insert(ConnectInfo::<SocketAddr>(peer.parse().unwrap()));
         r
     }

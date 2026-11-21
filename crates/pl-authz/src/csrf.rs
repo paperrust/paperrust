@@ -15,18 +15,15 @@ use axum::http::HeaderMap;
 pub const CSRF_SECRET_LENGTH: usize = 32;
 pub const CSRF_TOKEN_LENGTH: usize = 2 * CSRF_SECRET_LENGTH;
 /// `CSRF_ALLOWED_CHARS = string.ascii_letters + string.digits` (order matters for unmasking).
-pub const CSRF_ALLOWED_CHARS: &[u8] =
-    b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+pub const CSRF_ALLOWED_CHARS: &[u8] = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
 pub const REASON_BAD_ORIGIN: &str = "Origin checking failed - %s does not match any trusted origins.";
 pub const REASON_NO_REFERER: &str = "Referer checking failed - no Referer.";
-pub const REASON_BAD_REFERER: &str =
-    "Referer checking failed - %s does not match any trusted origins.";
+pub const REASON_BAD_REFERER: &str = "Referer checking failed - %s does not match any trusted origins.";
 pub const REASON_NO_CSRF_COOKIE: &str = "CSRF cookie not set.";
 pub const REASON_CSRF_TOKEN_MISSING: &str = "CSRF token missing.";
 pub const REASON_MALFORMED_REFERER: &str = "Referer checking failed - Referer is malformed.";
-pub const REASON_INSECURE_REFERER: &str =
-    "Referer checking failed - Referer is insecure while host is secure.";
+pub const REASON_INSECURE_REFERER: &str = "Referer checking failed - Referer is insecure while host is secure.";
 pub const REASON_INCORRECT_LENGTH: &str = "has incorrect length";
 pub const REASON_INVALID_CHARACTERS: &str = "has invalid characters";
 
@@ -158,12 +155,8 @@ fn unquote_cookie(s: &str) -> String {
         if ib[i] == b'\\' && i + 1 < ib.len() {
             // \ooo octal or \x quoted char
             // _OctalPatt = r"\\[0-3][0-7][0-7]", _QuotePatt = r'[\\].'
-            if ib.len() >= i + 4
-                && (b'0'..=b'3').contains(&ib[i + 1])
-                && ib[i + 2..i + 4].iter().all(|c| (b'0'..=b'7').contains(c))
-            {
-                let o = (ib[i + 1] - b'0') as u32 * 64 + (ib[i + 2] - b'0') as u32 * 8
-                    + (ib[i + 3] - b'0') as u32;
+            if ib.len() >= i + 4 && (b'0'..=b'3').contains(&ib[i + 1]) && ib[i + 2..i + 4].iter().all(|c| (b'0'..=b'7').contains(c)) {
+                let o = (ib[i + 1] - b'0') as u32 * 64 + (ib[i + 2] - b'0') as u32 * 8 + (ib[i + 3] - b'0') as u32;
                 out.push((o & 0xff) as u8);
                 i += 4;
             } else {
@@ -255,9 +248,7 @@ pub fn split_domain_port(host: &str) -> (String, String) {
         let b = &b[1..];
         if !a.bytes().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
             || b.is_empty()
-            || !b
-                .bytes()
-                .all(|c| (c.is_ascii_hexdigit() && !c.is_ascii_uppercase()) || c == b'.' || c == b':')
+            || !b.bytes().all(|c| (c.is_ascii_hexdigit() && !c.is_ascii_uppercase()) || c == b'.' || c == b':')
         {
             return (String::new(), String::new());
         }
@@ -267,11 +258,7 @@ pub fn split_domain_port(host: &str) -> (String, String) {
             Some(i) => (&h[..i], &h[i..]),
             None => (h.as_str(), ""),
         };
-        if d.is_empty()
-            || !d
-                .bytes()
-                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'.' || c == b'-')
-        {
+        if d.is_empty() || !d.bytes().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'.' || c == b'-') {
             return (String::new(), String::new());
         }
         (d.to_string(), p)
@@ -295,8 +282,7 @@ pub fn is_same_domain(host: &str, pattern: &str) -> bool {
         return false;
     }
     let pattern = pattern.to_lowercase();
-    (pattern.starts_with('.') && (host.ends_with(&pattern) || host == &pattern[1..]))
-        || pattern == host
+    (pattern.starts_with('.') && (host.ends_with(&pattern) || host == &pattern[1..])) || pattern == host
 }
 
 /// `validate_host(domain, allowed_hosts)`.
@@ -315,11 +301,7 @@ pub fn get_host(cfg: &AuthConfig, headers: &HeaderMap) -> Option<String> {
         &cfg.allowed_hosts
     };
     let (domain, _port) = split_domain_port(&host);
-    if !domain.is_empty() && validate_host(&domain, allowed) {
-        Some(host)
-    } else {
-        None
-    }
+    if !domain.is_empty() && validate_host(&domain, allowed) { Some(host) } else { None }
 }
 
 /// Result of CPython `urllib.parse.urlsplit` (only what CSRF needs).
@@ -358,25 +340,13 @@ impl SplitUrl {
 /// CPython `urlsplit(url)`; `None` = `ValueError` (e.g. "Invalid IPv6 URL").
 pub fn urlsplit(url: &str) -> Option<SplitUrl> {
     // strip leading C0 control or space, remove \t \r \n
-    let url: String = url
-        .trim_start_matches(|c: char| (c as u32) <= 0x20)
-        .chars()
-        .filter(|c| !matches!(c, '\t' | '\r' | '\n'))
-        .collect();
+    let url: String = url.trim_start_matches(|c: char| (c as u32) <= 0x20).chars().filter(|c| !matches!(c, '\t' | '\r' | '\n')).collect();
     let mut rest: &str = &url;
     let mut scheme = String::new();
     if let Some(i) = rest.find(':') {
         let cand = &rest[..i];
-        let first_ok = cand
-            .chars()
-            .next()
-            .is_some_and(|c| c.is_ascii_alphabetic());
-        if i > 0
-            && first_ok
-            && cand
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.'))
-        {
+        let first_ok = cand.chars().next().is_some_and(|c| c.is_ascii_alphabetic());
+        if i > 0 && first_ok && cand.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.')) {
             scheme = cand.to_ascii_lowercase();
             rest = &rest[i + 1..];
         }
@@ -400,13 +370,7 @@ pub fn urlsplit(url: &str) -> Option<SplitUrl> {
         Some((a, b)) => (a.to_string(), b.to_string()),
         None => (rest.to_string(), String::new()),
     };
-    Some(SplitUrl {
-        scheme,
-        netloc,
-        path,
-        query,
-        fragment,
-    })
+    Some(SplitUrl { scheme, netloc, path, query, fragment })
 }
 
 /// Django `CsrfViewMiddleware._origin_verified` (also for the WebSocket origin check in pl-server).
@@ -417,11 +381,7 @@ pub fn origin_verified(cfg: &AuthConfig, headers: &HeaderMap, origin: &str) -> b
             return true;
         }
     }
-    if cfg
-        .csrf_trusted_origins
-        .iter()
-        .any(|o| !o.contains('*') && o == origin)
-    {
+    if cfg.csrf_trusted_origins.iter().any(|o| !o.contains('*') && o == origin) {
         return true;
     }
     let Some(parsed) = urlsplit(origin) else {
@@ -448,11 +408,8 @@ fn check_referer(cfg: &AuthConfig, headers: &HeaderMap) -> Result<(), String> {
     if r.scheme != "https" {
         return Err(REASON_INSECURE_REFERER.into());
     }
-    let trusted_hosts = cfg.csrf_trusted_origins.iter().map(|o| {
-        urlsplit(o)
-            .map(|p| p.netloc.trim_start_matches('*').to_string())
-            .unwrap_or_default()
-    });
+    let trusted_hosts =
+        cfg.csrf_trusted_origins.iter().map(|o| urlsplit(o).map(|p| p.netloc.trim_start_matches('*').to_string()).unwrap_or_default());
     for h in trusted_hosts {
         if is_same_domain(&r.netloc, &h) {
             return Ok(());
@@ -504,11 +461,7 @@ pub fn enforce_csrf_with_form(cfg: &AuthConfig, req: &RequestInfo<'_>, form_toke
         None => return Err(REASON_NO_CSRF_COOKIE.into()),
         Some(c) => {
             check_token_format(c).map_err(|r| format!("CSRF cookie {r}."))?;
-            if c.len() == CSRF_TOKEN_LENGTH {
-                unmask_cipher_token(c).unwrap_or_default()
-            } else {
-                c.to_string()
-            }
+            if c.len() == CSRF_TOKEN_LENGTH { unmask_cipher_token(c).unwrap_or_default() } else { c.to_string() }
         }
     };
     if let Some(form) = form_token.filter(|t| !t.is_empty() && req.method == "POST") {
@@ -755,10 +708,7 @@ mod tests {
     fn hm(pairs: &[(&str, &str)]) -> HeaderMap {
         let mut h = HeaderMap::new();
         for (k, v) in pairs {
-            h.append(
-                axum::http::HeaderName::from_bytes(k.as_bytes()).unwrap(),
-                HeaderValue::from_str(v).unwrap(),
-            );
+            h.append(axum::http::HeaderName::from_bytes(k.as_bytes()).unwrap(), HeaderValue::from_str(v).unwrap());
         }
         h
     }
@@ -789,15 +739,9 @@ mod tests {
         assert_eq!(enforce_csrf(&c, &RequestInfo { method: "GET", headers: &hm(&[]) }), Ok(()));
 
         let no_cookie = hm(&[("host", "paperless.example")]);
-        assert_eq!(
-            enforce_csrf(&c, &RequestInfo { method: "POST", headers: &no_cookie }),
-            Err("CSRF cookie not set.".into())
-        );
+        assert_eq!(enforce_csrf(&c, &RequestInfo { method: "POST", headers: &no_cookie }), Err("CSRF cookie not set.".into()));
         let missing = hm(&[("host", "paperless.example"), ("cookie", &cookie)]);
-        assert_eq!(
-            enforce_csrf(&c, &RequestInfo { method: "PUT", headers: &missing }),
-            Err("CSRF token missing.".into())
-        );
+        assert_eq!(enforce_csrf(&c, &RequestInfo { method: "PUT", headers: &missing }), Err("CSRF token missing.".into()));
         let bad = hm(&[("host", "paperless.example"), ("cookie", &cookie), ("x-csrftoken", "abc")]);
         assert_eq!(
             enforce_csrf(&c, &RequestInfo { method: "PATCH", headers: &bad }),
@@ -810,10 +754,7 @@ mod tests {
             Err("CSRF token from the 'X-Csrftoken' HTTP header incorrect.".into())
         );
         let badc = hm(&[("host", "paperless.example"), ("cookie", "csrftoken=short")]);
-        assert_eq!(
-            enforce_csrf(&c, &RequestInfo { method: "POST", headers: &badc }),
-            Err("CSRF cookie has incorrect length.".into())
-        );
+        assert_eq!(enforce_csrf(&c, &RequestInfo { method: "POST", headers: &badc }), Err("CSRF cookie has incorrect length.".into()));
     }
 
     #[test]
@@ -828,21 +769,12 @@ mod tests {
             ("http://a.wild.example", false),
             ("https://evil.example", false),
         ] {
-            let h = hm(&[
-                ("host", "paperless.example"),
-                ("origin", origin),
-                ("cookie", &cookie),
-                ("x-csrftoken", SECRET),
-            ]);
+            let h = hm(&[("host", "paperless.example"), ("origin", origin), ("cookie", &cookie), ("x-csrftoken", SECRET)]);
             let r = enforce_csrf(&c, &RequestInfo { method: "POST", headers: &h });
             if ok {
                 assert_eq!(r, Ok(()), "{origin}");
             } else {
-                assert_eq!(
-                    r,
-                    Err(format!("Origin checking failed - {origin} does not match any trusted origins.")),
-                    "{origin}"
-                );
+                assert_eq!(r, Err(format!("Origin checking failed - {origin} does not match any trusted origins.")), "{origin}");
             }
         }
     }
@@ -853,12 +785,8 @@ mod tests {
         c.secure_proxy_ssl_header = Some(("HTTP_X_FORWARDED_PROTO".into(), "https".into()));
         let cookie = format!("csrftoken={SECRET}");
         let base = |r: Option<&str>| {
-            let mut v = vec![
-                ("host", "paperless.example"),
-                ("x-forwarded-proto", "https"),
-                ("cookie", cookie.as_str()),
-                ("x-csrftoken", SECRET),
-            ];
+            let mut v =
+                vec![("host", "paperless.example"), ("x-forwarded-proto", "https"), ("cookie", cookie.as_str()), ("x-csrftoken", SECRET)];
             if let Some(r) = r {
                 v.push(("referer", r));
             }
@@ -955,7 +883,10 @@ mod tests {
         let r = app.clone().oneshot(req).await.unwrap();
         let b = axum::body::to_bytes(r.into_body(), 1 << 20).await.unwrap();
         assert_eq!(&b[..], b"TOK|a=1&csrfmiddlewaretoken=TOK");
-        let big = format!("--B\r\nContent-Disposition: form-data; name=\"csrfmiddlewaretoken\"\r\n\r\nM\r\n--B\r\nContent-Disposition: form-data; name=\"f\"; filename=\"x\"\r\n\r\n{}\r\n--B--\r\n", "x".repeat(3 << 20));
+        let big = format!(
+            "--B\r\nContent-Disposition: form-data; name=\"csrfmiddlewaretoken\"\r\n\r\nM\r\n--B\r\nContent-Disposition: form-data; name=\"f\"; filename=\"x\"\r\n\r\n{}\r\n--B--\r\n",
+            "x".repeat(3 << 20)
+        );
         let req = axum::http::Request::post("/f")
             .header("content-type", "multipart/form-data; boundary=B")
             .header("cookie", "sessionid=x")

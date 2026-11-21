@@ -162,11 +162,7 @@ async fn range_config(state: &AppState) -> V2Result<RangeConfig> {
 }
 
 fn require_superuser(perm: &Perm) -> V2Result<()> {
-    if perm.superuser {
-        Ok(())
-    } else {
-        Err(V2Error(DomainError::Forbidden("Only superusers can change number ranges.".into())))
-    }
+    if perm.superuser { Ok(()) } else { Err(V2Error(DomainError::Forbidden("Only superusers can change number ranges.".into()))) }
 }
 
 pub async fn config(State(state): State<AppState>, Caller(p): Caller) -> V2Result<Response> {
@@ -378,7 +374,10 @@ pub async fn preview(
     if r.prefix != info.prefix {
         warnings.push(pl_labels::render::Warning {
             code: "prefix_differs",
-            message: format!("The prefix {:?} differs from the configured ASN prefix {:?} – PaperRust will not recognise these labels.", r.prefix, info.prefix),
+            message: format!(
+                "The prefix {:?} differs from the configured ASN prefix {:?} – PaperRust will not recognise these labels.",
+                r.prefix, info.prefix
+            ),
         });
     }
     let c = collisions(&state, r.start, r.last()).await?;

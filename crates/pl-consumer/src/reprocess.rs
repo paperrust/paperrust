@@ -78,7 +78,11 @@ impl Consumer {
     /// `archive_filename`) via `UPDATE` without `save()` (no file renaming), audit entry
     /// "Update document content", barcodes anew (with `CONSUMER_STORE_BARCODE_VALUES`), move files under
     /// `MEDIA_LOCK`, search index, caches. `page_count` and `checksum` stay unchanged.
-    pub async fn update_document_content_maybe_archive_file(&self, document_id: i64, remote_ocr: bool) -> Result<ReprocessOutcome, ReprocessError> {
+    pub async fn update_document_content_maybe_archive_file(
+        &self,
+        document_id: i64,
+        remote_ocr: bool,
+    ) -> Result<ReprocessOutcome, ReprocessError> {
         self.update_document_content_maybe_archive_file_with(document_id, remote_ocr, false).await
     }
 
@@ -323,7 +327,8 @@ fn read_barcodes_for_reprocess(
         if !scanner.available() {
             return Err("no barcode scanner available".into());
         }
-        let pdf = if mime_type == "image/tiff" { pages.tiff_to_pdf(source, &work).map_err(|e| e.to_string())? } else { source.to_path_buf() };
+        let pdf =
+            if mime_type == "image/tiff" { pages.tiff_to_pdf(source, &work).map_err(|e| e.to_string())? } else { source.to_path_buf() };
         let codes = scanner.scan(&pdf, &work, &settings.scan_settings()).map_err(|e| e.to_string())?;
         Ok(codes.into_iter().map(|c| StoredBarcode { page: c.page + 1, value: c.value, format: c.format }).collect())
     })();

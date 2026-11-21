@@ -5,11 +5,11 @@ use std::collections::{HashMap, HashSet};
 
 use pl_authz::User;
 use pl_authz::objects::{FilterOpts, permitted_objects_filter};
+use pl_core::sqlbind::SqlxBinder as _;
 use pl_domain::cursor::KeysetCursor;
 use pl_domain::model::*;
 use pl_domain::{DomainError, DomainResult, Kind, Principal};
 use sea_query::{Expr, Order, PostgresQueryBuilder, Query, SelectStatement};
-use pl_core::sqlbind::SqlxBinder as _;
 use serde_json::Value;
 use sqlx::Row as _;
 use sqlx::postgres::PgRow;
@@ -328,21 +328,13 @@ async fn build(
                 sort_reverse: r.try_get("sort_reverse").map_err(db_err)?,
                 page_size: r.try_get("page_size").map_err(db_err)?,
                 display_mode: r.try_get("display_mode").map_err(db_err)?,
-                display_fields: r
-                    .try_get::<Option<sqlx::types::Json<Value>>, _>("display_fields")
-                    .map_err(db_err)?
-                    .map(|j| j.0),
+                display_fields: r.try_get::<Option<sqlx::types::Json<Value>>, _>("display_fields").map_err(db_err)?.map(|j| j.0),
                 icon: r.try_get("icon").map_err(db_err)?,
                 filter_rules: Vec::new(),
                 owner: owner_ref,
                 access: acc,
             }),
-            Kind::User => Object::User(User_ {
-                meta,
-                username: s("username")?,
-                first_name: s("first_name")?,
-                last_name: s("last_name")?,
-            }),
+            Kind::User => Object::User(User_ { meta, username: s("username")?, first_name: s("first_name")?, last_name: s("last_name")? }),
             Kind::Group => Object::Group(Group { meta, name: s("name")? }),
             Kind::Document => continue,
         };
@@ -418,11 +410,8 @@ async fn document_counts(store: &Store, user: &User, kind: Kind, ids: &[i64]) ->
             )
         }
     };
-    let rows: Vec<(i64, i64)> = sqlx::query_as(&sql)
-        .bind(ids.iter().map(|i| *i as i32).collect::<Vec<_>>())
-        .fetch_all(&store.db)
-        .await
-        .map_err(db_err)?;
+    let rows: Vec<(i64, i64)> =
+        sqlx::query_as(&sql).bind(ids.iter().map(|i| *i as i32).collect::<Vec<_>>()).fetch_all(&store.db).await.map_err(db_err)?;
     Ok(rows.into_iter().collect())
 }
 

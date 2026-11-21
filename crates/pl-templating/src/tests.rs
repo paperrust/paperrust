@@ -415,10 +415,7 @@ fn test_version_index_suffix_for_template_filename() {
     let o = opts(Some("{title}"));
     let v = version_of(doc(1, "the_doc"), 2, "the_doc", 1);
     assert_eq!(g(&v, &o), "the_doc_v1.pdf");
-    assert_eq!(
-        generate_filename(&v, GenerateOptions { counter: 1, ..Default::default() }, &o).unwrap(),
-        "the_doc_v1_01.pdf"
-    );
+    assert_eq!(generate_filename(&v, GenerateOptions { counter: 1, ..Default::default() }, &o).unwrap(), "the_doc_v1_01.pdf");
 }
 
 #[test]
@@ -619,8 +616,7 @@ fn test_template_with_custom_fields() {
 #[test]
 fn test_datetime_filter() {
     let mut d = doc(2, "Some Title");
-    d.custom_fields =
-        vec![cf("Invoice Date", "date", CustomFieldValue::Date(NaiveDate::from_ymd_opt(2024, 10, 1).unwrap()))];
+    d.custom_fields = vec![cf("Invoice Date", "date", CustomFieldValue::Date(NaiveDate::from_ymd_opt(2024, 10, 1).unwrap()))];
     assert_eq!(g(&d, &opts(Some("{{ created | datetime('%Y') }}/{{ title }}"))), "2020/Some Title.pdf");
     assert_eq!(g(&d, &opts(Some("{{ created | datetime('%Y-%m-%d') }}/{{ title }}"))), "2020-06-25/Some Title.pdf");
     assert_eq!(
@@ -743,10 +739,7 @@ fn test_localize_date_raises_error_for_invalid_locale() {
 #[test]
 fn test_format_datetime_parses_iso_strings() {
     assert_eq!(wrender("{{ '2026-09-21' | datetime('%Y-%m-%d %H:%M') }}").unwrap().unwrap(), "2026-09-21 00:00");
-    assert_eq!(
-        wrender("{{ '2026-09-21T13:45:00+00:00' | datetime('%Y-%m-%d %H:%M') }}").unwrap().unwrap(),
-        "2026-09-21 13:45"
-    );
+    assert_eq!(wrender("{{ '2026-09-21T13:45:00+00:00' | datetime('%Y-%m-%d %H:%M') }}").unwrap().unwrap(), "2026-09-21 13:45");
     match wrender("{{ 'not a date' | datetime('%Y') }}") {
         Err(TemplateError::Other(m)) => assert!(m.contains("Invalid date or datetime string: 'not a date'"), "{m}"),
         other => panic!("{other:?}"),
@@ -867,10 +860,7 @@ fn test_api_create_invalid_assign_title_unknown_placeholder() {
 
 #[test]
 fn validate_workflow_template_globals_and_scopes() {
-    assert!(validate_workflow_template(
-        "{{ range(3)|join }}{% for z in custom_fields %}{{ z }}{{ loop.index }}{% endfor %}"
-    )
-    .is_ok());
+    assert!(validate_workflow_template("{{ range(3)|join }}{% for z in custom_fields %}{{ z }}{{ loop.index }}{% endfor %}").is_ok());
     assert!(validate_workflow_template("{% set y = 1 %}{{ y }}{{ doc_title }}").is_ok());
     let e = validate_workflow_template("{{ b }}{{ a }}").unwrap_err();
     assert_eq!(e.message(), "Template references unknown placeholders: a, b");
@@ -893,10 +883,7 @@ fn test_api_storage_path_placeholders() {
 fn test_test_storage_path() {
     let mut d = doc(1, "Something");
     d.checksum = "123".into();
-    assert_eq!(
-        storage_path_test_result(&d, "path/{{ title }}", &opts(None)).unwrap().as_deref(),
-        Some("path/Something.pdf")
-    );
+    assert_eq!(storage_path_test_result(&d, "path/{{ title }}", &opts(None)).unwrap().as_deref(), Some("path/Something.pdf"));
 }
 
 #[test]
@@ -908,10 +895,7 @@ fn test_test_storage_path_respects_none_placeholder_setting() {
     assert_eq!(storage_path_test_result(&d, "{{ nope }}", &opts(None)).unwrap(), None);
     let mut e = d.clone();
     e.filename = Some("x/old.PNG".into());
-    assert_eq!(
-        storage_path_test_result(&e, "a/{{ title }}", &opts(None)).unwrap().as_deref(),
-        Some("a/Something.PNG")
-    );
+    assert_eq!(storage_path_test_result(&e, "a/{{ title }}", &opts(None)).unwrap().as_deref(), Some("a/Something.PNG"));
 }
 
 /// B-N1: `storage_path_test_response` returns all three upstream cases from a single rendering
@@ -974,9 +958,11 @@ fn jinja2_compat() {
     let mut fails: Vec<String> = Vec::new();
     let mut r = |t: &str, exp: &str| match validate_filepath_template_and_render(t, Some(&d), &o) {
         Ok(v) if v == exp => {}
-        other => fails.push(format!("{t}
+        other => fails.push(format!(
+            "{t}
    got {other:?}
-  want {exp:?}")),
+  want {exp:?}"
+        )),
     };
     r("{{ document.title|truncate(9) }}", "Hello World");
     r("{{ 'abcdefghijklmnop'|truncate(9) }}", "abcdef...");
@@ -985,7 +971,10 @@ fn jinja2_compat() {
     r("{{ 'x y-z(a'|title }}", "X Y-Z(A");
     r("{{ '42'|int }}|{{ '4.7'|int }}|{{ 'abc'|int }}|{{ '1e3'|float }}", "42|4|0|1000.0");
     r("{{ '%05.1f|%-4s|%d' | format(3.14159, 'ab', 7) }}", "003.1|ab  |7");
-    r("{{ document.title.split()[1] }}|{{ document.title.replace('o','0') }}|{{ document.title.startswith(('x','H')) }}|{{ '{:>8}'.format(document.title[:3]) }}", "World|Hell0 W0rld|True|     Hel");
+    r(
+        "{{ document.title.split()[1] }}|{{ document.title.replace('o','0') }}|{{ document.title.startswith(('x','H')) }}|{{ '{:>8}'.format(document.title[:3]) }}",
+        "World|Hell0 W0rld|True|     Hel",
+    );
     r("{{ tag_name_list|join(',') }}|{{ tag_name_list|sort|first }}|{{ tag_name_list|length }}", "b,a|a|2");
     r("{% for k, v in {'a': 1}.items() %}{{ k }}={{ v }}{% endfor %}", "a=1");
     r("{{ 10 // 3 }}|{{ -7 // 2 }}|{{ 2 ** -1 }}|{{ 1 / 3 }}", "3|-4|0.5|0.3333333333333333");
@@ -999,13 +988,22 @@ fn jinja2_compat() {
     r("{{ document.page_count }}|{{ document.owner }}|{{ document.tags[0].name }}", "None|None|b");
     r("{{ document.added }}|{{ document.created }}|{{ document.created.year }}", "2024-10-01 07:36:51.000153+00:00|2020-06-25|2020");
     r("{{ document.created.strftime('%d.%m.%Y') }}|{{ document.added.isoformat() }}", "25.06.2020|2024-10-01T07:36:51.000153+00:00");
-    r("{{ correspondent|length }}|{{ correspondent|upper }}|{{ correspondent ~ '!' }}|{{ correspondent + '!' }}", "6|-NONE-|-none-!|-none-!");
+    r(
+        "{{ correspondent|length }}|{{ correspondent|upper }}|{{ correspondent ~ '!' }}|{{ correspondent + '!' }}",
+        "6|-NONE-|-none-!|-none-!",
+    );
     r("{{ document.correspondent }}|{{ document.correspondent == none }}", "None|True");
     r("{{ 2 ** 3 ** 2 }}|{{ -2 ** 2 }}|{{ 2 ** 0.5 > 1 }}", "64|4|True");
     r("{{ 'ab' * 2 }}{{ [1] * 2 }}{{ 2 * 3 }}{{ 1 + 2.5 }}{{ [1] + [2] }}", "abab[1, 1]63.5[1, 2]");
     r("{% for t in document.tags %}{% if loop.index > 1 %}{% break %}{% endif %}{{ t.name }}{% endfor %}", "b");
-    assert!(fails.is_empty(), "{}", fails.join("
-"));
+    assert!(
+        fails.is_empty(),
+        "{}",
+        fails.join(
+            "
+"
+        )
+    );
 }
 
 /// W9: Jinja2 filters/globals that were previously missing, and the `%` operator.

@@ -73,12 +73,42 @@ impl UiFlags {
 pub fn routes() -> Vec<ApiRoute> {
     vec![
         ApiRoute::new(INDEX_ID, Method::GET, "/", "src/paperless/urls.py::IndexView (re_path .*)", get(index_root)),
-        ApiRoute::new(STATIC_ID, Method::GET, "/static/{*path}", "whitenoise.middleware.WhiteNoiseMiddleware (STATIC_ROOT)", on(ALL_METHODS, static_files)),
+        ApiRoute::new(
+            STATIC_ID,
+            Method::GET,
+            "/static/{*path}",
+            "whitenoise.middleware.WhiteNoiseMiddleware (STATIC_ROOT)",
+            on(ALL_METHODS, static_files),
+        ),
         ApiRoute::new("ui.api_root", Method::GET, "/api/", "src/paperless/urls.py::RedirectView(url=\"schema/view/\")", get(api_root)),
-        ApiRoute::new("ui.assets", Method::GET, "/assets/{*path}", "src/paperless/urls.py::RedirectView(STATIC_URL + frontend/en-US/assets/)", get(assets)),
-        ApiRoute::new("ui.fetch_doc", Method::GET, "/fetch/doc/{num}", "src/paperless/urls.py::RedirectView(api/documents/<pk>/download/)", get(fetch_doc)),
-        ApiRoute::new("ui.fetch_thumb", Method::GET, "/fetch/thumb/{num}", "src/paperless/urls.py::RedirectView(api/documents/<pk>/thumb/)", get(fetch_thumb)),
-        ApiRoute::new("ui.fetch_preview", Method::GET, "/fetch/preview/{num}", "src/paperless/urls.py::RedirectView(api/documents/<pk>/preview/)", get(fetch_preview)),
+        ApiRoute::new(
+            "ui.assets",
+            Method::GET,
+            "/assets/{*path}",
+            "src/paperless/urls.py::RedirectView(STATIC_URL + frontend/en-US/assets/)",
+            get(assets),
+        ),
+        ApiRoute::new(
+            "ui.fetch_doc",
+            Method::GET,
+            "/fetch/doc/{num}",
+            "src/paperless/urls.py::RedirectView(api/documents/<pk>/download/)",
+            get(fetch_doc),
+        ),
+        ApiRoute::new(
+            "ui.fetch_thumb",
+            Method::GET,
+            "/fetch/thumb/{num}",
+            "src/paperless/urls.py::RedirectView(api/documents/<pk>/thumb/)",
+            get(fetch_thumb),
+        ),
+        ApiRoute::new(
+            "ui.fetch_preview",
+            Method::GET,
+            "/fetch/preview/{num}",
+            "src/paperless/urls.py::RedirectView(api/documents/<pk>/preview/)",
+            get(fetch_preview),
+        ),
     ]
 }
 
@@ -109,22 +139,14 @@ pub async fn fallback(st: AppState, req: Request) -> Response {
     let path = decoded_path(&req);
     // Websocket upgrades (Channels, not the HTTP URL configuration) are not the index.
     let upgrade = req.headers().contains_key(axum::http::header::UPGRADE);
-    if !upgrade && index_handles(flags(&st), req.method(), &path) {
-        index_view(st, req).await
-    } else {
-        not_found(req.uri().path())
-    }
+    if !upgrade && index_handles(flags(&st), req.method(), &path) { index_view(st, req).await } else { not_found(req.uri().path()) }
 }
 
 /// Inside a mounted route: index if active and Django would render it, else the 404 of a path
 /// without a route (Django's URL resolver finds no other view).
 async fn index_or_delegate(st: AppState, req: Request) -> Response {
     let path = decoded_path(&req);
-    if index_handles(flags(&st), req.method(), &path) {
-        index_view(st, req).await
-    } else {
-        not_found(req.uri().path())
-    }
+    if index_handles(flags(&st), req.method(), &path) { index_view(st, req).await } else { not_found(req.uri().path()) }
 }
 
 async fn index_root(State(st): State<AppState>, req: Request) -> Response {
@@ -323,8 +345,14 @@ pub fn render_index(c: &IndexContext) -> String {
         && !c.share_meta.is_empty()
         && let Some(i) = out.find("</head>")
     {
-        out.insert_str(i, &format!("	{}
-", c.share_meta));
+        out.insert_str(
+            i,
+            &format!(
+                "	{}
+",
+                c.share_meta
+            ),
+        );
     }
     out
 }
@@ -421,7 +449,9 @@ mod tests {
         };
         let out = render_index(&c);
         assert!(out.starts_with("<!doctype html>\n\n\n\n<html lang=\"en\" data-bs-theme=\"auto\">"));
-        assert!(out.contains("<link rel=\"manifest\" href=\"/static/frontend/en-US/manifest.webmanifest\" crossorigin=\"use-credentials\">"));
+        assert!(
+            out.contains("<link rel=\"manifest\" href=\"/static/frontend/en-US/manifest.webmanifest\" crossorigin=\"use-credentials\">")
+        );
         assert!(out.contains("<h6 class=\"m-auto\">Paperless-ngx wird geladen...</h6>"));
         assert!(out.contains("window.DJANGO_MESSAGES = [\n\t\t\t\t\n\t\t\t\t\t{ level: \"success\", message: \"Successfully signed in as admin.\" },\n\t\t\t\t\n\t\t\t]"));
         let empty = render_index(&IndexContext { messages: vec![], ..c });
@@ -446,7 +476,9 @@ mod tests {
         assert!(out.contains("<title>PaperRust</title>"));
         assert!(out.contains("<h6 class=\"m-auto\">PaperRust wird geladen...</h6>"));
         assert!(!out.contains("Paperless-ngx wird") && !out.contains("docs.paperless-ngx.com"));
-        assert!(out.contains("<link rel=\"manifest\" href=\"/static/frontend/en-US/manifest.webmanifest\" crossorigin=\"use-credentials\">"));
+        assert!(
+            out.contains("<link rel=\"manifest\" href=\"/static/frontend/en-US/manifest.webmanifest\" crossorigin=\"use-credentials\">")
+        );
         assert!(!out.contains("{{"));
     }
 
@@ -457,7 +489,9 @@ mod tests {
         let local = share_meta(&Env::from_pairs([("PAPERRUST_SHARE_MODE", "local")]), Some("http://127.0.0.1:58080"));
         assert_eq!(local, "<meta name=\"paperrust_share_mode\" content=\"local\">");
         let lan = share_meta(&Env::from_pairs([("PAPERRUST_SHARE_MODE", "lan")]), Some("http://192.168.1.20:58080"));
-        assert!(lan.contains("content=\"lan\"") && lan.contains("<meta name=\"paperrust_share_url\" content=\"http://192.168.1.20:58080\">"));
+        assert!(
+            lan.contains("content=\"lan\"") && lan.contains("<meta name=\"paperrust_share_url\" content=\"http://192.168.1.20:58080\">")
+        );
         let base = IndexContext {
             base: "/".into(),
             cookie_prefix: "".into(),
@@ -469,8 +503,13 @@ mod tests {
             share_meta: local.clone(),
         };
         let out = render_index(&base);
-        assert!(out.contains("	<meta name=\"paperrust_share_mode\" content=\"local\">
-</head>"), "{out}");
+        assert!(
+            out.contains(
+                "	<meta name=\"paperrust_share_mode\" content=\"local\">
+</head>"
+            ),
+            "{out}"
+        );
         // upstream template (branding off) stays byte for byte
         let plain = render_index(&IndexContext { product_name: None, ..base });
         assert!(!plain.contains("paperrust_share"));

@@ -23,10 +23,7 @@ impl Rng {
 
 #[test]
 fn mutated_samples_never_panic() {
-    let reg = ParserRegistry::new(RegistryConfig {
-        tika_enabled: true,
-        extended_formats: true,
-    });
+    let reg = ParserRegistry::new(RegistryConfig { tika_enabled: true, extended_formats: true });
     let ctx = ParseContext {
         limits: Limits {
             timeout: Duration::from_secs(10),
@@ -38,12 +35,7 @@ fn mutated_samples_never_panic() {
     };
     let tmp = tempfile::tempdir().unwrap();
     let mut rng = Rng(0x9e37_79b9_7f4a_7c15);
-    let mut files: Vec<PathBuf> = std::fs::read_dir(samples())
-        .unwrap()
-        .flatten()
-        .map(|e| e.path())
-        .filter(|p| p.is_file())
-        .collect();
+    let mut files: Vec<PathBuf> = std::fs::read_dir(samples()).unwrap().flatten().map(|e| e.path()).filter(|p| p.is_file()).collect();
     files.sort();
     let start = Instant::now();
     let mut runs = 0;
@@ -67,9 +59,7 @@ fn mutated_samples_never_panic() {
             variants.push(v);
         }
         for (k, v) in variants.into_iter().enumerate() {
-            let p = tmp
-                .path()
-                .join(format!("v{k}_{}", f.file_name().unwrap().to_string_lossy()));
+            let p = tmp.path().join(format!("v{k}_{}", f.file_name().unwrap().to_string_lossy()));
             std::fs::write(&p, &v).unwrap();
             let m = mime::detect_file(&p).unwrap();
             // Try parsers for the detected and for the original type
@@ -101,46 +91,25 @@ fn huge_xml_and_deep_nesting_are_rejected() {
     {
         let f = std::fs::File::create(&path).unwrap();
         let mut w = std::io::BufWriter::new(f);
-        w.write_all(&stored_zip(&[
-            ("[Content_Types].xml", b"<Types/>"),
-            ("word/document.xml", deep.as_bytes()),
-        ]))
-        .unwrap();
+        w.write_all(&stored_zip(&[("[Content_Types].xml", b"<Types/>"), ("word/document.xml", deep.as_bytes())])).unwrap();
     }
     let reg = ParserRegistry::default();
     let m = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
     let p = reg.get_parser_for_file(m, "deep.docx", None, true).unwrap();
     let ctx = ParseContext::default();
-    assert!(matches!(
-        p.parse(&path, m, &ctx),
-        Err(pl_parsers::ParseError::LimitExceeded(_))
-    ));
+    assert!(matches!(p.parse(&path, m, &ctx), Err(pl_parsers::ParseError::LimitExceeded(_))));
 
     // File larger than max_file_size
     let big = tmp.path().join("big.txt");
     std::fs::write(&big, vec![b'a'; 4096]).unwrap();
-    let ctx = ParseContext {
-        limits: Limits {
-            max_file_size: 1024,
-            ..Limits::default()
-        },
-        ..ParseContext::default()
-    };
-    let t = reg
-        .get_parser_for_file("text/plain", "big.txt", None, true)
-        .unwrap();
-    assert!(matches!(
-        t.parse(&big, "text/plain", &ctx),
-        Err(pl_parsers::ParseError::LimitExceeded(_))
-    ));
+    let ctx = ParseContext { limits: Limits { max_file_size: 1024, ..Limits::default() }, ..ParseContext::default() };
+    let t = reg.get_parser_for_file("text/plain", "big.txt", None, true).unwrap();
+    assert!(matches!(t.parse(&big, "text/plain", &ctx), Err(pl_parsers::ParseError::LimitExceeded(_))));
 
     // Time limit 0 → timeout instead of endless work (large XLSX-like sheet)
-    let rows: String = (0..20000)
-        .map(|i| format!("<row><c t=\"inlineStr\"><is><t>Zeile {i}</t></is></c></row>"))
-        .collect();
-    let sheet = format!(
-        "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData>{rows}</sheetData></worksheet>"
-    );
+    let rows: String = (0..20000).map(|i| format!("<row><c t=\"inlineStr\"><is><t>Zeile {i}</t></is></c></row>")).collect();
+    let sheet =
+        format!("<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData>{rows}</sheetData></worksheet>");
     let wb = r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="S" sheetId="1" r:id="rId1"/></sheets></workbook>"#;
     let rels = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>"#;
     let xp = tmp.path().join("slow.xlsx");
@@ -156,21 +125,9 @@ fn huge_xml_and_deep_nesting_are_rejected() {
     .unwrap();
     let xm = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     let ok = p.parse(&xp, xm, &ParseContext::default());
-    assert!(
-        ok.as_ref().is_ok_and(|d| d.text.contains("Zeile 19999")),
-        "{ok:?}"
-    );
-    let ctx0 = ParseContext {
-        limits: Limits {
-            timeout: Duration::from_nanos(1),
-            ..Limits::default()
-        },
-        ..ParseContext::default()
-    };
-    assert!(matches!(
-        p.parse(&xp, xm, &ctx0),
-        Err(pl_parsers::ParseError::Timeout(_))
-    ));
+    assert!(ok.as_ref().is_ok_and(|d| d.text.contains("Zeile 19999")), "{ok:?}");
+    let ctx0 = ParseContext { limits: Limits { timeout: Duration::from_nanos(1), ..Limits::default() }, ..ParseContext::default() };
+    assert!(matches!(p.parse(&xp, xm, &ctx0), Err(pl_parsers::ParseError::Timeout(_))));
 }
 
 /// Uncompressed ZIP without CRC (the reader does not check CRCs).
@@ -188,9 +145,7 @@ fn stored_zip(entries: &[(&str, &[u8])]) -> Vec<u8> {
         h.extend_from_slice(name.as_bytes());
         v.extend(h);
         v.extend_from_slice(data);
-        cd.extend_from_slice(
-            b"PK\x01\x02\x14\x00\x14\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
-        );
+        cd.extend_from_slice(b"PK\x01\x02\x14\x00\x14\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00");
         cd.extend_from_slice(&(data.len() as u32).to_le_bytes());
         cd.extend_from_slice(&(data.len() as u32).to_le_bytes());
         cd.extend_from_slice(&(name.len() as u16).to_le_bytes());

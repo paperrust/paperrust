@@ -4,8 +4,8 @@
 //! django-multiselectfield 1.0.1 (`MultiSelectField.to_python`), DRF `MultipleChoiceField.to_representation`.
 
 use crate::schema::*;
-use sea_query::{Alias, Expr, Order, PostgresQueryBuilder, Query, SelectStatement};
 use pl_core::sqlbind::SqlxBinder;
+use sea_query::{Alias, Expr, Order, PostgresQueryBuilder, Query, SelectStatement};
 use serde_json::{Map, Value, json};
 use sqlx::{PgConnection, Row};
 use std::collections::HashMap;
@@ -63,8 +63,7 @@ pub async fn load_m2m(db: &mut PgConnection, m: &M2m, owner_ids: &[i64]) -> Resu
         .from(Alias::new(m.target))
         .inner_join(
             Alias::new(m.through),
-            Expr::col((Alias::new(m.target), Alias::new("id")))
-                .equals((Alias::new(m.through), Alias::new(m.other))),
+            Expr::col((Alias::new(m.target), Alias::new("id"))).equals((Alias::new(m.through), Alias::new(m.other))),
         )
         .and_where(Expr::col((Alias::new(m.through), Alias::new(m.own))).is_in(owner_ids.iter().copied()));
     match m.order {
@@ -151,12 +150,7 @@ async fn render(
                     json!(ids)
                 }
                 Col::Nested(fk) => match row.get(fk).and_then(Value::as_i64) {
-                    Some(nid) => nested
-                        .get(fld.spec.name)
-                        .and_then(|m| m.get(&nid))
-                        .cloned()
-                        .map(Value::Object)
-                        .unwrap_or(Value::Null),
+                    Some(nid) => nested.get(fld.spec.name).and_then(|m| m.get(&nid)).cloned().map(Value::Object).unwrap_or(Value::Null),
                     None => Value::Null,
                 },
             };
@@ -209,14 +203,10 @@ async fn children(
     q.expr(Expr::col((Alias::new(through), Alias::new("workflow_id"))).cast_as(Alias::new("bigint")))
         .expr(row_json_expr(table))
         .from(Alias::new(table))
-        .inner_join(
-            Alias::new(through),
-            Expr::col((Alias::new(table), Alias::new("id"))).equals((Alias::new(through), Alias::new(other))),
-        )
+        .inner_join(Alias::new(through), Expr::col((Alias::new(table), Alias::new("id"))).equals((Alias::new(through), Alias::new(other))))
         .and_where(Expr::col((Alias::new(through), Alias::new("workflow_id"))).is_in(wf_ids.iter().copied()));
     if ordered {
-        q.order_by((Alias::new(table), Alias::new("order")), Order::Asc)
-            .order_by((Alias::new(table), Alias::new("id")), Order::Asc);
+        q.order_by((Alias::new(table), Alias::new("order")), Order::Asc).order_by((Alias::new(table), Alias::new("id")), Order::Asc);
     }
     let (sql, values) = q.build_sqlx(PostgresQueryBuilder);
     let mut out = Vec::new();
@@ -273,10 +263,8 @@ pub fn select_rows(table: &'static str) -> SelectStatement {
 }
 
 pub async fn count(db: &mut PgConnection, table: &'static str) -> Result<i64, sqlx::Error> {
-    let (sql, values) = Query::select()
-        .expr(Expr::col(sea_query::Asterisk).count())
-        .from(Alias::new(table))
-        .build_sqlx(PostgresQueryBuilder);
+    let (sql, values) =
+        Query::select().expr(Expr::col(sea_query::Asterisk).count()).from(Alias::new(table)).build_sqlx(PostgresQueryBuilder);
     let r = sqlx::query_with(&sql, values).fetch_one(&mut *db).await?;
     r.try_get::<i64, _>(0)
 }

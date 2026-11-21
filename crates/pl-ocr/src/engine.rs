@@ -90,7 +90,11 @@ impl TessOptions {
     /// Options that only the Tesseract program implements (the library instances are reused per
     /// language/psm and do not know them) → program path.
     pub fn needs_cli(&self) -> bool {
-        self.oem.is_some() || self.thresholding.is_some() || !self.config.is_empty() || self.user_words.is_some() || self.user_patterns.is_some()
+        self.oem.is_some()
+            || self.thresholding.is_some()
+            || !self.config.is_empty()
+            || self.user_words.is_some()
+            || self.user_patterns.is_some()
     }
     pub fn is_default(&self) -> bool {
         *self == TessOptions::default()
@@ -151,7 +155,6 @@ fn ensure_raster_file(raster: &Raster, file: &Path) -> Result<()> {
     if file.exists() { Ok(()) } else { write_raster(raster, file) }
 }
 
-
 /// `tesseract`-CLI.
 #[derive(Debug, Clone)]
 pub struct TesseractCli {
@@ -167,9 +170,7 @@ impl TesseractCli {
     /// `PAPERRUST_TESSDATA_DIR` optional.
     pub fn from_env() -> Self {
         Self {
-            program: std::env::var_os("PAPERRUST_TESSERACT_PATH")
-                .map(PathBuf::from)
-                .unwrap_or_else(|| PathBuf::from("tesseract")),
+            program: std::env::var_os("PAPERRUST_TESSERACT_PATH").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("tesseract")),
             tessdata_dir: std::env::var_os("PAPERRUST_TESSDATA_DIR").map(PathBuf::from),
             psm: None,
         }

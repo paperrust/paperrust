@@ -29,7 +29,7 @@ pub trait SqlxBinder {
 impl<S: sea_query_binder::SqlxBinder> SqlxBinder for S {
     fn build_sqlx<T: QueryBuilder>(&self, query_builder: T) -> (String, SqlxValues) {
         let (mut sql, values) = sea_query_binder::SqlxBinder::build_sqlx(self, query_builder);
-        tag_types(&mut sql, &values.0 .0);
+        tag_types(&mut sql, &values.0.0);
         (sql, values)
     }
 }

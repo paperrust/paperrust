@@ -89,12 +89,7 @@ fn boolean_widget(v: Option<&str>) -> Option<bool> {
     }
 }
 
-fn multiple_choice(
-    errors: &mut ValidationErrors,
-    field: &str,
-    values: Vec<&str>,
-    choices: &[(&str, &str)],
-) -> Vec<String> {
+fn multiple_choice(errors: &mut ValidationErrors, field: &str, values: Vec<&str>, choices: &[(&str, &str)]) -> Vec<String> {
     for v in &values {
         if !choices.iter().any(|(c, _)| c == v) {
             errors.add(field, format!("Select a valid choice. {v} is not one of the available choices."));
@@ -178,16 +173,9 @@ pub fn filter_condition(f: &TaskFilter, lang: &str) -> Condition {
     }
     if let Some(name) = &f.name {
         let v = name.to_lowercase();
-        let types: Vec<&str> = TASK_TYPE
-            .iter()
-            .filter(|(_, l)| translate(lang, l).to_lowercase().contains(&v))
-            .map(|(t, _)| *t)
-            .collect();
-        let sources: Vec<&str> = TRIGGER_SOURCE
-            .iter()
-            .filter(|(_, l)| translate(lang, l).to_lowercase().contains(&v))
-            .map(|(t, _)| *t)
-            .collect();
+        let types: Vec<&str> = TASK_TYPE.iter().filter(|(_, l)| translate(lang, l).to_lowercase().contains(&v)).map(|(t, _)| *t).collect();
+        let sources: Vec<&str> =
+            TRIGGER_SOURCE.iter().filter(|(_, l)| translate(lang, l).to_lowercase().contains(&v)).map(|(t, _)| *t).collect();
         c = c.add(
             Cond::any()
                 .add(icontains("\"t\".\"input_data\" ->> 'filename'", name))
@@ -229,17 +217,13 @@ pub fn filter_condition(f: &TaskFilter, lang: &str) -> Condition {
 }
 
 /// `TasksViewSet.ordering_fields`
-pub const ORDERING_FIELDS: &[&str] =
-    &["date_created", "date_done", "status", "task_type", "duration_seconds", "wait_time_seconds"];
+pub const ORDERING_FIELDS: &[&str] = &["date_created", "date_done", "status", "task_type", "duration_seconds", "wait_time_seconds"];
 
 /// `OrderingFilter.get_ordering`: valid terms of `?ordering=`, else `["-date_created"]`.
 pub fn ordering(q: &QueryParams) -> Vec<String> {
     if let Some(p) = q.get("ordering").filter(|p| !p.is_empty()) {
-        let terms: Vec<String> = p
-            .split(',')
-            .map(|t| t.trim().to_string())
-            .filter(|t| ORDERING_FIELDS.contains(&t.strip_prefix('-').unwrap_or(t)))
-            .collect();
+        let terms: Vec<String> =
+            p.split(',').map(|t| t.trim().to_string()).filter(|t| ORDERING_FIELDS.contains(&t.strip_prefix('-').unwrap_or(t))).collect();
         if !terms.is_empty() {
             return terms;
         }
@@ -275,9 +259,7 @@ mod tests {
 
     #[test]
     fn filter_errors_in_field_order() {
-        let e = parse_filter(&qp("status=bogus&task_type=x&owner=abc"), "en-us", &chrono_tz::UTC, |_| true)
-            .unwrap_err()
-            .to_value();
+        let e = parse_filter(&qp("status=bogus&task_type=x&owner=abc"), "en-us", &chrono_tz::UTC, |_| true).unwrap_err().to_value();
         assert_eq!(
             e.to_string(),
             concat!(

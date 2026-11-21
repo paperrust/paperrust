@@ -21,10 +21,10 @@ use serde_json::{Value, json};
 use crate::drf::{self, AuditMeta, ClientAddr, HResult};
 use crate::listing::{self, ALIAS, FilterData, OrderTerm};
 use crate::model::{Kind, ObjectRow};
-use crate::tagtree::TagTree;
 use crate::objects;
 use crate::perms;
 use crate::serialize::{self, ChangeSource, SerCtx};
+use crate::tagtree::TagTree;
 use crate::write;
 
 /// GET list.
@@ -69,17 +69,21 @@ pub async fn list(state: &AppState, kind: Kind, auth: &AuthUser, ctx: &RequestCo
 }
 
 /// `TagViewSet.list` (children map, `display_count`, legacy `all`).
-async fn tag_list(state: &AppState, user: &User, ctx: &RequestContext, q: SelectStatement, terms: &Option<Vec<OrderTerm>>, need_count: bool) -> HResult {
+async fn tag_list(
+    state: &AppState,
+    user: &User,
+    ctx: &RequestContext,
+    q: SelectStatement,
+    terms: &Option<Vec<OrderTerm>>,
+    need_count: bool,
+) -> HResult {
     let db = state.db();
     // need_count: ordering by document_count → counts inside the query (all tags); otherwise
     // counted afterwards for the shown tags and their children only (PERF-SCALE #3b)
     let all_tags = listing::fetch(db, Kind::Tag, &q, need_count, false).await?;
     // Tag.get_hierarchy().descendants(all_tags) – one snapshot of the parent edges (upstream #14612)
-    let descendant_pks: HashSet<i64> = if all_tags.is_empty() {
-        HashSet::new()
-    } else {
-        TagTree::load_pool(db).await?.descendants(all_tags.iter().map(|t| t.id))
-    };
+    let descendant_pks: HashSet<i64> =
+        if all_tags.is_empty() { HashSet::new() } else { TagTree::load_pool(db).await?.descendants(all_tags.iter().map(|t| t.id)) };
     let children_source: Vec<ObjectRow> = if !descendant_pks.is_empty() {
         let mut ids: HashSet<i64> = descendant_pks.clone();
         ids.extend(all_tags.iter().map(|t| t.id));
@@ -166,7 +170,16 @@ pub async fn create(state: &AppState, kind: Kind, auth: &AuthUser, ctx: &Request
 
 /// PUT / PATCH.
 #[allow(clippy::too_many_arguments)]
-pub async fn update(state: &AppState, kind: Kind, auth: &AuthUser, ctx: &RequestContext, meta: &AuditMeta, pk: &str, body: &Bytes, partial: bool) -> HResult {
+pub async fn update(
+    state: &AppState,
+    kind: Kind,
+    auth: &AuthUser,
+    ctx: &RequestContext,
+    meta: &AuditMeta,
+    pk: &str,
+    body: &Bytes,
+    partial: bool,
+) -> HResult {
     let user = objects::check_model_perm(auth, kind)?;
     let pk = objects::parse_pk(pk)?;
     let db = state.db();
@@ -204,7 +217,13 @@ macro_rules! kind_handlers {
             pub async fn retrieve(State(s): State<AppState>, ctx: RequestContext, auth: AuthUser, Path(pk): Path<String>) -> HResult {
                 super::retrieve(&s, $kind, &auth, &ctx, &pk).await
             }
-            pub async fn create(State(s): State<AppState>, ctx: RequestContext, auth: AuthUser, client: ClientAddr, body: Bytes) -> HResult {
+            pub async fn create(
+                State(s): State<AppState>,
+                ctx: RequestContext,
+                auth: AuthUser,
+                client: ClientAddr,
+                body: Bytes,
+            ) -> HResult {
                 let meta = AuditMeta::new(&ctx, &client, &auth);
                 super::create(&s, $kind, &auth, &ctx, &meta, &body).await
             }
@@ -230,7 +249,13 @@ macro_rules! kind_handlers {
                 let meta = AuditMeta::new(&ctx, &client, &auth);
                 super::update(&s, $kind, &auth, &ctx, &meta, &pk, &body, true).await
             }
-            pub async fn destroy(State(s): State<AppState>, ctx: RequestContext, auth: AuthUser, client: ClientAddr, Path(pk): Path<String>) -> HResult {
+            pub async fn destroy(
+                State(s): State<AppState>,
+                ctx: RequestContext,
+                auth: AuthUser,
+                client: ClientAddr,
+                Path(pk): Path<String>,
+            ) -> HResult {
                 let meta = AuditMeta::new(&ctx, &client, &auth);
                 super::destroy(&s, $kind, &auth, &meta, &pk).await
             }

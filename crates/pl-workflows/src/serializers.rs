@@ -7,8 +7,8 @@
 use crate::drf::{self, Ctx, FieldSpec, Out, VErr, msg, non_field};
 use crate::schema::*;
 use crate::{cfquery, jinja, pyfmt};
-use sea_query::{Alias, Expr, PostgresQueryBuilder, Query};
 use pl_core::sqlbind::SqlxBinder;
+use sea_query::{Alias, Expr, PostgresQueryBuilder, Query};
 use serde_json::{Map, Value, json};
 use sqlx::PgConnection;
 
@@ -49,9 +49,10 @@ pub async fn validate_trigger(db: &mut PgConnection, ctx: Ctx, data: &Value, ins
 async fn trigger_validate(db: &mut PgConnection, attrs: &mut Attrs, instance_type: Option<i64>) -> Result<(), VErr> {
     for key in ["filter_filename", "filter_path", "filter_custom_field_query"] {
         if let Some(Value::String(s)) = attrs.get(key)
-            && s.is_empty() {
-                attrs.insert(key.into(), Value::Null);
-            }
+            && s.is_empty()
+        {
+            attrs.insert(key.into(), Value::Null);
+        }
     }
     if let Some(Value::String(q)) = attrs.get("filter_custom_field_query") {
         cfquery::validate(db, "filter_custom_field_query", q).await?;
@@ -77,11 +78,8 @@ async fn trigger_validate(db: &mut PgConnection, attrs: &mut Attrs, instance_typ
 pub fn url_validator(value: &str) -> Result<(), String> {
     let unable = || format!("Unable to parse URI {value}");
     // urlsplit: strip leading C0 control characters/spaces, remove \t\r\n everywhere
-    let cleaned: String = value
-        .trim_start_matches(|c: char| (c as u32) <= 0x20)
-        .chars()
-        .filter(|c| !matches!(c, '\t' | '\r' | '\n'))
-        .collect();
+    let cleaned: String =
+        value.trim_start_matches(|c: char| (c as u32) <= 0x20).chars().filter(|c| !matches!(c, '\t' | '\r' | '\n')).collect();
     let mut scheme = String::new();
     let mut rest = cleaned.as_str();
     if let Some(i) = cleaned.find(':') {
@@ -138,12 +136,14 @@ pub async fn validate_nested(db: &mut PgConnection, ctx: Ctx, name: &str, data: 
         let r = drf::run_field(db, ctx, &spec, obj.get(spec.name)).await;
         match r {
             Ok(Out::Val(v)) => {
-                if name == "webhook" && spec.name == "url"
+                if name == "webhook"
+                    && spec.name == "url"
                     && let Value::String(u) = &v
-                        && let Err(m) = url_validator(u) {
-                            errors.insert("url".into(), msg(m));
-                            continue;
-                        }
+                    && let Err(m) = url_validator(u)
+                {
+                    errors.insert("url".into(), msg(m));
+                    continue;
+                }
                 ret.insert(spec.name.into(), v);
             }
             Ok(Out::Skip) => {}
@@ -220,22 +220,23 @@ fn action_validate(attrs: &mut Attrs) -> Result<(), VErr> {
         }
     }
     if let Some(v) = attrs.get("assign_custom_fields_values")
-        && py_truthy(v) {
-            match v {
-                Value::Object(o) => {
-                    let mapped: Map<String, Value> = o
-                        .iter()
-                        .map(|(k, val)| {
-                            let nv = if val.as_str() == Some("") { Value::Null } else { val.clone() };
-                            (k.clone(), nv)
-                        })
-                        .collect();
-                    attrs.insert("assign_custom_fields_values".into(), Value::Object(mapped));
-                }
-                // upstream: AttributeError (`.items()` on a non-dict) → 500
-                _ => return Err(VErr::Server("assign_custom_fields_values is not a dict".into())),
+        && py_truthy(v)
+    {
+        match v {
+            Value::Object(o) => {
+                let mapped: Map<String, Value> = o
+                    .iter()
+                    .map(|(k, val)| {
+                        let nv = if val.as_str() == Some("") { Value::Null } else { val.clone() };
+                        (k.clone(), nv)
+                    })
+                    .collect();
+                attrs.insert("assign_custom_fields_values".into(), Value::Object(mapped));
             }
+            // upstream: AttributeError (`.items()` on a non-dict) → 500
+            _ => return Err(VErr::Server("assign_custom_fields_values is not a dict".into())),
         }
+    }
     let ty = attrs.get("type").and_then(Value::as_i64);
     if ty == Some(ACTION_EMAIL) && !attrs.contains_key("email") {
         return Err(non_field("Email data is required for email actions"));
@@ -245,10 +246,7 @@ fn action_validate(attrs: &mut Attrs) -> Result<(), VErr> {
     }
     if ty == Some(ACTION_PASSWORD_REMOVAL) {
         let ok = match attrs.get("passwords") {
-            Some(Value::Array(a)) => {
-                !a.is_empty()
-                    && a.iter().all(|p| p.as_str().is_some_and(|s| !pyfmt::py_strip(s).is_empty()))
-            }
+            Some(Value::Array(a)) => !a.is_empty() && a.iter().all(|p| p.as_str().is_some_and(|s| !pyfmt::py_strip(s).is_empty())),
             _ => false,
         };
         if !ok {
@@ -360,10 +358,11 @@ pub async fn validate_workflow(db: &mut PgConnection, ctx: Ctx, data: &Value, in
             Ok(Out::Val(v)) => {
                 if f.spec.name == "name"
                     && let Value::String(n) = &v
-                        && name_taken(db, n, instance).await? {
-                            errors.insert("name".into(), msg("workflow with this name already exists."));
-                            continue;
-                        }
+                    && name_taken(db, n, instance).await?
+                {
+                    errors.insert("name".into(), msg("workflow with this name already exists."));
+                    continue;
+                }
                 attrs.insert(f.spec.name.into(), v);
             }
             Ok(Out::Skip) => {}
@@ -399,10 +398,7 @@ pub async fn validate_workflow(db: &mut PgConnection, ctx: Ctx, data: &Value, in
 
 async fn name_taken(db: &mut PgConnection, name: &str, instance: Option<i64>) -> Result<bool, VErr> {
     let mut q = Query::select();
-    q.expr(Expr::val(1))
-        .from(Alias::new(T_WORKFLOW))
-        .and_where(Expr::col(Alias::new("name")).eq(name))
-        .limit(1);
+    q.expr(Expr::val(1)).from(Alias::new(T_WORKFLOW)).and_where(Expr::col(Alias::new("name")).eq(name)).limit(1);
     if let Some(id) = instance {
         q.and_where(Expr::col(Alias::new("id")).ne(id));
     }
@@ -428,10 +424,7 @@ async fn child_type_exists(
     let (sql, values) = Query::select()
         .expr(Expr::val(1))
         .from(Alias::new(table))
-        .inner_join(
-            Alias::new(through),
-            Expr::col((Alias::new(table), Alias::new("id"))).equals((Alias::new(through), Alias::new(other))),
-        )
+        .inner_join(Alias::new(through), Expr::col((Alias::new(table), Alias::new("id"))).equals((Alias::new(through), Alias::new(other))))
         .and_where(Expr::col((Alias::new(through), Alias::new("workflow_id"))).eq(wf))
         .and_where(cond)
         .limit(1)
@@ -442,30 +435,21 @@ async fn child_type_exists(
 async fn workflow_validate(db: &mut PgConnection, input: &WorkflowInput, instance: Option<i64>) -> Result<(), VErr> {
     let ty_of = |a: &Attrs| a.get("type").and_then(Value::as_i64);
     let (has_remote_ocr, has_ai) = match &input.actions {
-        Some(acts) => (
-            acts.iter().any(|a| ty_of(a) == Some(ACTION_REMOTE_OCR)),
-            acts.iter().any(|a| ty_of(a) == Some(ACTION_AI)),
-        ),
+        Some(acts) => (acts.iter().any(|a| ty_of(a) == Some(ACTION_REMOTE_OCR)), acts.iter().any(|a| ty_of(a) == Some(ACTION_AI))),
         None => match instance {
             Some(wf) => (
-                child_type_exists(db, T_ACTION, T_WF_ACTIONS, "workflowaction_id", wf, ACTION_REMOTE_OCR, false)
-                    .await?,
+                child_type_exists(db, T_ACTION, T_WF_ACTIONS, "workflowaction_id", wf, ACTION_REMOTE_OCR, false).await?,
                 child_type_exists(db, T_ACTION, T_WF_ACTIONS, "workflowaction_id", wf, ACTION_AI, false).await?,
             ),
             None => (false, false),
         },
     };
     let (has_consumption, has_non_consumption) = match &input.triggers {
-        Some(ts) => (
-            ts.iter().any(|t| ty_of(t) == Some(TYPE_CONSUMPTION)),
-            ts.iter().any(|t| ty_of(t) != Some(TYPE_CONSUMPTION)),
-        ),
+        Some(ts) => (ts.iter().any(|t| ty_of(t) == Some(TYPE_CONSUMPTION)), ts.iter().any(|t| ty_of(t) != Some(TYPE_CONSUMPTION))),
         None => match instance {
             Some(wf) => (
-                child_type_exists(db, T_TRIGGER, T_WF_TRIGGERS, "workflowtrigger_id", wf, TYPE_CONSUMPTION, false)
-                    .await?,
-                child_type_exists(db, T_TRIGGER, T_WF_TRIGGERS, "workflowtrigger_id", wf, TYPE_CONSUMPTION, true)
-                    .await?,
+                child_type_exists(db, T_TRIGGER, T_WF_TRIGGERS, "workflowtrigger_id", wf, TYPE_CONSUMPTION, false).await?,
+                child_type_exists(db, T_TRIGGER, T_WF_TRIGGERS, "workflowtrigger_id", wf, TYPE_CONSUMPTION, true).await?,
             ),
             None => (false, false),
         },
@@ -474,9 +458,7 @@ async fn workflow_validate(db: &mut PgConnection, input: &WorkflowInput, instanc
         return Err(non_field("Remote OCR actions require a consumption started trigger"));
     }
     if has_ai && !has_non_consumption {
-        return Err(non_field(
-            "Apply AI suggestions actions require a trigger other than consumption started",
-        ));
+        return Err(non_field("Apply AI suggestions actions require a trigger other than consumption started"));
     }
     Ok(())
 }
@@ -488,10 +470,7 @@ mod tests {
     #[test]
     fn urls() {
         assert!(url_validator("https://examplewithouttld:3000/path").is_ok());
-        assert_eq!(
-            url_validator("file:///etc/passwd/path").unwrap_err(),
-            "URI scheme 'file' is not allowed. Allowed schemes: http, https"
-        );
+        assert_eq!(url_validator("file:///etc/passwd/path").unwrap_err(), "URI scheme 'file' is not allowed. Allowed schemes: http, https");
         assert_eq!(url_validator("example.com").unwrap_err(), "Unable to parse URI example.com, missing scheme");
         assert_eq!(url_validator("http:").unwrap_err(), "Unable to parse URI http:, missing net location or path");
         assert!(url_validator("http:foo").is_ok());
@@ -502,23 +481,20 @@ mod tests {
     fn action_rules() {
         let mut a: Attrs = serde_json::from_value(json!({"type": 5, "passwords": ["", "x"]})).unwrap();
         match action_validate(&mut a) {
-            Err(VErr::Detail(d)) => assert_eq!(
-                d,
-                json!({"non_field_errors": ["Passwords are required for password removal actions"]})
-            ),
+            Err(VErr::Detail(d)) => assert_eq!(d, json!({"non_field_errors": ["Passwords are required for password removal actions"]})),
             _ => panic!(),
         }
         let mut a: Attrs = serde_json::from_value(json!({"type": 8, "ai_suggestion_fields": ["x"]})).unwrap();
         match action_validate(&mut a) {
             Err(VErr::Detail(d)) => assert_eq!(
                 d["non_field_errors"][0],
-                json!("At least one valid field is required for apply AI suggestions actions, options are: ['correspondent', 'created', 'document_type', 'storage_path', 'tags', 'title']")
+                json!(
+                    "At least one valid field is required for apply AI suggestions actions, options are: ['correspondent', 'created', 'document_type', 'storage_path', 'tags', 'title']"
+                )
             ),
             _ => panic!(),
         }
-        let mut a: Attrs =
-            serde_json::from_value(json!({"assign_title": "", "assign_custom_fields_values": {"1": "", "2": 0}}))
-                .unwrap();
+        let mut a: Attrs = serde_json::from_value(json!({"assign_title": "", "assign_custom_fields_values": {"1": "", "2": 0}})).unwrap();
         assert!(action_validate(&mut a).is_ok());
         assert_eq!(a["assign_title"], Value::Null);
         assert_eq!(a["assign_custom_fields_values"], json!({"1": null, "2": 0}));

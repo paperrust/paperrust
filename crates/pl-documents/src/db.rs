@@ -2,8 +2,8 @@
 //! `pl_core::ApiError` (500 with Django's generic page, cause only in the log).
 
 use pl_core::ApiError;
-use sea_query::{Alias, PostgresQueryBuilder, SelectStatement};
 use pl_core::sqlbind::SqlxBinder;
+use sea_query::{Alias, PostgresQueryBuilder, SelectStatement};
 use sqlx::Row;
 use sqlx::postgres::PgRow;
 
@@ -28,10 +28,7 @@ pub async fn fetch_optional(db: &sqlx::PgPool, q: &SelectStatement) -> ApiResult
 /// `postgres-array` feature does not support array binding here; the value is bound, not interpolated.
 pub fn id_in_list(col: sea_query::SimpleExpr, ids: &[i64]) -> sea_query::SimpleExpr {
     let list: Vec<String> = ids.iter().map(|i| i.to_string()).collect();
-    sea_query::Expr::cust_with_exprs(
-        "$1 = ANY(string_to_array($2, ',')::bigint[])",
-        [col, sea_query::Expr::val(list.join(",")).into()],
-    )
+    sea_query::Expr::cust_with_exprs("$1 = ANY(string_to_array($2, ',')::bigint[])", [col, sea_query::Expr::val(list.join(",")).into()])
 }
 
 fn col_err(col: &str, e: sqlx::Error) -> ApiError {
@@ -46,9 +43,7 @@ pub fn opt_i64(row: &PgRow, col: &str) -> ApiResult<Option<i64>> {
     if let Ok(v) = row.try_get::<Option<i32>, _>(col) {
         return Ok(v.map(i64::from));
     }
-    row.try_get::<Option<i16>, _>(col)
-        .map(|v| v.map(i64::from))
-        .map_err(|e| col_err(col, e))
+    row.try_get::<Option<i16>, _>(col).map(|v| v.map(i64::from)).map_err(|e| col_err(col, e))
 }
 
 pub fn i64_col(row: &PgRow, col: &str) -> ApiResult<i64> {
@@ -64,9 +59,5 @@ where
 
 /// ids (column `id`) of all rows of a query, in query order.
 pub async fn id_list(db: &sqlx::PgPool, q: &SelectStatement) -> ApiResult<Vec<i64>> {
-    fetch_all(db, q)
-        .await?
-        .iter()
-        .map(|r| i64_col(r, "id"))
-        .collect()
+    fetch_all(db, q).await?.iter().map(|r| i64_col(r, "id")).collect()
 }

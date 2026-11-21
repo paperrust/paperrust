@@ -107,7 +107,12 @@ async fn user_with(db: &PgPool, name: &str, perms: &[(&str, &str)]) -> (i32, Str
         .unwrap();
     }
     let token = format!("{:0>40}", format!("{id:x}ee"));
-    sqlx::query("INSERT INTO authtoken_token (key, created, user_id) VALUES ($1, now(), $2)").bind(&token).bind(id).execute(db).await.unwrap();
+    sqlx::query("INSERT INTO authtoken_token (key, created, user_id) VALUES ($1, now(), $2)")
+        .bind(&token)
+        .bind(id)
+        .execute(db)
+        .await
+        .unwrap();
     (id, token)
 }
 
@@ -116,11 +121,11 @@ async fn user_with(db: &PgPool, name: &str, perms: &[(&str, &str)]) -> (i32, Str
 async fn read_config_requires_view_permission() {
     let db = copy_db(DB_CONFIG).await;
     let app = app(&db, DB_CONFIG, "/api/config/");
-    let cfg_id: i32 = sqlx::query_scalar("SELECT id FROM paperless_applicationconfiguration ORDER BY id LIMIT 1").fetch_one(&db).await.unwrap();
+    let cfg_id: i32 =
+        sqlx::query_scalar("SELECT id FROM paperless_applicationconfiguration ORDER BY id LIMIT 1").fetch_one(&db).await.unwrap();
     let endpoints = ["/api/config/".to_string(), format!("/api/config/{cfg_id}/")];
 
-    let denied: [&[(&str, &str)]; 3] =
-        [&[], &[("paperless", "change_applicationconfiguration")], &[("documents", "view_document")]];
+    let denied: [&[(&str, &str)]; 3] = [&[], &[("paperless", "change_applicationconfiguration")], &[("documents", "view_document")]];
     for (i, perms) in denied.iter().enumerate() {
         let (_, token) = user_with(&db, &format!("cfgdenied{i}"), perms).await;
         for ep in &endpoints {
@@ -171,12 +176,9 @@ async fn statistics_current_asn_respects_document_permissions() {
             .unwrap();
     sqlx::query("UPDATE documents_document SET archive_serial_number = NULL").execute(&db).await.unwrap();
     let (viewer_id, viewer) = user_with(&db, "asnviewer", &[("documents", "view_document")]).await;
-    for (id, owner, asn, root) in [
-        (ids[0], viewer_id, 12, None),
-        (ids[1], admin_id, 23, None),
-        (ids[2], admin_id, 99, None),
-        (ids[3], viewer_id, 500, Some(ids[0])),
-    ] {
+    for (id, owner, asn, root) in
+        [(ids[0], viewer_id, 12, None), (ids[1], admin_id, 23, None), (ids[2], admin_id, 99, None), (ids[3], viewer_id, 500, Some(ids[0]))]
+    {
         sqlx::query("UPDATE documents_document SET owner_id = $2, archive_serial_number = $3, root_document_id = $4 WHERE id = $1")
             .bind(id)
             .bind(owner)

@@ -15,8 +15,8 @@ use crate::models::ObjectModel;
 use crate::objects::{bare_codename, content_type_id_subquery};
 use crate::user::User;
 use axum::http::Method;
-use sea_query::{Alias, Expr, PostgresQueryBuilder, Query};
 use pl_core::sqlbind::SqlxBinder as _;
+use sea_query::{Alias, Expr, PostgresQueryBuilder, Query};
 use sqlx::PgPool;
 
 fn a(s: &str) -> Alias {
@@ -38,61 +38,40 @@ pub fn paperless_object_action(method: &Method) -> Option<&'static str> {
 pub type PermsMap = &'static [(&'static str, &'static [&'static str])];
 
 /// `ViewDocumentsPermissions.perms_map`.
-pub const VIEW_DOCUMENTS_PERMISSIONS: PermsMap = &[
-    ("OPTIONS", &["documents.view_document"]),
-    ("GET", &["documents.view_document"]),
-    ("POST", &["documents.view_document"]),
-];
+pub const VIEW_DOCUMENTS_PERMISSIONS: PermsMap =
+    &[("OPTIONS", &["documents.view_document"]), ("GET", &["documents.view_document"]), ("POST", &["documents.view_document"])];
 
 /// `TrashPermissions.perms_map`.
-pub const TRASH_PERMISSIONS: PermsMap = &[
-    ("OPTIONS", &["documents.view_document"]),
-    ("GET", &["documents.view_document"]),
-    ("POST", &["documents.delete_document"]),
-];
+pub const TRASH_PERMISSIONS: PermsMap =
+    &[("OPTIONS", &["documents.view_document"]), ("GET", &["documents.view_document"]), ("POST", &["documents.delete_document"])];
 
 /// `PaperlessNotePermissions.perms_map`.
 pub const NOTE_PERMISSIONS: PermsMap = &[
     ("OPTIONS", &["documents.view_note", "documents.view_document"]),
     ("GET", &["documents.view_note", "documents.view_document"]),
-    (
-        "POST",
-        &["documents.add_note", "documents.view_document", "documents.change_document"],
-    ),
-    (
-        "DELETE",
-        &["documents.delete_note", "documents.view_document", "documents.change_document"],
-    ),
+    ("POST", &["documents.add_note", "documents.view_document", "documents.change_document"]),
+    ("DELETE", &["documents.delete_note", "documents.view_document", "documents.change_document"]),
 ];
 
 /// `AcknowledgeTasksPermissions.perms_map`.
-pub const ACKNOWLEDGE_TASKS_PERMISSIONS: PermsMap = &[
-    ("OPTIONS", &["documents.change_paperlesstask"]),
-    ("POST", &["documents.change_paperlesstask"]),
-];
+pub const ACKNOWLEDGE_TASKS_PERMISSIONS: PermsMap =
+    &[("OPTIONS", &["documents.change_paperlesstask"]), ("POST", &["documents.change_paperlesstask"])];
 
 /// `GlobalPermissionsByMethod.has_permission` (HEAD is checked as GET; unknown method → False).
 pub fn global_perms_by_method(user: Option<&User>, method: &Method, map: PermsMap) -> bool {
     let Some(user) = user else { return false };
     let m = if method == Method::HEAD { "GET" } else { method.as_str() };
-    map.iter()
-        .find(|(k, _)| *k == m)
-        .is_some_and(|(_, perms)| user.has_perms(perms))
+    map.iter().find(|(k, _)| *k == m).is_some_and(|(_, perms)| user.has_perms(perms))
 }
 
 /// `has_global_statistics_permission(user)`.
 pub fn has_global_statistics_permission(user: Option<&User>) -> bool {
-    user.is_some_and(|u| {
-        u.is_active && (u.is_superuser || u.has_perm("paperless.view_global_statistics"))
-    })
+    user.is_some_and(|u| u.is_active && (u.is_superuser || u.has_perm("paperless.view_global_statistics")))
 }
 
 /// `has_system_status_permission(user)`.
 pub fn has_system_status_permission(user: Option<&User>) -> bool {
-    user.is_some_and(|u| {
-        u.is_active
-            && (u.is_superuser || u.is_staff || u.has_perm("paperless.view_system_monitoring"))
-    })
+    user.is_some_and(|u| u.is_active && (u.is_superuser || u.is_staff || u.has_perm("paperless.view_system_monitoring")))
 }
 
 /// A loaded object as the permission system needs it.
@@ -104,13 +83,7 @@ pub struct ObjRef {
 
 /// guardian `ObjectPermissionChecker(user).has_perm(perm, obj)`:
 /// inactive → false, superuser → true, else a direct or group grant of `perm` on the object.
-pub async fn guardian_has_perm(
-    db: &PgPool,
-    user: &User,
-    model: &ObjectModel,
-    obj_id: i64,
-    perm: &str,
-) -> Result<bool, AuthError> {
+pub async fn guardian_has_perm(db: &PgPool, user: &User, model: &ObjectModel, obj_id: i64, perm: &str) -> Result<bool, AuthError> {
     if !user.is_active {
         return Ok(false);
     }
@@ -139,11 +112,8 @@ pub async fn guardian_has_perm(
         .and_where(Expr::col(a("object_pk")).eq(pk.clone()))
         .and_where(Expr::col(a("permission_id")).in_subquery(perm_ids.clone()))
         .to_owned();
-    let groups = Query::select()
-        .column(a("group_id"))
-        .from(a("auth_user_groups"))
-        .and_where(Expr::col(a("user_id")).eq(user.id))
-        .to_owned();
+    let groups =
+        Query::select().column(a("group_id")).from(a("auth_user_groups")).and_where(Expr::col(a("user_id")).eq(user.id)).to_owned();
     let group_grant = Query::select()
         .expr(Expr::val(1))
         .from(a("guardian_groupobjectpermission"))
@@ -152,12 +122,7 @@ pub async fn guardian_has_perm(
         .and_where(Expr::col(a("object_pk")).eq(pk))
         .and_where(Expr::col(a("permission_id")).in_subquery(perm_ids))
         .to_owned();
-    let q = Query::select()
-        .expr_as(
-            Expr::exists(user_grant).or(Expr::exists(group_grant)),
-            a("granted"),
-        )
-        .to_owned();
+    let q = Query::select().expr_as(Expr::exists(user_grant).or(Expr::exists(group_grant)), a("granted")).to_owned();
     let (sql, values) = q.build_sqlx(PostgresQueryBuilder);
     let (b,): (bool,) = sqlx::query_as_with(&sql, values).fetch_one(db).await?;
     Ok(b)
@@ -217,12 +182,7 @@ impl AuthContext {
     /// unowned or own → ok; else guardian object perm for the method (GET→view, PUT/PATCH→change,
     /// DELETE→delete, POST→add); without it: 404 for safe methods or without view grant,
     /// otherwise 403.
-    pub async fn check_object_perms(
-        &self,
-        db: &PgPool,
-        model: &ObjectModel,
-        obj: ObjRef,
-    ) -> Result<(), AuthError> {
+    pub async fn check_object_perms(&self, db: &PgPool, model: &ObjectModel, obj: ObjRef) -> Result<(), AuthError> {
         let Some(owner) = obj.owner_id else { return Ok(()) };
         let Some(user) = self.user() else {
             // AnonymousUser never equals an owner; guardian anonymous grants are not supported.
@@ -284,10 +244,7 @@ mod tests {
         let c = ctx(Some(u), Method::POST);
         assert!(c.require_perms_by_method(TRASH_PERMISSIONS).is_err());
         let c = ctx(None, Method::GET);
-        assert_eq!(
-            c.check_perms_by_method(NOTE_PERMISSIONS).unwrap_err().status(),
-            axum::http::StatusCode::UNAUTHORIZED
-        );
+        assert_eq!(c.check_perms_by_method(NOTE_PERMISSIONS).unwrap_err().status(), axum::http::StatusCode::UNAUTHORIZED);
     }
 
     #[test]

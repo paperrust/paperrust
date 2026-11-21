@@ -32,7 +32,12 @@ fn word(t: &str, x0: f64, y0: f64, x1: f64, y1: f64, line: u32) -> Word {
 }
 
 fn ocr(w: u32, h: u32) -> PageOcr {
-    PageOcr { width: w, height: h, words: vec![word("Rechnung", 50.0, 50.0, 250.0, 90.0, 1), word("Größe€", 300.0, 50.0, 450.0, 90.0, 1)], text: String::new() }
+    PageOcr {
+        width: w,
+        height: h,
+        words: vec![word("Rechnung", 50.0, 50.0, 250.0, 90.0, 1), word("Größe€", 300.0, 50.0, 450.0, 90.0, 1)],
+        text: String::new(),
+    }
 }
 
 /// Black/white test page (text-like bars) as an RGB raster.
@@ -110,7 +115,8 @@ fn has_claim(pdf: &[u8], part: u8) -> bool {
 #[test]
 fn ocr_output_passes_pdfa_self_check_for_all_parts() {
     for (t, part) in [(OutputType::PdfA1, 1), (OutputType::PdfA2, 2), (OutputType::PdfA3, 3), (OutputType::PdfA, 2)] {
-        let spec = ImagePageSpec { image: PageImage::Raw(bitonal_rgb(600, 400)), dpi_x: 150.0, dpi_y: 150.0, rotate: 0, ocr: Some(ocr(600, 400)) };
+        let spec =
+            ImagePageSpec { image: PageImage::Raw(bitonal_rgb(600, 400)), dpi_x: 150.0, dpi_y: 150.0, rotate: 0, ocr: Some(ocr(600, 400)) };
         let pdf = pdfwrite::build_from_images(&[spec], &meta(t)).unwrap();
         let v = pl_ocr::pdfa::check(&pdf, part);
         assert!(v.is_empty(), "{t:?}: {v:?}");
@@ -376,7 +382,8 @@ fn unembedded_standard_font_gets_substitute() {
         let data = ff.decompressed_content().unwrap_or_else(|_| ff.content.clone());
         let ttf = pl_ocr::pdfa_fonts::ttf::Ttf::parse(&data).expect("subset is a valid TrueType font");
         assert_ne!(ttf.glyph(u32::from('H')), 0);
-        let orig = substitute_font(pl_ocr::pdfa_fonts::Face { family: pl_ocr::pdfa_fonts::Family::Sans, bold: true, italic: false }).unwrap();
+        let orig =
+            substitute_font(pl_ocr::pdfa_fonts::Face { family: pl_ocr::pdfa_fonts::Family::Sans, bold: true, italic: false }).unwrap();
         assert!(data.len() * 3 < orig.len(), "subset {} vs font {}", data.len(), orig.len());
         eprintln!("substitute subset {} bytes (stream {} bytes) of {} bytes", data.len(), ff.content.len(), orig.len());
     }
@@ -467,7 +474,9 @@ fn image_colorspaces(pdf: &[u8]) -> Vec<String> {
         .filter(|s| matches!(s.dict.get(b"Subtype"), Ok(Object::Name(n)) if n.as_slice() == b"Image"))
         .map(|s| match s.dict.get(b"ColorSpace") {
             Ok(Object::Name(n)) => String::from_utf8_lossy(n).into_owned(),
-            Ok(Object::Array(a)) => a.first().and_then(|x| x.as_name().ok()).map(|n| String::from_utf8_lossy(n).into_owned()).unwrap_or_default(),
+            Ok(Object::Array(a)) => {
+                a.first().and_then(|x| x.as_name().ok()).map(|n| String::from_utf8_lossy(n).into_owned()).unwrap_or_default()
+            }
             _ => String::new(),
         })
         .collect()
@@ -476,9 +485,17 @@ fn image_colorspaces(pdf: &[u8]) -> Vec<String> {
 #[test]
 fn color_conversion_strategies() {
     let mk = |c: ColorConversion| {
-        let spec = ImagePageSpec { image: PageImage::Raw(photo_rgb(120, 80)), dpi_x: 150.0, dpi_y: 150.0, rotate: 0, ocr: Some(ocr(120, 80)) };
+        let spec =
+            ImagePageSpec { image: PageImage::Raw(photo_rgb(120, 80)), dpi_x: 150.0, dpi_y: 150.0, rotate: 0, ocr: Some(ocr(120, 80)) };
         let m = OutputMeta { color: c, optimize: OptimizeOptions::none(), ..meta(OutputType::PdfA2) };
-        let doc = pdfwrite::load_pdf(&pdfwrite::build_from_images(&[spec], &OutputMeta { output_type: OutputType::Pdf, optimize: OptimizeOptions::none(), ..Default::default() }).unwrap()).unwrap();
+        let doc = pdfwrite::load_pdf(
+            &pdfwrite::build_from_images(
+                &[spec],
+                &OutputMeta { output_type: OutputType::Pdf, optimize: OptimizeOptions::none(), ..Default::default() },
+            )
+            .unwrap(),
+        )
+        .unwrap();
         pdfwrite::finish_with_report(doc, &m).unwrap()
     };
     let (gray, r) = mk(ColorConversion::Gray);
@@ -496,7 +513,11 @@ fn color_conversion_strategies() {
     assert_eq!(image_colorspaces(&cmyk), vec!["DeviceRGB"]);
     // Without PDF/A the strategy has no effect (upstream passes it on only with PDF/A)
     let spec = ImagePageSpec { image: PageImage::Raw(photo_rgb(20, 20)), dpi_x: 72.0, dpi_y: 72.0, rotate: 0, ocr: None };
-    let plain = pdfwrite::build_from_images(&[spec], &OutputMeta { output_type: OutputType::Pdf, color: ColorConversion::Gray, ..Default::default() }).unwrap();
+    let plain = pdfwrite::build_from_images(
+        &[spec],
+        &OutputMeta { output_type: OutputType::Pdf, color: ColorConversion::Gray, ..Default::default() },
+    )
+    .unwrap();
     assert_eq!(image_colorspaces(&plain), vec!["DeviceRGB"]);
     // Rendered: gray result has the same brightness as the original (PDFium)
     if let Some(r) = pdfium() {
@@ -524,19 +545,34 @@ fn optimize_levels_shrink_archive_and_render_identically() {
     let scan = bitonal_rgb(1240, 1754); // A4 at 150 dpi
     let photo = photo_rgb(600, 400);
     let mut jpeg = Vec::new();
-    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, 95).encode(&photo.data, 600, 400, image::ExtendedColorType::Rgb8).unwrap();
+    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, 95)
+        .encode(&photo.data, 600, 400, image::ExtendedColorType::Rgb8)
+        .unwrap();
     let pages = || {
         vec![
             ImagePageSpec { image: PageImage::Raw(scan.clone()), dpi_x: 150.0, dpi_y: 150.0, rotate: 0, ocr: Some(ocr(1240, 1754)) },
             ImagePageSpec { image: PageImage::Raw(photo.clone()), dpi_x: 150.0, dpi_y: 150.0, rotate: 0, ocr: None },
-            ImagePageSpec { image: PageImage::Jpeg { data: jpeg.clone(), width: 600, height: 400, components: 3 }, dpi_x: 150.0, dpi_y: 150.0, rotate: 0, ocr: None },
+            ImagePageSpec {
+                image: PageImage::Jpeg { data: jpeg.clone(), width: 600, height: 400, components: 3 },
+                dpi_x: 150.0,
+                dpi_y: 150.0,
+                rotate: 0,
+                ocr: None,
+            },
         ]
     };
     let mut sizes = Vec::new();
     let mut pdfs = Vec::new();
     for level in 0..=3u8 {
         let (pdf, rep) = pdfwrite::finish_with_report(
-            pdfwrite::load_pdf(&pdfwrite::build_from_images(&pages(), &OutputMeta { output_type: OutputType::Pdf, optimize: OptimizeOptions::none(), ..Default::default() }).unwrap()).unwrap(),
+            pdfwrite::load_pdf(
+                &pdfwrite::build_from_images(
+                    &pages(),
+                    &OutputMeta { output_type: OutputType::Pdf, optimize: OptimizeOptions::none(), ..Default::default() },
+                )
+                .unwrap(),
+            )
+            .unwrap(),
             &opt_meta(level),
         )
         .unwrap();
@@ -702,8 +738,20 @@ fn user_args_are_parsed() {
 #[test]
 fn metadata_args_reach_info_and_xmp() {
     let spec = ImagePageSpec { image: PageImage::Raw(bitonal_rgb(100, 100)), dpi_x: 72.0, dpi_y: 72.0, rotate: 0, ocr: None };
-    let m = OutputMeta { title: Some("Rechnung März".into()), author: Some("Ä & B".into()), keywords: Some("a, b".into()), ..meta(OutputType::PdfA2) };
-    let (pdf, rep) = pdfwrite::finish_with_report(pdfwrite::load_pdf(&pdfwrite::build_from_images(&[spec], &OutputMeta { output_type: OutputType::Pdf, ..Default::default() }).unwrap()).unwrap(), &m).unwrap();
+    let m = OutputMeta {
+        title: Some("Rechnung März".into()),
+        author: Some("Ä & B".into()),
+        keywords: Some("a, b".into()),
+        ..meta(OutputType::PdfA2)
+    };
+    let (pdf, rep) = pdfwrite::finish_with_report(
+        pdfwrite::load_pdf(
+            &pdfwrite::build_from_images(&[spec], &OutputMeta { output_type: OutputType::Pdf, ..Default::default() }).unwrap(),
+        )
+        .unwrap(),
+        &m,
+    )
+    .unwrap();
     assert!(rep.pdfa_violations.is_empty(), "{:?}", rep.pdfa_violations);
     let s = String::from_utf8_lossy(&pdf);
     assert!(s.contains("<rdf:li xml:lang=\"x-default\">Rechnung März</rdf:li>"));

@@ -35,6 +35,5 @@ pub fn document_is_shared() -> SimpleExpr {
             .and_where(col(alias, "object_pk").eq(key.clone()))
             .to_owned()
     };
-    Expr::exists(mk("guardian_userobjectpermission", "sbu"))
-        .or(Expr::exists(mk("guardian_groupobjectpermission", "sbg")))
+    Expr::exists(mk("guardian_userobjectpermission", "sbu")).or(Expr::exists(mk("guardian_groupobjectpermission", "sbg")))
 }

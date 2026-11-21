@@ -41,9 +41,9 @@ pub fn parse_bytes(content_type: Option<&str>, bytes: &[u8]) -> Result<Data> {
     match main.as_str() {
         "application/json" => match serde_json::from_slice::<Value>(bytes) {
             Ok(v) => Ok(Data::Json(v)),
-            Err(e) => Err(Error::Api(ApiError::json_parse_error(
-                &crate::pyjson::decode_error(bytes).unwrap_or_else(|| python_json_error(&e)),
-            ))),
+            Err(e) => {
+                Err(Error::Api(ApiError::json_parse_error(&crate::pyjson::decode_error(bytes).unwrap_or_else(|| python_json_error(&e)))))
+            }
         },
         "application/x-www-form-urlencoded" => {
             let s = String::from_utf8_lossy(bytes);
@@ -65,11 +65,8 @@ fn python_json_error(e: &serde_json::Error) -> String {
 
 /// Minimal multipart reader for text fields (files are ignored; these views take none).
 fn parse_multipart(content_type: &str, body: &[u8]) -> Vec<(String, String)> {
-    let Some(boundary) = content_type
-        .split(';')
-        .map(str::trim)
-        .find_map(|p| p.strip_prefix("boundary="))
-        .map(|b| b.trim_matches('"').to_string())
+    let Some(boundary) =
+        content_type.split(';').map(str::trim).find_map(|p| p.strip_prefix("boundary=")).map(|b| b.trim_matches('"').to_string())
     else {
         return Vec::new();
     };
@@ -128,9 +125,7 @@ fn integer_field(v: &Value) -> std::result::Result<i64, &'static str> {
         other => pl_core::pyrepr::repr_value(other),
     };
     let trimmed = strip_decimal_zeros(&s);
-    crate::py::int(trimmed)
-        .and_then(|i| i64::try_from(i).ok())
-        .ok_or("A valid integer is required.")
+    crate::py::int(trimmed).and_then(|i| i64::try_from(i).ok()).ok_or("A valid integer is required.")
 }
 
 /// `re.compile(r'\.0*\s*$').sub('', s)` (only the first match at the end).
@@ -237,10 +232,7 @@ pub fn acknowledge_fields(data: &Data) -> std::result::Result<AckFields, ApiErro
             }
             if errs.is_empty() { Ok(ids) } else { Err(Value::Object(errs)) }
         }
-        other => Err(Value::Array(vec![Value::from(format!(
-            "Expected a list of items but got type \"{}\".",
-            py_type(&other)
-        ))])),
+        other => Err(Value::Array(vec![Value::from(format!("Expected a list of items but got type \"{}\".", py_type(&other)))])),
     });
     let all = match all_raw {
         None => Ok(false),
@@ -288,10 +280,7 @@ pub fn run_task_type(data: &Data, choices: &[(&str, &str)]) -> std::result::Resu
     let raw: Option<Value> = match data {
         Data::Json(Value::Object(m)) => m.get("task_type").cloned(),
         Data::Json(other) => {
-            return Err(ApiError::non_field_error(format!(
-                "Invalid data. Expected a dictionary, but got {}.",
-                py_type(other)
-            )));
+            return Err(ApiError::non_field_error(format!("Invalid data. Expected a dictionary, but got {}.", py_type(other))));
         }
         Data::Form(pairs) => pairs.iter().rev().find(|(k, _)| k == "task_type").map(|(_, v)| Value::from(v.clone())),
     };
@@ -382,11 +371,7 @@ mod tests {
             r#"{"task_type":["This field is required."]}"#
         );
         assert_eq!(
-            run_task_type(&Data::Json(json!({"task_type": "bogus"})), choices)
-                .unwrap_err()
-                .body_json()
-                .unwrap()
-                .to_string(),
+            run_task_type(&Data::Json(json!({"task_type": "bogus"})), choices).unwrap_err().body_json().unwrap().to_string(),
             r#"{"task_type":["\"bogus\" is not a valid choice."]}"#
         );
     }

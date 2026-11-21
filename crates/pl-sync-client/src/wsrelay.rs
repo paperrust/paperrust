@@ -286,7 +286,9 @@ mod tests {
     use super::*;
 
     fn hs(target: &str, origin: Option<&str>) -> Handshake {
-        let mut head = format!("GET {target} HTTP/1.1\r\nHost: 127.0.0.1:1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\nCookie: sessionid=x\r\n");
+        let mut head = format!(
+            "GET {target} HTTP/1.1\r\nHost: 127.0.0.1:1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\nCookie: sessionid=x\r\n"
+        );
         if let Some(o) = origin {
             head.push_str(&format!("Origin: {o}\r\n"));
         }

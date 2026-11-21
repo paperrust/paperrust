@@ -282,7 +282,11 @@ pub async fn send_webhook(req: &WebhookRequest, s: &WebhookSettings) -> Result<u
 
 async fn send_pinned(req: &WebhookRequest, target: &Target, s: &WebhookSettings) -> Result<u16, WebhookError> {
     let ip = pin(target, s.allow_internal).await?;
-    let mut b = reqwest::Client::builder().user_agent(pl_core::brand::USER_AGENT).timeout(s.timeout).redirect(reqwest::redirect::Policy::none()).no_proxy();
+    let mut b = reqwest::Client::builder()
+        .user_agent(pl_core::brand::USER_AGENT)
+        .timeout(s.timeout)
+        .redirect(reqwest::redirect::Policy::none())
+        .no_proxy();
     if target.host.parse::<IpAddr>().is_err() {
         b = b.resolve(&target.host, SocketAddr::new(ip, target.port));
     }
@@ -299,11 +303,7 @@ async fn send_pinned(req: &WebhookRequest, target: &Target, s: &WebhookSettings)
         rb = rb.header(reqwest::header::CONTENT_TYPE, ct);
     }
     let resp = rb.body(body).send().await.map_err(|e| {
-        if e.is_connect() {
-            WebhookError::Connect(e.without_url().to_string())
-        } else {
-            WebhookError::Http(e.without_url().to_string())
-        }
+        if e.is_connect() { WebhookError::Connect(e.without_url().to_string()) } else { WebhookError::Http(e.without_url().to_string()) }
     })?;
     let status = resp.status().as_u16();
     if !(200..300).contains(&status) {
@@ -382,18 +382,31 @@ mod tests {
     fn validation() {
         let s = settings();
         assert!(validate_outbound_url("http://example.org/x", &s).is_ok());
-        assert_eq!(validate_outbound_url("ftp://example.org/x", &s).unwrap_err(), WebhookError::Blocked("Invalid URL scheme or hostname.".into()));
+        assert_eq!(
+            validate_outbound_url("ftp://example.org/x", &s).unwrap_err(),
+            WebhookError::Blocked("Invalid URL scheme or hostname.".into())
+        );
         assert_eq!(validate_outbound_url("http:///x", &s).unwrap_err(), WebhookError::Blocked("Invalid URL scheme or hostname.".into()));
         let mut s2 = settings();
         s2.allowed_ports.insert(443);
-        assert_eq!(validate_outbound_url("http://example.org/x", &s2).unwrap_err(), WebhookError::Blocked("Destination port not permitted.".into()));
+        assert_eq!(
+            validate_outbound_url("http://example.org/x", &s2).unwrap_err(),
+            WebhookError::Blocked("Destination port not permitted.".into())
+        );
         assert!(validate_outbound_url("https://example.org/x", &s2).is_ok());
     }
 
     #[tokio::test]
     async fn internal_addresses_blocked() {
         let s = settings();
-        for u in ["http://127.0.0.1/", "http://2130706433/", "http://[::1]/", "http://10.0.0.1/", "http://169.254.169.254/latest", "http://localhost:8080/"] {
+        for u in [
+            "http://127.0.0.1/",
+            "http://2130706433/",
+            "http://[::1]/",
+            "http://10.0.0.1/",
+            "http://169.254.169.254/latest",
+            "http://localhost:8080/",
+        ] {
             let t = validate_outbound_url(u, &s).unwrap();
             let r = pin(&t, false).await;
             assert!(matches!(r, Err(WebhookError::Connect(ref m)) if m.starts_with("Connection blocked")), "{u}: {r:?}");
@@ -416,6 +429,8 @@ mod tests {
         let (ct, body) = encode_body(&r);
         assert!(ct.unwrap().starts_with("multipart/form-data; boundary="));
         let b = String::from_utf8(body).unwrap();
-        assert!(b.contains("Content-Disposition: form-data; name=\"file\"; filename=\"a%22b.pdf\"\r\nContent-Type: application/pdf\r\n\r\nPDF\r\n"));
+        assert!(b.contains(
+            "Content-Disposition: form-data; name=\"file\"; filename=\"a%22b.pdf\"\r\nContent-Type: application/pdf\r\n\r\nPDF\r\n"
+        ));
     }
 }

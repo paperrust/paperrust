@@ -14,9 +14,9 @@ use axum::extract::{Path as UrlPath, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use pl_authz::AuthUser;
+use pl_core::sqlbind::SqlxBinder as _;
 use pl_core::{ApiError, AppState, Drf, RequestContext};
 use sea_query::{Alias, Expr, Order, PostgresQueryBuilder, Query};
-use pl_core::sqlbind::SqlxBinder as _;
 use serde_json::{Map, Value};
 use sqlx::Row as _;
 use sqlx::postgres::PgRow;
@@ -90,14 +90,8 @@ const MODEL_FIELDS: &[(&str, Kind)] = &[
 ];
 
 /// Declared serializer fields (after `id`), in class order.
-const DECLARED: &[&str] = &[
-    "externally_configured_variables",
-    "user_args",
-    "barcode_tag_mapping",
-    "llm_embedding_api_key",
-    "llm_api_key",
-    "remote_ocr_api_key",
-];
+const DECLARED: &[&str] =
+    &["externally_configured_variables", "user_args", "barcode_tag_mapping", "llm_embedding_api_key", "llm_api_key", "remote_ocr_api_key"];
 
 /// `get_externally_configured_variables`: sorted variable names (values never exposed).
 /// Upstream: `sorted(name for name in os.environ if name.startswith("PAPERLESS_"))`.
@@ -121,8 +115,7 @@ pub fn externally_configured_variables(names: impl Iterator<Item = String>) -> V
         .map(|rest| format!("{UPSTREAM_PREFIX}{rest}"))
         .filter(|up| !pl_settings::schema::SCHEMA.iter().any(|d| d.key == up.as_str()))
         .collect();
-    let mut v: Vec<String> =
-        names.iter().filter(|n| !mirrored.contains(n.as_str())).filter_map(|n| upstream_variable(n)).collect();
+    let mut v: Vec<String> = names.iter().filter(|n| !mirrored.contains(n.as_str())).filter_map(|n| upstream_variable(n)).collect();
     v.sort();
     v.dedup();
     v
@@ -236,10 +229,7 @@ fn field_value(row: &PgRow, name: &str, kind: Kind, ctx: &RequestContext, script
         Kind::Str => row.try_get::<Option<String>, _>(name)?.map_or(Value::Null, Value::from),
         Kind::SmallInt => row.try_get::<Option<i16>, _>(name)?.map_or(Value::Null, Value::from),
         Kind::Int => row.try_get::<Option<i32>, _>(name)?.map_or(Value::Null, Value::from),
-        Kind::Float => row
-            .try_get::<Option<f64>, _>(name)?
-            .and_then(serde_json::Number::from_f64)
-            .map_or(Value::Null, Value::Number),
+        Kind::Float => row.try_get::<Option<f64>, _>(name)?.and_then(serde_json::Number::from_f64).map_or(Value::Null, Value::Number),
         Kind::Bool => row.try_get::<Option<bool>, _>(name)?.map_or(Value::Null, Value::from),
         Kind::JsonBinary => match row.try_get::<Option<Value>, _>(name)? {
             None | Some(Value::Null) => Value::Null,
@@ -393,9 +383,16 @@ mod tests {
     #[test]
     fn env_names_filtered_and_sorted() {
         let v = externally_configured_variables(
-            ["UNRELATED_SETTING", "PAPERLESS_REMOTE_OCR_API_KEY", "PAPERLESS_FUTURE_SETTING", "PAPERLESS_OCR_LANGUAGE", "PAPERLESS_RS_BIND", "PAPERLESS_"]
-                .into_iter()
-                .map(String::from),
+            [
+                "UNRELATED_SETTING",
+                "PAPERLESS_REMOTE_OCR_API_KEY",
+                "PAPERLESS_FUTURE_SETTING",
+                "PAPERLESS_OCR_LANGUAGE",
+                "PAPERLESS_RS_BIND",
+                "PAPERLESS_",
+            ]
+            .into_iter()
+            .map(String::from),
         );
         // unknown PAPERLESS_* listed like upstream; PaperRust's own PAPERLESS_RS_BIND not
         assert_eq!(v, vec!["PAPERLESS_FUTURE_SETTING", "PAPERLESS_OCR_LANGUAGE", "PAPERLESS_REMOTE_OCR_API_KEY"]);
@@ -444,7 +441,18 @@ mod tests {
         names.extend(DECLARED);
         names.extend(MODEL_FIELDS.iter().map(|(n, _)| *n).filter(|n| !DECLARED.contains(n)));
         assert_eq!(names.len(), 1 + 1 + MODEL_FIELDS.len());
-        assert_eq!(&names[..8], &["id", "externally_configured_variables", "user_args", "barcode_tag_mapping",
-            "llm_embedding_api_key", "llm_api_key", "remote_ocr_api_key", "output_type"]);
+        assert_eq!(
+            &names[..8],
+            &[
+                "id",
+                "externally_configured_variables",
+                "user_args",
+                "barcode_tag_mapping",
+                "llm_embedding_api_key",
+                "llm_api_key",
+                "remote_ocr_api_key",
+                "output_type"
+            ]
+        );
     }
 }

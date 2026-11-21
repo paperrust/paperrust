@@ -23,8 +23,7 @@ use crate::data::{ConsumableDocument, DocumentMetadataOverrides, DocumentSource,
 /// `ConsumerFilter.DEFAULT_IGNORE_PATTERNS`.
 pub const DEFAULT_IGNORE_PATTERNS: &[&str] = &[r"^\.DS_Store$", r"^\.DS_STORE$", r"^\._.*", r"^desktop\.ini$", r"^Thumbs\.db$"];
 /// `ConsumerFilter.DEFAULT_IGNORE_DIRS`.
-pub const DEFAULT_IGNORE_DIRS: &[&str] =
-    &[".stfolder", ".stversions", ".localized", "@eaDir", ".Spotlight-V100", ".Trashes", "__MACOSX"];
+pub const DEFAULT_IGNORE_DIRS: &[&str] = &[".stfolder", ".stversions", ".localized", "@eaDir", ".Spotlight-V100", ".Trashes", "__MACOSX"];
 
 /// `watchfiles.Change`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -298,7 +297,9 @@ impl FolderWatcher {
         if self.opts.subdirs_as_tags {
             match self.tags_from_path(filepath).await {
                 Ok(t) => tag_ids = Some(t),
-                Err(e) => tracing::error!(target: "paperless.management.consumer", "Error creating tags from path for {}: {e}", filepath.display()),
+                Err(e) => {
+                    tracing::error!(target: "paperless.management.consumer", "Error creating tags from path for {}: {e}", filepath.display())
+                }
             }
         }
         tracing::info!(target: "paperless.management.consumer", "Adding {} to the task queue", filepath.display());
@@ -582,10 +583,7 @@ pub fn map_event(ev: &notify::Event) -> Vec<(Change, PathBuf)> {
 }
 
 /// Snapshot comparison (watchfiles polling).
-fn diff(
-    old: &BTreeMap<PathBuf, (Option<SystemTime>, u64)>,
-    new: &BTreeMap<PathBuf, (Option<SystemTime>, u64)>,
-) -> Vec<(Change, PathBuf)> {
+fn diff(old: &BTreeMap<PathBuf, (Option<SystemTime>, u64)>, new: &BTreeMap<PathBuf, (Option<SystemTime>, u64)>) -> Vec<(Change, PathBuf)> {
     let mut out = Vec::new();
     for (p, v) in new {
         match old.get(p) {

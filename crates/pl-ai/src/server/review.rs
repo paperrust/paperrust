@@ -24,11 +24,11 @@ use axum::extract::{Path, Query as AxQuery, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use pl_authz::models::DOCUMENT;
-use pl_authz::perms::{has_perms_owner_aware, ObjRef};
+use pl_authz::perms::{ObjRef, has_perms_owner_aware};
 use pl_authz::{AuthUser, User};
-use pl_core::{ApiError, AppState, Drf, RequestContext};
-use serde_json::{json, Map, Value};
 use pl_core::sqlbind::SqlxBinder as _;
+use pl_core::{ApiError, AppState, Drf, RequestContext};
+use serde_json::{Map, Value, json};
 use sqlx::Row;
 
 use super::data::{self, Cat};
@@ -38,7 +38,7 @@ use crate::config::AutoMode;
 use crate::mcp::api::SideStore;
 use crate::pg::PgSideStore;
 use crate::schema::ClassificationSuggestions;
-use crate::taxonomy::{check_duplicate, Alias, MatchOptions, TaxonomyEntry, TaxonomyKind};
+use crate::taxonomy::{Alias, MatchOptions, TaxonomyEntry, TaxonomyKind, check_duplicate};
 
 fn kind_of(cat: Cat) -> TaxonomyKind {
     match cat {
@@ -77,7 +77,10 @@ pub const MANUAL_RUN_MAX_DOCUMENTS: usize = 10;
 /// `PAPERRUST_AI_RUN_MAX_DOCUMENTS_PER_HOUR` – documents per user and hour via `/api/x-ai/run/`
 /// (default 100; security wave 3 M1).
 fn run_documents_per_hour() -> u32 {
-    pl_core::config::var("PAPERRUST_AI_RUN_MAX_DOCUMENTS_PER_HOUR").and_then(|v| v.trim().parse::<u32>().ok()).filter(|n| *n >= 1).unwrap_or(100)
+    pl_core::config::var("PAPERRUST_AI_RUN_MAX_DOCUMENTS_PER_HOUR")
+        .and_then(|v| v.trim().parse::<u32>().ok())
+        .filter(|n| *n >= 1)
+        .unwrap_or(100)
 }
 
 fn run_budget() -> &'static crate::mcp::ratelimit::Budget {
@@ -92,7 +95,9 @@ pub fn manual_run_mode(requested: AutoMode, configured: AutoMode) -> Result<Auto
     match (configured, requested) {
         (_, AutoMode::Off) => Err("Invalid mode."),
         (AutoMode::Off, AutoMode::Apply) => Err("Automatic AI processing is disabled on this server; use mode \"suggest\"."),
-        (AutoMode::Suggest, AutoMode::Apply) => Err("Automatic application of AI changes is disabled on this server; use mode \"suggest\"."),
+        (AutoMode::Suggest, AutoMode::Apply) => {
+            Err("Automatic application of AI changes is disabled on this server; use mode \"suggest\".")
+        }
         (_, m) => Ok(m),
     }
 }
@@ -136,7 +141,14 @@ pub async fn load_taxonomy(state: &AppState, user: Option<&User>) -> Result<Taxo
         let kind = kind_of(cat);
         let pool = data::permitted_pool(state.db(), user, cat).await?;
         let ids: std::collections::HashSet<i64> = pool.iter().map(|(i, _)| *i).collect();
-        entries.extend(pool.into_iter().map(|(id, name)| TaxonomyEntry { kind, id, name, owner_id: None, extra: None, document_count: None }));
+        entries.extend(pool.into_iter().map(|(id, name)| TaxonomyEntry {
+            kind,
+            id,
+            name,
+            owner_id: None,
+            extra: None,
+            document_count: None,
+        }));
         if let Ok(a) = store.aliases(kind).await {
             aliases.extend(a.into_iter().filter(|a| ids.contains(&a.target_id)));
         }
@@ -173,7 +185,17 @@ fn snapshot(cur: &DocState, fields: &[Field]) -> Value {
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn insert_audit(state: &AppState, actor: Option<i64>, run: uuid::Uuid, action: &str, doc: i64, before: &Value, after: &Value, conf: Option<f64>, cands: Option<Value>) -> Option<i64> {
+async fn insert_audit(
+    state: &AppState,
+    actor: Option<i64>,
+    run: uuid::Uuid,
+    action: &str,
+    doc: i64,
+    before: &Value,
+    after: &Value,
+    conf: Option<f64>,
+    cands: Option<Value>,
+) -> Option<i64> {
     let r = sqlx::query_scalar::<_, i64>(
         "INSERT INTO paperrust_ai_audit (actor_id, channel, run_id, action, object_kind, object_id, candidates, before, after, confidence) \
          VALUES ($1, 'auto', $2, $3, 'document', $4, $5, $6, $7, $8) RETURNING id",
@@ -304,7 +326,8 @@ async fn apply_changes(
             o.insert("custom_fields".into(), cf_snapshot(&cf_after, &cf_ids));
         }
     }
-    let conf = done.iter().filter_map(|i| plan.get(*i).map(|c| c.confidence)).fold(None, |a: Option<f64>, c| Some(a.map_or(c, |x| x.min(c))));
+    let conf =
+        done.iter().filter_map(|i| plan.get(*i).map(|c| c.confidence)).fold(None, |a: Option<f64>, c| Some(a.map_or(c, |x| x.min(c))));
     let audit = insert_audit(state, actor, run, "update_document", doc_id, &before, &after, conf, None).await;
     workflow::after_change(state, doc_id).await;
     Ok((done, audit))
@@ -325,11 +348,17 @@ async fn custom_field_plan(
 ) -> Vec<PlannedChange> {
     use crate::prompt_store::PromptKind;
     let Ok(defs) = super::store::load_field_defs(state.db()).await else { return Vec::new() };
-    let fields: Vec<_> = defs.into_iter().filter(|f| ai_opts.custom_fields.contains(&f.id) && crate::custom_fields::supported(&f.data_type)).take(20).collect();
+    let fields: Vec<_> = defs
+        .into_iter()
+        .filter(|f| ai_opts.custom_fields.contains(&f.id) && crate::custom_fields::supported(&f.data_type))
+        .take(20)
+        .collect();
     if fields.is_empty() {
         return Vec::new();
     }
-    let prompt = super::store::render_for_document(state, cfg, PromptKind::CustomFields, prompts.get(PromptKind::CustomFields), doc, owner, &fields).await;
+    let prompt =
+        super::store::render_for_document(state, cfg, PromptKind::CustomFields, prompts.get(PromptKind::CustomFields), doc, owner, &fields)
+            .await;
     let Ok(client) = crate::llm::LlmClient::from_config(cfg) else { return Vec::new() };
     let answer = match client.complete_json(&prompt, "CustomFields", &crate::custom_fields::response_schema()).await {
         Ok(a) => a,
@@ -394,12 +423,14 @@ pub async fn process_document(
             None => None,
         };
         let lang = crate::classifier::get_llm_output_language(cfg.llm_output_language.as_deref(), ui.as_ref());
-        let mut s: ClassificationSuggestions = super::suggest::classify(state, &cfg, &doc, owner.as_ref(), lang.as_deref()).await.map_err(|e| e.to_string())?;
+        let mut s: ClassificationSuggestions =
+            super::suggest::classify(state, &cfg, &doc, owner.as_ref(), lang.as_deref()).await.map_err(|e| e.to_string())?;
         // PaperRust: own title template → own title call; custom fields via AI
         let prompts = super::store::load_prompts(state.db()).await;
         let ai_opts = super::store::load_options(state.db()).await;
         if let Some(t) = prompts.custom(crate::prompt_store::PromptKind::Title) {
-            let p = super::store::render_for_document(state, &cfg, crate::prompt_store::PromptKind::Title, t, &doc, owner.as_ref(), &[]).await;
+            let p =
+                super::store::render_for_document(state, &cfg, crate::prompt_store::PromptKind::Title, t, &doc, owner.as_ref(), &[]).await;
             if let Ok(c) = crate::llm::LlmClient::from_config(&cfg)
                 && let Ok(answer) = c.with_system_prompt(true).complete_text(None, &p).await
             {
@@ -428,7 +459,18 @@ pub async fn process_document(
         let (done, audit) = if which.is_empty() {
             (Vec::new(), None)
         } else {
-            apply_changes(state, doc.id, owner.as_ref().map(|u| u.id).or(doc.owner_id), owner.as_ref(), actor.map(|a| a.id), run, &mut p.changes, &which, &tax).await?
+            apply_changes(
+                state,
+                doc.id,
+                owner.as_ref().map(|u| u.id).or(doc.owner_id),
+                owner.as_ref(),
+                actor.map(|a| a.id),
+                run,
+                &mut p.changes,
+                &which,
+                &tax,
+            )
+            .await?
         };
         let plan_json: Vec<Value> = p
             .changes
@@ -515,10 +557,8 @@ pub async fn process_trigger_tag(state: &AppState) -> Result<Value, ApiError> {
     .fetch_all(state.db())
     .await
     .map_err(ApiError::internal)?;
-    let pairs: Vec<(i64, i64)> = rows
-        .iter()
-        .filter_map(|r| Some((i64::from(r.try_get::<i32, _>(0).ok()?), i64::from(r.try_get::<i32, _>(1).ok()?))))
-        .collect();
+    let pairs: Vec<(i64, i64)> =
+        rows.iter().filter_map(|r| Some((i64::from(r.try_get::<i32, _>(0).ok()?), i64::from(r.try_get::<i32, _>(1).ok()?)))).collect();
     let opts = super::store::load_options(state.db()).await;
     let mut pairs = pairs;
     if opts.tag_after == crate::options::TagAfter::Keep {
@@ -551,7 +591,12 @@ pub async fn process_trigger_tag(state: &AppState) -> Result<Value, ApiError> {
     let failed: Vec<i64> = summary
         .get("results")
         .and_then(Value::as_array)
-        .map(|a| a.iter().filter(|r| r.get("status").and_then(Value::as_str) == Some("error")).filter_map(|r| r.get("document").and_then(Value::as_i64)).collect())
+        .map(|a| {
+            a.iter()
+                .filter(|r| r.get("status").and_then(Value::as_str) == Some("error"))
+                .filter_map(|r| r.get("document").and_then(Value::as_i64))
+                .collect()
+        })
         .unwrap_or_default();
     for (d, t) in pairs {
         if opts.tag_after == crate::options::TagAfter::Keep {
@@ -592,7 +637,8 @@ fn not_installed(e: sqlx::Error) -> ApiError {
     }
 }
 
-const REVIEW_COLUMNS: &str = "id, document_id, created, run_id, trigger, mode, status, suggestions, plan, audit_id, decided_by_id, decided_at";
+const REVIEW_COLUMNS: &str =
+    "id, document_id, created, run_id, trigger, mode, status, suggestions, plan, audit_id, decided_by_id, decided_at";
 const SELECT: &str = "SELECT id, document_id, created, run_id, trigger, mode, status, suggestions, plan, audit_id, decided_by_id, decided_at FROM paperrust_ai_review";
 
 /// `FROM paperrust_ai_review WHERE document_id IN (<visible documents>) [AND status = …]
@@ -601,8 +647,9 @@ const SELECT: &str = "SELECT id, document_id, created, run_id, trigger, mode, st
 fn review_list_query(user: &User, status: Option<&str>, document: Option<i64>) -> sea_query::SelectStatement {
     use sea_query::{Alias as A, Expr};
     let mut q = sea_query::Query::select();
-    q.from(A::new("paperrust_ai_review"))
-        .and_where(Expr::col(A::new("document_id")).in_subquery(pl_authz::objects::permitted_document_ids(Some(user), "view_document", false)));
+    q.from(A::new("paperrust_ai_review")).and_where(
+        Expr::col(A::new("document_id")).in_subquery(pl_authz::objects::permitted_document_ids(Some(user), "view_document", false)),
+    );
     match status {
         // PaperRust UI: "open" = pending + partial
         Some("open") => {
@@ -624,7 +671,12 @@ fn review_list_query(user: &User, status: Option<&str>, document: Option<i64>) -
 }
 
 /// GET /api/x-ai/review/?status=pending&document=<id>&page=&page_size=
-pub async fn list(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser, AxQuery(q): AxQuery<std::collections::HashMap<String, String>>) -> Result<Response, ApiError> {
+pub async fn list(
+    State(state): State<AppState>,
+    ctx: RequestContext,
+    auth: AuthUser,
+    AxQuery(q): AxQuery<std::collections::HashMap<String, String>>,
+) -> Result<Response, ApiError> {
     let user = auth.require_model_perms(&DOCUMENT)?;
     let status = q.get("status").cloned();
     let doc = q.get("document").and_then(|d| super::py_int(d));
@@ -652,7 +704,12 @@ pub async fn list(State(state): State<AppState>, ctx: RequestContext, auth: Auth
 
 async fn load_review(state: &AppState, user: &User, id: &str, perm: &str) -> Result<sqlx::postgres::PgRow, ApiError> {
     let id = super::py_int(id).ok_or_else(ApiError::not_found)?;
-    let r = sqlx::query(&format!("{SELECT} WHERE id = $1")).bind(id).fetch_optional(state.db()).await.map_err(not_installed)?.ok_or_else(ApiError::not_found)?;
+    let r = sqlx::query(&format!("{SELECT} WHERE id = $1"))
+        .bind(id)
+        .fetch_optional(state.db())
+        .await
+        .map_err(not_installed)?
+        .ok_or_else(ApiError::not_found)?;
     let doc_id = i64::from(r.try_get::<i32, _>("document_id").map_err(ApiError::internal)?);
     let doc = data::load_doc(state.db(), doc_id).await?.ok_or_else(ApiError::not_found)?;
     let obj = ObjRef { id: doc.root_id, owner_id: doc.root_owner_id };
@@ -666,7 +723,12 @@ async fn load_review(state: &AppState, user: &User, id: &str, perm: &str) -> Res
 }
 
 /// GET /api/x-ai/review/{id}/
-pub async fn retrieve(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser, Path(id): Path<String>) -> Result<Response, ApiError> {
+pub async fn retrieve(
+    State(state): State<AppState>,
+    ctx: RequestContext,
+    auth: AuthUser,
+    Path(id): Path<String>,
+) -> Result<Response, ApiError> {
     let user = auth.require_model_perms(&DOCUMENT)?;
     let r = load_review(&state, user, &id, "view_document").await?;
     Ok(Drf::ok(review_json(&r)).indent(ctx.negotiation.indent).into_response())
@@ -730,7 +792,13 @@ pub fn review_status(plan: &[Value]) -> &'static str {
 /// {"<index>": {"value"|"existing_id": …}}, "dismiss": [<index>…]}` (default: apply all open ones).
 /// `dismiss` discards individual suggestions ("Discard" per field), `overrides` applies a value
 /// changed by the user.
-pub async fn apply(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser, Path(id): Path<String>, body: Bytes) -> Result<Response, ApiError> {
+pub async fn apply(
+    State(state): State<AppState>,
+    ctx: RequestContext,
+    auth: AuthUser,
+    Path(id): Path<String>,
+    body: Bytes,
+) -> Result<Response, ApiError> {
     let user = auth.require_perms_by_method(&[("POST", &["documents.change_document"])])?;
     let r = load_review(&state, user, &id, "change_document").await?;
     let status: String = r.try_get("status").unwrap_or_default();
@@ -750,14 +818,20 @@ pub async fn apply(State(state): State<AppState>, ctx: RequestContext, auth: Aut
         .map(|a| a.iter().filter_map(Value::as_u64).map(|x| x as usize).filter(|i| *i < plan.len() && !decided(*i)).collect())
         .unwrap_or_default();
     let which: Vec<usize> = match b.get("changes").and_then(Value::as_array) {
-        Some(a) => a.iter().filter_map(Value::as_u64).map(|x| x as usize).filter(|i| *i < plan.len() && !decided(*i) && !dismiss.contains(i)).collect(),
+        Some(a) => a
+            .iter()
+            .filter_map(Value::as_u64)
+            .map(|x| x as usize)
+            .filter(|i| *i < plan.len() && !decided(*i) && !dismiss.contains(i))
+            .collect(),
         None if b.get("dismiss").is_some() => Vec::new(),
         None => (0..plan.len()).filter(|i| !decided(*i)).collect(),
     };
     // "Edit": validate and insert the user's values
     let mut overridden: Vec<usize> = Vec::new();
     if let Some(ov) = b.get("overrides").and_then(Value::as_object) {
-        let defs = if plan.iter().any(|c| c.field == Field::CustomFields) { super::store::load_field_defs(state.db()).await? } else { Vec::new() };
+        let defs =
+            if plan.iter().any(|c| c.field == Field::CustomFields) { super::store::load_field_defs(state.db()).await? } else { Vec::new() };
         let mut errs = Map::new();
         for (k, o) in ov {
             let Some(i) = k.parse::<usize>().ok().filter(|i| which.contains(i)) else { continue };
@@ -795,7 +869,9 @@ pub async fn apply(State(state): State<AppState>, ctx: RequestContext, auth: Aut
     } else {
         let tax = load_taxonomy(&state, Some(user)).await?;
         // new objects belong to the applying user (AI-N2), not to the document owner
-        apply_changes(&state, doc_id, Some(user.id), Some(user), Some(user.id), run, &mut plan, &which, &tax).await.map_err(ApiError::internal)?
+        apply_changes(&state, doc_id, Some(user.id), Some(user), Some(user.id), run, &mut plan, &which, &tax)
+            .await
+            .map_err(ApiError::internal)?
     };
     let mut new_plan = raw_plan.clone();
     for i in &overridden {
@@ -835,7 +911,12 @@ pub async fn apply(State(state): State<AppState>, ctx: RequestContext, auth: Aut
 }
 
 /// POST /api/x-ai/review/{id}/reject/
-pub async fn reject(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser, Path(id): Path<String>) -> Result<Response, ApiError> {
+pub async fn reject(
+    State(state): State<AppState>,
+    ctx: RequestContext,
+    auth: AuthUser,
+    Path(id): Path<String>,
+) -> Result<Response, ApiError> {
     let user = auth.require_perms_by_method(&[("POST", &["documents.change_document"])])?;
     let r = load_review(&state, user, &id, "change_document").await?;
     let rid: i64 = r.try_get("id").map_err(ApiError::internal)?;
@@ -854,7 +935,12 @@ pub async fn reject(State(state): State<AppState>, ctx: RequestContext, auth: Au
 }
 
 /// POST /api/x-ai/review/{id}/undo/ – counter-change from the audit (`before`), only without conflict.
-pub async fn undo(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser, Path(id): Path<String>) -> Result<Response, ApiError> {
+pub async fn undo(
+    State(state): State<AppState>,
+    ctx: RequestContext,
+    auth: AuthUser,
+    Path(id): Path<String>,
+) -> Result<Response, ApiError> {
     let user = auth.require_perms_by_method(&[("POST", &["documents.change_document"])])?;
     let r = load_review(&state, user, &id, "change_document").await?;
     let rid: i64 = r.try_get("id").map_err(ApiError::internal)?;
@@ -881,13 +967,22 @@ pub async fn undo(State(state): State<AppState>, ctx: RequestContext, auth: Auth
         return Err(ApiError::validation(json!({"status": ["Nothing was applied."]})));
     }
     let cur = workflow::load_state(&state, doc_id).await.map_err(ApiError::internal)?.ok_or_else(ApiError::not_found)?;
-    let fields: Vec<Field> = after.as_object().map(|o| {
-        o.keys().filter_map(|k| serde_json::from_value::<Field>(Value::String(k.clone())).ok()).collect()
-    }).unwrap_or_default();
+    let fields: Vec<Field> = after
+        .as_object()
+        .map(|o| o.keys().filter_map(|k| serde_json::from_value::<Field>(Value::String(k.clone())).ok()).collect())
+        .unwrap_or_default();
     let mut now = snapshot(&cur, &fields);
     // Custom fields (PaperRust): current value of the affected fields
-    let cf_ids: Vec<i64> = after.get("custom_fields").and_then(Value::as_object).map(|o| o.keys().filter_map(|k| k.parse().ok()).collect()).unwrap_or_default();
-    let cf_now = if cf_ids.is_empty() { Default::default() } else { workflow::load_custom_values(&state, doc_id).await.map_err(ApiError::internal)? };
+    let cf_ids: Vec<i64> = after
+        .get("custom_fields")
+        .and_then(Value::as_object)
+        .map(|o| o.keys().filter_map(|k| k.parse().ok()).collect())
+        .unwrap_or_default();
+    let cf_now = if cf_ids.is_empty() {
+        Default::default()
+    } else {
+        workflow::load_custom_values(&state, doc_id).await.map_err(ApiError::internal)?
+    };
     if !cf_ids.is_empty()
         && let Some(o) = now.as_object_mut()
     {
@@ -898,7 +993,10 @@ pub async fn undo(State(state): State<AppState>, ctx: RequestContext, auth: Auth
         .map(|o| o.iter().filter(|(k, v)| now.get(k.as_str()) != Some(v)).map(|(k, _)| k.clone()).collect())
         .unwrap_or_default();
     if !conflicts.is_empty() {
-        return Err(ApiError::json(StatusCode::CONFLICT, json!({"detail": "The document was changed after the AI update; not undone.", "fields": conflicts})));
+        return Err(ApiError::json(
+            StatusCode::CONFLICT,
+            json!({"detail": "The document was changed after the AI update; not undone.", "fields": conflicts}),
+        ));
     }
     let mut ch = DocChanges::default();
     let b = before.as_object().cloned().unwrap_or_default();
@@ -937,7 +1035,8 @@ pub async fn undo(State(state): State<AppState>, ctx: RequestContext, auth: Auth
     }
     let run: uuid::Uuid = r.try_get("run_id").map_err(ApiError::internal)?;
     let undo_id = insert_audit(&state, Some(user.id), run, "undo", doc_id, &after, &before, None, None).await;
-    let _ = sqlx::query("UPDATE paperrust_ai_audit SET undone_by_id = $2 WHERE id = $1").bind(audit_id).bind(undo_id).execute(state.db()).await;
+    let _ =
+        sqlx::query("UPDATE paperrust_ai_audit SET undone_by_id = $2 WHERE id = $1").bind(audit_id).bind(undo_id).execute(state.db()).await;
     workflow::after_change(&state, doc_id).await;
     let r = sqlx::query(
         "UPDATE paperrust_ai_review SET status = 'undone', decided_by_id = $2, decided_at = now() WHERE id = $1 \
@@ -965,7 +1064,9 @@ pub async fn run_view(State(state): State<AppState>, ctx: RequestContext, auth: 
     let mode = manual_run_mode(requested, cfg.rs.auto_mode).map_err(ApiError::permission_denied_msg)?;
     let ids: Vec<i64> = match b.get("documents").and_then(Value::as_array) {
         Some(a) if a.len() > MANUAL_RUN_MAX_DOCUMENTS => {
-            return Err(ApiError::validation(json!({"documents": [format!("Ensure this field has no more than {MANUAL_RUN_MAX_DOCUMENTS} elements.")]})));
+            return Err(ApiError::validation(
+                json!({"documents": [format!("Ensure this field has no more than {MANUAL_RUN_MAX_DOCUMENTS} elements.")]}),
+            ));
         }
         Some(a) if !a.is_empty() => a.iter().filter_map(Value::as_i64).collect(),
         _ => return Err(ApiError::validation(json!({"documents": ["This field is required."]}))),
@@ -973,7 +1074,9 @@ pub async fn run_view(State(state): State<AppState>, ctx: RequestContext, auth: 
     let mut allowed = Vec::new();
     for id in &ids {
         let Some(d) = data::load_doc(state.db(), *id).await? else { continue };
-        if has_perms_owner_aware(state.db(), Some(user), "change_document", &DOCUMENT, ObjRef { id: d.root_id, owner_id: d.root_owner_id }).await? {
+        if has_perms_owner_aware(state.db(), Some(user), "change_document", &DOCUMENT, ObjRef { id: d.root_id, owner_id: d.root_owner_id })
+            .await?
+        {
             allowed.push(*id);
         }
     }
@@ -1027,7 +1130,16 @@ mod tests {
     }
 
     fn change(field: Field, existing: Option<i64>) -> PlannedChange {
-        PlannedChange { field, existing_id: existing, new_name: None, value: None, confidence: 0.95, apply: true, why: String::new(), data: None }
+        PlannedChange {
+            field,
+            existing_id: existing,
+            new_name: None,
+            value: None,
+            confidence: 0.95,
+            apply: true,
+            why: String::new(),
+            data: None,
+        }
     }
 
     /// Security wave 3 M1: `mode=apply` only with `PAPERRUST_AI_AUTO_MODE=apply`, `off` blocks the

@@ -22,48 +22,25 @@ use tokio::sync::Mutex;
 static LOCK: Mutex<()> = Mutex::const_new(());
 
 fn url() -> String {
-    let url = std::env::var("PAPERRUST_SETTINGS_TEST_DATABASE_URL")
-        .expect("PAPERRUST_SETTINGS_TEST_DATABASE_URL");
-    let db = url
-        .trim_end_matches('/')
-        .rsplit('/')
-        .next()
-        .unwrap_or("")
-        .split('?')
-        .next()
-        .unwrap_or("")
-        .to_string();
-    assert!(
-        db.starts_with("pl_settings_test"),
-        "refusing to run against a non-test database ({db})"
-    );
+    let url = std::env::var("PAPERRUST_SETTINGS_TEST_DATABASE_URL").expect("PAPERRUST_SETTINGS_TEST_DATABASE_URL");
+    let db = url.trim_end_matches('/').rsplit('/').next().unwrap_or("").split('?').next().unwrap_or("").to_string();
+    assert!(db.starts_with("pl_settings_test"), "refusing to run against a non-test database ({db})");
     url
 }
 
 async fn pool() -> PgPool {
-    let pool = PgPoolOptions::new()
-        .max_connections(4)
-        .connect(&url())
-        .await
-        .expect("connect");
+    let pool = PgPoolOptions::new().max_connections(4).connect(&url()).await.expect("connect");
     let mut c = pool.acquire().await.unwrap();
     store::migrate(&mut c).await.unwrap();
     pool
 }
 
 async fn clean(pool: &PgPool) {
-    sqlx::raw_sql("DELETE FROM paperrust_setting; DELETE FROM paperrust_setting_history;")
-        .execute(pool)
-        .await
-        .unwrap();
+    sqlx::raw_sql("DELETE FROM paperrust_setting; DELETE FROM paperrust_setting_history;").execute(pool).await.unwrap();
 }
 
 fn actor() -> Actor {
-    Actor {
-        user_id: Some(1),
-        user_name: Some("admin".into()),
-        remote_addr: "127.0.0.1".parse().ok(),
-    }
+    Actor { user_id: Some(1), user_name: Some("admin".into()), remote_addr: "127.0.0.1".parse().ok() }
 }
 
 fn opts<'a>() -> ApplyOptions<'a> {
@@ -80,12 +57,11 @@ async fn migration_idempotent() {
     store::migrate(&mut c).await.unwrap();
     assert!(store::installed(&mut c).await.unwrap());
     // no Django table changed: AC table still has exactly its columns
-    let cols: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM information_schema.columns WHERE table_name = 'paperless_applicationconfiguration'",
-    )
-    .fetch_one(&mut *c)
-    .await
-    .unwrap();
+    let cols: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM information_schema.columns WHERE table_name = 'paperless_applicationconfiguration'")
+            .fetch_one(&mut *c)
+            .await
+            .unwrap();
     assert_eq!(cols, 46);
 }
 
@@ -100,14 +76,8 @@ async fn secrets_encrypted_history_masked_wrong_key_unreadable() {
         &pool,
         &sb,
         &[
-            (
-                "PAPERLESS_EMAIL_HOST_PASSWORD".into(),
-                Input::Json(json!("hunter2-plain")),
-            ),
-            (
-                "PAPERLESS_EMAIL_HOST".into(),
-                Input::Json(json!("smtp.example.ch")),
-            ),
+            ("PAPERLESS_EMAIL_HOST_PASSWORD".into(), Input::Json(json!("hunter2-plain"))),
+            ("PAPERLESS_EMAIL_HOST".into(), Input::Json(json!("smtp.example.ch"))),
         ],
         &opts(),
         &actor(),
@@ -137,9 +107,7 @@ async fn secrets_encrypted_history_masked_wrong_key_unreadable() {
     let other = SecretBox::from_secret_key("test-secret-key-B");
     let db = store::load_db(&mut c, &other).await.unwrap();
     assert!(db["PAPERLESS_EMAIL_HOST_PASSWORD"].value == DbValue::Unreadable);
-    let s = store::load_settings(&pool, Env::from_pairs([("X", "1")]), &other, None)
-        .await
-        .unwrap();
+    let s = store::load_settings(&pool, Env::from_pairs([("X", "1")]), &other, None).await.unwrap();
     let e = s.get("PAPERLESS_EMAIL_HOST_PASSWORD").unwrap();
     assert!(e.unreadable);
     assert_eq!(e.source, Source::Default);
@@ -151,10 +119,7 @@ async fn secrets_encrypted_history_masked_wrong_key_unreadable() {
     // Export without secrets
     let ex = store::export(&mut c, &other, false).await.unwrap();
     assert!(!ex.to_string().contains("hunter2"));
-    assert_eq!(
-        ex["settings"]["PAPERLESS_EMAIL_HOST"],
-        json!("smtp.example.ch")
-    );
+    assert_eq!(ex["settings"]["PAPERLESS_EMAIL_HOST"], json!("smtp.example.ch"));
 }
 
 #[tokio::test]
@@ -164,100 +129,34 @@ async fn rev_conflict_lock_and_reset() {
     let pool = pool().await;
     clean(&pool).await;
     let sb = SecretBox::from_secret_key("k");
-    let r1 = store::apply(
-        &pool,
-        &sb,
-        &[("PAPERLESS_EMAIL_PORT".into(), Input::Json(json!(587)))],
-        &opts(),
-        &actor(),
-        Action::Set,
-    )
-    .await
-    .unwrap();
+    let r1 = store::apply(&pool, &sb, &[("PAPERLESS_EMAIL_PORT".into(), Input::Json(json!(587)))], &opts(), &actor(), Action::Set)
+        .await
+        .unwrap();
     // outdated state → 409
-    let o = ApplyOptions {
-        expected_rev: Some(r1 - 1),
-        ..opts()
-    };
-    let e = store::apply(
-        &pool,
-        &sb,
-        &[("PAPERLESS_EMAIL_PORT".into(), Input::Json(json!(25)))],
-        &o,
-        &actor(),
-        Action::Set,
-    )
-    .await
-    .unwrap_err();
+    let o = ApplyOptions { expected_rev: Some(r1 - 1), ..opts() };
+    let e =
+        store::apply(&pool, &sb, &[("PAPERLESS_EMAIL_PORT".into(), Input::Json(json!(25)))], &o, &actor(), Action::Set).await.unwrap_err();
     assert_eq!(e.code(), "rev_conflict");
     // Environment locks
     let env = Env::from_pairs([("PAPERLESS_EMAIL_PORT", "2525")]);
-    let o = ApplyOptions {
-        expected_rev: Some(r1),
-        env: Some(&env),
-        ..opts()
-    };
-    let e = store::apply(
-        &pool,
-        &sb,
-        &[("PAPERLESS_EMAIL_PORT".into(), Input::Json(json!(25)))],
-        &o,
-        &actor(),
-        Action::Set,
-    )
-    .await
-    .unwrap_err();
+    let o = ApplyOptions { expected_rev: Some(r1), env: Some(&env), ..opts() };
+    let e =
+        store::apply(&pool, &sb, &[("PAPERLESS_EMAIL_PORT".into(), Input::Json(json!(25)))], &o, &actor(), Action::Set).await.unwrap_err();
     assert_eq!(e.code(), "locked_by_environment");
     // --if-unset leaves existing values alone
-    let o = ApplyOptions {
-        if_unset: true,
-        ..opts()
-    };
-    store::apply(
-        &pool,
-        &sb,
-        &[("PAPERLESS_EMAIL_PORT".into(), Input::Raw("1".into()))],
-        &o,
-        &actor(),
-        Action::Cli,
-    )
-    .await
-    .unwrap();
-    let s = store::load_settings(&pool, Env::default(), &sb, None)
-        .await
-        .unwrap();
+    let o = ApplyOptions { if_unset: true, ..opts() };
+    store::apply(&pool, &sb, &[("PAPERLESS_EMAIL_PORT".into(), Input::Raw("1".into()))], &o, &actor(), Action::Cli).await.unwrap();
+    let s = store::load_settings(&pool, Env::default(), &sb, None).await.unwrap();
     assert_eq!(s.value("PAPERLESS_EMAIL_PORT"), Some("587"));
     // Reset deletes the row
-    let r2 = store::apply(
-        &pool,
-        &sb,
-        &[("PAPERLESS_EMAIL_PORT".into(), Input::Reset)],
-        &opts(),
-        &actor(),
-        Action::Set,
-    )
-    .await
-    .unwrap();
+    let r2 = store::apply(&pool, &sb, &[("PAPERLESS_EMAIL_PORT".into(), Input::Reset)], &opts(), &actor(), Action::Set).await.unwrap();
     assert!(r2 > r1);
-    let s = store::load_settings(&pool, Env::default(), &sb, None)
-        .await
-        .unwrap();
-    assert_eq!(
-        (
-            s.value("PAPERLESS_EMAIL_PORT"),
-            s.get("PAPERLESS_EMAIL_PORT").unwrap().source
-        ),
-        (Some("25"), Source::Default)
-    );
+    let s = store::load_settings(&pool, Env::default(), &sb, None).await.unwrap();
+    assert_eq!((s.value("PAPERLESS_EMAIL_PORT"), s.get("PAPERLESS_EMAIL_PORT").unwrap().source), (Some("25"), Source::Default));
     assert_eq!(s.rev, r2);
     let mut c = pool.acquire().await.unwrap();
-    let h = store::history_list(&mut c, Some("PAPERLESS_EMAIL_PORT"), None, 10)
-        .await
-        .unwrap();
-    assert_eq!(
-        h.iter().map(|r| r.action.as_str()).collect::<Vec<_>>(),
-        ["reset", "set"]
-    );
+    let h = store::history_list(&mut c, Some("PAPERLESS_EMAIL_PORT"), None, 10).await.unwrap();
+    assert_eq!(h.iter().map(|r| r.action.as_str()).collect::<Vec<_>>(), ["reset", "set"]);
 }
 
 /// AC fields: the same Django row, no copy in `paperrust_setting` (E3, §2.8).
@@ -267,79 +166,38 @@ async fn appconfig_same_row() {
     let _g = LOCK.lock().await;
     let pool = pool().await;
     clean(&pool).await;
-    let before: Option<serde_json::Value> = sqlx::query_scalar(
-        "SELECT to_jsonb(c) FROM paperless_applicationconfiguration c ORDER BY id LIMIT 1",
-    )
-    .fetch_optional(&pool)
-    .await
-    .unwrap();
+    let before: Option<serde_json::Value> =
+        sqlx::query_scalar("SELECT to_jsonb(c) FROM paperless_applicationconfiguration c ORDER BY id LIMIT 1")
+            .fetch_optional(&pool)
+            .await
+            .unwrap();
     let sb = SecretBox::from_secret_key("k");
     store::apply(
         &pool,
         &sb,
-        &[
-            (
-                "PAPERLESS_OCR_LANGUAGE".into(),
-                Input::Json(json!("deu+fra")),
-            ),
-            ("PAPERLESS_OCR_PAGES".into(), Input::Json(json!(3))),
-        ],
+        &[("PAPERLESS_OCR_LANGUAGE".into(), Input::Json(json!("deu+fra"))), ("PAPERLESS_OCR_PAGES".into(), Input::Json(json!(3)))],
         &opts(),
         &actor(),
         Action::Set,
     )
     .await
     .unwrap();
-    let (lang, pages): (Option<String>, Option<i16>) = sqlx::query_as(
-        "SELECT language, pages FROM paperless_applicationconfiguration ORDER BY id LIMIT 1",
-    )
-    .fetch_one(&pool)
-    .await
-    .unwrap();
-    assert_eq!((lang.as_deref(), pages), (Some("deu+fra"), Some(3)));
-    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM paperrust_setting")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-    assert_eq!(n, 0);
-    let hk: Vec<String> =
-        sqlx::query_scalar("SELECT key FROM paperrust_setting_history ORDER BY key")
-            .fetch_all(&pool)
+    let (lang, pages): (Option<String>, Option<i16>) =
+        sqlx::query_as("SELECT language, pages FROM paperless_applicationconfiguration ORDER BY id LIMIT 1")
+            .fetch_one(&pool)
             .await
             .unwrap();
+    assert_eq!((lang.as_deref(), pages), (Some("deu+fra"), Some(3)));
+    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM paperrust_setting").fetch_one(&pool).await.unwrap();
+    assert_eq!(n, 0);
+    let hk: Vec<String> = sqlx::query_scalar("SELECT key FROM paperrust_setting_history ORDER BY key").fetch_all(&pool).await.unwrap();
     assert_eq!(hk, ["AC:language", "AC:pages"]);
-    let s = store::load_settings(
-        &pool,
-        Env::from_pairs([("PAPERLESS_OCR_LANGUAGE", "eng")]),
-        &sb,
-        None,
-    )
-    .await
-    .unwrap();
+    let s = store::load_settings(&pool, Env::from_pairs([("PAPERLESS_OCR_LANGUAGE", "eng")]), &sb, None).await.unwrap();
     let e = s.get("PAPERLESS_OCR_LANGUAGE").unwrap();
-    assert_eq!(
-        (e.value.as_deref(), e.source, e.locked),
-        (Some("deu+fra"), Source::AppConfig, false)
-    );
+    assert_eq!((e.value.as_deref(), e.source, e.locked), (Some("deu+fra"), Source::AppConfig, false));
     // Reset = NULL; afterwards the environment applies
-    store::apply(
-        &pool,
-        &sb,
-        &[("PAPERLESS_OCR_LANGUAGE".into(), Input::Reset)],
-        &opts(),
-        &actor(),
-        Action::Set,
-    )
-    .await
-    .unwrap();
-    let s = store::load_settings(
-        &pool,
-        Env::from_pairs([("PAPERLESS_OCR_LANGUAGE", "eng")]),
-        &sb,
-        None,
-    )
-    .await
-    .unwrap();
+    store::apply(&pool, &sb, &[("PAPERLESS_OCR_LANGUAGE".into(), Input::Reset)], &opts(), &actor(), Action::Set).await.unwrap();
+    let s = store::load_settings(&pool, Env::from_pairs([("PAPERLESS_OCR_LANGUAGE", "eng")]), &sb, None).await.unwrap();
     assert_eq!(s.value("PAPERLESS_OCR_LANGUAGE"), Some("eng"));
     // Restore copy
     if let Some(serde_json::Value::Object(m)) = before {
@@ -365,12 +223,8 @@ async fn live_reload_two_processes() {
     clean(&pa).await;
     let sb = SecretBox::from_secret_key("k");
     let env = Env::from_pairs([("X", "1")]);
-    let a = SettingsHandle::load_initial(&pa, env.clone(), sb.clone())
-        .await
-        .unwrap();
-    let b = SettingsHandle::load_initial(&pb, env.clone(), sb.clone())
-        .await
-        .unwrap();
+    let a = SettingsHandle::load_initial(&pa, env.clone(), sb.clone()).await.unwrap();
+    let b = SettingsHandle::load_initial(&pb, env.clone(), sb.clone()).await.unwrap();
     let (stop_tx, stop) = tokio::sync::watch::channel(false);
     let ja = a.spawn_listener(pa.clone(), stop.clone());
     // B with a long fallback: only NOTIFY can deliver the change in time
@@ -382,14 +236,8 @@ async fn live_reload_two_processes() {
         &pa,
         &sb,
         &[
-            (
-                "PAPERLESS_EMAIL_HOST".into(),
-                Input::Raw("live.example".into()),
-            ),
-            (
-                "PAPERLESS_TIME_ZONE".into(),
-                Input::Raw("Europe/Zurich".into()),
-            ),
+            ("PAPERLESS_EMAIL_HOST".into(), Input::Raw("live.example".into())),
+            ("PAPERLESS_TIME_ZONE".into(), Input::Raw("Europe/Zurich".into())),
         ],
         &opts(),
         &actor(),
@@ -420,16 +268,7 @@ async fn live_reload_two_processes() {
     .await
     .unwrap();
     // Reset → restart_pending off again
-    let rev2 = store::apply(
-        &pa,
-        &sb,
-        &[("PAPERLESS_TIME_ZONE".into(), Input::Reset)],
-        &opts(),
-        &actor(),
-        Action::Set,
-    )
-    .await
-    .unwrap();
+    let rev2 = store::apply(&pa, &sb, &[("PAPERLESS_TIME_ZONE".into(), Input::Reset)], &opts(), &actor(), Action::Set).await.unwrap();
     tokio::time::timeout(Duration::from_secs(2), async {
         while b.load().rev != rev2 {
             tokio::time::sleep(Duration::from_millis(20)).await;
@@ -455,17 +294,17 @@ async fn fallback_poll() {
     let pool = pool().await;
     clean(&pool).await;
     let sb = SecretBox::from_secret_key("k");
-    let h = SettingsHandle::load_initial(&pool, Env::default(), sb.clone())
-        .await
-        .unwrap();
+    let h = SettingsHandle::load_initial(&pool, Env::default(), sb.clone()).await.unwrap();
     let (stop_tx, stop) = tokio::sync::watch::channel(false);
     let j = h.spawn_listener_with(pool.clone(), stop, Duration::from_millis(200));
     tokio::time::sleep(Duration::from_millis(300)).await;
     // write directly, without pg_notify
-    sqlx::query("INSERT INTO paperrust_setting (key, value, rev) VALUES ('PAPERLESS_EMAIL_HOST', 'poll.example', nextval('paperrust_setting_rev'))")
-        .execute(&pool)
-        .await
-        .unwrap();
+    sqlx::query(
+        "INSERT INTO paperrust_setting (key, value, rev) VALUES ('PAPERLESS_EMAIL_HOST', 'poll.example', nextval('paperrust_setting_rev'))",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
     tokio::time::timeout(Duration::from_secs(3), async {
         while h.load().value("PAPERLESS_EMAIL_HOST") != Some("poll.example") {
             tokio::time::sleep(Duration::from_millis(50)).await;
@@ -488,16 +327,9 @@ async fn publish_overlay_live_config_and_startup() {
     clean(&pool).await;
     let sb = SecretBox::from_secret_key("k");
     // restart key already in the DB before the "start"
-    store::apply(
-        &pool,
-        &sb,
-        &[("PAPERLESS_COOKIE_PREFIX".into(), Input::Raw("boot_".into()))],
-        &opts(),
-        &actor(),
-        Action::Set,
-    )
-    .await
-    .unwrap();
+    store::apply(&pool, &sb, &[("PAPERLESS_COOKIE_PREFIX".into(), Input::Raw("boot_".into()))], &opts(), &actor(), Action::Set)
+        .await
+        .unwrap();
     let url = url();
     let db = url.rsplit('/').next().unwrap().to_string();
     let core = pl_core::Config::from_env_map(Env::from_pairs([
@@ -510,15 +342,10 @@ async fn publish_overlay_live_config_and_startup() {
     ]))
     .unwrap();
     assert!(pl_settings::reload::startup_overlay(&core).await);
-    assert_eq!(
-        pl_core::config::var("PAPERLESS_COOKIE_PREFIX").as_deref(),
-        Some("boot_")
-    );
+    assert_eq!(pl_core::config::var("PAPERLESS_COOKIE_PREFIX").as_deref(), Some("boot_"));
     // Holder as in the server
     let state = pl_core::AppState::with_pool(core.clone(), pool.clone()).unwrap();
-    let h = SettingsHandle::load_initial(&pool, Env::from_process_raw(), sb.clone())
-        .await
-        .unwrap();
+    let h = SettingsHandle::load_initial(&pool, Env::from_process_raw(), sb.clone()).await.unwrap();
     let live = pl_core::live::LiveConfig::new(core.clone());
     state.set_service(live.clone());
     h.publish_process_wide(live.clone(), core.clone(), core.env.clone());
@@ -527,14 +354,8 @@ async fn publish_overlay_live_config_and_startup() {
         &pool,
         &sb,
         &[
-            (
-                "PAPERLESS_EMAIL_HOST".into(),
-                Input::Raw("live.example".into()),
-            ),
-            (
-                "PAPERLESS_COOKIE_PREFIX".into(),
-                Input::Raw("after_".into()),
-            ),
+            ("PAPERLESS_EMAIL_HOST".into(), Input::Raw("live.example".into())),
+            ("PAPERLESS_COOKIE_PREFIX".into(), Input::Raw("after_".into())),
         ],
         &opts(),
         &actor(),
@@ -543,23 +364,12 @@ async fn publish_overlay_live_config_and_startup() {
     .await
     .unwrap();
     h.reload(&pool).await.unwrap();
-    assert_eq!(
-        pl_core::config::var("PAPERLESS_EMAIL_HOST").as_deref(),
-        Some("live.example")
-    );
+    assert_eq!(pl_core::config::var("PAPERLESS_EMAIL_HOST").as_deref(), Some("live.example"));
     assert_eq!(state.live_config().email_host, "live.example");
     // S key: start value until restart, badge "restart needed"
-    assert_eq!(
-        pl_core::config::var("PAPERLESS_COOKIE_PREFIX").as_deref(),
-        Some("boot_")
-    );
+    assert_eq!(pl_core::config::var("PAPERLESS_COOKIE_PREFIX").as_deref(), Some("boot_"));
     assert_eq!(state.live_config().cookie_prefix, "boot_");
-    assert!(
-        h.load()
-            .get("PAPERLESS_COOKIE_PREFIX")
-            .unwrap()
-            .restart_pending
-    );
+    assert!(h.load().get("PAPERLESS_COOKIE_PREFIX").unwrap().restart_pending);
     // Layering stays on the pure environment: DB values are not locked as "from environment"
     assert!(!h.load().get("PAPERLESS_EMAIL_HOST").unwrap().locked);
     pl_core::config::set_live_overlay(Default::default());
@@ -580,14 +390,8 @@ async fn snapshot_rev_matches_values_during_apply() {
     let sb = SecretBox::from_secret_key("k");
     // `apply` by hand until shortly before the COMMIT (same lock, same flow)
     let mut tx = pool.begin().await.unwrap();
-    sqlx::query("SELECT pg_advisory_xact_lock(hashtext('paperrust_setting'))")
-        .execute(&mut *tx)
-        .await
-        .unwrap();
-    let rev: i64 = sqlx::query_scalar("SELECT nextval('paperrust_setting_rev')")
-        .fetch_one(&mut *tx)
-        .await
-        .unwrap();
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtext('paperrust_setting'))").execute(&mut *tx).await.unwrap();
+    let rev: i64 = sqlx::query_scalar("SELECT nextval('paperrust_setting_rev')").fetch_one(&mut *tx).await.unwrap();
     sqlx::query(
         "INSERT INTO paperrust_setting (key, value, rev, updated_at) VALUES ('PAPERLESS_EMAIL_HOST', 'race.example', $1, now())
          ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, rev = EXCLUDED.rev",

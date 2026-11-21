@@ -114,7 +114,11 @@ const IN_FLIGHT_LIMIT: std::time::Duration = pl_core::dbconn::RETRY_LIMIT;
 
 /// Let `fut` run to completion – unless `is_down()` reports the outage and `fut` has already run for `limit`;
 /// then `None` (the handler is discarded).
-async fn abort_when_down<T>(fut: impl std::future::Future<Output = T>, is_down: impl Fn() -> bool, limit: std::time::Duration) -> Option<T> {
+async fn abort_when_down<T>(
+    fut: impl std::future::Future<Output = T>,
+    is_down: impl Fn() -> bool,
+    limit: std::time::Duration,
+) -> Option<T> {
     let start = std::time::Instant::now();
     let mut suspected = false;
     tokio::pin!(fut);
@@ -143,7 +147,8 @@ fn is_db_path(p: &str) -> bool {
 
 /// Files that are served without a database (UI building blocks, icons).
 fn is_static_path(p: &str) -> bool {
-    const EXT: &[&str] = &[".js", ".css", ".png", ".svg", ".ico", ".woff", ".woff2", ".webmanifest", ".map", ".json", ".webp", ".br", ".gz"];
+    const EXT: &[&str] =
+        &[".js", ".css", ".png", ".svg", ".ico", ".woff", ".woff2", ".webmanifest", ".map", ".json", ".webp", ".br", ".gz"];
     p.starts_with("/static/") || p.starts_with("/rs/app/assets/") || EXT.iter().any(|e| p.ends_with(e))
 }
 
@@ -181,7 +186,15 @@ mod unavailable_tests {
         assert!(start.elapsed() < Duration::from_secs(3), "took {:?}", start.elapsed());
         flip.await.unwrap();
         // DB reachable: nothing is aborted
-        let r = abort_when_down(async { tokio::time::sleep(Duration::from_millis(600)).await; 7 }, || false, Duration::from_millis(100)).await;
+        let r = abort_when_down(
+            async {
+                tokio::time::sleep(Duration::from_millis(600)).await;
+                7
+            },
+            || false,
+            Duration::from_millis(100),
+        )
+        .await;
         assert_eq!(r, Some(7));
         // fast response despite outage unchanged
         assert_eq!(abort_when_down(async { 1 }, || true, Duration::ZERO).await, Some(1));

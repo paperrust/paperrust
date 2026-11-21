@@ -16,16 +16,15 @@ use serde_json::{Map, Value as Json};
 
 use crate::cfquery::custom_field_query_cond;
 use crate::dates::{
-    DateTimeInputError, django_form_date, iso_datetime_field, py_naive_datetime_str,
-    start_of_local_day, year_bounds, year_bounds_datetime,
+    DateTimeInputError, django_form_date, iso_datetime_field, py_naive_datetime_str, start_of_local_day, year_bounds, year_bounds_datetime,
 };
 use crate::db::FilterDb;
 use crate::error::FilterError;
 use crate::perms::{document_is_shared, visible_root_documents};
 use crate::pyval::{NUMBER_FILTER_MAX, PyDecimal, PyInt, RangeCheck, py_int, py_strip};
 use crate::sql::{
-    CF, CFI, CORRESPONDENT, Cond, DOC, DOC_TAGS, DOCTYPE, STORAGEPATH, TAG, TextLookup, col,
-    doc_col, effective_content, exists, select_one_from, text_lookup,
+    CF, CFI, CORRESPONDENT, Cond, DOC, DOC_TAGS, DOCTYPE, STORAGEPATH, TAG, TextLookup, col, doc_col, effective_content, exists,
+    select_one_from, text_lookup,
 };
 use crate::textfold::{UpperFold, folded_lookup};
 use crate::{FilterContext, User};
@@ -145,14 +144,32 @@ fn filters() -> Vec<(&'static str, Spec)> {
     ]);
     for (y, m, d, dgt, dgte, gt, gte, dlt, dlte, lt, lte, c) in [
         (
-            "added__year", "added__month", "added__day", "added__date__gt", "added__date__gte",
-            "added__gt", "added__gte", "added__date__lt", "added__date__lte", "added__lt",
-            "added__lte", "added",
+            "added__year",
+            "added__month",
+            "added__day",
+            "added__date__gt",
+            "added__date__gte",
+            "added__gt",
+            "added__gte",
+            "added__date__lt",
+            "added__date__lte",
+            "added__lt",
+            "added__lte",
+            "added",
         ),
         (
-            "modified__year", "modified__month", "modified__day", "modified__date__gt",
-            "modified__date__gte", "modified__gt", "modified__gte", "modified__date__lt",
-            "modified__date__lte", "modified__lt", "modified__lte", "modified",
+            "modified__year",
+            "modified__month",
+            "modified__day",
+            "modified__date__gt",
+            "modified__date__gte",
+            "modified__gt",
+            "modified__gte",
+            "modified__date__lt",
+            "modified__date__lte",
+            "modified__lt",
+            "modified__lte",
+            "modified",
         ),
     ] {
         v.extend([
@@ -325,8 +342,16 @@ fn clean(spec: Spec, raw: Option<&str>, ctx: &FilterContext) -> Result<Cleaned, 
                 }
             },
         },
-        ObjAll(_) | ObjNone(_) | ObjIn(_) | Inbox | TitleContent | Content(_)
-        | CustomFieldsIContains | CustomFieldQuery | SharedBy | MimeType => match raw {
+        ObjAll(_)
+        | ObjNone(_)
+        | ObjIn(_)
+        | Inbox
+        | TitleContent
+        | Content(_)
+        | CustomFieldsIContains
+        | CustomFieldQuery
+        | SharedBy
+        | MimeType => match raw {
             None => Cleaned::Skip,
             Some(v) => Cleaned::Raw(v.to_string()),
         },
@@ -434,14 +459,12 @@ fn obj_exclude(rel: ObjRel, id: i64) -> SimpleExpr {
 
 fn duplicates_exists(user: &User) -> SimpleExpr {
     let mut sel = select_one_from(DOC, "dup");
-    sel.and_where(col("dup", "root_document_id").is_null())
-        .and_where(col("dup", "id").eq(doc_col("id")).not());
+    sel.and_where(col("dup", "root_document_id").is_null()).and_where(col("dup", "id").eq(doc_col("id")).not());
     // active superusers see everything (also in the trash) → no permission subquery needed
     if !pl_authz::objects::user_is_unrestricted(Some(user)) {
         sel.and_where(col("dup", "id").in_subquery(visible_root_documents(user)));
     }
-    let nonempty_archive =
-        || Expr::cust_with_exprs("NULLIF($1, '')", [doc_col("archive_checksum")]);
+    let nonempty_archive = || Expr::cust_with_exprs("NULLIF($1, '')", [doc_col("archive_checksum")]);
     sel.and_where(
         col("dup", "checksum")
             .eq(doc_col("checksum"))
@@ -519,16 +542,7 @@ async fn custom_fields_icontains<D: FilterDb>(value: &str, db: &D) -> Result<Con
         .and_where(lk(col("cfn", "name")))
         .to_owned();
     let mut any = col("ci", "field_id").in_subquery(field_names);
-    for c in [
-        "value_text",
-        "value_bool",
-        "value_int",
-        "value_float",
-        "value_date",
-        "value_url",
-        "value_monetary",
-        "value_document_ids",
-    ] {
+    for c in ["value_text", "value_bool", "value_int", "value_float", "value_date", "value_url", "value_monetary", "value_document_ids"] {
         any = any.or(lk(col("ci", c)));
     }
     if !option_ids.is_empty() {
@@ -556,11 +570,7 @@ async fn filter_cond<D: FilterDb>(
         (Num(t, op), C::Int(v)) => int_lookup(num_column(t), op, v, range_of(t)),
         (NumIn(t), C::IntList(list)) => {
             let vals = in_values(&list, range_of(t));
-            if vals.is_empty() {
-                Cond::False
-            } else {
-                Cond::Expr(num_column(t).is_in(vals))
-            }
+            if vals.is_empty() { Cond::False } else { Cond::Expr(num_column(t).is_in(vals)) }
         }
         (Char(target, lookup), C::Str(s)) => Cond::Expr(match target {
             CT::Doc(c) => text_lookup(doc_col(c), lookup, &s),
@@ -581,11 +591,7 @@ async fn filter_cond<D: FilterDb>(
                 tag_exists(Some(col("dt", "tag_id").in_subquery(sub)))
             }
         }),
-        (IsNull(c), C::Bool(b)) => Cond::Expr(if b {
-            doc_col(c).is_null()
-        } else {
-            doc_col(c).is_not_null()
-        }),
+        (IsNull(c), C::Bool(b)) => Cond::Expr(if b { doc_col(c).is_null() } else { doc_col(c).is_not_null() }),
         (DatePart(c, is_dt, part), C::Int(v)) => match part {
             Part::Year => {
                 let Some(year) = v.as_i64() else {
@@ -606,10 +612,7 @@ async fn filter_cond<D: FilterDb>(
             Part::Month | Part::Day => {
                 let unit = if matches!(part, Part::Month) { "MONTH" } else { "DAY" };
                 let e = if is_dt {
-                    Expr::cust_with_exprs(
-                        format!("EXTRACT({unit} FROM $1 AT TIME ZONE $2)"),
-                        [doc_col(c), Expr::val(ctx.tz.name()).into()],
-                    )
+                    Expr::cust_with_exprs(format!("EXTRACT({unit} FROM $1 AT TIME ZONE $2)"), [doc_col(c), Expr::val(ctx.tz.name()).into()])
                 } else {
                     Expr::cust_with_exprs(format!("EXTRACT({unit} FROM $1)"), [doc_col(c)])
                 };
@@ -720,58 +723,41 @@ async fn filter_cond<D: FilterDb>(
             } else {
                 tracing_warn("Deprecated document filter parameter 'title_content' used; use `text` instead.");
                 // fast, result-identical form with calibrated DB (crate::textfold)
-                Cond::Expr(
-                    folded_lookup(fold, doc_col("title"), IContains, v)
-                        .or(folded_lookup(fold, effective_content(), IContains, v)),
-                )
+                Cond::Expr(folded_lookup(fold, doc_col("title"), IContains, v).or(folded_lookup(fold, effective_content(), IContains, v)))
             }
         }
         (Content(lookup), C::Raw(raw)) => {
             let v = py_strip(&raw);
-            if v.is_empty() {
-                Cond::True
-            } else {
-                Cond::Expr(folded_lookup(fold, effective_content(), lookup, v))
-            }
+            if v.is_empty() { Cond::True } else { Cond::Expr(folded_lookup(fold, effective_content(), lookup, v)) }
         }
         (CustomFieldsIContains, C::Raw(raw)) => {
             let v = py_strip(&raw);
             if v.is_empty() {
                 Cond::True
             } else {
-                tracing_warn("Deprecated document filter parameter 'custom_fields__icontains' used; use `custom_field_query` or advanced Tantivy field syntax instead.");
+                tracing_warn(
+                    "Deprecated document filter parameter 'custom_fields__icontains' used; use `custom_field_query` or advanced Tantivy field syntax instead.",
+                );
                 custom_fields_icontains(v, db).await?
             }
         }
-        (CustomFieldQuery, C::Raw(raw)) => {
-            custom_field_query_cond(&raw, "custom_field_query", ctx, db).await?
-        }
+        (CustomFieldQuery, C::Raw(raw)) => custom_field_query_cond(&raw, "custom_field_query", ctx, db).await?,
         (SharedBy, C::Raw(raw)) => {
             // owner_id=value: Django's int(value); ValueError → 500
             let Some(v) = py_int(&raw) else {
-                return Err(FilterError::internal(
-                    "ValueError: Field 'id' expected a number",
-                ));
+                return Err(FilterError::internal("ValueError: Field 'id' expected a number"));
             };
             match v.range_check(AUTO_MIN, AUTO_MAX) {
-                RangeCheck::InRange(x) => {
-                    Cond::Expr(doc_col("owner_id").eq(x).and(document_is_shared()))
-                }
+                RangeCheck::InRange(x) => Cond::Expr(doc_col("owner_id").eq(x).and(document_is_shared())),
                 _ => Cond::False,
             }
         }
         (MimeType, C::Raw(raw)) => {
             let v = py_strip(&raw);
-            if v.is_empty() {
-                Cond::True
-            } else {
-                Cond::Expr(text_lookup(doc_col("mime_type"), IContains, v))
-            }
+            if v.is_empty() { Cond::True } else { Cond::Expr(text_lookup(doc_col("mime_type"), IContains, v)) }
         }
         (spec, value) => {
-            return Err(FilterError::internal(format!(
-                "filter/value mismatch: {spec:?} / {value:?}"
-            )));
+            return Err(FilterError::internal(format!("filter/value mismatch: {spec:?} / {value:?}")));
         }
     })
 }
@@ -799,13 +785,8 @@ pub async fn apply_filterset_lenient<D: FilterDb>(
     db: &D,
 ) -> Result<(), FilterError> {
     let defs = filters();
-    let cleaned: Vec<_> = defs
-        .iter()
-        .filter_map(|(name, spec)| clean(*spec, params.get(name), ctx).ok().map(|c| (*spec, c)))
-        .collect();
-    let needs_fold = cleaned.iter().any(|(spec, value)| {
-        matches!(spec, TitleContent | Content(_)) && !matches!(value, Cleaned::Skip)
-    });
+    let cleaned: Vec<_> = defs.iter().filter_map(|(name, spec)| clean(*spec, params.get(name), ctx).ok().map(|c| (*spec, c))).collect();
+    let needs_fold = cleaned.iter().any(|(spec, value)| matches!(spec, TitleContent | Content(_)) && !matches!(value, Cleaned::Skip));
     let fold = if needs_fold { db.upper_fold().await } else { None };
     for (spec, value) in cleaned {
         if matches!(value, Cleaned::Skip) {
@@ -838,9 +819,7 @@ pub async fn apply_filterset<D: FilterDb>(
         return Err(FilterError::Validation(Json::Object(errors)));
     }
     // only calibrate UPPER folding if a content filter is active
-    let needs_fold = cleaned.iter().any(|(spec, value)| {
-        matches!(spec, TitleContent | Content(_)) && !matches!(value, Cleaned::Skip)
-    });
+    let needs_fold = cleaned.iter().any(|(spec, value)| matches!(spec, TitleContent | Content(_)) && !matches!(value, Cleaned::Skip));
     let fold = if needs_fold { db.upper_fold().await } else { None };
     for (spec, value) in cleaned {
         if matches!(value, Cleaned::Skip) {
@@ -850,7 +829,6 @@ pub async fn apply_filterset<D: FilterDb>(
     }
     Ok(())
 }
-
 
 // ---------------------------------------------------------------------------------------
 // L1: DocumentFilterSet → AST (pl_domain::filter). Same form validation (`clean`), same
@@ -950,12 +928,7 @@ fn ast_text(l: TextLookup) -> f::TextLookup {
     crate::ast::text_lookup_ast(l)
 }
 
-async fn filter_pred<D: FilterDb>(
-    spec: Spec,
-    value: Cleaned,
-    ctx: &FilterContext,
-    db: &D,
-) -> Result<f::Pred, FilterError> {
+async fn filter_pred<D: FilterDb>(spec: Spec, value: Cleaned, ctx: &FilterContext, db: &D) -> Result<f::Pred, FilterError> {
     use Cleaned as C;
     use f::Pred as P;
     Ok(match (spec, value) {
@@ -967,11 +940,7 @@ async fn filter_pred<D: FilterDb>(
         (Num(t, op), C::Int(v)) => int_lookup_pred(ast_num_col(t), op, v, range_of(t)),
         (NumIn(t), C::IntList(list)) => {
             let vals = in_values(&list, range_of(t));
-            if vals.is_empty() {
-                P::False
-            } else {
-                P::NumIn { col: ast_num_col(t), values: vals }
-            }
+            if vals.is_empty() { P::False } else { P::NumIn { col: ast_num_col(t), values: vals } }
         }
         (Char(target, lookup), C::Str(s)) => match target {
             CT::Doc(c) => P::Text { col: ast_text_col(c)?, lookup: ast_text(lookup), value: s },
@@ -1095,17 +1064,16 @@ async fn filter_pred<D: FilterDb>(
             if v.is_empty() {
                 P::True
             } else {
-                P::Text { col: f::TextCol::Title, lookup: f::TextLookup::IContains, value: v.to_string() }
-                    .or(P::Text { col: f::TextCol::Content, lookup: f::TextLookup::IContains, value: v.to_string() })
+                P::Text { col: f::TextCol::Title, lookup: f::TextLookup::IContains, value: v.to_string() }.or(P::Text {
+                    col: f::TextCol::Content,
+                    lookup: f::TextLookup::IContains,
+                    value: v.to_string(),
+                })
             }
         }
         (Content(lookup), C::Raw(raw)) => {
             let v = py_strip(&raw);
-            if v.is_empty() {
-                P::True
-            } else {
-                P::Text { col: f::TextCol::Content, lookup: ast_text(lookup), value: v.to_string() }
-            }
+            if v.is_empty() { P::True } else { P::Text { col: f::TextCol::Content, lookup: ast_text(lookup), value: v.to_string() } }
         }
         (CustomFieldsIContains, C::Raw(raw)) => {
             let v = py_strip(&raw);
@@ -1116,9 +1084,7 @@ async fn filter_pred<D: FilterDb>(
                 P::Instance(f::InstanceCond::IContains { value: v.to_string(), select_option_ids: option_ids })
             }
         }
-        (CustomFieldQuery, C::Raw(raw)) => {
-            crate::cfquery::custom_field_query_pred(&raw, "custom_field_query", ctx, db).await?
-        }
+        (CustomFieldQuery, C::Raw(raw)) => crate::cfquery::custom_field_query_pred(&raw, "custom_field_query", ctx, db).await?,
         (SharedBy, C::Raw(raw)) => {
             let Some(v) = py_int(&raw) else {
                 return Err(FilterError::internal("ValueError: Field 'id' expected a number"));

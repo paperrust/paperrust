@@ -44,12 +44,7 @@ pub fn bind_vis<'q, O>(
 }
 
 /// Field `set_permissions` (parser + `validate_set_permissions`).
-pub async fn set_permissions_field(
-    db: &PgPool,
-    e: &mut Errors,
-    data: &Map<String, Value>,
-    partial: bool,
-) -> Got<ValidSetPermissions> {
+pub async fn set_permissions_field(db: &PgPool, e: &mut Errors, data: &Map<String, Value>, partial: bool) -> Got<ValidSetPermissions> {
     match drf::empty_values::<()>(drf::raw(data, "set_permissions"), drf::OPTIONAL, partial, None) {
         Err(fe) => {
             e.add("set_permissions", fe);

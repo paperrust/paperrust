@@ -22,11 +22,7 @@ pub fn py_dt(dt: &DateTime<Utc>) -> String {
     let n = dt.naive_utc();
     let base = n.format("%Y-%m-%d %H:%M:%S").to_string();
     let us = dt.timestamp_subsec_micros();
-    if us != 0 {
-        format!("{base}.{us:06}")
-    } else {
-        base
-    }
+    if us != 0 { format!("{base}.{us:06}") } else { base }
 }
 
 pub fn py_date(d: &NaiveDate) -> String {
@@ -116,11 +112,7 @@ fn dump_str(s: &str, out: &mut String) {
 
 /// `AuditlogMiddleware._get_remote_addr`
 pub fn remote_addr(ctx: &Ctx) -> Option<String> {
-    let xff = ctx
-        .headers
-        .get("x-forwarded-for")
-        .and_then(|v| v.to_str().ok())
-        .filter(|v| !v.is_empty());
+    let xff = ctx.headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()).filter(|v| !v.is_empty());
     let Some(xff) = xff else {
         return ctx.remote_ip.clone();
     };
@@ -128,22 +120,13 @@ pub fn remote_addr(ctx: &Ctx) -> Option<String> {
     if addr.contains('.') && addr.contains(':') {
         addr = addr.split(':').next().unwrap_or("").to_string();
     } else if addr.contains('[') {
-        addr = addr
-            .get(1..)
-            .unwrap_or("")
-            .split(']')
-            .next()
-            .unwrap_or("")
-            .to_string();
+        addr = addr.get(1..).unwrap_or("").split(']').next().unwrap_or("").to_string();
     }
     Some(addr)
 }
 
 fn remote_port(ctx: &Ctx) -> Option<i32> {
-    ctx.headers
-        .get("x-forwarded-port")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.trim().parse::<i32>().ok())
+    ctx.headers.get("x-forwarded-port").and_then(|v| v.to_str().ok()).and_then(|v| v.trim().parse::<i32>().ok())
 }
 
 /// A change list `{field: [old, new]}` (insertion order; jsonb normalises anyway).
@@ -164,21 +147,10 @@ pub async fn log(
     }
     let mut m = Map::new();
     for (k, a, b) in changes {
-        m.insert(
-            k.clone(),
-            Value::Array(vec![Value::String(a.clone()), Value::String(b.clone())]),
-        );
+        m.insert(k.clone(), Value::Array(vec![Value::String(a.clone()), Value::String(b.clone())]));
     }
-    let (actor_id, actor_email) = if ctx.user.via_session {
-        (Some(ctx.user.id), Some(ctx.user.email.clone()))
-    } else {
-        (None, None)
-    };
-    let cid = ctx
-        .headers
-        .get("x-correlation-id")
-        .and_then(|v| v.to_str().ok())
-        .map(str::to_string);
+    let (actor_id, actor_email) = if ctx.user.via_session { (Some(ctx.user.id), Some(ctx.user.email.clone())) } else { (None, None) };
+    let cid = ctx.headers.get("x-correlation-id").and_then(|v| v.to_str().ok()).map(str::to_string);
     sqlx::query(
         "INSERT INTO auditlog_logentry \
          (content_type_id, object_pk, object_id, object_repr, serialized_data, action, \
@@ -247,23 +219,13 @@ pub fn cf_create_changes(new: &CfState) -> Changes {
 }
 
 pub fn cf_delete_changes(old: &CfState) -> Changes {
-    let mut c: Changes = old
-        .values()
-        .into_iter()
-        .filter(|(_, v)| v != NONE)
-        .map(|(k, v)| (k.to_string(), v, NONE.to_string()))
-        .collect();
+    let mut c: Changes = old.values().into_iter().filter(|(_, v)| v != NONE).map(|(k, v)| (k.to_string(), v, NONE.to_string())).collect();
     c.push(("fields".into(), CF_REVERSE_MANAGER.into(), NONE.into()));
     c
 }
 
 pub fn cf_update_changes(old: &CfState, new: &CfState) -> Changes {
-    old.values()
-        .into_iter()
-        .zip(new.values())
-        .filter(|((_, a), (_, b))| a != b)
-        .map(|((k, a), (_, b))| (k.to_string(), a, b))
-        .collect()
+    old.values().into_iter().zip(new.values()).filter(|((_, a), (_, b))| a != b).map(|((k, a), (_, b))| (k.to_string(), a, b)).collect()
 }
 
 /// Fields of a CustomFieldInstance for the delete diff (old = instance, new = "None").
@@ -286,16 +248,8 @@ pub fn cfi_delete_changes(old: &CfiState) -> Changes {
     let mut c: Changes = Vec::new();
     c.push(("id".into(), old.id.to_string(), NONE.into()));
     // DateTimeField: None stays None (≠ "None") → always in the diff
-    for (k, v) in [
-        ("created", &old.created),
-        ("deleted_at", &old.deleted_at),
-        ("restored_at", &old.restored_at),
-    ] {
-        c.push((
-            k.into(),
-            v.as_ref().map(py_dt).unwrap_or_else(|| NONE.into()),
-            NONE.into(),
-        ));
+    for (k, v) in [("created", &old.created), ("deleted_at", &old.deleted_at), ("restored_at", &old.restored_at)] {
+        c.push((k.into(), v.as_ref().map(py_dt).unwrap_or_else(|| NONE.into()), NONE.into()));
     }
     if let Some(t) = &old.transaction_id {
         c.push(("transaction_id".into(), t.clone(), NONE.into()));
@@ -304,15 +258,12 @@ pub fn cfi_delete_changes(old: &CfiState) -> Changes {
     c.push(("field".into(), old.field_id.to_string(), NONE.into()));
     for (k, v) in &old.plain_values {
         if let Some(v) = v
-            && v != NONE {
-                c.push(((*k).into(), v.clone(), NONE.into()));
-            }
+            && v != NONE
+        {
+            c.push(((*k).into(), v.clone(), NONE.into()));
+        }
     }
-    c.push((
-        "value_document_ids".into(),
-        py_json_dumps(&old.value_document_ids),
-        NONE.into(),
-    ));
+    c.push(("value_document_ids".into(), py_json_dumps(&old.value_document_ids), NONE.into()));
     c
 }
 
@@ -333,16 +284,8 @@ mod tests {
 
     #[test]
     fn cf_diffs() {
-        let created = DateTime::parse_from_rfc3339("2024-01-02T03:04:05.000006Z")
-            .map(|d| d.with_timezone(&Utc))
-            .unwrap_or_default();
-        let s = CfState {
-            id: 5,
-            created,
-            name: "N".into(),
-            data_type: "string".into(),
-            extra_data: Value::Null,
-        };
+        let created = DateTime::parse_from_rfc3339("2024-01-02T03:04:05.000006Z").map(|d| d.with_timezone(&Utc)).unwrap_or_default();
+        let s = CfState { id: 5, created, name: "N".into(), data_type: "string".into(), extra_data: Value::Null };
         let c = cf_create_changes(&s);
         assert!(c.contains(&("extra_data".into(), "None".into(), "null".into())));
         assert!(c.contains(&("created".into(), "None".into(), "2024-01-02 03:04:05.000006".into())));

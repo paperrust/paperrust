@@ -198,9 +198,7 @@ async fn dispatch(cmd: &str, rest: Vec<String>) -> CliResult {
         "timeline_backfill" => timeline_backfill(rest).await,
         "guard" => guard_command(rest).await,
         "backup" => backup_command(rest).await,
-        other => Err(CliError::Command(format!(
-            "Unknown command: '{other}'\nType 'paperrust manage help' for usage."
-        ))),
+        other => Err(CliError::Command(format!("Unknown command: '{other}'\nType 'paperrust manage help' for usage."))),
     }
 }
 

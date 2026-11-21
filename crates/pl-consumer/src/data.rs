@@ -231,11 +231,8 @@ impl ConsumableDocument {
 
 /// `Path(...).resolve()` without a symlink requirement (file need not exist).
 pub fn absolute(p: &Path) -> PathBuf {
-    let abs = if p.is_absolute() {
-        p.to_path_buf()
-    } else {
-        std::env::current_dir().map(|d| d.join(p)).unwrap_or_else(|_| p.to_path_buf())
-    };
+    let abs =
+        if p.is_absolute() { p.to_path_buf() } else { std::env::current_dir().map(|d| d.join(p)).unwrap_or_else(|_| p.to_path_buf()) };
     let canon = std::fs::canonicalize(&abs).unwrap_or(abs);
     strip_verbatim(canon)
 }
@@ -315,8 +312,7 @@ mod tests {
         let d: ConsumableDocument = serde_json::from_value(v).unwrap();
         assert_eq!(d.source(), DocumentSource::ConsumeFolder);
         let o: DocumentMetadataOverrides =
-            serde_json::from_value(serde_json::json!({"tag_ids": [1], "created": "2024-03-01", "custom_fields": {"3": "x"}}))
-                .unwrap();
+            serde_json::from_value(serde_json::json!({"tag_ids": [1], "created": "2024-03-01", "custom_fields": {"3": "x"}})).unwrap();
         assert_eq!(o.created, NaiveDate::from_ymd_opt(2024, 3, 1));
         assert_eq!(o.custom_fields.unwrap()[&3], Value::from("x"));
         let inp = DocumentMetadataOverrides { tag_ids: Some(vec![1]), ..Default::default() }.to_input_data();

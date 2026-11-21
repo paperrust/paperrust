@@ -204,12 +204,7 @@ pub fn sync_profile_state(app: AppHandle) -> Result<Option<SyncProfileView>, Str
 
 /// Switch offline data (mode 3) on/off for a profile; active profile → restart.
 #[tauri::command]
-pub fn sync_profile_set(
-    id: String,
-    sync: bool,
-    app: AppHandle,
-    shared: tauri::State<'_, Arc<crate::Shared>>,
-) -> Result<(), String> {
+pub fn sync_profile_set(id: String, sync: bool, app: AppHandle, shared: tauri::State<'_, Arc<crate::Shared>>) -> Result<(), String> {
     crate::with_profile(&id, |cfg, _| {
         let p = cfg.profiles.iter_mut().find(|p| p.id == id).ok_or("Unbekanntes Profil.")?;
         if sync && !known_flavor(p) {
@@ -228,12 +223,7 @@ pub fn sync_profile_set(
 /// Choose the UI of a profile (`server` = page from the server, `app` = light UI with
 /// offline data via prapi); active profile → restart.
 #[tauri::command]
-pub fn sync_profile_set_ui(
-    id: String,
-    ui: String,
-    app: AppHandle,
-    shared: tauri::State<'_, Arc<crate::Shared>>,
-) -> Result<(), String> {
+pub fn sync_profile_set_ui(id: String, ui: String, app: AppHandle, shared: tauri::State<'_, Arc<crate::Shared>>) -> Result<(), String> {
     let new_ui = match ui.as_str() {
         "app" => Ui::App,
         "server" => Ui::Server,

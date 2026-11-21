@@ -42,8 +42,7 @@ impl Outcome {
 #[allow(clippy::result_large_err)]
 fn drf_check(auth: Result<AuthUser, AuthError>) -> Result<AuthUser, Response> {
     let auth = auth.map_err(IntoResponse::into_response)?;
-    auth.require_model_perms(&DOCUMENT)
-        .map_err(IntoResponse::into_response)?;
+    auth.require_model_perms(&DOCUMENT).map_err(IntoResponse::into_response)?;
     Ok(auth)
 }
 
@@ -80,11 +79,7 @@ fn step_error(context: &str, e: StepError) -> Outcome {
 }
 
 /// `_resolve_request_and_root_doc(pk, request, include_deleted=True)` + object permission.
-async fn request_and_root(
-    cx: Ctx<'_>,
-    user: &User,
-    pk: Option<i64>,
-) -> Result<Result<(DocRow, DocRow), Outcome>, StepError> {
+async fn request_and_root(cx: Ctx<'_>, user: &User, pk: Option<i64>) -> Result<Result<(DocRow, DocRow), Outcome>, StepError> {
     let Some(pk) = pk else {
         return Ok(Err(Outcome::Raised(compat::drf_not_found())));
     };
@@ -99,22 +94,12 @@ async fn request_and_root(
 }
 
 /// `_get_effective_file_doc` with the view's error mapping.
-async fn effective(
-    cx: Ctx<'_>,
-    request_doc: &DocRow,
-    root: &DocRow,
-    params: &Params,
-) -> Result<Result<DocRow, Outcome>, StepError> {
-    Ok(
-        match resolve::effective_file_doc(cx.db, request_doc, root, params).await? {
-            Ok(d) => Ok(d),
-            Err(VersionError::Invalid) => Err(Outcome::Raised(compat::drf_detail(
-                StatusCode::NOT_FOUND,
-                "Invalid version parameter",
-            ))),
-            Err(VersionError::NotFound) => Err(Outcome::Raised(compat::drf_not_found())),
-        },
-    )
+async fn effective(cx: Ctx<'_>, request_doc: &DocRow, root: &DocRow, params: &Params) -> Result<Result<DocRow, Outcome>, StepError> {
+    Ok(match resolve::effective_file_doc(cx.db, request_doc, root, params).await? {
+        Ok(d) => Ok(d),
+        Err(VersionError::Invalid) => Err(Outcome::Raised(compat::drf_detail(StatusCode::NOT_FOUND, "Invalid version parameter"))),
+        Err(VersionError::NotFound) => Err(Outcome::Raised(compat::drf_not_found())),
+    })
 }
 
 fn map_serve(e: ServeError) -> Outcome {
@@ -126,14 +111,7 @@ fn map_serve(e: ServeError) -> Outcome {
 }
 
 /// The body shared by download and preview (`file_response` / `preview`).
-async fn file_view(
-    cx: Ctx<'_>,
-    user: &User,
-    pk: Option<i64>,
-    params: &Params,
-    disposition: &str,
-    follow_formatting: bool,
-) -> Outcome {
+async fn file_view(cx: Ctx<'_>, user: &User, pk: Option<i64>, params: &Params, disposition: &str, follow_formatting: bool) -> Outcome {
     let step = async {
         let (request_doc, root) = match request_and_root(cx, user, pk).await? {
             Ok(v) => v,
@@ -145,12 +123,10 @@ async fn file_view(
         };
         let context = resolve::root_of(cx.db, &file_doc).await?;
         let use_archive = !params.original_requested() && file_doc.has_archive_version();
-        Ok::<_, StepError>(
-            match docfile::serve_file(cx, &file_doc, &context, use_archive, disposition, follow_formatting).await {
-                Ok(r) => Outcome::Returned(r),
-                Err(e) => map_serve(e),
-            },
-        )
+        Ok::<_, StepError>(match docfile::serve_file(cx, &file_doc, &context, use_archive, disposition, follow_formatting).await {
+            Ok(r) => Outcome::Returned(r),
+            Err(e) => map_serve(e),
+        })
     };
     match step.await {
         Ok(o) => o,
@@ -170,16 +146,7 @@ pub async fn download(
         Err(r) => return r,
     };
     let params = Params::parse(raw.as_deref());
-    file_view(
-        Ctx::new(&state),
-        auth.user(),
-        parse_pk(&id),
-        &params,
-        "attachment",
-        params.follow_formatting(),
-    )
-    .await
-    .into_response()
+    file_view(Ctx::new(&state), auth.user(), parse_pk(&id), &params, "attachment", params.follow_formatting()).await.into_response()
 }
 
 /// Run `cache_control(no_cache=True)` + `condition()` around a view: compute validators,
@@ -231,18 +198,9 @@ pub async fn preview(
         None => None,
     };
     // preview_etag / preview_last_modified
-    let etag = eff.as_ref().and_then(|d| {
-        if params.original_requested() {
-            Some(d.checksum.clone())
-        } else {
-            d.archive_checksum.clone()
-        }
-    });
+    let etag = eff.as_ref().and_then(|d| if params.original_requested() { Some(d.checksum.clone()) } else { d.archive_checksum.clone() });
     let lm = eff.as_ref().map(|d| d.modified.timestamp());
-    conditional_view(&method, &headers, etag, lm, || {
-        file_view(cx, auth.user(), pk, &params, "inline", false)
-    })
-    .await
+    conditional_view(&method, &headers, etag, lm, || file_view(cx, auth.user(), pk, &params, "inline", false)).await
 }
 
 /// GET /api/documents/{id}/thumb/

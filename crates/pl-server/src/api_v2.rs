@@ -104,8 +104,7 @@ impl pl_domain::ChangeFeed for SyncFeed {
         kinds: Option<&'a [pl_domain::Kind]>,
     ) -> pl_domain::BoxFut<'a, pl_domain::repo::FeedPage> {
         Box::pin(async move {
-            let kinds: Option<Vec<pl_sync::Kind>> =
-                kinds.map(|ks| ks.iter().filter_map(|k| pl_sync::Kind::from_code(k.code())).collect());
+            let kinds: Option<Vec<pl_sync::Kind>> = kinds.map(|ks| ks.iter().filter_map(|k| pl_sync::Kind::from_code(k.code())).collect());
             let page = pl_sync::changes(&self.pool, after, limit, kinds.as_deref()).await.map_err(feed_error)?;
             let entries = page
                 .changes

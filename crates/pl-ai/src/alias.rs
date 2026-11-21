@@ -12,7 +12,7 @@
 
 use std::sync::Mutex;
 
-use crate::taxonomy::{alias_key, Alias, TaxonomyEntry, TaxonomyKind};
+use crate::taxonomy::{Alias, TaxonomyEntry, TaxonomyKind, alias_key};
 
 /// Why an alias is not stored.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

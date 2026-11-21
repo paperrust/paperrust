@@ -70,7 +70,13 @@ impl NativeParsing {
     }
 
     fn ctx(&self, mailrule_id: Option<i64>) -> pl_parsers::ParseContext {
-        pl_parsers::ParseContext { mailrule_id, mail_pdf_layout: None, work_dir: None, time_zone: self.time_zone, limits: self.limits.clone() }
+        pl_parsers::ParseContext {
+            mailrule_id,
+            mail_pdf_layout: None,
+            work_dir: None,
+            time_zone: self.time_zone,
+            limits: self.limits.clone(),
+        }
     }
 
     /// Effective mail PDF layout like upstream `MailDocumentParser.parse`: with a rule
@@ -93,7 +99,10 @@ impl NativeParsing {
         let r = std::thread::scope(|sc| {
             sc.spawn(move || {
                 handle.block_on(async move {
-                    sqlx::query_scalar::<_, i16>("SELECT pdf_layout FROM paperless_mail_mailrule WHERE id = $1").bind(id).fetch_optional(&pool).await
+                    sqlx::query_scalar::<_, i16>("SELECT pdf_layout FROM paperless_mail_mailrule WHERE id = $1")
+                        .bind(id)
+                        .fetch_optional(&pool)
+                        .await
                 })
             })
             .join()
@@ -152,12 +161,15 @@ impl NativeParsing {
         }
         // 2. PdfCraft (lenient reader) in the child process
         if let Some(tool) = pl_pdftools::runner::tool_path() {
-            let op = pl_pdftools::job::Op::Repair { input: pdf.to_string_lossy().into_owned(), output: repaired.to_string_lossy().into_owned() };
+            let op =
+                pl_pdftools::job::Op::Repair { input: pdf.to_string_lossy().into_owned(), output: repaired.to_string_lossy().into_owned() };
             match pl_pdftools::runner::run_blocking_with(&tool, op, pl_pdftools::runner::Limits::from_env()) {
-                Ok(pl_pdftools::job::Reply::Repaired(_)) => match pl_ocr::thumbnail::make_thumbnail_from_pdf(renderer.as_ref(), &repaired, tempdir) {
-                    Ok(p) => return Ok(p),
-                    Err(e) => last = e.message().to_string(),
-                },
+                Ok(pl_pdftools::job::Reply::Repaired(_)) => {
+                    match pl_ocr::thumbnail::make_thumbnail_from_pdf(renderer.as_ref(), &repaired, tempdir) {
+                        Ok(p) => return Ok(p),
+                        Err(e) => last = e.message().to_string(),
+                    }
+                }
                 Ok(_) => {}
                 Err(e) => last = e.user_message(),
             }
@@ -167,9 +179,7 @@ impl NativeParsing {
     }
 
     fn find(&self, info: &ParserInfo, mime_type: &str, filename: &str, path: &Path) -> Option<&dyn pl_parsers::DocumentParser> {
-        self.registry
-            .get_parser_for_file(mime_type, filename, Some(path), true)
-            .filter(|p| p.class_name() == info.class_name)
+        self.registry.get_parser_for_file(mime_type, filename, Some(path), true).filter(|p| p.class_name() == info.class_name)
     }
 
     fn renderer(&self) -> Box<dyn pl_ocr::render::PdfRenderer> {
@@ -233,11 +243,13 @@ impl DocumentParsing for NativeParsing {
                 Some(png) => (png.as_path(), "image/png"),
                 None => (req.path, req.mime_type),
             };
-            let out = pl_ocr::native::parse_document(&backend, &self.ocr, req.tempdir, path, mime_type, produce_archive)
-                .map_err(|e| match e {
-                    pl_ocr::OcrError::Parse(m) => StageError::Parse(m),
-                    other => StageError::Parse(format!("{}: {}", other.class_name(), other.message())),
-                })?;
+            let out =
+                pl_ocr::native::parse_document(&backend, &self.ocr, req.tempdir, path, mime_type, produce_archive).map_err(
+                    |e| match e {
+                        pl_ocr::OcrError::Parse(m) => StageError::Parse(m),
+                        other => StageError::Parse(format!("{}: {}", other.class_name(), other.message())),
+                    },
+                )?;
             return Ok(ParsedOutput { text: Some(out.text), date: None, archive_path: out.archive_path });
         }
         if parser.class_name == crate::remote::CLASS_NAME {
@@ -325,11 +337,7 @@ impl DocumentParsing for NativeParsing {
         }
         // Tesseract/Remote: archive or document (`make_thumbnail_from_pdf(archive or document)`);
         // Mail/Tika: PDF version.
-        let source: Option<&Path> = if parser.class_name == RASTERISED || remote {
-            Some(archive.unwrap_or(req.path))
-        } else {
-            archive
-        };
+        let source: Option<&Path> = if parser.class_name == RASTERISED || remote { Some(archive.unwrap_or(req.path)) } else { archive };
         let Some(pdf) = source else {
             return Self::default_thumbnail(req.tempdir);
         };

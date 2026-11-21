@@ -144,12 +144,8 @@ fn walk(dir: &Path, root: &Path, out: &mut Vec<(String, u64, i128)>) {
             walk(&p, root, out);
         } else if ft.is_file() {
             let Ok(m) = e.metadata() else { continue };
-            let mt = m
-                .modified()
-                .ok()
-                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                .map(|d| d.as_nanos() as i128)
-                .unwrap_or(0);
+            let mt =
+                m.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_nanos() as i128).unwrap_or(0);
             if let Some(rel) = rel_path(root, &p) {
                 out.push((rel, m.len(), mt));
             }
@@ -217,10 +213,16 @@ pub fn hex(b: &[u8]) -> String {
 fn verdict_finding(path: &str, v: &ContentVerdict) -> Option<Finding> {
     match v {
         ContentVerdict::Ok => None,
-        ContentVerdict::Encrypted { entropy } => Some(Finding { path: path.into(), reason: Reason::Encrypted, detail: format!("content looks encrypted (entropy {entropy:.2} bit/byte)") }),
-        ContentVerdict::BadMagic { expected, entropy } => {
-            Some(Finding { path: path.into(), reason: Reason::BadMagic, detail: format!("header is not {expected} (entropy {entropy:.2} bit/byte)") })
-        }
+        ContentVerdict::Encrypted { entropy } => Some(Finding {
+            path: path.into(),
+            reason: Reason::Encrypted,
+            detail: format!("content looks encrypted (entropy {entropy:.2} bit/byte)"),
+        }),
+        ContentVerdict::BadMagic { expected, entropy } => Some(Finding {
+            path: path.into(),
+            reason: Reason::BadMagic,
+            detail: format!("header is not {expected} (entropy {entropy:.2} bit/byte)"),
+        }),
     }
 }
 
@@ -242,8 +244,12 @@ pub async fn evaluate(media_root: &Path, cfg: &GuardConfig, catalog: &dyn Catalo
     let name_finding = if exists {
         match detect::check_name(area, inner, &cfg.extra_extensions) {
             NameVerdict::Ok => None,
-            NameVerdict::RansomNote => Some(Finding { path: rel.into(), reason: Reason::RansomNote, detail: "file name of a ransom note".into() }),
-            NameVerdict::SuspiciousExtension(e) => Some(Finding { path: rel.into(), reason: Reason::SuspiciousExtension, detail: format!("extension .{e}") }),
+            NameVerdict::RansomNote => {
+                Some(Finding { path: rel.into(), reason: Reason::RansomNote, detail: "file name of a ransom note".into() })
+            }
+            NameVerdict::SuspiciousExtension(e) => {
+                Some(Finding { path: rel.into(), reason: Reason::SuspiciousExtension, detail: format!("extension .{e}") })
+            }
             NameVerdict::UnknownExtension(e) => Some(Finding {
                 path: rel.into(),
                 reason: Reason::UnknownExtension,
@@ -279,7 +285,11 @@ pub async fn evaluate(media_root: &Path, cfg: &GuardConfig, catalog: &dyn Catalo
                         ContentVerdict::Ok => String::new(),
                     };
                     let reason = if matches!(v, ContentVerdict::Encrypted { .. }) { Reason::Encrypted } else { Reason::Modified };
-                    Some(Finding { path: rel.into(), reason, detail: format!("document {}: checksum differs from the database{extra}", exp.doc_id) })
+                    Some(Finding {
+                        path: rel.into(),
+                        reason,
+                        detail: format!("document {}: checksum differs from the database{extra}", exp.doc_id),
+                    })
                 }
                 Ok(_) => None,
                 // just renamed/deleted: evaluate again on the next event
@@ -290,7 +300,9 @@ pub async fn evaluate(media_root: &Path, cfg: &GuardConfig, catalog: &dyn Catalo
                 Err(_) => None,
             },
         },
-        (Some(exp), false) => Some(Finding { path: rel.into(), reason: Reason::Deleted, detail: format!("file of document {} is missing", exp.doc_id) }),
+        (Some(exp), false) => {
+            Some(Finding { path: rel.into(), reason: Reason::Deleted, detail: format!("file of document {} is missing", exp.doc_id) })
+        }
         (None, true) => {
             let c = content(false).await.ok().and_then(|(v, _)| verdict_finding(rel, &v));
             match (name_finding, c) {
@@ -522,7 +534,11 @@ impl Engine {
 }
 
 /// File system events; `None` if unavailable (then only review + sampling).
-fn start_watcher(media_root: &Path, tx: mpsc::Sender<PathBuf>, overflow: Arc<std::sync::atomic::AtomicBool>) -> Option<notify::RecommendedWatcher> {
+fn start_watcher(
+    media_root: &Path,
+    tx: mpsc::Sender<PathBuf>,
+    overflow: Arc<std::sync::atomic::AtomicBool>,
+) -> Option<notify::RecommendedWatcher> {
     use notify::{RecursiveMode, Watcher};
     let dir = media_root.join("documents");
     let dir = if dir.is_dir() { dir } else { media_root.to_path_buf() };
@@ -588,7 +604,8 @@ impl Catalog for MemoryCatalog {
                 }
             }
         }
-        let v: Vec<SampleDoc> = by_id.into_iter().filter(|(id, _)| *id > after).take(n.max(0) as usize).map(|(id, files)| SampleDoc { id, files }).collect();
+        let v: Vec<SampleDoc> =
+            by_id.into_iter().filter(|(id, _)| *id > after).take(n.max(0) as usize).map(|(id, files)| SampleDoc { id, files }).collect();
         Box::pin(async move { Ok(v) })
     }
 }

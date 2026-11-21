@@ -169,7 +169,9 @@ impl DirSink {
         let perform_copy = if target.exists() {
             let ss = std::fs::metadata(source)?;
             let ts = std::fs::metadata(&target)?;
-            if self.compare_checksums && let Some(c) = checksum {
+            if self.compare_checksums
+                && let Some(c) = checksum
+            {
                 sha256_file(&target)? != c
             } else {
                 ss.modified().ok() != ts.modified().ok() || ss.len() != ts.len()
@@ -361,7 +363,13 @@ impl ManifestWriter {
 fn literal(v: &Value) -> String {
     match v {
         Value::Null => "NULL".into(),
-        Value::Bool(b) => if *b { "true".into() } else { "false".into() },
+        Value::Bool(b) => {
+            if *b {
+                "true".into()
+            } else {
+                "false".into()
+            }
+        }
         Value::Number(n) => n.to_string(),
         Value::String(s) => format!("'{}'", s.replace('\'', "''")),
         other => format!("'{}'", other.to_string().replace('\'', "''")),
@@ -569,7 +577,15 @@ pub async fn export(c: &Ctx, o: &ExportOptions) -> CliResult {
         // bounds checked above (LEVEL_BOUNDS)
         let level = o.zip_compression_level.and_then(|l| i32::try_from(l).ok());
         let zw = ZipWriter::create(&tmp_path, method, level, c.cfg.tz)?;
-        Sink::Zip(ZipSink { target: target.clone(), zip_path, tmp_path, delete: o.delete, zip: Some(zw), dirs: HashSet::new(), pending_manifest: None })
+        Sink::Zip(ZipSink {
+            target: target.clone(),
+            zip_path,
+            tmp_path,
+            delete: o.delete,
+            zip: Some(zw),
+            dirs: HashSet::new(),
+            pending_manifest: None,
+        })
     } else {
         let mut ds = DirSink {
             target: target.clone(),
@@ -602,7 +618,13 @@ async fn dump(c: &Ctx, o: &ExportOptions, d: &descriptor::Descriptor, sink: &mut
             let salt: [u8; 16] = rand::random();
             let salt = fernet::hex_encode(&salt[..d.crypt_defaults.salt_size.min(16)]);
             let f = fernet::derive(p, &salt, d.crypt_defaults.iterations, d.crypt_defaults.key_size).map_err(CliError::Other)?;
-            Some(Crypt { fernet: f, salt, iterations: d.crypt_defaults.iterations, key_size: d.crypt_defaults.key_size, algorithm: d.crypt_defaults.algorithm.clone() })
+            Some(Crypt {
+                fernet: f,
+                salt,
+                iterations: d.crypt_defaults.iterations,
+                key_size: d.crypt_defaults.key_size,
+                algorithm: d.crypt_defaults.algorithm.clone(),
+            })
         }
         None => {
             let mails: i64 = sqlx::query_scalar("SELECT count(*) FROM paperless_mail_mailaccount").fetch_one(&mut *conn).await?;
@@ -895,7 +917,8 @@ mod tests {
         std::fs::create_dir_all(&target).unwrap();
         let src = d.path().join("src.pdf");
         std::fs::write(&src, b"%PDF").unwrap();
-        let mut ds = DirSink { target: target.clone(), compare_checksums: false, compare_json: false, delete: false, snapshot: HashSet::new() };
+        let mut ds =
+            DirSink { target: target.clone(), compare_checksums: false, compare_json: false, delete: false, snapshot: HashSet::new() };
         assert!(ds.add_file(&src, "originals/../../escape.pdf", None).is_err());
         assert!(ds.add_json("[]", "../manifest.json").is_err());
         assert!(!d.path().join("escape.pdf").exists() && !d.path().join("manifest.json").exists());

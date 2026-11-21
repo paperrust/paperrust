@@ -10,14 +10,14 @@
 
 use std::collections::{BTreeSet, HashSet};
 
-use sea_query::{Alias, Expr, PostgresQueryBuilder, Query};
 use pl_core::sqlbind::SqlxBinder;
+use sea_query::{Alias, Expr, PostgresQueryBuilder, Query};
 use serde_json::{Map, Value, json};
 use sqlx::PgConnection;
 
 use crate::audit::Snapshot;
-use crate::enqueue::{BULK_UPDATE_DOCUMENTS, RUN_WORKFLOWS_FOR_DOCUMENTS, Task, TriggerSource, UPDATE_CONTENT_MAYBE_ARCHIVE};
 use crate::drf::{self, django_int_lookup, py_truthy};
+use crate::enqueue::{BULK_UPDATE_DOCUMENTS, RUN_WORKFLOWS_FOR_DOCUMENTS, Task, TriggerSource, UPDATE_CONTENT_MAYBE_ARCHIVE};
 use crate::error::ApiError;
 use crate::perms::{GranteesUpdate, OperationNeeds, PermissionsSpec, count_existing, set_permissions_for_documents};
 
@@ -152,10 +152,7 @@ impl Method {
             Method::Delete => OperationNeeds { ownership: true, delete_document: true, ..Default::default() },
             // Actions change owner/permissions and can move to the trash → like
             // set_permissions only for owners (upstream: run_workflow in the owner list).
-            _ => OperationNeeds {
-                ownership: matches!(self, Method::SetPermissions | Method::RunWorkflow),
-                ..Default::default()
-            },
+            _ => OperationNeeds { ownership: matches!(self, Method::SetPermissions | Method::RunWorkflow), ..Default::default() },
         }
     }
 }
@@ -163,17 +160,39 @@ impl Method {
 /// Validated parameters.
 #[derive(Clone, Debug)]
 pub enum Params {
-    Fk { column: &'static str, value: Option<i64> },
-    Tag { id: i64, add: bool },
-    ModifyTags { add: Vec<i64>, remove: Vec<i64> },
-    SetPermissions { spec: PermissionsSpec, owner: Option<i64>, merge: bool },
+    Fk {
+        column: &'static str,
+        value: Option<i64>,
+    },
+    Tag {
+        id: i64,
+        add: bool,
+    },
+    ModifyTags {
+        add: Vec<i64>,
+        remove: Vec<i64>,
+    },
+    SetPermissions {
+        spec: PermissionsSpec,
+        owner: Option<i64>,
+        merge: bool,
+    },
     /// `ai_ocr`: PaperRust "AI text recognition" (only passed on to the task when set).
-    Reprocess { remote_ocr: bool, ai_ocr: bool },
+    Reprocess {
+        remote_ocr: bool,
+        ai_ocr: bool,
+    },
     /// `(field_id, value)` in input order; list (old API) → value `None`.
-    ModifyCustomFields { add: Vec<(i64, Value)>, remove: Vec<i64> },
+    ModifyCustomFields {
+        add: Vec<(i64, Value)>,
+        remove: Vec<i64>,
+    },
     Delete,
     /// Workflow id (exists, active, has trigger `MANUAL`) and whether the trigger filters apply.
-    RunWorkflow { workflow: i64, filter_documents: bool },
+    RunWorkflow {
+        workflow: i64,
+        filter_documents: bool,
+    },
 }
 
 /// `_validate_tag_id_list` (isinstance int; JSON bool counts as int in Python).
@@ -236,8 +255,7 @@ pub async fn validate_parameters(
     // source_mode
     if let Some(sm) = parameters.get("source_mode") {
         // `SourceModeChoices.__dict__.values()` also contains "__module__" and `__doc__` (None).
-        let ok = matches!(sm, Value::Null)
-            || matches!(sm.as_str(), Some("latest_version" | "explicit_selection" | "documents.bulk_edit"));
+        let ok = matches!(sm, Value::Null) || matches!(sm.as_str(), Some("latest_version" | "explicit_selection" | "documents.bulk_edit"));
         if !ok {
             return nf("Invalid source_mode");
         }
@@ -247,9 +265,27 @@ pub async fn validate_parameters(
         (param, table, column, missing, unknown)
     };
     let fk_spec = match method {
-        Method::SetCorrespondent => Some(fk("correspondent", "documents_correspondent", "correspondent_id", "correspondent not specified", "Correspondent does not exist")),
-        Method::SetDocumentType => Some(fk("document_type", "documents_documenttype", "document_type_id", "document_type not specified", "Document type does not exist")),
-        Method::SetStoragePath => Some(fk("storage_path", "documents_storagepath", "storage_path_id", "storage path not specified", "Storage path does not exist")),
+        Method::SetCorrespondent => Some(fk(
+            "correspondent",
+            "documents_correspondent",
+            "correspondent_id",
+            "correspondent not specified",
+            "Correspondent does not exist",
+        )),
+        Method::SetDocumentType => Some(fk(
+            "document_type",
+            "documents_documenttype",
+            "document_type_id",
+            "document_type not specified",
+            "Document type does not exist",
+        )),
+        Method::SetStoragePath => Some(fk(
+            "storage_path",
+            "documents_storagepath",
+            "storage_path_id",
+            "storage path not specified",
+            "Storage path does not exist",
+        )),
         _ => None,
     };
     if let Some((param, table, column, missing, unknown)) = fk_spec {
@@ -371,9 +407,7 @@ async fn cf_id_list_or_dict(conn: &mut PgConnection, v: &Value, name: &str) -> R
                 match drf::py_int_from_str(k) {
                     Some(i) => out.push(i),
                     None => {
-                        return Ok(Err(format!(
-                            "{name} must be a list of integers or a dict of id:value pairs, see the log for details"
-                        )));
+                        return Ok(Err(format!("{name} must be a list of integers or a dict of id:value pairs, see the log for details")));
                     }
                 }
             }
@@ -456,10 +490,7 @@ type ParsedPermissions = Vec<(&'static str, ParsedIds, ParsedIds)>;
 /// `SetPermissionsSerializer().run_validation(x)` → Ok(per action (users, groups) as raw values) or error.
 fn run_set_permissions_serializer(v: &Value) -> Result<ParsedPermissions, Value> {
     let Value::Object(map) = v else {
-        return Err(drf::non_field(format!(
-            "Invalid data. Expected a dictionary, but got {}.",
-            drf::py_type_name(v)
-        )));
+        return Err(drf::non_field(format!("Invalid data. Expected a dictionary, but got {}.", drf::py_type_name(v))));
     };
     let mut unknown: Vec<&String> = map.keys().filter(|k| *k != "view" && *k != "change").collect();
     if !unknown.is_empty() {
@@ -653,8 +684,7 @@ pub async fn execute(conn: &mut PgConnection, doc_ids: &[i64], params: &Params, 
                     return Err(ApiError::Uncaught("KeyError: custom field".into()));
                 };
                 let is_doclink = field.data_type == "documentlink";
-                let targets: Vec<i64> =
-                    value.as_array().map(|a| a.iter().filter_map(Value::as_i64).collect()).unwrap_or_default();
+                let targets: Vec<i64> = value.as_array().map(|a| a.iter().filter_map(Value::as_i64).collect()).unwrap_or_default();
                 for doc_id in &affected {
                     if is_doclink && drf::py_truthy(value) && targets.contains(doc_id) {
                         continue;
@@ -725,9 +755,7 @@ pub async fn execute(conn: &mut PgConnection, doc_ids: &[i64], params: &Params, 
             for id in ordered {
                 // The iterator has preloaded the instances: versions already deleted via the root
                 // are deleted again (without cascade).
-                if let Err(e) =
-                    crate::softdelete::soft_delete_document(conn, &ex.log, &ex.media, i64::from(id), Some(tid)).await
-                {
+                if let Err(e) = crate::softdelete::soft_delete_document(conn, &ex.log, &ex.media, i64::from(id), Some(tid)).await {
                     tracing::error!(target: "paperless.bulk_edit", "Error deleting documents: {e:?}");
                     break;
                 }
@@ -747,11 +775,7 @@ pub async fn execute(conn: &mut PgConnection, doc_ids: &[i64], params: &Params, 
                     sel.and_where(Expr::col(a(column)).is_not_null());
                 }
                 Some(v) => {
-                    sel.cond_where(
-                        sea_query::Cond::any()
-                            .add(Expr::col(a(column)).is_null())
-                            .add(Expr::col(a(column)).ne(i32v(*v))),
-                    );
+                    sel.cond_where(sea_query::Cond::any().add(Expr::col(a(column)).is_null()).add(Expr::col(a(column)).ne(i32v(*v))));
                 }
             }
             let (sql, values) = sel.build_sqlx(PostgresQueryBuilder);
@@ -987,5 +1011,4 @@ mod tests {
         p.insert("remote_ocr".into(), json!(true));
         assert!(!kwargs_accepted(m, &p));
     }
-
 }

@@ -52,12 +52,7 @@ fn model_file(state: &AppState) -> PathBuf {
 }
 
 fn match_threshold(state: &AppState) -> f64 {
-    state
-        .config()
-        .env
-        .get("PAPERLESS_CLASSIFIER_MATCH_THRESHOLD")
-        .and_then(|v| v.trim().parse().ok())
-        .unwrap_or(0.3)
+    state.config().env.get("PAPERLESS_CLASSIFIER_MATCH_THRESHOLD").and_then(|v| v.trim().parse().ok()).unwrap_or(0.3)
 }
 
 /// Loaded model in memory: re-read only if path, modification time or size of the
@@ -148,10 +143,9 @@ fn number_of_suggested_dates(state: &AppState) -> ApiResult<i64> {
 
 /// `OcrConfig().language`: `ApplicationConfiguration.language or settings.OCR_LANGUAGE`.
 async fn ocr_language(state: &AppState) -> ApiResult<String> {
-    let app: Option<Option<String>> =
-        sqlx::query_scalar("SELECT language FROM paperless_applicationconfiguration ORDER BY id LIMIT 1")
-            .fetch_optional(state.db())
-            .await?;
+    let app: Option<Option<String>> = sqlx::query_scalar("SELECT language FROM paperless_applicationconfiguration ORDER BY id LIMIT 1")
+        .fetch_optional(state.db())
+        .await?;
     Ok(match app.flatten().filter(|l| !l.is_empty()) {
         Some(l) => l,
         None => state.config().env.get("PAPERLESS_OCR_LANGUAGE").unwrap_or("eng").to_string(),
@@ -262,9 +256,8 @@ fn set_suggestions_cache(doc_id: i64, ident: Option<&(u32, String)>, user_id: i6
 /// model file and matching format version).
 async fn etag_and_last_modified(state: &AppState) -> ApiResult<(Option<String>, Option<i64>)> {
     let st = state.clone();
-    let classifier = tokio::task::spawn_blocking(move || load_classifier(&st))
-        .await
-        .map_err(|e| ApiError::internal(format!("classifier task: {e}")))?;
+    let classifier =
+        tokio::task::spawn_blocking(move || load_classifier(&st)).await.map_err(|e| ApiError::internal(format!("classifier task: {e}")))?;
     let Some(c) = classifier else { return Ok((None, None)) };
     if c.model.format_version != pl_classifier::FORMAT_VERSION {
         return Ok((None, None));
@@ -305,9 +298,7 @@ async fn view(state: &AppState, user: &User, pk: Option<i64>) -> ApiResult<Optio
     let Some(doc) = pl_files::db::load_doc(db, pk, false).await? else {
         return Err(ApiError::not_found_model("Document"));
     };
-    if !has_perms_owner_aware(db, Some(user), "change_document", &DOCUMENT, ObjRef { id: doc.id, owner_id: doc.owner_id })
-        .await?
-    {
+    if !has_perms_owner_aware(db, Some(user), "change_document", &DOCUMENT, ObjRef { id: doc.id, owner_id: doc.owner_id }).await? {
         return Ok(None);
     }
     let mut conn = db.acquire().await?;
@@ -319,9 +310,7 @@ async fn view(state: &AppState, user: &User, pk: Option<i64>) -> ApiResult<Optio
     drop(conn);
     let classifier = {
         let st = state.clone();
-        tokio::task::spawn_blocking(move || load_classifier(&st))
-            .await
-            .map_err(|e| ApiError::internal(format!("classifier task: {e}")))?
+        tokio::task::spawn_blocking(move || load_classifier(&st)).await.map_err(|e| ApiError::internal(format!("classifier task: {e}")))?
     };
     let n = number_of_suggested_dates(state)?;
     let ident = classifier.as_ref().and_then(classifier_identity);

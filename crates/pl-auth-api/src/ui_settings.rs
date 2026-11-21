@@ -15,9 +15,9 @@ use crate::profile::begin;
 use axum::extract::{Request, State};
 use axum::response::{IntoResponse, Response};
 use pl_authz::ObjectModel;
+use pl_core::sqlbind::SqlxBinder as _;
 use pl_core::{ApiError, AppState, Config, Drf};
 use sea_query::{Expr, PostgresQueryBuilder, Query};
-use pl_core::sqlbind::SqlxBinder as _;
 use serde_json::{Map, Value, json};
 use sqlx::Row;
 
@@ -90,11 +90,8 @@ fn validate(data: &Data) -> HResult<Option<Value>> {
         }
         other => {
             // form input "settings=x" is a str as well
-            Err(ApiError::field_error(
-                "settings",
-                format!("Expected a dictionary of items but got type \"{}\".", py_type_name(&other)),
-            )
-            .into())
+            Err(ApiError::field_error("settings", format!("Expected a dictionary of items but got type \"{}\".", py_type_name(&other)))
+                .into())
         }
     }
 }
@@ -221,111 +218,109 @@ fn or_env(db: Option<String>, env: Option<String>) -> Option<String> {
 }
 
 pub async fn get(State(state): State<AppState>, req: Request) -> Response {
-    respond(async {
-        let (r, auth) = begin(&state, req).await?;
-        let user = auth.require_model_perms(&UISETTINGS_MODEL)?.clone();
-        let data = r.data().await?;
-        validate(&data)?;
-        // email_enabled / trash_delay live (docs/SETTINGS.md WP4b).
-        let cfg = state.live_config();
-        let db = state.db();
+    respond(
+        async {
+            let (r, auth) = begin(&state, req).await?;
+            let user = auth.require_model_perms(&UISETTINGS_MODEL)?.clone();
+            let data = r.data().await?;
+            validate(&data)?;
+            // email_enabled / trash_delay live (docs/SETTINGS.md WP4b).
+            let cfg = state.live_config();
+            let db = state.db();
 
-        let Loaded { stored, ac } = load(db, user.id).await?;
-        let mut settings: Map<String, Value> = match stored {
-            None => Map::new(),
-            Some(None) => return Err(server_error("TypeError: argument of type 'NoneType' is not iterable")),
-            Some(Some(sqlx::types::Json(Value::Object(m)))) => m,
-            Some(Some(_)) => return Err(server_error("TypeError: stored ui settings are not a dict")),
-        };
+            let Loaded { stored, ac } = load(db, user.id).await?;
+            let mut settings: Map<String, Value> = match stored {
+                None => Map::new(),
+                Some(None) => return Err(server_error("TypeError: argument of type 'NoneType' is not iterable")),
+                Some(Some(sqlx::types::Json(Value::Object(m)))) => m,
+                Some(Some(_)) => return Err(server_error("TypeError: stored ui settings are not a dict")),
+            };
 
-        let backend_setting = match cfg.enable_update_check {
-            None => Value::String("default".into()),
-            Some(b) => Value::Bool(b),
-        };
-        match settings.get_mut("update_checking") {
-            Some(Value::Object(o)) => {
-                o.insert("backend_setting".into(), backend_setting);
+            let backend_setting = match cfg.enable_update_check {
+                None => Value::String("default".into()),
+                Some(b) => Value::Bool(b),
+            };
+            match settings.get_mut("update_checking") {
+                Some(Value::Object(o)) => {
+                    o.insert("backend_setting".into(), backend_setting);
+                }
+                Some(_) => return Err(server_error("TypeError: update_checking is not a dict")),
+                None => {
+                    settings.insert("update_checking".into(), json!({ "backend_setting": backend_setting }));
+                }
             }
-            Some(_) => return Err(server_error("TypeError: update_checking is not a dict")),
-            None => {
-                settings.insert("update_checking".into(), json!({ "backend_setting": backend_setting }));
+            settings.insert("trash_delay".into(), Value::from(cfg.empty_trash_delay));
+
+            settings.insert("version".into(), Value::String(VERSION.into()));
+            let title = ac.app_title.clone().filter(|s| !s.is_empty()).or_else(|| cfg.app_title.clone());
+            settings.insert("app_title".into(), title.map(Value::String).unwrap_or(Value::Null));
+            let logo = match ac.app_logo.clone().filter(|s| !s.is_empty()) {
+                Some(name) => Some(format!("{}{}", cfg.base_url, filepath_to_uri(&name))),
+                None => cfg.app_logo.clone(),
+            };
+            settings.insert("app_logo".into(), logo.map(Value::String).unwrap_or(Value::Null));
+            settings.insert("auditlog_enabled".into(), Value::Bool(cfg.audit_log_enabled));
+
+            let engine = or_env(ac.remote_ocr_engine, cfg.remote_ocr_engine.clone());
+            let api_key = or_env(ac.remote_ocr_api_key, cfg.remote_ocr_api_key.clone());
+            let endpoint = or_env(ac.remote_ocr_endpoint, cfg.remote_ocr_endpoint.clone());
+            let mode = or_env(ac.remote_ocr_mode, Some(cfg.remote_ocr_mode.clone()));
+            let configured = engine.as_deref() == Some("azureai") && api_key.is_some() && endpoint.is_some();
+            settings.insert("remote_ocr".into(), json!({ "configured": configured, "mode": mode }));
+
+            // PaperlessMailOAuth2Manager(): new state per request, stored in the session (standalone,
+            // docs/STANDALONE-GAPS.md; consumed by `/api/oauth/callback/` in pl-mail).
+            let mut set_cookie = None;
+            if mail_oauth_enabled(&cfg) {
+                let oauth_state = token_urlsafe_32();
+                let callback = oauth_callback_url(&cfg);
+                if cfg.gmail_oauth_enabled {
+                    let url = gmail_authorization_url(cfg.gmail_oauth_client_id.as_deref().unwrap_or(""), &callback, &oauth_state);
+                    settings.insert("gmail_oauth_url".into(), Value::String(url));
+                }
+                if cfg.outlook_oauth_enabled {
+                    let url = outlook_authorization_url(cfg.outlook_oauth_client_id.as_deref().unwrap_or(""), &callback, &oauth_state);
+                    settings.insert("outlook_oauth_url".into(), Value::String(url));
+                }
+                set_cookie =
+                    Some(crate::session::set_session_value(&state, &r.parts.headers, "oauth_state", Value::String(oauth_state)).await?);
             }
-        }
-        settings.insert("trash_delay".into(), Value::from(cfg.empty_trash_delay));
 
-        settings.insert("version".into(), Value::String(VERSION.into()));
-        let title = ac.app_title.clone().filter(|s| !s.is_empty()).or_else(|| cfg.app_title.clone());
-        settings.insert("app_title".into(), title.map(Value::String).unwrap_or(Value::Null));
-        let logo = match ac.app_logo.clone().filter(|s| !s.is_empty()) {
-            Some(name) => Some(format!("{}{}", cfg.base_url, filepath_to_uri(&name))),
-            None => cfg.app_logo.clone(),
-        };
-        settings.insert("app_logo".into(), logo.map(Value::String).unwrap_or(Value::Null));
-        settings.insert("auditlog_enabled".into(), Value::Bool(cfg.audit_log_enabled));
+            settings.insert("email_enabled".into(), Value::Bool(cfg.email_enabled));
+            settings.insert("ai_enabled".into(), Value::Bool(ac.ai_enabled.unwrap_or(cfg.ai_enabled)));
 
-        let engine = or_env(ac.remote_ocr_engine, cfg.remote_ocr_engine.clone());
-        let api_key = or_env(ac.remote_ocr_api_key, cfg.remote_ocr_api_key.clone());
-        let endpoint = or_env(ac.remote_ocr_endpoint, cfg.remote_ocr_endpoint.clone());
-        let mode = or_env(ac.remote_ocr_mode, Some(cfg.remote_ocr_mode.clone()));
-        let configured = engine.as_deref() == Some("azureai") && api_key.is_some() && endpoint.is_some();
-        settings.insert("remote_ocr".into(), json!({ "configured": configured, "mode": mode }));
-
-        // PaperlessMailOAuth2Manager(): new state per request, stored in the session (standalone,
-        // docs/STANDALONE-GAPS.md; consumed by `/api/oauth/callback/` in pl-mail).
-        let mut set_cookie = None;
-        if mail_oauth_enabled(&cfg) {
-            let oauth_state = token_urlsafe_32();
-            let callback = oauth_callback_url(&cfg);
-            if cfg.gmail_oauth_enabled {
-                let url = gmail_authorization_url(cfg.gmail_oauth_client_id.as_deref().unwrap_or(""), &callback, &oauth_state);
-                settings.insert("gmail_oauth_url".into(), Value::String(url));
+            let mut user_resp = Map::new();
+            user_resp.insert("id".into(), Value::from(user.id));
+            user_resp.insert("username".into(), Value::String(user.username.clone()));
+            user_resp.insert("is_staff".into(), Value::Bool(user.is_staff));
+            user_resp.insert("is_superuser".into(), Value::Bool(user.is_superuser));
+            user_resp.insert("groups".into(), Value::Array(user.groups.iter().copied().map(Value::from).collect()));
+            if !user.first_name.is_empty() {
+                user_resp.insert("first_name".into(), Value::String(user.first_name.clone()));
             }
-            if cfg.outlook_oauth_enabled {
-                let url = outlook_authorization_url(cfg.outlook_oauth_client_id.as_deref().unwrap_or(""), &callback, &oauth_state);
-                settings.insert("outlook_oauth_url".into(), Value::String(url));
+            if !user.last_name.is_empty() {
+                user_resp.insert("last_name".into(), Value::String(user.last_name.clone()));
             }
-            set_cookie = Some(
-                crate::session::set_session_value(&state, &r.parts.headers, "oauth_state", Value::String(oauth_state)).await?,
-            );
-        }
 
-        settings.insert("email_enabled".into(), Value::Bool(cfg.email_enabled));
-        settings.insert("ai_enabled".into(), Value::Bool(ac.ai_enabled.unwrap_or(cfg.ai_enabled)));
+            // get_all_permissions() with `^\w+.` stripped; inactive users have none
+            let mut perms: Vec<String> =
+                if user.is_active { user.permissions.iter().map(|p| strip_app_label(p)).collect() } else { Vec::new() };
+            perms.sort();
 
-        let mut user_resp = Map::new();
-        user_resp.insert("id".into(), Value::from(user.id));
-        user_resp.insert("username".into(), Value::String(user.username.clone()));
-        user_resp.insert("is_staff".into(), Value::Bool(user.is_staff));
-        user_resp.insert("is_superuser".into(), Value::Bool(user.is_superuser));
-        user_resp.insert("groups".into(), Value::Array(user.groups.iter().copied().map(Value::from).collect()));
-        if !user.first_name.is_empty() {
-            user_resp.insert("first_name".into(), Value::String(user.first_name.clone()));
+            let mut body = Map::new();
+            body.insert("user".into(), Value::Object(user_resp));
+            body.insert("settings".into(), Value::Object(settings));
+            body.insert("permissions".into(), Value::Array(perms.into_iter().map(Value::String).collect()));
+            let mut resp = Drf::ok(Value::Object(body)).into_response();
+            if let Some(c) = set_cookie
+                && let Ok(v) = axum::http::HeaderValue::from_str(&c)
+            {
+                resp.headers_mut().append(axum::http::header::SET_COOKIE, v);
+            }
+            Ok(resp)
         }
-        if !user.last_name.is_empty() {
-            user_resp.insert("last_name".into(), Value::String(user.last_name.clone()));
-        }
-
-        // get_all_permissions() with `^\w+.` stripped; inactive users have none
-        let mut perms: Vec<String> = if user.is_active {
-            user.permissions.iter().map(|p| strip_app_label(p)).collect()
-        } else {
-            Vec::new()
-        };
-        perms.sort();
-
-        let mut body = Map::new();
-        body.insert("user".into(), Value::Object(user_resp));
-        body.insert("settings".into(), Value::Object(settings));
-        body.insert("permissions".into(), Value::Array(perms.into_iter().map(Value::String).collect()));
-        let mut resp = Drf::ok(Value::Object(body)).into_response();
-        if let Some(c) = set_cookie
-            && let Ok(v) = axum::http::HeaderValue::from_str(&c)
-        {
-            resp.headers_mut().append(axum::http::header::SET_COOKIE, v);
-        }
-        Ok(resp)
-    }
-    .await)
+        .await,
+    )
 }
 
 /// `re.sub(r"^\w+.", "", perm)`: greedy word run at the start plus one more character.
@@ -355,27 +350,29 @@ fn strip_app_label(perm: &str) -> String {
 }
 
 pub async fn post(State(state): State<AppState>, req: Request) -> Response {
-    respond(async {
-        let (r, auth) = begin(&state, req).await?;
-        let user = auth.require_model_perms(&UISETTINGS_MODEL)?.clone();
-        let data = r.data().await?;
-        let settings = validate(&data)?;
-        let value = match settings {
-            Some(v) => Expr::val(v.to_string()).cast_as(a("jsonb")),
-            None => Expr::val(Option::<String>::None).cast_as(a("jsonb")),
-        };
-        // UiSettings.objects.update_or_create(user=user, defaults={"settings": ...})
-        let (sql, values) = Query::insert()
-            .into_table(a("documents_uisettings"))
-            .columns([a("settings"), a("user_id")])
-            .values([value, user.id.into()])
-            .map_err(crate::db::qerr)?
-            .on_conflict(sea_query::OnConflict::column(a("user_id")).update_column(a("settings")).to_owned())
-            .build_sqlx(PostgresQueryBuilder);
-        sqlx::query_with(&sql, values).execute(state.db()).await?;
-        Ok(Drf::ok(json!({ "success": true })).into_response())
-    }
-    .await)
+    respond(
+        async {
+            let (r, auth) = begin(&state, req).await?;
+            let user = auth.require_model_perms(&UISETTINGS_MODEL)?.clone();
+            let data = r.data().await?;
+            let settings = validate(&data)?;
+            let value = match settings {
+                Some(v) => Expr::val(v.to_string()).cast_as(a("jsonb")),
+                None => Expr::val(Option::<String>::None).cast_as(a("jsonb")),
+            };
+            // UiSettings.objects.update_or_create(user=user, defaults={"settings": ...})
+            let (sql, values) = Query::insert()
+                .into_table(a("documents_uisettings"))
+                .columns([a("settings"), a("user_id")])
+                .values([value, user.id.into()])
+                .map_err(crate::db::qerr)?
+                .on_conflict(sea_query::OnConflict::column(a("user_id")).update_column(a("settings")).to_owned())
+                .build_sqlx(PostgresQueryBuilder);
+            sqlx::query_with(&sql, values).execute(state.db()).await?;
+            Ok(Drf::ok(json!({ "success": true })).into_response())
+        }
+        .await,
+    )
 }
 
 #[cfg(test)]

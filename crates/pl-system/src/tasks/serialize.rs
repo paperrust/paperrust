@@ -118,9 +118,9 @@ pub fn py_int(v: &Value) -> Result<i64, String> {
                 Err(format!("int too large: {n}"))
             }
         }
-        Value::String(s) => py::int(s)
-            .and_then(|i| i64::try_from(i).ok())
-            .ok_or_else(|| format!("invalid literal for int() with base 10: {s:?}")),
+        Value::String(s) => {
+            py::int(s).and_then(|i| i64::try_from(i).ok()).ok_or_else(|| format!("invalid literal for int() with base 10: {s:?}"))
+        }
         other => Err(format!("int() argument must be a string or a number, not {other}")),
     }
 }
@@ -139,8 +139,7 @@ fn float(v: Option<f64>) -> Value {
 
 /// `TaskSerializerV10(task).data`
 pub fn v10(t: &TaskRow, lang: &str, tz: &Tz) -> Result<Value, String> {
-    let related: Result<Vec<Value>, String> =
-        t.related_document_ids_raw().iter().map(|v| py_int(v).map(Value::from)).collect();
+    let related: Result<Vec<Value>, String> = t.related_document_ids_raw().iter().map(|v| py_int(v).map(Value::from)).collect();
     let mut m = Map::new();
     m.insert("id".into(), Value::from(t.id));
     m.insert("task_id".into(), Value::from(t.task_id.clone()));
@@ -258,9 +257,24 @@ mod tests {
         assert_eq!(
             keys,
             vec![
-                "id", "task_id", "task_type", "task_type_display", "trigger_source", "trigger_source_display",
-                "status", "status_display", "date_created", "date_started", "date_done", "duration_seconds",
-                "wait_time_seconds", "input_data", "result_data", "related_document_ids", "acknowledged", "owner"
+                "id",
+                "task_id",
+                "task_type",
+                "task_type_display",
+                "trigger_source",
+                "trigger_source_display",
+                "status",
+                "status_display",
+                "date_created",
+                "date_started",
+                "date_done",
+                "duration_seconds",
+                "wait_time_seconds",
+                "input_data",
+                "result_data",
+                "related_document_ids",
+                "acknowledged",
+                "owner"
             ]
         );
         assert_eq!(v["related_document_ids"], json!([7]));

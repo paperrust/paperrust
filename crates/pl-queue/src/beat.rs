@@ -42,7 +42,13 @@ pub const DEFAULT_ENTRIES: &[(&str, &str, &str, &str, f64)] = &[
     ("Check all e-mail accounts", "PAPERLESS_EMAIL_TASK_CRON", "*/10 * * * *", "paperless_mail.tasks.process_mail_accounts", 9.0 * 60.0),
     ("Train the classifier", "PAPERLESS_TRAIN_TASK_CRON", "5 */1 * * *", "documents.tasks.train_classifier", 59.0 * 60.0),
     ("Optimize the index", "PAPERLESS_INDEX_TASK_CRON", "0 0 * * *", "documents.tasks.index_optimize", 23.0 * 60.0 * 60.0),
-    ("Perform sanity check", "PAPERLESS_SANITY_TASK_CRON", "30 0 * * sun", "documents.tasks.sanity_check", ((7.0 * 24.0) - 1.0) * 60.0 * 60.0),
+    (
+        "Perform sanity check",
+        "PAPERLESS_SANITY_TASK_CRON",
+        "30 0 * * sun",
+        "documents.tasks.sanity_check",
+        ((7.0 * 24.0) - 1.0) * 60.0 * 60.0,
+    ),
     ("Empty trash", "PAPERLESS_EMPTY_TRASH_TASK_CRON", "0 1 * * *", "documents.tasks.empty_trash", 23.0 * 60.0 * 60.0),
     (
         "Check and run scheduled workflows",
@@ -103,7 +109,12 @@ pub fn parse_beat_schedule(env: &Env) -> Result<Vec<BeatEntry>, ConfigError> {
 pub trait BeatStore: Send + Sync {
     /// Checks under lock whether `entry` is due and reserves the run (`last_run_at = now`).
     /// Returns `(due, seconds until the next run)`.
-    fn reserve<'a>(&'a self, entry: &'a BeatEntry, now: DateTime<Utc>, tz: Tz) -> futures::future::BoxFuture<'a, Result<(bool, f64), crate::QueueError>>;
+    fn reserve<'a>(
+        &'a self,
+        entry: &'a BeatEntry,
+        now: DateTime<Utc>,
+        tz: Tz,
+    ) -> futures::future::BoxFuture<'a, Result<(bool, f64), crate::QueueError>>;
     /// Remove entries that are no longer in the schedule (`merge_inplace`).
     fn retain<'a>(&'a self, names: &'a [String]) -> futures::future::BoxFuture<'a, Result<(), crate::QueueError>>;
 }
@@ -131,27 +142,33 @@ pub const CATCH_UP_ON_FIRST_START: &[&str] = &[];
 /// `last_run_at` for a new entry: now (Celery `default_now`), for
 /// [`CATCH_UP_ON_FIRST_START`] far in the past → due on the first tick.
 pub fn initial_last_run(entry: &BeatEntry, now: DateTime<Utc>) -> DateTime<Utc> {
-    if CATCH_UP_ON_FIRST_START.contains(&entry.task.as_str()) {
-        now - chrono::Duration::days(400)
-    } else {
-        now
-    }
+    if CATCH_UP_ON_FIRST_START.contains(&entry.task.as_str()) { now - chrono::Duration::days(400) } else { now }
 }
 
 impl BeatStore for PgBeatStore {
-    fn reserve<'a>(&'a self, entry: &'a BeatEntry, now: DateTime<Utc>, tz: Tz) -> futures::future::BoxFuture<'a, Result<(bool, f64), crate::QueueError>> {
+    fn reserve<'a>(
+        &'a self,
+        entry: &'a BeatEntry,
+        now: DateTime<Utc>,
+        tz: Tz,
+    ) -> futures::future::BoxFuture<'a, Result<(bool, f64), crate::QueueError>> {
         Box::pin(async move {
             let mut tx = self.pool.begin().await?;
             // New entry: last_run_at = now (ScheduleEntry.default_now) → first run at the
             // next matching time; exception CATCH_UP_ON_FIRST_START.
-            sqlx::query("INSERT INTO paperrust_beat_state (name, task, last_run_at, tz) VALUES ($1, $2, $3, $4) ON CONFLICT (name) DO NOTHING")
+            sqlx::query(
+                "INSERT INTO paperrust_beat_state (name, task, last_run_at, tz) VALUES ($1, $2, $3, $4) ON CONFLICT (name) DO NOTHING",
+            )
+            .bind(&entry.name)
+            .bind(&entry.task)
+            .bind(initial_last_run(entry, now))
+            .bind(tz.name())
+            .execute(&mut *tx)
+            .await?;
+            let row = sqlx::query("SELECT last_run_at, tz FROM paperrust_beat_state WHERE name = $1 FOR UPDATE")
                 .bind(&entry.name)
-                .bind(&entry.task)
-                .bind(initial_last_run(entry, now))
-                .bind(tz.name())
-                .execute(&mut *tx)
+                .fetch_one(&mut *tx)
                 .await?;
-            let row = sqlx::query("SELECT last_run_at, tz FROM paperrust_beat_state WHERE name = $1 FOR UPDATE").bind(&entry.name).fetch_one(&mut *tx).await?;
             let mut last: DateTime<Utc> = row.try_get("last_run_at")?;
             let stored_tz: String = row.try_get("tz")?;
             if stored_tz != tz.name() {
@@ -167,12 +184,14 @@ impl BeatStore for PgBeatStore {
             }
             let (due, rem) = entry.schedule.is_due(last, now, tz);
             if due {
-                sqlx::query("UPDATE paperrust_beat_state SET last_run_at = $1, task = $2, total_run_count = total_run_count + 1 WHERE name = $3")
-                    .bind(now)
-                    .bind(&entry.task)
-                    .bind(&entry.name)
-                    .execute(&mut *tx)
-                    .await?;
+                sqlx::query(
+                    "UPDATE paperrust_beat_state SET last_run_at = $1, task = $2, total_run_count = total_run_count + 1 WHERE name = $3",
+                )
+                .bind(now)
+                .bind(&entry.task)
+                .bind(&entry.name)
+                .execute(&mut *tx)
+                .await?;
             }
             tx.commit().await?;
             Ok((due, rem))
@@ -195,7 +214,12 @@ pub struct MemoryBeatStore {
 }
 
 impl BeatStore for MemoryBeatStore {
-    fn reserve<'a>(&'a self, entry: &'a BeatEntry, now: DateTime<Utc>, tz: Tz) -> futures::future::BoxFuture<'a, Result<(bool, f64), crate::QueueError>> {
+    fn reserve<'a>(
+        &'a self,
+        entry: &'a BeatEntry,
+        now: DateTime<Utc>,
+        tz: Tz,
+    ) -> futures::future::BoxFuture<'a, Result<(bool, f64), crate::QueueError>> {
         Box::pin(async move {
             let mut m = self.last.lock().unwrap_or_else(|p| p.into_inner());
             let last = *m.entry(entry.name.clone()).or_insert_with(|| initial_last_run(entry, now));

@@ -34,29 +34,18 @@ pub struct Message {
 /// Title from the first question (at most 80 characters).
 pub fn title_of(question: &str) -> String {
     let flat = question.split_whitespace().collect::<Vec<_>>().join(" ");
-    if flat.chars().count() <= 80 {
-        flat
-    } else {
-        format!("{}…", flat.chars().take(79).collect::<String>())
-    }
+    if flat.chars().count() <= 80 { flat } else { format!("{}…", flat.chars().take(79).collect::<String>()) }
 }
 
 /// Fetch own conversation (`Some(uuid)`, otherwise `NotFound`) or create a new one. → (id, uuid)
-pub async fn open(
-    pool: &PgPool,
-    user_id: i64,
-    conversation: Option<Uuid>,
-    question: &str,
-) -> Result<(i64, Uuid)> {
+pub async fn open(pool: &PgPool, user_id: i64, conversation: Option<Uuid>, question: &str) -> Result<(i64, Uuid)> {
     ensure(pool).await?;
     if let Some(u) = conversation {
-        let id: Option<i64> = sqlx::query_scalar(
-            "SELECT id FROM paperrust_ask_conversation WHERE uuid = $1 AND user_id = $2",
-        )
-        .bind(u)
-        .bind(user_id as i32)
-        .fetch_optional(pool)
-        .await?;
+        let id: Option<i64> = sqlx::query_scalar("SELECT id FROM paperrust_ask_conversation WHERE uuid = $1 AND user_id = $2")
+            .bind(u)
+            .bind(user_id as i32)
+            .fetch_optional(pool)
+            .await?;
         return id.map(|i| (i, u)).ok_or(TimelineError::NotFound);
     }
     let (id, u): (i64, Uuid) = sqlx::query_as("INSERT INTO paperrust_ask_conversation (user_id, title) VALUES ($1, $2) RETURNING id, uuid")
@@ -94,10 +83,7 @@ pub async fn add(
     .bind(meta)
     .fetch_one(&mut *tx)
     .await?;
-    sqlx::query("UPDATE paperrust_ask_conversation SET updated = now() WHERE id = $1")
-        .bind(conv)
-        .execute(&mut *tx)
-        .await?;
+    sqlx::query("UPDATE paperrust_ask_conversation SET updated = now() WHERE id = $1").bind(conv).execute(&mut *tx).await?;
     tx.commit().await?;
     Ok(r)
 }
@@ -121,24 +107,14 @@ fn cursor_of(c: &Conversation) -> String {
 
 fn parse_cursor(s: &str) -> Option<(DateTime<Utc>, i64)> {
     let (t, i) = s.split_once('.')?;
-    Some((
-        DateTime::from_timestamp_micros(t.parse().ok()?)?,
-        i.parse().ok()?,
-    ))
+    Some((DateTime::from_timestamp_micros(t.parse().ok()?)?, i.parse().ok()?))
 }
 
 /// Own conversations, most recently active first. → (page, next cursor)
-pub async fn list(
-    pool: &PgPool,
-    user_id: i64,
-    limit: i64,
-    cursor: Option<&str>,
-) -> Result<(Vec<Conversation>, Option<String>)> {
+pub async fn list(pool: &PgPool, user_id: i64, limit: i64, cursor: Option<&str>) -> Result<(Vec<Conversation>, Option<String>)> {
     ensure(pool).await?;
     let after = match cursor {
-        Some(c) => {
-            Some(parse_cursor(c).ok_or_else(|| crate::invalid("cursor", "Invalid cursor."))?)
-        }
+        Some(c) => Some(parse_cursor(c).ok_or_else(|| crate::invalid("cursor", "Invalid cursor."))?),
         None => None,
     };
     let rows = sqlx::query(&format!(
@@ -163,40 +139,36 @@ pub async fn list(
 }
 
 /// Own conversation with messages.
-pub async fn get(
-    pool: &PgPool,
-    user_id: i64,
-    uuid: Uuid,
-) -> Result<Option<(Conversation, Vec<Message>)>> {
+pub async fn get(pool: &PgPool, user_id: i64, uuid: Uuid) -> Result<Option<(Conversation, Vec<Message>)>> {
     ensure(pool).await?;
-    let Some(r) = sqlx::query(&format!(
-        "SELECT {CONV_COLS} FROM paperrust_ask_conversation c WHERE c.uuid = $1 AND c.user_id = $2"
-    ))
-    .bind(uuid)
-    .bind(user_id as i32)
-    .fetch_optional(pool)
-    .await?
+    let Some(r) = sqlx::query(&format!("SELECT {CONV_COLS} FROM paperrust_ask_conversation c WHERE c.uuid = $1 AND c.user_id = $2"))
+        .bind(uuid)
+        .bind(user_id as i32)
+        .fetch_optional(pool)
+        .await?
     else {
         return Ok(None);
     };
     let c = conv_from(&r)?;
-    let msgs = sqlx::query("SELECT uuid, role, content, citations, actions, meta, created FROM paperrust_ask_message WHERE conversation_id = $1 ORDER BY id")
-        .bind(c.id)
-        .fetch_all(pool)
-        .await?
-        .iter()
-        .map(|m| {
-            Ok(Message {
-                uuid: m.try_get("uuid")?,
-                role: m.try_get("role")?,
-                content: m.try_get("content")?,
-                citations: m.try_get("citations")?,
-                actions: m.try_get("actions")?,
-                meta: m.try_get("meta")?,
-                created: m.try_get("created")?,
-            })
+    let msgs = sqlx::query(
+        "SELECT uuid, role, content, citations, actions, meta, created FROM paperrust_ask_message WHERE conversation_id = $1 ORDER BY id",
+    )
+    .bind(c.id)
+    .fetch_all(pool)
+    .await?
+    .iter()
+    .map(|m| {
+        Ok(Message {
+            uuid: m.try_get("uuid")?,
+            role: m.try_get("role")?,
+            content: m.try_get("content")?,
+            citations: m.try_get("citations")?,
+            actions: m.try_get("actions")?,
+            meta: m.try_get("meta")?,
+            created: m.try_get("created")?,
         })
-        .collect::<Result<Vec<_>>>()?;
+    })
+    .collect::<Result<Vec<_>>>()?;
     Ok(Some((c, msgs)))
 }
 
@@ -215,13 +187,7 @@ pub async fn delete(pool: &PgPool, user_id: i64, uuid: Uuid) -> Result<bool> {
 /// Delete all own conversations.
 pub async fn delete_all(pool: &PgPool, user_id: i64) -> Result<u64> {
     ensure(pool).await?;
-    Ok(
-        sqlx::query("DELETE FROM paperrust_ask_conversation WHERE user_id = $1")
-            .bind(user_id as i32)
-            .execute(pool)
-            .await?
-            .rows_affected(),
-    )
+    Ok(sqlx::query("DELETE FROM paperrust_ask_conversation WHERE user_id = $1").bind(user_id as i32).execute(pool).await?.rows_affected())
 }
 
 #[cfg(test)]
@@ -230,20 +196,10 @@ mod tests {
 
     #[test]
     fn titles_and_cursor() {
-        assert_eq!(
-            title_of("  Wann  ist\n die Rechnung fällig? "),
-            "Wann ist die Rechnung fällig?"
-        );
+        assert_eq!(title_of("  Wann  ist\n die Rechnung fällig? "), "Wann ist die Rechnung fällig?");
         let long = "x".repeat(200);
         assert_eq!(title_of(&long).chars().count(), 80);
-        let c = Conversation {
-            id: 7,
-            uuid: Uuid::nil(),
-            title: "t".into(),
-            created: Utc::now(),
-            updated: Utc::now(),
-            message_count: 0,
-        };
+        let c = Conversation { id: 7, uuid: Uuid::nil(), title: "t".into(), created: Utc::now(), updated: Utc::now(), message_count: 0 };
         let (t, i) = parse_cursor(&cursor_of(&c)).unwrap();
         assert_eq!((t.timestamp_micros(), i), (c.updated.timestamp_micros(), 7));
         assert!(parse_cursor("nope").is_none());

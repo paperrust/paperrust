@@ -237,11 +237,26 @@ mod reference_tree {
     #[allow(clippy::type_complexity)]
     fn matches_django_treenode_on_reference_seed() {
         let rows: &[(i64, Option<i64>, &str)] = &[
-            (1, None, "Inbox"), (2, None, "Finance"), (3, Some(2), "Taxes"), (4, Some(3), "Taxes 2024"),
-            (5, Some(3), "Taxes 2025"), (6, Some(2), "Invoices"), (7, Some(6), "Paid"), (8, Some(6), "Unpaid"),
-            (9, Some(8), "Overdue"), (10, None, "Home"), (11, Some(10), "Rent"), (12, Some(10), "Utilities"),
-            (13, None, "Health"), (14, None, "Insurance"), (15, None, "Vehicle"), (16, None, "Important"),
-            (17, None, "To Do"), (18, None, "Archive"), (19, None, "Private"), (20, None, "Ümlaut-Tag ä"),
+            (1, None, "Inbox"),
+            (2, None, "Finance"),
+            (3, Some(2), "Taxes"),
+            (4, Some(3), "Taxes 2024"),
+            (5, Some(3), "Taxes 2025"),
+            (6, Some(2), "Invoices"),
+            (7, Some(6), "Paid"),
+            (8, Some(6), "Unpaid"),
+            (9, Some(8), "Overdue"),
+            (10, None, "Home"),
+            (11, Some(10), "Rent"),
+            (12, Some(10), "Utilities"),
+            (13, None, "Health"),
+            (14, None, "Insurance"),
+            (15, None, "Vehicle"),
+            (16, None, "Important"),
+            (17, None, "To Do"),
+            (18, None, "Archive"),
+            (19, None, "Private"),
+            (20, None, "Ümlaut-Tag ä"),
         ];
         let nodes: Vec<Node> = rows.iter().map(|(pk, p, n)| Node { pk: *pk, parent: *p, priority: 0, name: (*n).into() }).collect();
         let t = compute(&nodes);
@@ -264,7 +279,16 @@ mod reference_tree {
         for (id, anc, ch, de, order, index, level, depth, sib) in expected {
             let f = &t[id];
             assert_eq!(
-                (f.tn_ancestors_pks.as_str(), f.tn_children_pks.as_str(), f.tn_descendants_pks.as_str(), f.tn_order, f.tn_index, f.tn_level, f.tn_depth, f.tn_siblings_pks.as_str()),
+                (
+                    f.tn_ancestors_pks.as_str(),
+                    f.tn_children_pks.as_str(),
+                    f.tn_descendants_pks.as_str(),
+                    f.tn_order,
+                    f.tn_index,
+                    f.tn_level,
+                    f.tn_depth,
+                    f.tn_siblings_pks.as_str()
+                ),
                 (*anc, *ch, *de, *order, *index, *level, *depth, *sib),
                 "tag {id}"
             );

@@ -50,26 +50,11 @@ pub struct Item {
 
 /// Older names that paperless-ngx v3.4.2 no longer knows.
 pub const OBSOLETE: &[(&str, &str)] = &[
-    (
-        "PAPERLESS_CONSUMER_INOTIFY_DELAY",
-        "replaced by PAPERLESS_CONSUMER_STABILITY_DELAY",
-    ),
-    (
-        "PAPERLESS_FILENAME_PARSE_TRANSFORMS",
-        "removed in paperless-ngx",
-    ),
-    (
-        "PAPERLESS_PASSPHRASE",
-        "GPG storage was removed in paperless-ngx 2.x",
-    ),
-    (
-        "PAPERLESS_CONSUMER_POLLING_DELAY",
-        "removed, see PAPERLESS_CONSUMER_STABILITY_DELAY",
-    ),
-    (
-        "PAPERLESS_CONSUMER_POLLING_RETRY_COUNT",
-        "removed, see PAPERLESS_CONSUMER_STABILITY_DELAY",
-    ),
+    ("PAPERLESS_CONSUMER_INOTIFY_DELAY", "replaced by PAPERLESS_CONSUMER_STABILITY_DELAY"),
+    ("PAPERLESS_FILENAME_PARSE_TRANSFORMS", "removed in paperless-ngx"),
+    ("PAPERLESS_PASSPHRASE", "GPG storage was removed in paperless-ngx 2.x"),
+    ("PAPERLESS_CONSUMER_POLLING_DELAY", "removed, see PAPERLESS_CONSUMER_STABILITY_DELAY"),
+    ("PAPERLESS_CONSUMER_POLLING_RETRY_COUNT", "removed, see PAPERLESS_CONSUMER_STABILITY_DELAY"),
     ("PAPERLESS_WORKER_RETRY", "removed in paperless-ngx"),
     ("PAPERLESS_OCR_ALWAYS", "replaced by PAPERLESS_OCR_MODE"),
 ];
@@ -104,11 +89,9 @@ pub fn classify(name: &str, value: &str, source: &'static str, current: Option<&
         verdict: Verdict::Unknown,
         reason: None,
     };
-    if let Some((_, hint)) = OBSOLETE.iter().find(|(n, _)| {
-        *n == name
-            || n.strip_prefix("PAPERLESS_")
-                .is_some_and(|r| name == format!("PAPERRUST_{r}"))
-    }) {
+    if let Some((_, hint)) =
+        OBSOLETE.iter().find(|(n, _)| *n == name || n.strip_prefix("PAPERLESS_").is_some_and(|r| name == format!("PAPERRUST_{r}")))
+    {
         item.verdict = Verdict::Obsolete;
         item.reason = Some((*hint).to_string());
         return item;
@@ -126,24 +109,14 @@ pub fn classify(name: &str, value: &str, source: &'static str, current: Option<&
         Class::A | Class::B if !def.is_env() => Verdict::MustStay,
         Class::A | Class::B => {
             let adopted = current.and_then(|s| s.get(def.key)).is_some_and(|e| {
-                (e.in_db
-                    || e.source == Source::AppConfig
-                    || e.shadowed
-                        .as_ref()
-                        .is_some_and(|sh| sh.source == Source::Db))
+                (e.in_db || e.source == Source::AppConfig || e.shadowed.as_ref().is_some_and(|sh| sh.source == Source::Db))
                     && db_value(current, def) == Some(value.to_string())
             });
-            if adopted {
-                Verdict::Adopted
-            } else {
-                Verdict::Adoptable
-            }
+            if adopted { Verdict::Adopted } else { Verdict::Adoptable }
         }
     };
     item.reason = match item.verdict {
-        Verdict::Adopted => {
-            Some("already in the database – can be removed from the environment".into())
-        }
+        Verdict::Adopted => Some("already in the database – can be removed from the environment".into()),
         _ => reason_for(def),
     };
     item
@@ -154,11 +127,7 @@ fn db_value(s: Option<&Settings>, def: &SettingDef) -> Option<String> {
     let e = s?.get(def.key)?;
     match e.source {
         Source::Db | Source::AppConfig => e.value.clone(),
-        _ => e
-            .shadowed
-            .as_ref()
-            .filter(|sh| matches!(sh.source, Source::Db | Source::AppConfig))
-            .and_then(|sh| sh.value.clone()),
+        _ => e.shadowed.as_ref().filter(|sh| matches!(sh.source, Source::Db | Source::AppConfig)).and_then(|sh| sh.value.clone()),
     }
 }
 
@@ -182,17 +151,9 @@ pub fn origin(s: &Settings) -> Vec<Item> {
             },
             _ => continue,
         };
-        let raw = if e.source == Source::AppConfig {
-            e.shadowed.as_ref().and_then(|sh| sh.value.clone())
-        } else {
-            e.value.clone()
-        };
+        let raw = if e.source == Source::AppConfig { e.shadowed.as_ref().and_then(|sh| sh.value.clone()) } else { e.value.clone() };
         let Some(raw) = raw else { continue };
-        let name = e
-            .source_detail
-            .clone()
-            .filter(|d| is_ours(d))
-            .unwrap_or_else(|| e.def.key.to_string());
+        let name = e.source_detail.clone().filter(|d| is_ours(d)).unwrap_or_else(|| e.def.key.to_string());
         let mut it = classify(&name, &raw, src, Some(s));
         if src == "desktop" && it.verdict == Verdict::Adoptable {
             it.verdict = Verdict::MustStay;
@@ -205,11 +166,7 @@ pub fn origin(s: &Settings) -> Vec<Item> {
 
 /// Checks uploaded variables (from [`parse_file`]).
 pub fn check_pairs(pairs: &[(String, String)], current: Option<&Settings>) -> Vec<Item> {
-    pairs
-        .iter()
-        .filter(|(k, _)| is_ours(k))
-        .map(|(k, v)| classify(k, v, "upload", current))
-        .collect()
+    pairs.iter().filter(|(k, _)| is_ours(k)).map(|(k, v)| classify(k, v, "upload", current)).collect()
 }
 
 /// Detected file kind.
@@ -240,12 +197,7 @@ pub fn parse_file(text: &str) -> ParsedFile {
     {
         return p;
     }
-    ParsedFile {
-        kind: FileKind::Dotenv,
-        service: None,
-        pairs: pl_core::config::parse_dotenv(text),
-        env_files: Vec::new(),
-    }
+    ParsedFile { kind: FileKind::Dotenv, service: None, pairs: pl_core::config::parse_dotenv(text), env_files: Vec::new() }
 }
 
 fn unquote(v: &str) -> String {
@@ -254,9 +206,7 @@ fn unquote(v: &str) -> String {
         Some(i) if !(v.starts_with('"') || v.starts_with('\'')) => v[..i].trim_end(),
         _ => v,
     };
-    if v.len() >= 2
-        && ((v.starts_with('"') && v.ends_with('"')) || (v.starts_with('\'') && v.ends_with('\'')))
-    {
+    if v.len() >= 2 && ((v.starts_with('"') && v.ends_with('"')) || (v.starts_with('\'') && v.ends_with('\''))) {
         v[1..v.len() - 1].to_string()
     } else {
         v.to_string()
@@ -286,20 +236,11 @@ fn parse_compose(text: &str) -> Option<ParsedFile> {
             if let Some(last) = services.last_mut() {
                 last.2 = i;
             }
-            services.push((
-                l.trim().trim_end_matches(':').to_string(),
-                i + 1,
-                lines.len(),
-            ));
+            services.push((l.trim().trim_end_matches(':').to_string(), i + 1, lines.len()));
         }
     }
     if let Some(last) = services.last_mut() {
-        let end = lines
-            .iter()
-            .enumerate()
-            .skip(last.1)
-            .find(|(_, l)| !l.trim().is_empty() && indent(l) == 0)
-            .map(|(i, _)| i);
+        let end = lines.iter().enumerate().skip(last.1).find(|(_, l)| !l.trim().is_empty() && indent(l) == 0).map(|(i, _)| i);
         if let Some(e) = end {
             last.2 = last.2.min(e);
         }
@@ -308,11 +249,7 @@ fn parse_compose(text: &str) -> Option<ParsedFile> {
         let mut pairs = Vec::new();
         let mut files = Vec::new();
         let body: Vec<&str> = lines[from..to].to_vec();
-        let child = body
-            .iter()
-            .find(|l| !l.trim().is_empty() && !l.trim_start().starts_with('#'))
-            .map(|l| indent(l))
-            .unwrap_or(0);
+        let child = body.iter().find(|l| !l.trim().is_empty() && !l.trim_start().starts_with('#')).map(|l| indent(l)).unwrap_or(0);
         let mut i = 0;
         while i < body.len() {
             let l = body[i];
@@ -321,9 +258,7 @@ fn parse_compose(text: &str) -> Option<ParsedFile> {
                 let is_env = t.starts_with("environment:");
                 let inline = t.split_once(':').map(|(_, r)| r.trim()).unwrap_or("");
                 if !inline.is_empty() && !is_env {
-                    files.push(unquote(
-                        inline.trim_start_matches('[').trim_end_matches(']'),
-                    ));
+                    files.push(unquote(inline.trim_start_matches('[').trim_end_matches(']')));
                 }
                 i += 1;
                 while i < body.len() {
@@ -347,8 +282,7 @@ fn parse_compose(text: &str) -> Option<ParsedFile> {
                             }
                             None => {
                                 if let Some((k, v)) = t2.split_once(':') {
-                                    pairs
-                                        .push((k.trim().trim_matches('"').to_string(), unquote(v)));
+                                    pairs.push((k.trim().trim_matches('"').to_string(), unquote(v)));
                                 }
                             }
                         }
@@ -379,19 +313,11 @@ fn parse_compose(text: &str) -> Option<ParsedFile> {
         }
     }
     let (service, pairs, env_files) = chosen?;
-    Some(ParsedFile {
-        kind: FileKind::Compose,
-        service: Some(service),
-        pairs,
-        env_files,
-    })
+    Some(ParsedFile { kind: FileKind::Compose, service: Some(service), pairs, env_files })
 }
 
 fn quote_env(v: &str) -> String {
-    if v.is_empty()
-        || v.chars()
-            .any(|c| c.is_whitespace() || matches!(c, '#' | '"' | '\'' | '$' | '\\'))
-    {
+    if v.is_empty() || v.chars().any(|c| c.is_whitespace() || matches!(c, '#' | '"' | '\'' | '$' | '\\')) {
         format!("\"{}\"", v.replace('\\', "\\\\").replace('"', "\\\""))
     } else {
         v.to_string()
@@ -406,22 +332,12 @@ pub fn slim_env(items: &[Item], other_lines: &[(String, String)], mask_secrets: 
     let mut removed = Vec::new();
     for it in items {
         match it.verdict {
-            Verdict::Adopted => removed.push(format!(
-                "# {} – {}",
-                it.name, "already in the database (web UI)"
-            )),
+            Verdict::Adopted => removed.push(format!("# {} – {}", it.name, "already in the database (web UI)")),
             Verdict::NoEffect => removed.push(format!("# {} – no effect in PaperRust", it.name)),
-            Verdict::Obsolete => removed.push(format!(
-                "# {} – {}",
-                it.name,
-                it.reason.clone().unwrap_or_default()
-            )),
+            Verdict::Obsolete => removed.push(format!("# {} – {}", it.name, it.reason.clone().unwrap_or_default())),
             _ => {
                 let line = if it.secret && mask_secrets {
-                    format!(
-                        "# {}=<secret – copy the value from your current configuration>",
-                        it.name
-                    )
+                    format!("# {}=<secret – copy the value from your current configuration>", it.name)
                 } else {
                     format!("{}={}", it.name, quote_env(&it.raw))
                 };
@@ -434,9 +350,7 @@ pub fn slim_env(items: &[Item], other_lines: &[(String, String)], mask_secrets: 
             }
         }
     }
-    let mut out = String::from(
-        "# docker-compose.env generated by PaperRust (only what must stay in the environment)\n",
-    );
+    let mut out = String::from("# docker-compose.env generated by PaperRust (only what must stay in the environment)\n");
     for l in keep {
         out.push_str(&l);
         out.push('\n');
@@ -462,69 +376,33 @@ mod tests {
 
     #[test]
     fn classify_names() {
-        assert_eq!(
-            classify("PAPERLESS_DBHOST", "db", "env", None).verdict,
-            Verdict::MustStay
-        );
-        assert_eq!(
-            classify("PAPERLESS_TRUSTED_PROXIES", "x", "env", None).verdict,
-            Verdict::MustStay
-        );
-        assert_eq!(
-            classify("PAPERLESS_TIKA_ENABLED", "1", "env", None).verdict,
-            Verdict::NoEffect
-        );
-        assert_eq!(
-            classify("PAPERLESS_TIME_ZONE", "Europe/Zurich", "env", None).verdict,
-            Verdict::Adoptable
-        );
-        assert_eq!(
-            classify("PAPERRUST_TIME_ZONE", "Europe/Zurich", "env", None).key,
-            Some("PAPERLESS_TIME_ZONE")
-        );
-        assert_eq!(
-            classify("PAPERLESS_CONSUMER_INOTIFY_DELAY", "1", "env", None).verdict,
-            Verdict::Obsolete
-        );
-        assert_eq!(
-            classify("PAPERLESS_TYPO_X", "1", "env", None).verdict,
-            Verdict::Unknown
-        );
+        assert_eq!(classify("PAPERLESS_DBHOST", "db", "env", None).verdict, Verdict::MustStay);
+        assert_eq!(classify("PAPERLESS_TRUSTED_PROXIES", "x", "env", None).verdict, Verdict::MustStay);
+        assert_eq!(classify("PAPERLESS_TIKA_ENABLED", "1", "env", None).verdict, Verdict::NoEffect);
+        assert_eq!(classify("PAPERLESS_TIME_ZONE", "Europe/Zurich", "env", None).verdict, Verdict::Adoptable);
+        assert_eq!(classify("PAPERRUST_TIME_ZONE", "Europe/Zurich", "env", None).key, Some("PAPERLESS_TIME_ZONE"));
+        assert_eq!(classify("PAPERLESS_CONSUMER_INOTIFY_DELAY", "1", "env", None).verdict, Verdict::Obsolete);
+        assert_eq!(classify("PAPERLESS_TYPO_X", "1", "env", None).verdict, Verdict::Unknown);
         let s = classify("PAPERLESS_EMAIL_HOST_PASSWORD", "pw", "env", None);
         assert!(s.secret && s.value.is_none());
         // already adopted
         let mut l = Layers::new(Env::from_pairs([("PAPERLESS_EMAIL_HOST", "smtp")]));
         l.db.insert(
             "PAPERLESS_EMAIL_HOST".into(),
-            DbEntry {
-                value: DbValue::Plain("smtp".into()),
-                rev: 1,
-                updated_at: None,
-                updated_by: None,
-            },
+            DbEntry { value: DbValue::Plain("smtp".into()), rev: 1, updated_at: None, updated_by: None },
         );
         let snap = Settings::build(&l, 1, None);
-        assert_eq!(
-            classify("PAPERLESS_EMAIL_HOST", "smtp", "env", Some(&snap)).verdict,
-            Verdict::Adopted
-        );
-        assert_eq!(
-            classify("PAPERLESS_EMAIL_HOST", "other", "env", Some(&snap)).verdict,
-            Verdict::Adoptable
-        );
+        assert_eq!(classify("PAPERLESS_EMAIL_HOST", "smtp", "env", Some(&snap)).verdict, Verdict::Adopted);
+        assert_eq!(classify("PAPERLESS_EMAIL_HOST", "other", "env", Some(&snap)).verdict, Verdict::Adoptable);
         let o = origin(&snap);
         assert_eq!(o.len(), 1);
-        assert_eq!(
-            (o[0].name.as_str(), o[0].verdict),
-            ("PAPERLESS_EMAIL_HOST", Verdict::Adopted)
-        );
+        assert_eq!((o[0].name.as_str(), o[0].verdict), ("PAPERLESS_EMAIL_HOST", Verdict::Adopted));
     }
 
     /// upstream examples from `upstream/docker/compose` are classified correctly (WP8 test).
     #[test]
     fn upstream_compose_examples() {
-        let dir =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../upstream/docker/compose");
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../upstream/docker/compose");
         let Ok(rd) = std::fs::read_dir(&dir) else {
             return;
         };
@@ -534,27 +412,17 @@ mod tests {
             let text = std::fs::read_to_string(e.path()).unwrap_or_default();
             let p = parse_file(&text);
             // Installation examples (ci-test/portainer are special cases without env_file)
-            if name.ends_with(".yml")
-                && ["postgres", "mariadb", "sqlite"]
-                    .iter()
-                    .any(|d| name.starts_with(&format!("docker-compose.{d}")))
+            if name.ends_with(".yml") && ["postgres", "mariadb", "sqlite"].iter().any(|d| name.starts_with(&format!("docker-compose.{d}")))
             {
                 assert_eq!(p.kind, FileKind::Compose, "{name}");
                 assert_eq!(p.service.as_deref(), Some("webserver"), "{name}");
-                assert!(
-                    p.env_files.iter().any(|f| f.contains("docker-compose.env")),
-                    "{name}: {:?}",
-                    p.env_files
-                );
+                assert!(p.env_files.iter().any(|f| f.contains("docker-compose.env")), "{name}: {:?}", p.env_files);
                 seen += 1;
             }
             if name == "docker-compose.env" {
                 assert_eq!(p.kind, FileKind::Dotenv);
                 let items = check_pairs(&p.pairs, None);
-                assert!(
-                    items.iter().all(|i| i.verdict != Verdict::Unknown),
-                    "{items:?}"
-                );
+                assert!(items.iter().all(|i| i.verdict != Verdict::Unknown), "{items:?}");
             }
             for it in check_pairs(&p.pairs, None) {
                 // DB host from the upstream example stays in the environment; PaperRust does not need Redis
@@ -575,13 +443,7 @@ mod tests {
         let p = parse_file(y);
         assert_eq!(p.service.as_deref(), Some("webserver"));
         assert_eq!(p.env_files, vec!["docker-compose.env".to_string()]);
-        assert_eq!(
-            p.pairs,
-            vec![
-                ("PAPERLESS_REDIS".into(), "redis://broker:6379".into()),
-                ("PAPERLESS_DBHOST".into(), "db".into())
-            ]
-        );
+        assert_eq!(p.pairs, vec![("PAPERLESS_REDIS".into(), "redis://broker:6379".into()), ("PAPERLESS_DBHOST".into(), "db".into())]);
         let y2 = "services:\n  app:\n    environment:\n      - PAPERLESS_TIME_ZONE=Europe/Zurich\n      - \"PAPERLESS_OCR_LANGUAGE=deu\"\n";
         assert_eq!(parse_file(y2).pairs.len(), 2);
     }

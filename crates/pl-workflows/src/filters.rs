@@ -23,9 +23,12 @@ fn a(s: &str) -> Alias {
 pub const TRIGGER_TYPE_PARAM: &str = "trigger_type";
 
 fn workflow_filterset() -> FilterSet {
-    FilterSet::new()
-        .field("id", Expr::col((a(T_WORKFLOW), a("id"))), FieldKind::INT, ID_KWARGS)
-        .field("enabled", Expr::col((a(T_WORKFLOW), a("enabled"))), FieldKind::Boolean, &[Lookup::Exact])
+    FilterSet::new().field("id", Expr::col((a(T_WORKFLOW), a("id"))), FieldKind::INT, ID_KWARGS).field(
+        "enabled",
+        Expr::col((a(T_WORKFLOW), a("enabled"))),
+        FieldKind::Boolean,
+        &[Lookup::Exact],
+    )
 }
 
 /// `trigger_type = NumberFilter(field_name="triggers__type", distinct=True)`: condition on
@@ -42,10 +45,7 @@ fn trigger_type_condition(raw: Option<&str>, ctx: &FilterContext<'_>) -> Result<
     let sub = Query::select()
         .column((a(T_WF_TRIGGERS), a("workflow_id")))
         .from(a(T_WF_TRIGGERS))
-        .inner_join(
-            a(T_TRIGGER),
-            Expr::col((a(T_TRIGGER), a("id"))).equals((a(T_WF_TRIGGERS), a("workflowtrigger_id"))),
-        )
+        .inner_join(a(T_TRIGGER), Expr::col((a(T_TRIGGER), a("id"))).equals((a(T_WF_TRIGGERS), a("workflowtrigger_id"))))
         .and_where(cond)
         .to_owned();
     Ok(Some(Expr::col((a(T_WORKFLOW), a("id"))).in_subquery(sub)))

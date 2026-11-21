@@ -301,12 +301,19 @@ fn run(cx: &mut Ctx<'_, '_>, content: &[u8], res: Option<&Dictionary>, start: M,
             }
             "Do" if depth < 8 => {
                 let Some(name) = o.first().and_then(|n| n.as_name().ok()) else { continue };
-                let Some(xo) = res.and_then(|r| r.get(b"XObject").ok()).map(|x| deref(cx.doc, x)).and_then(|x| x.as_dict().ok()) else { continue };
+                let Some(xo) = res.and_then(|r| r.get(b"XObject").ok()).map(|x| deref(cx.doc, x)).and_then(|x| x.as_dict().ok()) else {
+                    continue;
+                };
                 let Some(Object::Stream(s)) = xo.get(name).ok().map(|x| deref(cx.doc, x)) else { continue };
                 if s.dict.get(b"Subtype").ok().and_then(|t| t.as_name().ok()) != Some(b"Form") {
                     continue;
                 }
-                let Ok(data) = s.decompressed_content_with_limit(cx.limit).or_else(|_| if s.dict.get(b"Filter").is_err() { Ok(s.content.clone()) } else { Err(()) }) else { continue };
+                let Ok(data) = s
+                    .decompressed_content_with_limit(cx.limit)
+                    .or_else(|_| if s.dict.get(b"Filter").is_err() { Ok(s.content.clone()) } else { Err(()) })
+                else {
+                    continue;
+                };
                 let fm = s.dict.get(b"Matrix").ok().and_then(|m| m.as_array().ok()).and_then(|a| matrix(a)).unwrap_or(IDENTITY);
                 let form_res = s.dict.get(b"Resources").ok().map(|r| deref(cx.doc, r)).and_then(|r| r.as_dict().ok());
                 let start = mul(&fm, &gs.ctm);
@@ -328,7 +335,9 @@ fn run(cx: &mut Ctx<'_, '_>, content: &[u8], res: Option<&Dictionary>, start: M,
 /// Pieces to lines: same baseline (tolerance ½ font size), top to bottom, left to
 /// right; gap > 0.15 em → space.
 fn layout(mut frags: Vec<Frag>) -> String {
-    frags.sort_by(|a, b| b.y.partial_cmp(&a.y).unwrap_or(std::cmp::Ordering::Equal).then(a.x0.partial_cmp(&b.x0).unwrap_or(std::cmp::Ordering::Equal)));
+    frags.sort_by(|a, b| {
+        b.y.partial_cmp(&a.y).unwrap_or(std::cmp::Ordering::Equal).then(a.x0.partial_cmp(&b.x0).unwrap_or(std::cmp::Ordering::Equal))
+    });
     let mut lines: Vec<(f64, f64, Vec<Frag>)> = Vec::new();
     for f in frags {
         match lines.last_mut() {
@@ -416,14 +425,17 @@ mod tests {
     #[test]
     fn lines_top_to_bottom_left_to_right() {
         // Lines written in reverse order, right column before the left one
-        let (d, p) = pdf("BT /F1 10 Tf 300 700 Td (rechts) Tj ET BT /F1 10 Tf 100 600 Td (unten) Tj ET BT /F1 10 Tf 100 700 Td (links) Tj ET");
+        let (d, p) =
+            pdf("BT /F1 10 Tf 300 700 Td (rechts) Tj ET BT /F1 10 Tf 100 600 Td (unten) Tj ET BT /F1 10 Tf 100 700 Td (links) Tj ET");
         assert_eq!(page_text(&d, p, 1 << 20).unwrap(), "links rechts\nunten\n");
     }
 
     #[test]
     fn word_gaps_from_td_and_tj_kerning() {
         // Words offset via Td (no spaces in the text) and via TJ spacing
-        let (d, p) = pdf("BT /F1 10 Tf 100 700 Td (Rech) Tj 30 0 Td (nung) Tj ET BT /F1 10 Tf 100 680 Td [(Betrag) -600 (12,50)] TJ ET BT /F1 10 Tf 100 660 Td [(Zu) -20 (sammen)] TJ ET");
+        let (d, p) = pdf(
+            "BT /F1 10 Tf 100 700 Td (Rech) Tj 30 0 Td (nung) Tj ET BT /F1 10 Tf 100 680 Td [(Betrag) -600 (12,50)] TJ ET BT /F1 10 Tf 100 660 Td [(Zu) -20 (sammen)] TJ ET",
+        );
         // "Rech" = 4 × 5 pt = 20 pt wide, next start at +30 → gap 10 pt > 1.5 pt
         assert_eq!(page_text(&d, p, 1 << 20).unwrap(), "Rech nung\nBetrag 12,50\nZusammen\n");
     }

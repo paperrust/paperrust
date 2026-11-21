@@ -54,10 +54,7 @@ impl FilterError {
 
 pub(crate) fn field_errors(field: &str, msgs: Vec<String>) -> Value {
     let mut m = Map::new();
-    m.insert(
-        field.to_string(),
-        Value::Array(msgs.into_iter().map(Value::String).collect()),
-    );
+    m.insert(field.to_string(), Value::Array(msgs.into_iter().map(Value::String).collect()));
     Value::Object(m)
 }
 

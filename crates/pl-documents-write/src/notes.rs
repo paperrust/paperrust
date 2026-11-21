@@ -117,15 +117,14 @@ pub async fn notes_create_handler(
             let media = MediaCfg::from_config(&state.live_config());
             let mut conn = state.db().acquire().await?;
             let created = now_micros();
-            let id: i32 = sqlx::query_scalar(
-                "INSERT INTO documents_note (note, created, document_id, user_id) VALUES ($1, $2, $3, $4) RETURNING id",
-            )
-            .bind(&note)
-            .bind(created)
-            .bind(doc_id as i32)
-            .bind(auth.user().id as i32)
-            .fetch_one(&mut *conn)
-            .await?;
+            let id: i32 =
+                sqlx::query_scalar("INSERT INTO documents_note (note, created, document_id, user_id) VALUES ($1, $2, $3, $4) RETURNING id")
+                    .bind(&note)
+                    .bind(created)
+                    .bind(doc_id as i32)
+                    .bind(auth.user().id as i32)
+                    .fetch_one(&mut *conn)
+                    .await?;
             if lctx.enabled {
                 let n = NoteRow {
                     id: i64::from(id),
@@ -203,9 +202,7 @@ pub async fn notes_destroy_handler(
         let media = MediaCfg::from_config(&state.live_config());
         let mut conn = state.db().acquire().await?;
         // get_object_or_404(Note, id=…, document=doc) – Note.objects (without trash)
-        let note = softdelete::load_note(&mut conn, note_id)
-            .await?
-            .filter(|n| n.deleted_at.is_none() && n.document_id == Some(doc_id));
+        let note = softdelete::load_note(&mut conn, note_id).await?.filter(|n| n.deleted_at.is_none() && n.document_id == Some(doc_id));
         let Some(note) = note else {
             return Err(ApiError::Core(pl_core::ApiError::not_found_model("Note")));
         };

@@ -16,9 +16,8 @@ pub const LANGUAGE_CODE: &str = "en-us";
 
 /// `settings.LANGUAGES` keys (lowercase, as `get_languages()` returns them), in order.
 pub const LANGUAGES: &[&str] = &[
-    "en-us", "ar-ar", "af-za", "be-by", "bg-bg", "ca-es", "cs-cz", "da-dk", "de-de", "el-gr",
-    "en-gb", "es-es", "fa-ir", "fi-fi", "fr-fr", "hu-hu", "id-id", "it-it", "ja-jp", "ko-kr",
-    "lb-lu", "no-no", "nl-nl", "pl-pl", "pt-br", "pt-pt", "ro-ro", "ru-ru", "sk-sk", "sl-si",
+    "en-us", "ar-ar", "af-za", "be-by", "bg-bg", "ca-es", "cs-cz", "da-dk", "de-de", "el-gr", "en-gb", "es-es", "fa-ir", "fi-fi", "fr-fr",
+    "hu-hu", "id-id", "it-it", "ja-jp", "ko-kr", "lb-lu", "no-no", "nl-nl", "pl-pl", "pt-br", "pt-pt", "ro-ro", "ru-ru", "sk-sk", "sl-si",
     "sr-cs", "sv-se", "tr-tr", "uk-ua", "vi-vn", "zh-cn", "zh-tw",
 ];
 
@@ -26,23 +25,18 @@ const LANGUAGE_CODE_MAX_LENGTH: usize = 500;
 
 #[allow(clippy::expect_used)]
 static ACCEPT_LANGUAGE_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(
-        r"([A-Za-z]{1,8}(?:-[A-Za-z0-9]{1,8})*|\*)(?:\s*;\s*q=(0(?:\.[0-9]{0,3})?|1(?:\.0{0,3})?))?(?:\s*,\s*|$)",
-    )
-    .expect("static regex")
+    Regex::new(r"([A-Za-z]{1,8}(?:-[A-Za-z0-9]{1,8})*|\*)(?:\s*;\s*q=(0(?:\.[0-9]{0,3})?|1(?:\.0{0,3})?))?(?:\s*,\s*|$)")
+        .expect("static regex")
 });
 
 #[allow(clippy::expect_used)]
-static LANGUAGE_CODE_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)^[a-z]{1,8}(?:-[a-z0-9]{1,8})*(?:@[a-z0-9]{1,20})?$").expect("static regex")
-});
+static LANGUAGE_CODE_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)^[a-z]{1,8}(?:-[a-z0-9]{1,8})*(?:@[a-z0-9]{1,20})?$").expect("static regex"));
 
 /// `check_for_language`: assumes a catalog exists for every entry of `LANGUAGES`
 /// (Django ships catalogs for all of them except possibly `no`; see contract).
 fn check_for_language(code: &str) -> bool {
-    code.len() <= LANGUAGE_CODE_MAX_LENGTH
-        && LANGUAGE_CODE_RE.is_match(code)
-        && LANGUAGES.contains(&code.to_lowercase().as_str())
+    code.len() <= LANGUAGE_CODE_MAX_LENGTH && LANGUAGE_CODE_RE.is_match(code) && LANGUAGES.contains(&code.to_lowercase().as_str())
 }
 
 fn supported_variant_inner(lang_code: &str, strict: bool) -> Option<String> {
@@ -205,12 +199,7 @@ fn negotiate(cookie: Option<&str>, accept_language: &str) -> String {
 pub fn language_from_headers(headers: &axum::http::HeaderMap, language_cookie_name: &str) -> &'static str {
     let latin1 = |v: &axum::http::HeaderValue| v.as_bytes().iter().map(|&b| b as char).collect::<String>();
     let cookie = headers.get_all(axum::http::header::COOKIE).iter().map(latin1).collect::<Vec<_>>().join("; ");
-    let accept = headers
-        .get_all(axum::http::header::ACCEPT_LANGUAGE)
-        .iter()
-        .map(latin1)
-        .collect::<Vec<_>>()
-        .join(",");
+    let accept = headers.get_all(axum::http::header::ACCEPT_LANGUAGE).iter().map(latin1).collect::<Vec<_>>().join(",");
     let lang = language_from_request(cookie_value(&cookie, language_cookie_name).as_deref(), &accept);
     static_language(&lang)
 }
@@ -223,11 +212,7 @@ pub fn static_language(code: &str) -> &'static str {
 /// `django.utils.translation.to_language`
 fn to_language(locale: &str) -> String {
     match locale.find('_') {
-        Some(p) => format!(
-            "{}-{}",
-            locale[..p].to_lowercase(),
-            locale[p + 1..].to_lowercase()
-        ),
+        Some(p) => format!("{}-{}", locale[..p].to_lowercase(), locale[p + 1..].to_lowercase()),
         None => locale.to_lowercase(),
     }
 }
@@ -287,10 +272,7 @@ mod tests {
 
     #[test]
     fn cookies() {
-        assert_eq!(
-            cookie_value("a=1; django_language=de-de; b=2", "django_language").as_deref(),
-            Some("de-de")
-        );
+        assert_eq!(cookie_value("a=1; django_language=de-de; b=2", "django_language").as_deref(), Some("de-de"));
         assert_eq!(cookie_value("x=\"q\\\"v\"", "x").as_deref(), Some("q\"v"));
         assert_eq!(cookie_value("a=1", "django_language"), None);
     }

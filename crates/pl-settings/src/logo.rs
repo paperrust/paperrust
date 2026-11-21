@@ -147,24 +147,13 @@ const DANGEROUS_STYLE: &[&str] = &[
     "vbscript:",
     "data:application/",
 ];
-const DANGEROUS_SCHEMES: &[&str] = &[
-    "javascript:",
-    "data:text/html",
-    "vbscript:",
-    "file:",
-    "data:application/",
-];
+const DANGEROUS_SCHEMES: &[&str] = &["javascript:", "data:text/html", "vbscript:", "file:", "data:application/"];
 const SAFE_PREFIXES: &[&str] = &["#", "/", "./", "../", "data:image/"];
 
 /// Django `get_valid_filename` (+ Basisname).
 pub fn valid_filename(name: &str) -> Option<String> {
     let base = name.rsplit(['/', '\\']).next().unwrap_or(name);
-    let s: String = base
-        .trim()
-        .replace(' ', "_")
-        .chars()
-        .filter(|c| c.is_alphanumeric() || matches!(c, '-' | '_' | '.'))
-        .collect();
+    let s: String = base.trim().replace(' ', "_").chars().filter(|c| c.is_alphanumeric() || matches!(c, '-' | '_' | '.')).collect();
     if s.is_empty() || s == "." || s == ".." {
         return None;
     }
@@ -192,9 +181,7 @@ fn sniff(data: &[u8]) -> Kind {
     }
     let head = String::from_utf8_lossy(&data[..data.len().min(2048)]).to_ascii_lowercase();
     let t = head.trim_start_matches('\u{feff}').trim_start();
-    if (t.starts_with("<?xml") || t.starts_with("<svg") || t.starts_with("<!--"))
-        && t.contains("<svg")
-    {
+    if (t.starts_with("<?xml") || t.starts_with("<svg") || t.starts_with("<!--")) && t.contains("<svg") {
         return Kind::Svg;
     }
     Kind::Other
@@ -209,9 +196,7 @@ pub fn reject_dangerous_svg(data: &[u8]) -> Result<(), String> {
     let mut style_text = String::new();
     let mut root_seen = false;
     loop {
-        let ev = r
-            .read_event_into(&mut buf)
-            .map_err(|_| "Invalid SVG file.".to_string())?;
+        let ev = r.read_event_into(&mut buf).map_err(|_| "Invalid SVG file.".to_string())?;
         match ev {
             Event::Eof => break,
             Event::DocType(_) => return Err("Invalid SVG file.".into()),
@@ -233,10 +218,8 @@ pub fn reject_dangerous_svg(data: &[u8]) -> Result<(), String> {
                     if !SVG_ATTRS.contains(&name) {
                         return Err(format!("Disallowed SVG attribute: {raw}"));
                     }
-                    let value = a
-                        .normalized_value(quick_xml::XmlVersion::Implicit1_0)
-                        .map_err(|_| "Invalid SVG file.".to_string())?
-                        .to_lowercase();
+                    let value =
+                        a.normalized_value(quick_xml::XmlVersion::Implicit1_0).map_err(|_| "Invalid SVG file.".to_string())?.to_lowercase();
                     if name == "style"
                         && let Some(p) = DANGEROUS_STYLE.iter().find(|p| value.contains(*p))
                     {
@@ -248,9 +231,7 @@ pub fn reject_dangerous_svg(data: &[u8]) -> Result<(), String> {
                             return Err(format!("Disallowed URI scheme in {raw}: {s}"));
                         }
                         if !v.is_empty() && !SAFE_PREFIXES.iter().any(|p| v.starts_with(p)) {
-                            return Err(format!(
-                                "URI scheme not allowed in {raw}: must be #anchor, relative path, or data:image/*"
-                            ));
+                            return Err(format!("URI scheme not allowed in {raw}: must be #anchor, relative path, or data:image/*"));
                         }
                     }
                 }
@@ -259,9 +240,7 @@ pub fn reject_dangerous_svg(data: &[u8]) -> Result<(), String> {
                 }
             }
             Event::End(ref e) => {
-                if String::from_utf8_lossy(e.local_name().as_ref()).eq_ignore_ascii_case("style")
-                    && in_style > 0
-                {
+                if String::from_utf8_lossy(e.local_name().as_ref()).eq_ignore_ascii_case("style") && in_style > 0 {
                     in_style -= 1;
                     let t = style_text.to_lowercase();
                     if let Some(p) = DANGEROUS_STYLE.iter().find(|p| t.contains(*p)) {
@@ -270,12 +249,8 @@ pub fn reject_dangerous_svg(data: &[u8]) -> Result<(), String> {
                     style_text.clear();
                 }
             }
-            Event::Text(ref t) if in_style > 0 => {
-                style_text.push_str(&String::from_utf8_lossy(t.as_ref()))
-            }
-            Event::CData(ref t) if in_style > 0 => {
-                style_text.push_str(&String::from_utf8_lossy(t.as_ref()))
-            }
+            Event::Text(ref t) if in_style > 0 => style_text.push_str(&String::from_utf8_lossy(t.as_ref())),
+            Event::CData(ref t) if in_style > 0 => style_text.push_str(&String::from_utf8_lossy(t.as_ref())),
             _ => {}
         }
         buf.clear();
@@ -287,21 +262,11 @@ pub fn reject_dangerous_svg(data: &[u8]) -> Result<(), String> {
 }
 
 /// Checks and cleans a logo. Returns: (filename, bytes to store).
-pub fn validate(
-    name: &str,
-    data: &[u8],
-    max_pixels: Option<i64>,
-) -> Result<(String, Vec<u8>), String> {
+pub fn validate(name: &str, data: &[u8], max_pixels: Option<i64>) -> Result<(String, Vec<u8>), String> {
     let clean = valid_filename(name).ok_or_else(|| "Invalid file name.".to_string())?;
-    let ext = clean
-        .rsplit_once('.')
-        .map(|(_, e)| e.to_ascii_lowercase())
-        .unwrap_or_default();
+    let ext = clean.rsplit_once('.').map(|(_, e)| e.to_ascii_lowercase()).unwrap_or_default();
     if !ALLOWED_EXT.contains(&ext.as_str()) {
-        return Err(format!(
-            "File extension “{ext}” is not allowed. Allowed extensions are: {}.",
-            ALLOWED_EXT.join(", ")
-        ));
+        return Err(format!("File extension “{ext}” is not allowed. Allowed extensions are: {}.", ALLOWED_EXT.join(", ")));
     }
     if data.is_empty() {
         return Err("The submitted file is empty.".into());
@@ -312,19 +277,14 @@ pub fn validate(
             Ok((clean, data.to_vec()))
         }
         kind => {
-            let reader = image::ImageReader::new(Cursor::new(data))
-                .with_guessed_format()
-                .map_err(|_| "Invalid logo image.".to_string())?;
-            let (w, h) = reader
-                .into_dimensions()
-                .map_err(|_| "Invalid logo image.".to_string())?;
+            let reader = image::ImageReader::new(Cursor::new(data)).with_guessed_format().map_err(|_| "Invalid logo image.".to_string())?;
+            let (w, h) = reader.into_dimensions().map_err(|_| "Invalid logo image.".to_string())?;
             if let Some(m) = max_pixels.filter(|m| *m > 0)
                 && i64::from(w) * i64::from(h) > m
             {
                 return Err("Uploaded logo exceeds the maximum allowed image size.".into());
             }
-            let img =
-                image::load_from_memory(data).map_err(|_| "Invalid logo image.".to_string())?;
+            let img = image::load_from_memory(data).map_err(|_| "Invalid logo image.".to_string())?;
             let fmt = match kind {
                 Kind::Png => image::ImageFormat::Png,
                 Kind::Jpeg => image::ImageFormat::Jpeg,
@@ -333,13 +293,8 @@ pub fn validate(
                 _ => return Err("Invalid logo image.".into()),
             };
             let mut out = Cursor::new(Vec::new());
-            let img = if fmt == image::ImageFormat::Jpeg {
-                image::DynamicImage::ImageRgb8(img.to_rgb8())
-            } else {
-                img
-            };
-            img.write_to(&mut out, fmt)
-                .map_err(|_| "Invalid logo image.".to_string())?;
+            let img = if fmt == image::ImageFormat::Jpeg { image::DynamicImage::ImageRgb8(img.to_rgb8()) } else { img };
+            img.write_to(&mut out, fmt).map_err(|_| "Invalid logo image.".to_string())?;
             Ok((clean, out.into_inner()))
         }
     }
@@ -369,12 +324,7 @@ pub async fn store(media_root: &Path, name: &str, bytes: &[u8]) -> std::io::Resu
     let mut candidate = format!("{stem}{ext}");
     for _ in 0..100 {
         let path = dir.join(&candidate);
-        match tokio::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&path)
-            .await
-        {
+        match tokio::fs::OpenOptions::new().write(true).create_new(true).open(&path).await {
             Ok(mut f) => {
                 use tokio::io::AsyncWriteExt;
                 f.write_all(bytes).await?;
@@ -382,11 +332,7 @@ pub async fn store(media_root: &Path, name: &str, bytes: &[u8]) -> std::io::Resu
                 return Ok(format!("logo/{candidate}"));
             }
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-                let suffix: String = rand::thread_rng()
-                    .sample_iter(&rand::distributions::Alphanumeric)
-                    .take(7)
-                    .map(char::from)
-                    .collect();
+                let suffix: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
                 candidate = format!("{stem}_{suffix}{ext}");
             }
             Err(e) => return Err(e),
@@ -403,36 +349,12 @@ mod tests {
     fn svg_rules_like_upstream() {
         let ok = br##"<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 10 10"><defs><linearGradient id="g"><stop offset="0" stop-color="#fff"/></linearGradient></defs><rect width="10" height="10" fill="url(#g)"/><use xlink:href="#g"/><style>.a{fill:red}</style></svg>"##;
         assert_eq!(reject_dangerous_svg(ok), Ok(()));
-        assert!(
-            reject_dangerous_svg(br#"<svg><script>alert(1)</script></svg>"#)
-                .unwrap_err()
-                .contains("<script>")
-        );
-        assert!(
-            reject_dangerous_svg(br#"<svg onload="x()"/>"#)
-                .unwrap_err()
-                .contains("onload")
-        );
-        assert!(
-            reject_dangerous_svg(br##"<svg><a href="#x"/></svg>"##)
-                .unwrap_err()
-                .contains("<a>")
-        );
-        assert!(
-            reject_dangerous_svg(br#"<svg><use href="javascript:alert(1)"/></svg>"#)
-                .unwrap_err()
-                .contains("javascript:")
-        );
-        assert!(
-            reject_dangerous_svg(br#"<svg><use href="https://evil/x.svg"/></svg>"#)
-                .unwrap_err()
-                .contains("not allowed")
-        );
-        assert!(
-            reject_dangerous_svg(br#"<svg><style>@import url(x)</style></svg>"#)
-                .unwrap_err()
-                .contains("<style>")
-        );
+        assert!(reject_dangerous_svg(br#"<svg><script>alert(1)</script></svg>"#).unwrap_err().contains("<script>"));
+        assert!(reject_dangerous_svg(br#"<svg onload="x()"/>"#).unwrap_err().contains("onload"));
+        assert!(reject_dangerous_svg(br##"<svg><a href="#x"/></svg>"##).unwrap_err().contains("<a>"));
+        assert!(reject_dangerous_svg(br#"<svg><use href="javascript:alert(1)"/></svg>"#).unwrap_err().contains("javascript:"));
+        assert!(reject_dangerous_svg(br#"<svg><use href="https://evil/x.svg"/></svg>"#).unwrap_err().contains("not allowed"));
+        assert!(reject_dangerous_svg(br#"<svg><style>@import url(x)</style></svg>"#).unwrap_err().contains("<style>"));
         assert!(reject_dangerous_svg(br#"<svg style="behavior: url(x)"/>"#).is_err());
         assert!(reject_dangerous_svg(br#"<!DOCTYPE svg [<!ENTITY a "b">]><svg/>"#).is_err());
         assert!(reject_dangerous_svg(b"not xml <").is_err());
@@ -441,30 +363,17 @@ mod tests {
     #[test]
     fn raster_and_names() {
         let mut png = Cursor::new(Vec::new());
-        image::DynamicImage::new_rgb8(4, 3)
-            .write_to(&mut png, image::ImageFormat::Png)
-            .unwrap();
+        image::DynamicImage::new_rgb8(4, 3).write_to(&mut png, image::ImageFormat::Png).unwrap();
         let png = png.into_inner();
         let (n, b) = validate("my logo (1).png", &png, None).unwrap();
         assert_eq!(n, "my_logo_1.png");
         assert!(b.starts_with(b"\x89PNG"));
-        assert!(
-            validate("x.png", &png, Some(11))
-                .unwrap_err()
-                .contains("maximum")
-        );
+        assert!(validate("x.png", &png, Some(11)).unwrap_err().contains("maximum"));
         assert!(validate("x.png", &png, Some(12)).is_ok());
-        assert!(
-            validate("x.jpeg", &png, None)
-                .unwrap_err()
-                .contains("extension")
-        );
+        assert!(validate("x.jpeg", &png, None).unwrap_err().contains("extension"));
         assert!(validate("x.png", b"\x89PNG\r\n\x1a\ngarbage", None).is_err());
         assert!(validate("x.svg", br#"<svg onload="x"/>"#, None).is_err());
-        assert_eq!(
-            valid_filename("../../etc/passwd").as_deref(),
-            Some("passwd")
-        );
+        assert_eq!(valid_filename("../../etc/passwd").as_deref(), Some("passwd"));
         assert!(media_path(Path::new("/m"), "../x").is_none());
         assert!(media_path(Path::new("/m"), "logo/a.png").is_some());
     }
@@ -475,11 +384,7 @@ mod tests {
         let a = store(&dir, "a.png", b"1").await.unwrap();
         let b = store(&dir, "a.png", b"2").await.unwrap();
         assert_eq!(a, "logo/a.png");
-        assert!(
-            b.starts_with("logo/a_")
-                && b.ends_with(".png")
-                && b.len() == "logo/a_1234567.png".len()
-        );
+        assert!(b.starts_with("logo/a_") && b.ends_with(".png") && b.len() == "logo/a_1234567.png".len());
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

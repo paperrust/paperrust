@@ -125,7 +125,14 @@ fn strip_ids(v: &Value) -> Value {
 /// Skeleton of a trigger (type, schedule) without conditions.
 fn bare_trigger(t: &Map<String, Value>) -> Map<String, Value> {
     let mut o = Map::new();
-    for k in ["type", "schedule_offset_days", "schedule_is_recurring", "schedule_recurring_interval_days", "schedule_date_field", "schedule_date_custom_field"] {
+    for k in [
+        "type",
+        "schedule_offset_days",
+        "schedule_is_recurring",
+        "schedule_recurring_interval_days",
+        "schedule_date_field",
+        "schedule_date_custom_field",
+    ] {
         if let Some(v) = t.get(k) {
             o.insert(k.into(), v.clone());
         }
@@ -144,12 +151,16 @@ pub fn convert(workflow: &Value, else_actions: &[Value], has_ai: bool) -> Conver
     let mut out = Converted::default();
     let name = workflow.get("name").and_then(Value::as_str).unwrap_or("");
     if has_ai {
-        out.warnings.push(("ai_condition_dropped", "The AI condition cannot be expressed in paperless-ngx; the workflow will run without it.".into()));
+        out.warnings.push((
+            "ai_condition_dropped",
+            "The AI condition cannot be expressed in paperless-ngx; the workflow will run without it.".into(),
+        ));
     }
     if else_actions.is_empty() {
         return out;
     }
-    let triggers: Vec<&Map<String, Value>> = workflow.get("triggers").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_object).collect()).unwrap_or_default();
+    let triggers: Vec<&Map<String, Value>> =
+        workflow.get("triggers").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_object).collect()).unwrap_or_default();
     let mut types: Vec<i64> = triggers.iter().filter_map(|t| t.get("type").and_then(Value::as_i64)).collect();
     types.sort_unstable();
     types.dedup();
@@ -157,7 +168,10 @@ pub fn convert(workflow: &Value, else_actions: &[Value], has_ai: bool) -> Conver
     for ty in types {
         let of_type: Vec<&&Map<String, Value>> = triggers.iter().filter(|t| t.get("type").and_then(Value::as_i64) == Some(ty)).collect();
         if of_type.len() != 1 {
-            out.warnings.push(("else_not_expressible", format!("Else branch: several triggers of type {ty}; paperless-ngx cannot express the inverse.")));
+            out.warnings.push((
+                "else_not_expressible",
+                format!("Else branch: several triggers of type {ty}; paperless-ngx cannot express the inverse."),
+            ));
             return out;
         }
         match invert_trigger(of_type[0]) {
@@ -228,10 +242,22 @@ mod tests {
 
     #[test]
     fn inversions() {
-        assert_eq!(invert_trigger(&obj(json!({"type": 2, "filter_has_tags": [1, 2]}))).unwrap(), Some(("filter_has_not_tags".into(), json!([1, 2]))));
-        assert_eq!(invert_trigger(&obj(json!({"type": 3, "filter_has_correspondent": 5}))).unwrap(), Some(("filter_has_not_correspondents".into(), json!([5]))));
-        assert_eq!(invert_trigger(&obj(json!({"type": 3, "filter_has_not_document_types": [4]}))).unwrap(), Some(("filter_has_any_document_types".into(), json!([4]))));
-        assert_eq!(invert_trigger(&obj(json!({"type": 2, "filter_has_all_tags": [1]}))).unwrap(), Some(("filter_has_not_tags".into(), json!([1]))));
+        assert_eq!(
+            invert_trigger(&obj(json!({"type": 2, "filter_has_tags": [1, 2]}))).unwrap(),
+            Some(("filter_has_not_tags".into(), json!([1, 2])))
+        );
+        assert_eq!(
+            invert_trigger(&obj(json!({"type": 3, "filter_has_correspondent": 5}))).unwrap(),
+            Some(("filter_has_not_correspondents".into(), json!([5])))
+        );
+        assert_eq!(
+            invert_trigger(&obj(json!({"type": 3, "filter_has_not_document_types": [4]}))).unwrap(),
+            Some(("filter_has_any_document_types".into(), json!([4])))
+        );
+        assert_eq!(
+            invert_trigger(&obj(json!({"type": 2, "filter_has_all_tags": [1]}))).unwrap(),
+            Some(("filter_has_not_tags".into(), json!([1])))
+        );
         assert!(invert_trigger(&obj(json!({"type": 2, "filter_has_all_tags": [1, 2]}))).is_err());
         assert!(invert_trigger(&obj(json!({"type": 2, "filter_has_tags": [1], "filter_has_correspondent": 2}))).is_err());
         assert!(invert_trigger(&obj(json!({"type": 2, "filter_filename": "*.pdf"}))).is_err());

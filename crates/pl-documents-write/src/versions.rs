@@ -559,11 +559,8 @@ async fn update_version(state: &AppState, ctx: &RequestContext, auth: &AuthUser,
     let Some(queue) = crate::pdf_edit::pg_queue(state) else {
         return Err(ApiError::Uncaught("update_version: PaperRust task queue not attached".into()));
     };
-    let content_type = req
-        .headers()
-        .get(header::CONTENT_TYPE)
-        .map(|v| String::from_utf8_lossy(v.as_bytes()).into_owned())
-        .unwrap_or_default();
+    let content_type =
+        req.headers().get(header::CONTENT_TYPE).map(|v| String::from_utf8_lossy(v.as_bytes()).into_owned()).unwrap_or_default();
     let media = content_type.split(';').next().unwrap_or("").trim().to_ascii_lowercase();
     let empty_body = axum::body::HttpBody::size_hint(req.body()).exact() == Some(0);
     let mk_spool = || -> ApiResult<Spool> {
@@ -630,10 +627,8 @@ async fn update_version(state: &AppState, ctx: &RequestContext, auth: &AuthUser,
             ..Default::default()
         };
         let kwargs = pl_consumer::task::consume_kwargs(&input, &overrides)?;
-        let opts = pl_queue::EnqueueOptions {
-            trigger_source: Some(pl_core::tasks::trigger_source::WEB_UI.to_string()),
-            ..Default::default()
-        };
+        let opts =
+            pl_queue::EnqueueOptions { trigger_source: Some(pl_core::tasks::trigger_source::WEB_UI.to_string()), ..Default::default() };
         queue.enqueue(crate::pdf_edit::CONSUME_FILE, kwargs, opts).await.map_err(|e| e.to_string())
     }
     .await;
@@ -696,7 +691,8 @@ mod tests {
         let reg = pl_parsers::ParserRegistry::new(pl_parsers::RegistryConfig::default());
         let f = Form { html: true, ..Default::default() };
         assert_eq!(validate_version_form(&f, &reg).ok().and_then(|r| r.err()), Some(json!({"document": ["No file was submitted."]})));
-        let f = Form { html: true, fields: vec![("document".into(), "x".into()), ("version_label".into(), "y".repeat(70))], document: None };
+        let f =
+            Form { html: true, fields: vec![("document".into(), "x".into()), ("version_label".into(), "y".repeat(70))], document: None };
         assert_eq!(
             validate_version_form(&f, &reg).ok().and_then(|r| r.err()),
             Some(json!({

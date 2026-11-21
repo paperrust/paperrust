@@ -88,11 +88,7 @@ pub fn all_routes() -> Vec<ApiRoute> {
 
 /// Assemble the complete application: active Rust routes (404 for the rest) + Django-like
 /// middleware + internal health endpoint.
-pub fn build_app(
-    cfg: &ServerConfig,
-    mut plan: MountPlan,
-    state: AppState,
-) -> Result<Router, RoutesError> {
+pub fn build_app(cfg: &ServerConfig, mut plan: MountPlan, state: AppState) -> Result<Router, RoutesError> {
     if frontend::UiFlags::from_ids(plan.active.iter().map(|r| r.id)).static_files {
         plan.active.retain(|r| {
             let drop = frontend::SUPERSEDED_BY_STATIC.contains(&r.id);
@@ -158,10 +154,7 @@ pub fn build_app(
         router = router.merge(light_ui::missing_router());
     }
     // DRF authentication for the handlers (pl_authz::AuthUser / MaybeUser).
-    let authz = pl_authz::Authz::new(
-        state.db().clone(),
-        pl_authz::AuthConfig::from_core(state.config()),
-    );
+    let authz = pl_authz::Authz::new(state.db().clone(), pl_authz::AuthConfig::from_core(state.config()));
     let bus = state.service::<pl_queue::EventBus>();
     let router = router
         .with_state(state)
@@ -171,26 +164,16 @@ pub fn build_app(
         .layer(axum::Extension(authz.clone()))
         // Handlers never see more than Django's DATA_UPLOAD_MAX_MEMORY_SIZE (body::gate answers
         // larger bodies with 400); axum's own extractor limit must not be lower.
-        .layer(axum::extract::DefaultBodyLimit::max(
-            pl_core::body::DATA_UPLOAD_MAX_MEMORY_SIZE,
-        ))
+        .layer(axum::extract::DefaultBodyLimit::max(pl_core::body::DATA_UPLOAD_MAX_MEMORY_SIZE))
         // S6: Django's CsrfViewMiddleware also accepts the `csrfmiddlewaretoken` form field. Reads
         // it from form POSTs without `X-CSRFToken` and hands it to the authentication extractor
         // (pl_authz::csrf::FormCsrfToken), which runs the CSRF check inside the handlers.
         .layer(axum::middleware::from_fn(pl_authz::csrf::form_token_middleware));
     // Native `/ws/status/` (events come from the Rust worker over the event bus).
     let status_ws = bus.map(|bus| frontline::StatusSocket { authz: authz.clone(), bus });
-    let front = Arc::new(Frontline {
-        settings: cfg.settings.clone(),
-        rust_routes,
-        branding: cfg.branding.clone(),
-        status_ws,
-    });
+    let front = Arc::new(Frontline { settings: cfg.settings.clone(), rust_routes, branding: cfg.branding.clone(), status_ws });
     let inner = router
-        .layer(axum::middleware::from_fn_with_state(
-            front,
-            frontline::frontline,
-        ))
+        .layer(axum::middleware::from_fn_with_state(front, frontline::frontline))
         // Read-only mode after a ransomware alarm (pl-guard): writing API requests → 423, also
         // for paths without a route.
         .layer(axum::middleware::from_fn(pl_guard::readonly::middleware))

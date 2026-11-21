@@ -50,16 +50,12 @@ fn u64le(b: &[u8], o: usize) -> u64 {
 /// Quick test: does the file begin with a ZIP signature?
 pub fn looks_like_zip(path: &Path) -> bool {
     let mut b = [0u8; 4];
-    File::open(path)
-        .and_then(|mut f| f.read_exact(&mut b))
-        .is_ok()
-        && (u32le(&b, 0) == LOCAL_SIG || u32le(&b, 0) == EOCD_SIG)
+    File::open(path).and_then(|mut f| f.read_exact(&mut b)).is_ok() && (u32le(&b, 0) == LOCAL_SIG || u32le(&b, 0) == EOCD_SIG)
 }
 
 impl ZipIndex {
     pub fn open(path: &Path) -> Result<ZipIndex> {
-        let mut f = File::open(path)
-            .with_context(|| format!("{} lässt sich nicht öffnen", path.display()))?;
+        let mut f = File::open(path).with_context(|| format!("{} lässt sich nicht öffnen", path.display()))?;
         let len = f.metadata()?.len();
         if len < 22 {
             bail!("{} ist keine ZIP-Datei (zu klein)", path.display());
@@ -94,10 +90,7 @@ impl ZipIndex {
             }
         }
         if cd_size > MAX_CENTRAL_DIR || cd_off.saturating_add(cd_size) > len {
-            bail!(
-                "{}: Zentralverzeichnis ungültig oder zu groß",
-                path.display()
-            );
+            bail!("{}: Zentralverzeichnis ungültig oder zu groß", path.display());
         }
         f.seek(SeekFrom::Start(cd_off))?;
         let mut cd = vec![0u8; cd_size as usize];
@@ -151,25 +144,11 @@ impl ZipIndex {
                 }
                 x += 4 + sz;
             }
-            entries.push(Entry {
-                name,
-                method,
-                compressed,
-                size,
-                header_offset,
-            });
+            entries.push(Entry { name, method, compressed, size, header_offset });
             i = end;
         }
-        let by_name = entries
-            .iter()
-            .enumerate()
-            .map(|(i, e)| (normalize(&e.name), i))
-            .collect();
-        Ok(ZipIndex {
-            path: path.to_path_buf(),
-            entries,
-            by_name,
-        })
+        let by_name = entries.iter().enumerate().map(|(i, e)| (normalize(&e.name), i)).collect();
+        Ok(ZipIndex { path: path.to_path_buf(), entries, by_name })
     }
 
     pub fn entries(&self) -> &[Entry] {
@@ -177,16 +156,12 @@ impl ZipIndex {
     }
 
     pub fn get(&self, name: &str) -> Option<&Entry> {
-        self.by_name
-            .get(&normalize(name))
-            .map(|&i| &self.entries[i])
+        self.by_name.get(&normalize(name)).map(|&i| &self.entries[i])
     }
 
     /// Entry as a data stream (unpacked).
     pub fn open_entry(&self, name: &str) -> Result<Box<dyn Read>> {
-        let e = self
-            .get(name)
-            .ok_or_else(|| anyhow!("{name} fehlt im ZIP"))?;
+        let e = self.get(name).ok_or_else(|| anyhow!("{name} fehlt im ZIP"))?;
         let mut f = File::open(&self.path)?;
         f.seek(SeekFrom::Start(e.header_offset))?;
         let mut h = [0u8; 30];
@@ -225,8 +200,7 @@ pub mod testzip {
         for (name, data, deflate) in files {
             let crc = crc32(data);
             let body = if *deflate {
-                let mut e =
-                    flate2::write::DeflateEncoder::new(Vec::new(), flate2::Compression::default());
+                let mut e = flate2::write::DeflateEncoder::new(Vec::new(), flate2::Compression::default());
                 e.write_all(data).unwrap();
                 e.finish().unwrap()
             } else {
@@ -277,11 +251,7 @@ pub mod testzip {
         for &b in d {
             c ^= u32::from(b);
             for _ in 0..8 {
-                c = if c & 1 != 0 {
-                    (c >> 1) ^ 0xEDB8_8320
-                } else {
-                    c >> 1
-                };
+                c = if c & 1 != 0 { (c >> 1) ^ 0xEDB8_8320 } else { c >> 1 };
             }
         }
         !c
@@ -297,28 +267,15 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let p = dir.path().join("x.zip");
         let big = vec![b'a'; 100_000];
-        std::fs::write(
-            &p,
-            testzip::build(&[
-                ("manifest.json", b"[]", false),
-                ("originals/a.pdf", &big, true),
-            ]),
-        )
-        .unwrap();
+        std::fs::write(&p, testzip::build(&[("manifest.json", b"[]", false), ("originals/a.pdf", &big, true)])).unwrap();
         assert!(looks_like_zip(&p));
         let z = ZipIndex::open(&p).unwrap();
         assert_eq!(z.entries().len(), 2);
         let mut s = String::new();
-        z.open_entry("manifest.json")
-            .unwrap()
-            .read_to_string(&mut s)
-            .unwrap();
+        z.open_entry("manifest.json").unwrap().read_to_string(&mut s).unwrap();
         assert_eq!(s, "[]");
         let mut v = Vec::new();
-        z.open_entry("./originals\\a.pdf")
-            .unwrap()
-            .read_to_end(&mut v)
-            .unwrap();
+        z.open_entry("./originals\\a.pdf").unwrap().read_to_end(&mut v).unwrap();
         assert_eq!(v, big);
         assert!(z.open_entry("nope").is_err());
         let not = dir.path().join("n.zip");

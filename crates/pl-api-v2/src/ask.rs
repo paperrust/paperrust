@@ -52,10 +52,7 @@ const MAX_INTERNAL_BODY: usize = 32 * 1024 * 1024;
 pub fn routes(r: axum::Router<AppState>) -> axum::Router<AppState> {
     r.route("/ask", post(ask))
         .route("/ask/conversations", get(conversations).delete(delete_all))
-        .route(
-            "/ask/conversations/{uuid}",
-            get(conversation).delete(delete_conversation),
-        )
+        .route("/ask/conversations/{uuid}", get(conversation).delete(delete_conversation))
 }
 
 // ------------------------------------------------------------------------------ Transport
@@ -88,22 +85,17 @@ impl Transport for InProcTransport {
             if let Some(ct) = content_type {
                 b = b.header(header::CONTENT_TYPE, ct);
             }
-            let mut req = b
-                .body(Body::from(body))
-                .map_err(|_| BackendError::Internal)?;
+            let mut req = b.body(Body::from(body)).map_err(|_| BackendError::Internal)?;
             req.extensions_mut().insert(Arc::new(ctx));
             if let Some(peer) = self.peer {
-                req.extensions_mut()
-                    .insert(axum::extract::ConnectInfo(peer));
+                req.extensions_mut().insert(axum::extract::ConnectInfo(peer));
             }
             let resp = match self.router.clone().oneshot(req).await {
                 Ok(r) => r,
                 Err(e) => match e {},
             };
             let status = resp.status().as_u16();
-            let raw = axum::body::to_bytes(resp.into_body(), MAX_INTERNAL_BODY)
-                .await
-                .map_err(|_| BackendError::Internal)?;
+            let raw = axum::body::to_bytes(resp.into_body(), MAX_INTERNAL_BODY).await.map_err(|_| BackendError::Internal)?;
             Ok((status, raw.to_vec()))
         })
     }
@@ -113,17 +105,13 @@ impl Transport for InProcTransport {
 struct DbLlm(AppState);
 
 impl LlmSource for DbLlm {
-    fn current(
-        &self,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Option<LlmClient>> + Send + '_>> {
+    fn current(&self) -> std::pin::Pin<Box<dyn std::future::Future<Output = Option<LlmClient>> + Send + '_>> {
         Box::pin(async move {
             let cfg = pl_ai::server::effective_config(&self.0).await.ok()?;
             if !cfg.ai_enabled {
                 return None;
             }
-            LlmClient::from_config(&cfg)
-                .ok()
-                .map(|c| c.with_system_prompt(true))
+            LlmClient::from_config(&cfg).ok().map(|c| c.with_system_prompt(true))
         })
     }
 }
@@ -148,35 +136,20 @@ fn actor_of(p: &Principal) -> V2Result<Actor> {
 /// MCP service for a question (backend in-process, LLM + LLM index like MCP).
 async fn service(state: &AppState, v2: &V2, p: &Principal) -> V2Result<McpService<ApiBackend>> {
     let Some(router) = v2.legacy_read.clone() else {
-        return Err(V2Error(DomainError::NotImplemented(
-            "ask is not mounted on this server".into(),
-        )));
+        return Err(V2Error(DomainError::NotImplemented("ask is not mounted on this server".into())));
     };
-    let ext = p
-        .ext
-        .downcast_ref::<pl_store::AuthExt>()
-        .ok_or(V2Error(DomainError::Unauthenticated))?;
-    let transport = InProcTransport {
-        router,
-        ctx: ext.ctx.clone(),
-        peer: ext.peer,
-    };
-    let backend = Arc::new(ApiBackend::with_transport(
-        Arc::new(transport),
-        Arc::new(MemorySideStore::default()),
-    ));
+    let ext = p.ext.downcast_ref::<pl_store::AuthExt>().ok_or(V2Error(DomainError::Unauthenticated))?;
+    let transport = InProcTransport { router, ctx: ext.ctx.clone(), peer: ext.peer };
+    let backend = Arc::new(ApiBackend::with_transport(Arc::new(transport), Arc::new(MemorySideStore::default())));
     let mut settings = McpSettings::default();
     if let Ok(cfg) = pl_ai::server::effective_config(state).await {
         settings.llm_chunk_size = cfg.llm_embedding_chunk_size as usize;
         settings.llm_context_size = cfg.llm_context_size as usize;
     }
-    let mut svc = McpService::new(backend, settings, None, Arc::new(IdentityTruncator))
-        .with_llm_source(Arc::new(DbLlm(state.clone())));
+    let mut svc = McpService::new(backend, settings, None, Arc::new(IdentityTruncator)).with_llm_source(Arc::new(DbLlm(state.clone())));
     svc = match &v2.ask_knowledge {
         Some(k) => svc.with_knowledge(k.clone()),
-        None => svc.with_knowledge(Arc::new(pl_ai::server::mcp_index::LlmIndexKnowledge(
-            state.clone(),
-        ))),
+        None => svc.with_knowledge(Arc::new(pl_ai::server::mcp_index::LlmIndexKnowledge(state.clone()))),
     };
     Ok(svc)
 }
@@ -190,18 +163,11 @@ fn throttle(user: i64) -> V2Result<()> {
     let m = g.get_or_insert_with(HashMap::new);
     let now = Instant::now();
     let q = m.entry(user).or_default();
-    while q
-        .front()
-        .is_some_and(|t| now.duration_since(*t) > Duration::from_secs(60))
-    {
+    while q.front().is_some_and(|t| now.duration_since(*t) > Duration::from_secs(60)) {
         q.pop_front();
     }
     if q.len() >= ASK_PER_MINUTE {
-        let wait = q.front().map(|t| {
-            60u64
-                .saturating_sub(now.duration_since(*t).as_secs())
-                .max(1)
-        });
+        let wait = q.front().map(|t| 60u64.saturating_sub(now.duration_since(*t).as_secs()).max(1));
         return Err(V2Error(DomainError::Throttled { wait }));
     }
     q.push_back(now);
@@ -242,27 +208,11 @@ fn kind_label(k: DateKind, en: bool) -> &'static str {
 }
 
 /// A finding of the content detection as action `create_reminder`.
-pub fn reminder_action(
-    doc: Uuid,
-    legacy_id: i64,
-    title: &str,
-    kind: DateKind,
-    date: NaiveDate,
-    phrase: &str,
-    en: bool,
-) -> Value {
+pub fn reminder_action(doc: Uuid, legacy_id: i64, title: &str, kind: DateKind, date: NaiveDate, phrase: &str, en: bool) -> Value {
     let label = if en {
-        format!(
-            "Reminder: {title} – {} {}",
-            kind_label(kind, true),
-            date.format("%Y-%m-%d")
-        )
+        format!("Reminder: {title} – {} {}", kind_label(kind, true), date.format("%Y-%m-%d"))
     } else {
-        format!(
-            "Erinnerung: {title} – {} {}",
-            kind_label(kind, false),
-            date.format("%d.%m.%Y")
-        )
+        format!("Erinnerung: {title} – {} {}", kind_label(kind, false), date.format("%d.%m.%Y"))
     };
     json!({
         "type": "create_reminder",
@@ -300,10 +250,7 @@ pub fn open_action(docs: &[(Uuid, i64)], en: bool) -> Value {
 
 /// SSE event (`event: …\ndata: <JSON>\n\n`).
 pub fn sse(event: &str, data: &Value) -> String {
-    format!(
-        "event: {event}\ndata: {}\n\n",
-        serde_json::to_string(data).unwrap_or_else(|_| "null".into())
-    )
+    format!("event: {event}\ndata: {}\n\n", serde_json::to_string(data).unwrap_or_else(|_| "null".into()))
 }
 
 // ------------------------------------------------------------------------------ POST /ask
@@ -369,13 +316,7 @@ async fn actions(job: &Job, cits: &[(Citation, Option<Uuid>)]) -> Vec<Value> {
     let pool = job.state.db();
     let (Ok(contents), Ok(existing)) = (
         store::contents(pool, &ids).await,
-        store::existing_dates(
-            pool,
-            job.user_id,
-            &ids,
-            pl_timeline::refresh::enabled(&d2::setting),
-        )
-        .await,
+        store::existing_dates(pool, job.user_id, &ids, pl_timeline::refresh::enabled(&d2::setting)).await,
     ) else {
         return out;
     };
@@ -391,15 +332,7 @@ async fn actions(job: &Job, cits: &[(Citation, Option<Uuid>)]) -> Vec<Value> {
                 break;
             }
             if f.kind.is_deadline() && f.date >= today && !existing.contains(&(*id, f.date)) {
-                out.push(reminder_action(
-                    *u,
-                    *id,
-                    titles.get(id).map(String::as_str).unwrap_or(""),
-                    f.kind,
-                    f.date,
-                    &f.phrase,
-                    job.en,
-                ));
+                out.push(reminder_action(*u, *id, titles.get(id).map(String::as_str).unwrap_or(""), f.kind, f.date, &f.phrase, job.en));
                 n += 1;
             }
         }
@@ -409,32 +342,17 @@ async fn actions(job: &Job, cits: &[(Citation, Option<Uuid>)]) -> Vec<Value> {
 
 /// Answer a question; events to `tx` (meta, citations, delta*, actions, done | error).
 async fn run(job: Job, tx: Emit) {
-    let r = knowledge::retrieve(
-        &job.svc,
-        &job.actor,
-        &job.question,
-        job.max,
-        job.restrict.as_deref(),
-    )
-    .await;
+    let r = knowledge::retrieve(&job.svc, &job.actor, &job.question, job.max, job.restrict.as_deref()).await;
     let ids: Vec<i64> = r.citations.iter().map(|c| c.document_id).collect();
     let uuids = match store::uuids(job.state.db(), KIND_DOCUMENT, &ids).await {
         Ok(u) => u,
         Err(e) => {
             tracing::error!(target: "paperrust.ask", error = %e, "citation uuids");
-            emit(
-                &tx,
-                "error",
-                json!({"error": {"code": "internal", "message": "Internal server error."}}),
-            );
+            emit(&tx, "error", json!({"error": {"code": "internal", "message": "Internal server error."}}));
             return;
         }
     };
-    let cits: Vec<(Citation, Option<Uuid>)> = r
-        .citations
-        .iter()
-        .map(|c| (c.clone(), uuids.get(&c.document_id).copied()))
-        .collect();
+    let cits: Vec<(Citation, Option<Uuid>)> = r.citations.iter().map(|c| (c.clone(), uuids.get(&c.document_id).copied())).collect();
     let cits_json: Vec<Value> = cits.iter().map(|(c, u)| citation_json(c, *u)).collect();
     let state_s = match r.index_state {
         IndexState::Disabled => "disabled",
@@ -484,7 +402,8 @@ async fn run(job: Job, tx: Emit) {
     }
     let acts = actions(&job, &cits).await;
     emit(&tx, "actions", json!({"actions": acts}));
-    let meta = json!({"index_state": state_s, "retrieval": r.retrieval, "notes": notes, "answer_error": answer_error, "question": job.question});
+    let meta =
+        json!({"index_state": state_s, "retrieval": r.retrieval, "notes": notes, "answer_error": answer_error, "question": job.question});
     let saved = history::add(
         job.state.db(),
         job.conv_id,
@@ -500,11 +419,7 @@ async fn run(job: Job, tx: Emit) {
         Ok((_, created)) => created,
         Err(e) => {
             tracing::error!(target: "paperrust.ask", error = %e, "saving the answer failed");
-            emit(
-                &tx,
-                "error",
-                json!({"error": {"code": "internal", "message": "Internal server error."}}),
-            );
+            emit(&tx, "error", json!({"error": {"code": "internal", "message": "Internal server error."}}));
             return;
         }
     };
@@ -529,11 +444,7 @@ async fn run(job: Job, tx: Emit) {
 }
 
 fn wants_stream(h: &HeaderMap, body: Option<bool>) -> bool {
-    body.unwrap_or_else(|| {
-        h.get(header::ACCEPT)
-            .and_then(|v| v.to_str().ok())
-            .is_some_and(|a| a.contains("text/event-stream"))
-    })
+    body.unwrap_or_else(|| h.get(header::ACCEPT).and_then(|v| v.to_str().ok()).is_some_and(|a| a.contains("text/event-stream")))
 }
 
 pub async fn ask(
@@ -547,23 +458,14 @@ pub async fn ask(
     let question = b.question.trim().to_string();
     let n = question.chars().count();
     if n == 0 || n > 2000 {
-        return Err(V2Error(DomainError::field(
-            "question",
-            "The question must be 1–2000 characters.",
-        )));
+        return Err(V2Error(DomainError::field("question", "The question must be 1–2000 characters.")));
     }
     let max = b.max_passages.unwrap_or(8);
     if !(1..=20).contains(&max) {
-        return Err(V2Error(DomainError::field(
-            "max_passages",
-            "Expected 1–20.",
-        )));
+        return Err(V2Error(DomainError::field("max_passages", "Expected 1–20.")));
     }
     if b.documents.as_ref().is_some_and(|d| d.len() > 500) {
-        return Err(V2Error(DomainError::field(
-            "documents",
-            "At most 500 documents.",
-        )));
+        return Err(V2Error(DomainError::field("documents", "At most 500 documents.")));
     }
     let en = match b.lang.as_deref().map(str::trim) {
         None | Some("") | Some("de") => false,
@@ -574,29 +476,10 @@ pub async fn ask(
     throttle(p.user_id)?;
     let restrict = match &b.documents {
         None => None,
-        Some(u) => Some(
-            store::resolve(state.db(), KIND_DOCUMENT, u)
-                .await
-                .map_err(tl)?
-                .into_values()
-                .collect::<Vec<i64>>(),
-        ),
+        Some(u) => Some(store::resolve(state.db(), KIND_DOCUMENT, u).await.map_err(tl)?.into_values().collect::<Vec<i64>>()),
     };
-    let (conv_id, conv) = history::open(state.db(), p.user_id, b.conversation, &question)
-        .await
-        .map_err(tl)?;
-    history::add(
-        state.db(),
-        conv_id,
-        None,
-        "user",
-        &question,
-        &json!([]),
-        &json!([]),
-        &json!({}),
-    )
-    .await
-    .map_err(tl)?;
+    let (conv_id, conv) = history::open(state.db(), p.user_id, b.conversation, &question).await.map_err(tl)?;
+    history::add(state.db(), conv_id, None, "user", &question, &json!([]), &json!([]), &json!({})).await.map_err(tl)?;
     let svc = service(&state, &v2, &p).await?;
     let job = Job {
         state: state.clone(),
@@ -615,25 +498,17 @@ pub async fn ask(
     let (tx, rx) = futures::channel::mpsc::unbounded::<(String, Value)>();
     let task = tokio::spawn(run(job, tx));
     if wants_stream(&headers, b.stream) {
-        let body = rx
-            .map(|(ev, data)| Ok::<Bytes, std::convert::Infallible>(Bytes::from(sse(&ev, &data))));
+        let body = rx.map(|(ev, data)| Ok::<Bytes, std::convert::Infallible>(Bytes::from(sse(&ev, &data))));
         let mut r = Response::new(Body::from_stream(body));
         let h = r.headers_mut();
-        h.insert(
-            header::CONTENT_TYPE,
-            HeaderValue::from_static("text/event-stream; charset=utf-8"),
-        );
+        h.insert(header::CONTENT_TYPE, HeaderValue::from_static("text/event-stream; charset=utf-8"));
         h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
         h.insert("x-accel-buffering", HeaderValue::from_static("no"));
         return Ok(r);
     }
     let events: Vec<(String, Value)> = rx.collect().await;
     let _ = task.await;
-    match events
-        .into_iter()
-        .rev()
-        .find(|(e, _)| e == "done" || e == "error")
-    {
+    match events.into_iter().rev().find(|(e, _)| e == "done" || e == "error") {
         Some((e, data)) if e == "done" => Ok(json(&json!({"conversation": conv, "message": data}))),
         _ => Err(V2Error(DomainError::Internal("ask failed".into()))),
     }
@@ -648,14 +523,7 @@ pub async fn conversations(
 ) -> V2Result<Response> {
     d2::user(&p)?;
     let limit = d2::parse_int("limit", q.get("limit"), 50, 1, 200)?;
-    let (items, next) = history::list(
-        state.db(),
-        p.user_id,
-        limit,
-        q.get("cursor").map(String::as_str),
-    )
-    .await
-    .map_err(tl)?;
+    let (items, next) = history::list(state.db(), p.user_id, limit, q.get("cursor").map(String::as_str)).await.map_err(tl)?;
     Ok(json(&json!({"items": items, "next_cursor": next})))
 }
 
@@ -668,17 +536,9 @@ fn filter_visible(v: &Value, visible: &HashSet<i64>, key: &str) -> Value {
     for x in a {
         match x.get("type").and_then(Value::as_str) {
             Some("open_documents") => {
-                let ids: Vec<i64> = x["legacy_ids"]
-                    .as_array()
-                    .map(|a| a.iter().filter_map(Value::as_i64).collect())
-                    .unwrap_or_default();
+                let ids: Vec<i64> = x["legacy_ids"].as_array().map(|a| a.iter().filter_map(Value::as_i64).collect()).unwrap_or_default();
                 let docs: Vec<Value> = x["documents"].as_array().cloned().unwrap_or_default();
-                let keep: Vec<usize> = ids
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, i)| visible.contains(i))
-                    .map(|(n, _)| n)
-                    .collect();
+                let keep: Vec<usize> = ids.iter().enumerate().filter(|(_, i)| visible.contains(i)).map(|(n, _)| n).collect();
                 if keep.is_empty() {
                     continue;
                 }
@@ -690,10 +550,7 @@ fn filter_visible(v: &Value, visible: &HashSet<i64>, key: &str) -> Value {
                 out.push(y);
             }
             _ => {
-                if x.get(key)
-                    .and_then(Value::as_i64)
-                    .is_some_and(|i| visible.contains(&i))
-                {
+                if x.get(key).and_then(Value::as_i64).is_some_and(|i| visible.contains(&i)) {
                     out.push(x.clone());
                 }
             }
@@ -715,26 +572,17 @@ fn legacy_ids(v: &Value, acc: &mut Vec<i64>) {
     }
 }
 
-pub async fn conversation(
-    State(state): State<AppState>,
-    Caller(p): Caller,
-    Path(uuid): Path<String>,
-) -> V2Result<Response> {
+pub async fn conversation(State(state): State<AppState>, Caller(p): Caller, Path(uuid): Path<String>) -> V2Result<Response> {
     d2::user(&p)?;
     let u = Uuid::parse_str(&uuid).map_err(|_| V2Error(DomainError::NotFound))?;
-    let (c, msgs) = history::get(state.db(), p.user_id, u)
-        .await
-        .map_err(tl)?
-        .ok_or(V2Error(DomainError::NotFound))?;
+    let (c, msgs) = history::get(state.db(), p.user_id, u).await.map_err(tl)?.ok_or(V2Error(DomainError::NotFound))?;
     let mut ids = Vec::new();
     for m in &msgs {
         legacy_ids(&m.citations, &mut ids);
         legacy_ids(&m.actions, &mut ids);
     }
     let visible = match d2::require_view_documents(&p) {
-        Ok(_) => store::visible_documents(state.db(), &d2::visibility(&p)?, &ids)
-            .await
-            .map_err(tl)?,
+        Ok(_) => store::visible_documents(state.db(), &d2::visibility(&p)?, &ids).await.map_err(tl)?,
         Err(_) => HashSet::new(),
     };
     let messages: Vec<Value> = msgs
@@ -761,17 +609,10 @@ pub async fn conversation(
     })))
 }
 
-pub async fn delete_conversation(
-    State(state): State<AppState>,
-    Caller(p): Caller,
-    Path(uuid): Path<String>,
-) -> V2Result<Response> {
+pub async fn delete_conversation(State(state): State<AppState>, Caller(p): Caller, Path(uuid): Path<String>) -> V2Result<Response> {
     d2::user(&p)?;
     let u = Uuid::parse_str(&uuid).map_err(|_| V2Error(DomainError::NotFound))?;
-    if !history::delete(state.db(), p.user_id, u)
-        .await
-        .map_err(tl)?
-    {
+    if !history::delete(state.db(), p.user_id, u).await.map_err(tl)? {
         return Err(V2Error(DomainError::NotFound));
     }
     Ok(StatusCode::NO_CONTENT.into_response())
@@ -779,9 +620,7 @@ pub async fn delete_conversation(
 
 pub async fn delete_all(State(state): State<AppState>, Caller(p): Caller) -> V2Result<Response> {
     d2::user(&p)?;
-    history::delete_all(state.db(), p.user_id)
-        .await
-        .map_err(tl)?;
+    history::delete_all(state.db(), p.user_id).await.map_err(tl)?;
     Ok(StatusCode::NO_CONTENT.into_response())
 }
 
@@ -792,10 +631,7 @@ mod tests {
     #[test]
     fn sse_format() {
         let s = sse("delta", &json!({"text": "a\nb"}));
-        assert_eq!(
-            s, "event: delta\ndata: {\"text\":\"a\\nb\"}\n\n",
-            "JSON einzeilig, Zeilenumbruch maskiert"
-        );
+        assert_eq!(s, "event: delta\ndata: {\"text\":\"a\\nb\"}\n\n", "JSON einzeilig, Zeilenumbruch maskiert");
         assert!(s.ends_with("\n\n"));
     }
 
@@ -831,10 +667,7 @@ mod tests {
             {"type":"open_documents","documents":["b"],"legacy_ids":[2]}
         ]);
         let vis: HashSet<i64> = [1].into();
-        assert_eq!(
-            filter_visible(&cits, &vis, "legacy_id"),
-            json!([{"n":1,"legacy_id":1}])
-        );
+        assert_eq!(filter_visible(&cits, &vis, "legacy_id"), json!([{"n":1,"legacy_id":1}]));
         let f = filter_visible(&acts, &vis, "legacy_id");
         assert_eq!(f.as_array().unwrap().len(), 1);
         assert_eq!(f[0]["documents"], json!(["a"]));
@@ -860,10 +693,7 @@ mod tests {
         let mut h = HeaderMap::new();
         assert!(!wants_stream(&h, None));
         assert!(wants_stream(&h, Some(true)));
-        h.insert(
-            header::ACCEPT,
-            HeaderValue::from_static("text/event-stream"),
-        );
+        h.insert(header::ACCEPT, HeaderValue::from_static("text/event-stream"));
         assert!(wants_stream(&h, None));
         assert!(!wants_stream(&h, Some(false)));
     }

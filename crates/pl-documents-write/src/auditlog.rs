@@ -78,11 +78,7 @@ pub type FieldVals = Vec<(&'static str, Option<String>)>;
 /// `str(datetime)` naive in UTC (microseconds only if ≠ 0).
 pub fn py_dt(t: &DateTime<Utc>) -> String {
     let n = t.naive_utc();
-    if t.timestamp_subsec_micros() == 0 {
-        n.format("%Y-%m-%d %H:%M:%S").to_string()
-    } else {
-        n.format("%Y-%m-%d %H:%M:%S%.6f").to_string()
-    }
+    if t.timestamp_subsec_micros() == 0 { n.format("%Y-%m-%d %H:%M:%S").to_string() } else { n.format("%Y-%m-%d %H:%M:%S%.6f").to_string() }
 }
 
 fn dt(v: &Option<DateTime<Utc>>) -> Option<String> {
@@ -197,7 +193,13 @@ pub struct CfiRow {
 pub fn py_json_dumps(v: &Value) -> String {
     match v {
         Value::Null => "null".into(),
-        Value::Bool(b) => if *b { "true".into() } else { "false".into() },
+        Value::Bool(b) => {
+            if *b {
+                "true".into()
+            } else {
+                "false".into()
+            }
+        }
         Value::Number(n) => {
             if n.is_f64() {
                 pl_core::json::python_float_repr(n.as_f64().unwrap_or(0.0))
@@ -210,8 +212,7 @@ pub fn py_json_dumps(v: &Value) -> String {
         Value::Object(o) => {
             let mut keys: Vec<&String> = o.keys().collect();
             keys.sort();
-            let parts: Vec<String> =
-                keys.iter().map(|k| format!("{}: {}", py_json_str(k), py_json_dumps(&o[k.as_str()]))).collect();
+            let parts: Vec<String> = keys.iter().map(|k| format!("{}: {}", py_json_str(k), py_json_dumps(&o[k.as_str()]))).collect();
             format!("{{{}}}", parts.join(", "))
         }
     }
@@ -329,11 +330,10 @@ pub fn document_repr(created: NaiveDate, correspondent: Option<&str>, title: &st
 }
 
 async fn content_type(conn: &mut PgConnection, model: &str) -> Result<i32, sqlx::Error> {
-    let (id,): (i32,) =
-        sqlx::query_as("SELECT id FROM django_content_type WHERE app_label = 'documents' AND model = $1")
-            .bind(model)
-            .fetch_one(&mut *conn)
-            .await?;
+    let (id,): (i32,) = sqlx::query_as("SELECT id FROM django_content_type WHERE app_label = 'documents' AND model = $1")
+        .bind(model)
+        .fetch_one(&mut *conn)
+        .await?;
     Ok(id)
 }
 
@@ -446,7 +446,13 @@ pub fn value_for_search(data_type: &str, extra: Option<&Value>, c: &CfiRow) -> O
 pub fn py_str_json(v: &Value) -> String {
     match v {
         Value::Null => "None".into(),
-        Value::Bool(b) => if *b { "True".into() } else { "False".into() },
+        Value::Bool(b) => {
+            if *b {
+                "True".into()
+            } else {
+                "False".into()
+            }
+        }
         Value::Number(n) => {
             if n.is_f64() {
                 pl_core::json::python_float_repr(n.as_f64().unwrap_or(0.0))

@@ -185,9 +185,7 @@ impl BlockData {
             .fetch_all(&mut *conn)
             .await?
             {
-                tags.entry(i64::from(r.try_get::<i32, _>(0)?))
-                    .or_default()
-                    .push((i64::from(r.try_get::<i32, _>(1)?), r.try_get(2)?));
+                tags.entry(i64::from(r.try_get::<i32, _>(0)?)).or_default().push((i64::from(r.try_get::<i32, _>(1)?), r.try_get(2)?));
             }
         }
         // get_effective_content(): latest version (version_index DESC, id DESC like effective_content)
@@ -251,10 +249,8 @@ impl BlockData {
             self.doctypes.insert(c, n);
         }
         if let Some(c) = r.storage_path_id.filter(|c| !self.storage_paths.contains_key(c))
-            && let Some(row) = sqlx::query("SELECT name, path FROM documents_storagepath WHERE id = $1")
-                .bind(c as i32)
-                .fetch_optional(&mut *conn)
-                .await?
+            && let Some(row) =
+                sqlx::query("SELECT name, path FROM documents_storagepath WHERE id = $1").bind(c as i32).fetch_optional(&mut *conn).await?
         {
             self.storage_paths.insert(c, (row.try_get(0)?, row.try_get(1)?));
         }
@@ -295,9 +291,8 @@ impl BlockData {
     /// Template context like `templating::document_context` (root documents only).
     fn context(&self, r: &DocRow) -> DocumentContext {
         let mut c = crate::templating::base_context(r);
-        let named = |m: &HashMap<i64, String>, id: Option<i64>| {
-            id.and_then(|i| m.get(&i).map(|n| NamedRef { id: Some(i), name: n.clone() }))
-        };
+        let named =
+            |m: &HashMap<i64, String>, id: Option<i64>| id.and_then(|i| m.get(&i).map(|n| NamedRef { id: Some(i), name: n.clone() }));
         c.correspondent = named(&self.correspondents, r.correspondent_id);
         c.document_type = named(&self.doctypes, r.document_type_id);
         c.storage_path = r
@@ -373,7 +368,13 @@ impl Consumer {
         Ok(stats)
     }
 
-    async fn bulk_block(&self, conn: &mut PgConnection, block: &[i64], wfs: &[WorkflowDef], stats: &mut BulkStats) -> Result<(), sqlx::Error> {
+    async fn bulk_block(
+        &self,
+        conn: &mut PgConnection,
+        block: &[i64],
+        wfs: &[WorkflowDef],
+        stats: &mut BulkStats,
+    ) -> Result<(), sqlx::Error> {
         let s = self.settings.as_ref();
         let pre = BlockData::load(conn, block, wfs, s.templating.filename_format.as_deref(), s.time_zone).await?;
         self.caches.clear_many(block).await;
@@ -400,8 +401,7 @@ impl Consumer {
                     }
                     let mut doc = DocInstance::from_db(row.clone());
                     let outcome: RunOutcome =
-                        workflows::run_workflow_list(conn, &self.run_env(&audit), TRIGGER_DOCUMENT_UPDATED, &mut doc, &wfs[k..])
-                            .await?;
+                        workflows::run_workflow_list(conn, &self.run_env(&audit), TRIGGER_DOCUMENT_UPDATED, &mut doc, &wfs[k..]).await?;
                     self.send_websocket_document_updated(conn, id).await?;
                     workflows::enqueue_ai_suggestions(self.queue.as_deref(), &outcome).await;
                 }
@@ -474,11 +474,7 @@ impl Consumer {
         if !pre.context_complete(stored, &self.settings) {
             return FileStep::Unknown;
         }
-        if crate::files::filename_unchanged(&self.settings, stored, &pre.context(stored)) {
-            FileStep::Unchanged
-        } else {
-            FileStep::Changed
-        }
+        if crate::files::filename_unchanged(&self.settings, stored, &pre.context(stored)) { FileStep::Unchanged } else { FileStep::Changed }
     }
 
     /// Exact single path from a workflow on (state is written): remaining workflows,

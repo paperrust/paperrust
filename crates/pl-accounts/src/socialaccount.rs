@@ -40,10 +40,10 @@ use serde_json::{Map, Value, json};
 use crate::auth;
 use crate::emailaddr::{self, EmailAddr};
 use crate::flow::{self, Login};
+use crate::oauth2;
 use crate::oidc::{self, OidcError};
 use crate::page;
 use crate::social::{self, App, OIDC};
-use crate::oauth2;
 use crate::views::{not_allowed, run};
 use crate::web::{Ctx, Internal, R, not_found, redirect};
 use crate::{messages, tr};
@@ -244,7 +244,11 @@ impl SocialLogin {
             account: o.get("account")?.as_object()?.clone(),
             user: o.get("user")?.as_object()?.clone(),
             state: o.get("state").and_then(Value::as_object).cloned().unwrap_or_default(),
-            email_addresses: o.get("email_addresses").and_then(Value::as_array).map(|a| a.iter().filter_map(EmailAddr::deserialize).collect()).unwrap_or_default(),
+            email_addresses: o
+                .get("email_addresses")
+                .and_then(Value::as_array)
+                .map(|a| a.iter().filter_map(EmailAddr::deserialize).collect())
+                .unwrap_or_default(),
             phone: o.get("phone").cloned().unwrap_or(Value::Null),
             phone_verified: o.get("phone_verified").cloned().unwrap_or(Value::Bool(false)),
             token: o.get("token").and_then(Value::as_object).cloned(),
@@ -331,7 +335,9 @@ fn pick_data(data: &Map<String, Value>) -> Map<String, Value> {
 /// `DefaultSocialAccountAdapter.is_email_verified(provider, email)`.
 fn provider_email_verified(ctx: &Ctx, app: &App, email: &str) -> R<bool> {
     let v = match app.settings.get("verified_email") {
-        Some(Value::Null) | None => social::provider_settings(ctx, &app.provider).get("VERIFIED_EMAIL").cloned().unwrap_or(Value::Bool(false)),
+        Some(Value::Null) | None => {
+            social::provider_settings(ctx, &app.provider).get("VERIFIED_EMAIL").cloned().unwrap_or(Value::Bool(false))
+        }
         Some(v) => v.clone(),
     };
     match v {
@@ -484,7 +490,12 @@ pub async fn sync_social_groups(ctx: &Ctx, user_id: i64, extra_data: &Value) -> 
         is_staff = is_superuser || is_staff;
     }
     if is_superuser != u.is_superuser || is_staff != u.is_staff {
-        sqlx::query("UPDATE auth_user SET is_superuser = $1, is_staff = $2 WHERE id = $3").bind(is_superuser).bind(is_staff).bind(user_id).execute(ctx.st.db()).await?;
+        sqlx::query("UPDATE auth_user SET is_superuser = $1, is_staff = $2 WHERE id = $3")
+            .bind(is_superuser)
+            .bind(is_staff)
+            .bind(user_id)
+            .execute(ctx.st.db())
+            .await?;
     }
     Ok(())
 }
@@ -770,15 +781,21 @@ async fn complete_login(ctx: &mut Ctx, app: &App, mut sl: SocialLogin) -> R<Resp
 
 /// `SocialLogin.lookup()`: by account, otherwise by confirmed email (if allowed).
 async fn lookup(ctx: &mut Ctx, app: &App, sl: &mut SocialLogin) -> R<()> {
-    let row: Option<(i64, i64, DateTime<Utc>)> = sqlx::query_as("SELECT id::int8, user_id::int8, date_joined FROM socialaccount_socialaccount WHERE provider = $1 AND uid = $2")
-        .bind(sl.provider_sub_id())
-        .bind(sl.uid())
-        .fetch_optional(ctx.st.db())
-        .await?;
+    let row: Option<(i64, i64, DateTime<Utc>)> =
+        sqlx::query_as("SELECT id::int8, user_id::int8, date_joined FROM socialaccount_socialaccount WHERE provider = $1 AND uid = $2")
+            .bind(sl.provider_sub_id())
+            .bind(sl.uid())
+            .fetch_optional(ctx.st.db())
+            .await?;
     if let Some((id, user_id, date_joined)) = row {
         let now = Utc::now();
         let extra = sl.extra_data();
-        sqlx::query("UPDATE socialaccount_socialaccount SET extra_data = $1, last_login = $2 WHERE id = $3").bind(&extra).bind(now).bind(id).execute(ctx.st.db()).await?;
+        sqlx::query("UPDATE socialaccount_socialaccount SET extra_data = $1, last_login = $2 WHERE id = $3")
+            .bind(&extra)
+            .bind(now)
+            .bind(id)
+            .execute(ctx.st.db())
+            .await?;
         let mut a = Map::new();
         a.insert("id".into(), json!(id));
         a.insert("user_id".into(), json!(user_id));
@@ -799,7 +816,9 @@ async fn lookup(ctx: &mut Ctx, app: &App, sl: &mut SocialLogin) -> R<()> {
     let verified: Vec<String> = sl.email_addresses.iter().filter(|e| e.is_verified()).map(|e| e.email.clone()).collect();
     for email in verified {
         let allowed = match app.settings.get("email_authentication") {
-            Some(Value::Null) | None => social::provider_settings(ctx, &app.provider).get("EMAIL_AUTHENTICATION").is_some_and(social::py_truthy),
+            Some(Value::Null) | None => {
+                social::provider_settings(ctx, &app.provider).get("EMAIL_AUTHENTICATION").is_some_and(social::py_truthy)
+            }
             Some(v) => social::py_truthy(v),
         };
         if !allowed {
@@ -819,7 +838,11 @@ async fn lookup(ctx: &mut Ctx, app: &App, sl: &mut SocialLogin) -> R<()> {
 /// `filter_users_by_email(email, prefer_verified=True, for_login=True)[0]`.
 async fn first_user_for_login_email(ctx: &Ctx, email: &str) -> R<Option<i64>> {
     let email = email.to_lowercase();
-    let rows: Vec<(i64, String, bool)> = sqlx::query_as("SELECT user_id::int8, email, verified FROM account_emailaddress WHERE email = $1 ORDER BY id").bind(&email).fetch_all(ctx.st.db()).await?;
+    let rows: Vec<(i64, String, bool)> =
+        sqlx::query_as("SELECT user_id::int8, email, verified FROM account_emailaddress WHERE email = $1 ORDER BY id")
+            .bind(&email)
+            .fetch_all(ctx.st.db())
+            .await?;
     let mails: Vec<(i64, bool)> = rows.into_iter().filter(|(_, e, _)| e.to_lowercase() == email).map(|(u, _, v)| (u, v)).collect();
     if let Some((u, _)) = mails.iter().find(|(_, v)| *v) {
         return Ok(Some(*u));
@@ -827,7 +850,10 @@ async fn first_user_for_login_email(ctx: &Ctx, email: &str) -> R<Option<i64>> {
     if let Some((u, _)) = mails.first() {
         return Ok(Some(*u));
     }
-    let row: Option<(i64,)> = sqlx::query_as("SELECT id::int8 FROM auth_user WHERE email = $1 AND lower(email) = $1 ORDER BY id LIMIT 1").bind(&email).fetch_optional(ctx.st.db()).await?;
+    let row: Option<(i64,)> = sqlx::query_as("SELECT id::int8 FROM auth_user WHERE email = $1 AND lower(email) = $1 ORDER BY id LIMIT 1")
+        .bind(&email)
+        .fetch_optional(ctx.st.db())
+        .await?;
     Ok(row.map(|r| r.0))
 }
 
@@ -880,13 +906,18 @@ async fn authenticate(ctx: &mut Ctx, app: &App, sl: SocialLogin) -> R<Response> 
     let Some(user) = existing else { return process_signup(ctx, app, sl).await };
     // _accept_login
     if let Some(email) = sl.did_auth_by_email.clone() {
-        let (verified,): (bool,) = sqlx::query_as("SELECT COALESCE((SELECT verified FROM account_emailaddress WHERE user_id = $1 AND email = $2 LIMIT 1), false)")
-            .bind(user.id)
-            .bind(email.to_lowercase())
-            .fetch_one(ctx.st.db())
-            .await?;
+        let (verified,): (bool,) =
+            sqlx::query_as("SELECT COALESCE((SELECT verified FROM account_emailaddress WHERE user_id = $1 AND email = $2 LIMIT 1), false)")
+                .bind(user.id)
+                .bind(email.to_lowercase())
+                .fetch_one(ctx.st.db())
+                .await?;
         if !verified && user.has_usable_password() {
-            sqlx::query("UPDATE auth_user SET password = $1 WHERE id = $2").bind(unusable_password()).bind(user.id).execute(ctx.st.db()).await?;
+            sqlx::query("UPDATE auth_user SET password = $1 WHERE id = $2")
+                .bind(unusable_password())
+                .bind(user.id)
+                .execute(ctx.st.db())
+                .await?;
         }
     }
     let user = pl_authz::user::load_user_by_id(ctx.st.db(), user.id).await?.unwrap_or(user);
@@ -936,7 +967,10 @@ async fn clean_username(ctx: &Ctx, username: &str, shallow: bool) -> R<Result<()
         return Ok(Err(format!("Ensure this value has at most 150 characters (it has {}).", username.chars().count())));
     }
     if !shallow {
-        let (n,): (i64,) = sqlx::query_as("SELECT count(*) FROM auth_user WHERE UPPER(username::text) = UPPER($1)").bind(username).fetch_one(ctx.st.db()).await?;
+        let (n,): (i64,) = sqlx::query_as("SELECT count(*) FROM auth_user WHERE UPPER(username::text) = UPPER($1)")
+            .bind(username)
+            .fetch_one(ctx.st.db())
+            .await?;
         if n > 0 {
             return Ok(Err(tr!(l, "auth.error.username_taken").to_string()));
         }
@@ -955,7 +989,11 @@ async fn generate_unique_username(ctx: &Ctx, txts: &[String]) -> R<String> {
         if ascii.is_empty() {
             continue;
         }
-        let cleaned: String = ascii.chars().filter(|c| c.is_alphanumeric() || *c == '_' || c.is_whitespace() || "@+.-".contains(*c)).collect::<String>().to_lowercase();
+        let cleaned: String = ascii
+            .chars()
+            .filter(|c| c.is_alphanumeric() || *c == '_' || c.is_whitespace() || "@+.-".contains(*c))
+            .collect::<String>()
+            .to_lowercase();
         let cleaned = cleaned.split('@').next().unwrap_or("").trim().to_string();
         let mut out = String::new();
         let mut ws = false;
@@ -992,7 +1030,11 @@ async fn generate_unique_username(ctx: &Ctx, txts: &[String]) -> R<String> {
         let keep = 150usize.saturating_sub(suffix.len());
         candidates.push(format!("{}{suffix}", base.chars().take(keep).collect::<String>()));
     }
-    let rows: Vec<(String,)> = sqlx::query_as("SELECT username FROM auth_user WHERE UPPER(username::text) = ANY(SELECT UPPER(x) FROM unnest($1::text[]) x)").bind(&candidates).fetch_all(ctx.st.db()).await?;
+    let rows: Vec<(String,)> =
+        sqlx::query_as("SELECT username FROM auth_user WHERE UPPER(username::text) = ANY(SELECT UPPER(x) FROM unnest($1::text[]) x)")
+            .bind(&candidates)
+            .fetch_all(ctx.st.db())
+            .await?;
     let existing: Vec<String> = rows.into_iter().map(|r| r.0.to_lowercase()).collect();
     for c in candidates {
         if !existing.contains(&c.to_lowercase()) && clean_username(ctx, &c, true).await?.is_ok() {
@@ -1106,11 +1148,13 @@ async fn save_social_user(ctx: &mut Ctx, _app: &App, sl: &mut SocialLogin, form:
 }
 
 async fn add_groups(ctx: &Ctx, uid: i64, names: &[String]) -> R<()> {
-    sqlx::query("INSERT INTO auth_user_groups (user_id, group_id) SELECT $1, g.id FROM auth_group g WHERE g.name = ANY($2) ON CONFLICT DO NOTHING")
-        .bind(uid)
-        .bind(names)
-        .execute(ctx.st.db())
-        .await?;
+    sqlx::query(
+        "INSERT INTO auth_user_groups (user_id, group_id) SELECT $1, g.id FROM auth_group g WHERE g.name = ANY($2) ON CONFLICT DO NOTHING",
+    )
+    .bind(uid)
+    .bind(names)
+    .execute(ctx.st.db())
+    .await?;
     Ok(())
 }
 
@@ -1192,10 +1236,9 @@ async fn signup_view(ctx: &mut Ctx) -> R<Response> {
                 clean_email = email.to_lowercase();
                 match emailaddr::assess_unique_email(ctx, &clean_email).await? {
                     Some(true) => {}
-                    Some(false) => add(
-                        "email",
-                        crate::i18n::tf(l, "auth.error.external_email_taken", &[("PROVIDER", &social::display_name(&app))]),
-                    ),
+                    Some(false) => {
+                        add("email", crate::i18n::tf(l, "auth.error.external_email_taken", &[("PROVIDER", &social::display_name(&app))]))
+                    }
                     None => already_exists = true,
                 }
             }
@@ -1264,12 +1307,28 @@ mod tests {
     /// unconfirmed address (upstream: Python truthiness → confirmed).
     #[test]
     fn oidc_email_verified_string_false_is_unverified() {
-        let app = App { pk: None, provider: OIDC.into(), provider_id: "idp".into(), name: "IdP".into(), client_id: "c".into(), secret: String::new(), key: String::new(), settings: Map::new() };
+        let app = App {
+            pk: None,
+            provider: OIDC.into(),
+            provider_id: "idp".into(),
+            name: "IdP".into(),
+            client_id: "c".into(),
+            secret: String::new(),
+            key: String::new(),
+            settings: Map::new(),
+        };
         let ex = |v: Value| {
             let data = json!({"userinfo": {"sub": "u1", "email": "u@example.invalid", "email_verified": v}});
             oidc_extract(&app, data.as_object().cloned().unwrap_or_default()).map(|e| e.addresses)
         };
-        for (v, want) in [(json!("false"), false), (json!("False"), false), (json!(false), false), (json!(null), false), (json!("true"), true), (json!(true), true)] {
+        for (v, want) in [
+            (json!("false"), false),
+            (json!("False"), false),
+            (json!(false), false),
+            (json!(null), false),
+            (json!("true"), true),
+            (json!(true), true),
+        ] {
             let addrs = ex(v.clone()).unwrap_or_default();
             assert_eq!(addrs.len(), 1, "{v}");
             assert_eq!(addrs[0].is_verified(), want, "{v}");

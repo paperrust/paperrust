@@ -71,42 +71,22 @@ fn is_block(name: &str) -> bool {
 fn decode_entity(s: &str) -> Option<(String, usize)> {
     let b = s.as_bytes();
     if b.first() == Some(&b'#') {
-        let (hex, start) = if matches!(b.get(1), Some(b'x') | Some(b'X')) {
-            (true, 2)
-        } else {
-            (false, 1)
-        };
+        let (hex, start) = if matches!(b.get(1), Some(b'x') | Some(b'X')) { (true, 2) } else { (false, 1) };
         let mut end = start;
-        while end < b.len()
-            && (if hex {
-                b[end].is_ascii_hexdigit()
-            } else {
-                b[end].is_ascii_digit()
-            })
-        {
+        while end < b.len() && (if hex { b[end].is_ascii_hexdigit() } else { b[end].is_ascii_digit() }) {
             end += 1;
         }
         if end == start {
             return None;
         }
-        let num = u32::from_str_radix(&s[start..end.min(start + 8)], if hex { 16 } else { 10 })
-            .unwrap_or(0xfffd);
-        let consumed = if b.get(end) == Some(&b';') {
-            end + 1
-        } else {
-            end
-        };
+        let num = u32::from_str_radix(&s[start..end.min(start + 8)], if hex { 16 } else { 10 }).unwrap_or(0xfffd);
+        let consumed = if b.get(end) == Some(&b';') { end + 1 } else { end };
         // HTML5: 0x80..0x9F as Windows-1252, invalid → U+FFFD
         let c = match num {
             0 => '\u{fffd}',
             0x80..=0x9f => {
                 let byte = [num as u8];
-                encoding_rs::WINDOWS_1252
-                    .decode_without_bom_handling(&byte)
-                    .0
-                    .chars()
-                    .next()
-                    .unwrap_or('\u{fffd}')
+                encoding_rs::WINDOWS_1252.decode_without_bom_handling(&byte).0.chars().next().unwrap_or('\u{fffd}')
             }
             n => char::from_u32(n).unwrap_or('\u{fffd}'),
         };
@@ -207,17 +187,9 @@ impl Out {
 
 /// HTML → text. Malformed markup is tolerated (like TagSoup in Tika).
 pub fn html_to_text(html: &str, max_chars: usize) -> Result<String> {
-    let mut out = Out {
-        sink: TextSink::new(max_chars),
-        at_line_start: true,
-        pending_space: false,
-    };
+    let mut out = Out { sink: TextSink::new(max_chars), at_line_start: true, pending_space: false };
     let mut title = String::new();
-    let mut body = Out {
-        sink: TextSink::new(max_chars),
-        at_line_start: true,
-        pending_space: false,
-    };
+    let mut body = Out { sink: TextSink::new(max_chars), at_line_start: true, pending_space: false };
     let mut pre_depth = 0usize;
     let mut in_head = false;
     let mut i = 0usize;
@@ -244,9 +216,7 @@ pub fn html_to_text(html: &str, max_chars: usize) -> Result<String> {
             let name_start = if closing { 2 } else { 1 };
             let nb = rest.as_bytes();
             let mut ne = name_start;
-            while ne < nb.len()
-                && (nb[ne].is_ascii_alphanumeric() || nb[ne] == b'-' || nb[ne] == b':')
-            {
+            while ne < nb.len() && (nb[ne].is_ascii_alphanumeric() || nb[ne] == b'-' || nb[ne] == b':') {
                 ne += 1;
             }
             if ne == name_start {
@@ -338,8 +308,7 @@ pub fn html_to_text(html: &str, max_chars: usize) -> Result<String> {
 #[derive(Debug, Default)]
 pub struct HtmlDocumentParser;
 
-pub const HTML_MIME_TYPES: &[(&str, &str)] =
-    &[("text/html", ".html"), ("application/xhtml+xml", ".xhtml")];
+pub const HTML_MIME_TYPES: &[(&str, &str)] = &[("text/html", ".html"), ("application/xhtml+xml", ".xhtml")];
 
 impl DocumentParser for HtmlDocumentParser {
     fn class_name(&self) -> &'static str {
@@ -352,10 +321,7 @@ impl DocumentParser for HtmlDocumentParser {
         HTML_MIME_TYPES
     }
     fn score(&self, mime_type: &str, _f: &str, _p: Option<&Path>) -> Option<i32> {
-        HTML_MIME_TYPES
-            .iter()
-            .any(|(m, _)| *m == mime_type)
-            .then_some(10)
+        HTML_MIME_TYPES.iter().any(|(m, _)| *m == mime_type).then_some(10)
     }
     fn can_produce_archive(&self) -> bool {
         false
@@ -367,11 +333,7 @@ impl DocumentParser for HtmlDocumentParser {
         let raw = read_limited(path, &ctx.limits)?;
         let html = crate::text::decode_text_bytes(&raw);
         let text = html_to_text(&html, ctx.limits.max_text_chars)?;
-        Ok(ParsedDocument {
-            text: crate::pystr::py_strip(&text).to_owned(),
-            date: None,
-            archive_path: None,
-        })
+        Ok(ParsedDocument { text: crate::pystr::py_strip(&text).to_owned(), date: None, archive_path: None })
     }
     fn page_count(&self, _p: &Path, _m: &str, _c: &ParseContext) -> Option<u32> {
         None
@@ -391,10 +353,7 @@ mod tests {
                  <body><h1>Kopf</h1><p>Erster&nbsp;Absatz &amp; mehr &lt;x&gt; &#252; &#x00E4; &uuml</p>\
                  <div>Zwei<br>Drei</div><table><tr><td>A</td><td>B</td></tr></table><!-- c --></body></html>";
         let t = html_to_text(h, 1 << 20).unwrap();
-        assert_eq!(
-            t,
-            "T\nKopf\nErster\u{a0}Absatz & mehr <x> ü ä ü\nZwei\nDrei\nA\tB\t\n"
-        );
+        assert_eq!(t, "T\nKopf\nErster\u{a0}Absatz & mehr <x> ü ä ü\nZwei\nDrei\nA\tB\t\n");
     }
 
     #[test]

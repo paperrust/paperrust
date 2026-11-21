@@ -186,7 +186,8 @@ fn e2e_multi_page_tiffs() {
     let b = backend(Some(tesseract), pdfium, tmp.path());
     for name in ["multi-page-images.tiff", "multi-page-images-alpha.tiff", "multi-page-images-alpha-rgb.tiff"] {
         let d = tmp.path().join(name.replace('.', "_"));
-        let r = parse_document(&b, &cfg(|_| {}), &d, &upstream(name), "image/tiff", true).unwrap_or_else(|e| panic!("{name}: {}", e.message()));
+        let r =
+            parse_document(&b, &cfg(|_| {}), &d, &upstream(name), "image/tiff", true).unwrap_or_else(|e| panic!("{name}: {}", e.message()));
         assert_ordered(&r.text.to_lowercase(), &["page 1", "page 2", "page 3"]);
         let a = r.archive_path.unwrap();
         assert_eq!(pl_ocr::pdfwrite::page_count(&std::fs::read(&a).unwrap()), Some(3), "{name}");
@@ -211,20 +212,34 @@ fn e2e_image_pdf_modes() {
     assert_ordered(&r.text.to_lowercase(), &["page 1", "page 2", "page 3"]);
     // redo, pages=2 → page 3 missing
     let d = tmp.path().join("redo2");
-    let r = parse_document(&b, &cfg(|c| {
-        c.mode = Mode::Redo;
-        c.pages = Some(2);
-    }), &d, &src, "application/pdf", true)
+    let r = parse_document(
+        &b,
+        &cfg(|c| {
+            c.mode = Mode::Redo;
+            c.pages = Some(2);
+        }),
+        &d,
+        &src,
+        "application/pdf",
+        true,
+    )
     .unwrap();
     let t = r.text.to_lowercase();
     assert_ordered(&t, &["page 1", "page 2"]);
     assert!(!t.contains("page 3"), "{t}");
     // force, pages=1 → only page 1
     let d = tmp.path().join("force1");
-    let r = parse_document(&b, &cfg(|c| {
-        c.mode = Mode::Force;
-        c.pages = Some(1);
-    }), &d, &src, "application/pdf", true)
+    let r = parse_document(
+        &b,
+        &cfg(|c| {
+            c.mode = Mode::Force;
+            c.pages = Some(1);
+        }),
+        &d,
+        &src,
+        "application/pdf",
+        true,
+    )
     .unwrap();
     let t = r.text.to_lowercase();
     assert!(t.contains("page 1") && !t.contains("page 2") && !t.contains("page 3"), "{t}");
@@ -266,10 +281,17 @@ fn e2e_mixed_and_digital() {
     // test_multi_page_digital_pages_2 (all modes)
     for mode in [Mode::Auto, Mode::Redo, Mode::Force] {
         let d = tmp.path().join(format!("digital-{mode}"));
-        let r = parse_document(&b, &cfg(|c| {
-            c.mode = mode;
-            c.pages = Some(2);
-        }), &d, &upstream("multi-page-digital.pdf"), "application/pdf", true)
+        let r = parse_document(
+            &b,
+            &cfg(|c| {
+                c.mode = mode;
+                c.pages = Some(2);
+            }),
+            &d,
+            &upstream("multi-page-digital.pdf"),
+            "application/pdf",
+            true,
+        )
         .unwrap_or_else(|e| panic!("{mode}: {}", e.message()));
         assert!(r.archive_path.is_some());
         assert_ordered(&r.text.to_lowercase(), &["page 1", "page 2", "page 3"]);

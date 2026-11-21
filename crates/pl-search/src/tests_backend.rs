@@ -6,8 +6,7 @@ use crate::backend::{SearchBackend, SearchMode, SearchUser, search_language_sett
 use crate::testutil::{TestDoc, backend_with, settings, write_docs};
 
 fn text(b: &SearchBackend, q: &str) -> Vec<i64> {
-    b.search_ids(q, None, None, false, SearchMode::Text, None, None)
-        .unwrap()
+    b.search_ids(q, None, None, false, SearchMode::Text, None, None).unwrap()
 }
 
 #[test]
@@ -27,10 +26,7 @@ fn text_mode_title_and_content_only() {
     let (_t, b) = backend_with(&[d]);
     assert!(text(&b, "document_type:invoice").is_empty());
     assert_eq!(text(&b, "monthly"), vec![9]);
-    let title = |q: &str| {
-        b.search_ids(q, None, None, false, SearchMode::Title, None, None)
-            .unwrap()
-    };
+    let title = |q: &str| b.search_ids(q, None, None, false, SearchMode::Title, None, None).unwrap();
     assert!(title("monthly").is_empty());
     assert_eq!(title("invoice"), vec![9]);
 }
@@ -72,10 +68,7 @@ fn text_mode_numeric_anchor() {
 
 #[test]
 fn text_mode_folds_special_letters_and_cjk() {
-    let (_t, b) = backend_with(&[
-        TestDoc::new(1, "Straße", "details"),
-        TestDoc::new(2, "東京都の会議", "議事録 です"),
-    ]);
+    let (_t, b) = backend_with(&[TestDoc::new(1, "Straße", "details"), TestDoc::new(2, "東京都の会議", "議事録 です")]);
     assert_eq!(text(&b, "strasse"), vec![1]);
     assert_eq!(text(&b, "東京"), vec![2]);
 }
@@ -89,13 +82,9 @@ fn sort_fields() {
     let mut e = TestDoc::new(3, "gamma report", "x");
     e.asn = Some(20);
     let (_t, b) = backend_with(&[a, c, e]);
-    let asc = b
-        .search_ids("report", None, Some("archive_serial_number"), false, SearchMode::Text, None, None)
-        .unwrap();
+    let asc = b.search_ids("report", None, Some("archive_serial_number"), false, SearchMode::Text, None, None).unwrap();
     assert_eq!(asc, vec![2, 3, 1]);
-    let desc = b
-        .search_ids("report", None, Some("archive_serial_number"), true, SearchMode::Text, None, None)
-        .unwrap();
+    let desc = b.search_ids("report", None, Some("archive_serial_number"), true, SearchMode::Text, None, None).unwrap();
     assert_eq!(desc, vec![1, 3, 2]);
 }
 
@@ -114,15 +103,11 @@ fn permission_filter() {
     group.viewer_group_ids = vec![77];
     let (_t, b) = backend_with(&[public, own, other, viewer, group]);
     let u = SearchUser { id: 5, group_ids: vec![] };
-    let mut ids = b
-        .search_ids("report", Some(&u), None, false, SearchMode::Text, None, None)
-        .unwrap();
+    let mut ids = b.search_ids("report", Some(&u), None, false, SearchMode::Text, None, None).unwrap();
     ids.sort();
     assert_eq!(ids, vec![1, 2, 4]);
     let u = SearchUser { id: 5, group_ids: vec![77] };
-    let mut ids = b
-        .search_ids("report", Some(&u), None, false, SearchMode::Text, None, None)
-        .unwrap();
+    let mut ids = b.search_ids("report", Some(&u), None, false, SearchMode::Text, None, None).unwrap();
     ids.sort();
     assert_eq!(ids, vec![1, 2, 4, 5]);
 
@@ -137,18 +122,10 @@ fn permission_filter() {
 
 #[test]
 fn limit_zero_and_one() {
-    let (_t, b) = backend_with(&[
-        TestDoc::new(1, "invoice", "invoice invoice invoice"),
-        TestDoc::new(2, "other", "invoice"),
-    ]);
-    let ids = b
-        .search_ids("invoice", None, None, false, SearchMode::Text, None, Some(1))
-        .unwrap();
+    let (_t, b) = backend_with(&[TestDoc::new(1, "invoice", "invoice invoice invoice"), TestDoc::new(2, "other", "invoice")]);
+    let ids = b.search_ids("invoice", None, None, false, SearchMode::Text, None, Some(1)).unwrap();
     assert_eq!(ids.len(), 1);
-    assert!(b
-        .search_ids("invoice", None, None, false, SearchMode::Text, None, Some(0))
-        .unwrap()
-        .is_empty());
+    assert!(b.search_ids("invoice", None, None, false, SearchMode::Text, None, Some(0)).unwrap().is_empty());
 }
 
 #[test]
@@ -203,11 +180,7 @@ fn more_like_this_survives_deleted_docs() {
 
 #[test]
 fn highlights_text_mode() {
-    let (_t, b) = backend_with(&[TestDoc::new(
-        89,
-        "Highlight Test",
-        "The quick brown fox jumps over the lazy dog",
-    )]);
+    let (_t, b) = backend_with(&[TestDoc::new(89, "Highlight Test", "The quick brown fox jumps over the lazy dog")]);
     let hits = b.highlight_hits("quick", &[89], SearchMode::Text, 1).unwrap();
     assert_eq!(hits.len(), 1);
     let h = hits[0].content_highlight.as_deref().unwrap();
@@ -262,8 +235,6 @@ fn query_mode_search_and_note_highlights() {
     assert!(hits[0].notes_highlight.as_deref().unwrap().contains("<b>"));
     let hits = b.highlight_hits("quick", &[90], SearchMode::Query, 1).unwrap();
     assert!(hits[0].content_highlight.as_deref().unwrap().contains("<b>quick</b>"));
-    let err = b
-        .search_ids("asn:abc", None, None, false, SearchMode::Query, None, None)
-        .unwrap_err();
+    let err = b.search_ids("asn:abc", None, None, false, SearchMode::Query, None, None).unwrap_err();
     assert_eq!(err.messages().unwrap(), ["Invalid numeric value 'abc' for field 'asn'.".to_string()]);
 }

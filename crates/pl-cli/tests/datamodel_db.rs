@@ -178,17 +178,21 @@ async fn stages_convert_write_and_roll_back() {
     assert_eq!(
         triggers,
         [
-            "paperrust_count_del", "paperrust_count_ins", "paperrust_count_trunc", "paperrust_count_upd", // Stage 2
-            "paperrust_search_doc_del", "paperrust_search_doc_upd", "paperrust_sync_del", "paperrust_sync_ins",
+            "paperrust_count_del",
+            "paperrust_count_ins",
+            "paperrust_count_trunc",
+            "paperrust_count_upd", // Stage 2
+            "paperrust_search_doc_del",
+            "paperrust_search_doc_upd",
+            "paperrust_sync_del",
+            "paperrust_sync_ins",
             "paperrust_sync_rev", // Stage 5
             "paperrust_sync_upd"
         ]
     );
     // Join removal: whoever does not read content does not read paperrust_document_content
-    let plan: Vec<String> = sqlx::query_scalar("EXPLAIN SELECT id, title FROM documents_document WHERE id = 1")
-        .fetch_all(&pool)
-        .await
-        .expect("explain");
+    let plan: Vec<String> =
+        sqlx::query_scalar("EXPLAIN SELECT id, title FROM documents_document WHERE id = 1").fetch_all(&pool).await.expect("explain");
     assert!(!plan.join("\n").contains("paperrust_document_content"), "{plan:?}");
 
     // ---- Writing through the view
@@ -220,7 +224,11 @@ async fn stages_convert_write_and_roll_back() {
         .await
         .expect("update owner");
     assert_eq!(scalar_i64(&pool, &format!("SELECT count(*) FROM paperrust_search_dirty WHERE doc_id = {id}")).await, 1);
-    let f: String = sqlx::query_scalar("SELECT filename FROM paperrust_document_file WHERE document_id = $1").bind(id).fetch_one(&pool).await.expect("file");
+    let f: String = sqlx::query_scalar("SELECT filename FROM paperrust_document_file WHERE document_id = $1")
+        .bind(id)
+        .fetch_one(&pool)
+        .await
+        .expect("file");
     assert_eq!(f, "neu2.pdf");
     // UPDATE … FROM over several rows (bulk change)
     let n = sqlx::query(
@@ -247,20 +255,26 @@ async fn stages_convert_write_and_roll_back() {
     sqlx::query("DELETE FROM documents_document WHERE id = $1").bind(id).execute(&mut *tx).await.expect("delete");
     assert!(tx.commit().await.is_err(), "verwaiste Notiz verletzt den Fremdschlüssel");
     let mut tx = pool.begin().await.expect("tx");
-    let doc_uuid: uuid::Uuid = sqlx::query_scalar("SELECT uuid FROM paperrust_document WHERE id = $1").bind(id).fetch_one(&pool).await.expect("uuid");
+    let doc_uuid: uuid::Uuid =
+        sqlx::query_scalar("SELECT uuid FROM paperrust_document WHERE id = $1").bind(id).fetch_one(&pool).await.expect("uuid");
     let doc_rev = scalar_i64(&pool, &format!("SELECT rev FROM paperrust_document WHERE id = {id}")).await;
     sqlx::query("DELETE FROM documents_document WHERE id = $1").bind(id).execute(&mut *tx).await.expect("delete");
     tx.commit().await.expect("commit delete");
     // Stage 5: tombstone with uuid and rev + 1, sequencer reports 'd'
     let (t_uuid, t_rev): (uuid::Uuid, i64) =
-        sqlx::query_as("SELECT uuid, rev FROM paperrust_sync_tombstone WHERE kind = 1 AND local_id = $1").bind(id).fetch_one(&pool).await.expect("tombstone");
+        sqlx::query_as("SELECT uuid, rev FROM paperrust_sync_tombstone WHERE kind = 1 AND local_id = $1")
+            .bind(id)
+            .fetch_one(&pool)
+            .await
+            .expect("tombstone");
     assert_eq!((t_uuid, t_rev), (doc_uuid, doc_rev + 1));
     while scalar_i64(&pool, "SELECT paperrust_sync_sequence(100000)::int8").await > 0 {}
-    let (op, l_uuid): (String, uuid::Uuid) = sqlx::query_as("SELECT op::text, uuid FROM paperrust_sync_log WHERE kind = 1 AND local_id = $1")
-        .bind(i64::from(id))
-        .fetch_one(&pool)
-        .await
-        .expect("log");
+    let (op, l_uuid): (String, uuid::Uuid) =
+        sqlx::query_as("SELECT op::text, uuid FROM paperrust_sync_log WHERE kind = 1 AND local_id = $1")
+            .bind(i64::from(id))
+            .fetch_one(&pool)
+            .await
+            .expect("log");
     assert_eq!((op.as_str(), l_uuid), ("d", doc_uuid));
     // Tag assignment and share count as a change of the document (rev + 1), label change on the label
     let r50 = scalar_i64(&pool, "SELECT rev FROM paperrust_document WHERE id = 50").await;
@@ -279,9 +293,11 @@ async fn stages_convert_write_and_roll_back() {
     .fetch_one(&pool)
     .await
     .expect("tag insert über Sicht");
-    let tuuid: uuid::Uuid = sqlx::query_scalar("SELECT uuid FROM paperrust_tag WHERE id = $1").bind(tid).fetch_one(&pool).await.expect("uuid");
+    let tuuid: uuid::Uuid =
+        sqlx::query_scalar("SELECT uuid FROM paperrust_tag WHERE id = $1").bind(tid).fetch_one(&pool).await.expect("uuid");
     assert!(tid > 0);
-    let resolved = scalar_i64(&pool, &format!("SELECT local_id::int8 FROM paperrust_sync_object WHERE kind = 2 AND uuid = '{tuuid}'")).await;
+    let resolved =
+        scalar_i64(&pool, &format!("SELECT local_id::int8 FROM paperrust_sync_object WHERE kind = 2 AND uuid = '{tuuid}'")).await;
     assert_eq!(resolved, i64::from(tid), "neuer Tag über uuid auflösbar");
     sqlx::query("DELETE FROM documents_tag WHERE id = $1").bind(tid).execute(&pool).await.expect("tag delete");
     assert_eq!(scalar_i64(&pool, &format!("SELECT count(*) FROM paperrust_document_content WHERE document_id = {id}")).await, 0);
@@ -330,17 +346,16 @@ async fn stages_convert_write_and_roll_back() {
     pl_authz::grants::set_native(false);
     pl_authz::grants::set_override(None);
     // Revoke the share via the guardian view → bitmask, L5 view and count follow
-    sqlx::query("DELETE FROM guardian_userobjectpermission WHERE object_pk = '7' AND user_id = 3")
-        .execute(&pool)
-        .await
-        .expect("revoke");
+    sqlx::query("DELETE FROM guardian_userobjectpermission WHERE object_pk = '7' AND user_id = 3").execute(&pool).await.expect("revoke");
     assert_eq!(scalar_i64(&pool, "SELECT count(*) FROM paperrust_grant WHERE subject = 3 AND object_id = 7").await, 0);
     counters_match_live(&pool, "nach Entzug").await;
     assert_eq!(manage(&["datamodel", "counts", "check"]).await, 0, "counts check 2");
 
     // ---- Rollback: table is back, same content as the view before
     let before_rollback = rows_hash(&pool, "documents_document").await;
-    let ident_before = rows_hash(&pool, "(SELECT (kind::int8 << 32) + local_id AS id, uuid, rev FROM paperrust_sync_object WHERE deleted_at IS NULL)").await;
+    let ident_before =
+        rows_hash(&pool, "(SELECT (kind::int8 << 32) + local_id AS id, uuid, rev FROM paperrust_sync_object WHERE deleted_at IS NULL)")
+            .await;
     let seq_before = scalar_i64(&pool, "SELECT last_value FROM paperrust_document_id_seq").await;
     pool.close().await;
     assert_eq!(manage(&["datamodel", "rollback", "--to", "0"]).await, 0, "rollback");
@@ -353,7 +368,8 @@ async fn stages_convert_write_and_roll_back() {
     assert_eq!(kind, "r");
     assert_eq!(rows_hash(&pool, "documents_document").await, before_rollback);
     assert_eq!(
-        rows_hash(&pool, "(SELECT (kind::int8 << 32) + local_id AS id, uuid, rev FROM paperrust_sync_object WHERE deleted_at IS NULL)").await,
+        rows_hash(&pool, "(SELECT (kind::int8 << 32) + local_id AS id, uuid, rev FROM paperrust_sync_object WHERE deleted_at IS NULL)")
+            .await,
         ident_before,
         "Stufe 5 zurück: gleiche uuid/rev in der Seitentabelle"
     );

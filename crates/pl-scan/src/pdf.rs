@@ -141,7 +141,8 @@ pub fn write_pdf(pages: &[Page], dpi: u32, dst: &Path) -> Result<usize, ScanErro
         if is_pdf(p) {
             docs.push(pl_pdfops::pdf::load_bytes(&p.data, "scan", None).map_err(pdf_err)?);
         } else {
-            let img = image::load_from_memory(&p.data).map_err(|_| ScanError::Pdf(format!("page {} has an unsupported format ({})", n + 1, p.content_type)))?;
+            let img = image::load_from_memory(&p.data)
+                .map_err(|_| ScanError::Pdf(format!("page {} has an unsupported format ({})", n + 1, p.content_type)))?;
             let bytes = pl_pdfops::convert::images_to_pdf(&[img], (f64::from(dpi), f64::from(dpi))).map_err(pdf_err)?;
             docs.push(pl_pdfops::pdf::load_bytes(&bytes, "scan", None).map_err(pdf_err)?);
         }

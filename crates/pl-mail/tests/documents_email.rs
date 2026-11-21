@@ -127,10 +127,24 @@ async fn sends_documents_to_sink() {
     assert_eq!(data.matches("Content-Disposition: attachment;").count(), 2, "{data}");
 
     // deprecated detail route with form body
-    let (s, b) = post(&app, "/api/documents/1/email/", ADMIN_TOKEN, "application/x-www-form-urlencoded", "addresses=c%40example.com&subject=s&message=m&use_archive_version=false").await;
+    let (s, b) = post(
+        &app,
+        "/api/documents/1/email/",
+        ADMIN_TOKEN,
+        "application/x-www-form-urlencoded",
+        "addresses=c%40example.com&subject=s&message=m&use_archive_version=false",
+    )
+    .await;
     assert_eq!((s, b.as_str()), (200, r#"{"message":"Email sent"}"#));
     // ... and JSON (upstream AttributeError → 500; PaperRust accepts it like the form body)
-    let (s, b) = post(&app, "/api/documents/1/email/", ADMIN_TOKEN, "application/json", r#"{"addresses":"c@example.com","subject":"s","message":"m"}"#).await;
+    let (s, b) = post(
+        &app,
+        "/api/documents/1/email/",
+        ADMIN_TOKEN,
+        "application/json",
+        r#"{"addresses":"c@example.com","subject":"s","message":"m"}"#,
+    )
+    .await;
     assert_eq!((s, b.as_str()), (200, r#"{"message":"Email sent"}"#));
 }
 

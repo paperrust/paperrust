@@ -68,11 +68,7 @@ fn binary_magic(d: &[u8]) -> Option<&'static str> {
             return Some("image/bmp");
         }
     }
-    if d.starts_with(b"II*\0")
-        || d.starts_with(b"MM\0*")
-        || d.starts_with(b"II+\0")
-        || d.starts_with(b"MM\0+")
-    {
+    if d.starts_with(b"II*\0") || d.starts_with(b"MM\0*") || d.starts_with(b"II+\0") || d.starts_with(b"MM\0+") {
         return Some("image/tiff");
     }
     if d.len() >= 12 && d.starts_with(b"RIFF") {
@@ -149,10 +145,7 @@ fn find(hay: &[u8], needle: &[u8], from: usize, window: usize) -> Option<usize> 
         return None;
     }
     let end = (from + window + needle.len()).min(hay.len());
-    hay[from..end]
-        .windows(needle.len())
-        .position(|w| w == needle)
-        .map(|p| p + from)
+    hay[from..end].windows(needle.len()).position(|w| w == needle).map(|p| p + from)
 }
 
 /// Search window of the OOXML header search: start positions `[s, s + 10000)`.
@@ -185,21 +178,11 @@ fn msooxml(d: &[u8]) -> Option<Option<&'static str>> {
     }
     // >>0x1E regex \[Content_Types\]\.xml|_rels/\.rels|docProps|customXml
     // (searched from 0x1E up to the first NUL, like regexec on C strings)
-    let region_end = d[0x1e.min(d.len())..]
-        .iter()
-        .position(|&b| b == 0)
-        .map(|p| p + 0x1e)
-        .unwrap_or(d.len())
-        .min(0x1e + 8192);
+    let region_end = d[0x1e.min(d.len())..].iter().position(|&b| b == 0).map(|p| p + 0x1e).unwrap_or(d.len()).min(0x1e + 8192);
     let region = d.get(0x1e..region_end)?;
     // leftmost-first: earliest start wins, end = start + length of the match
     let mut first: Option<(usize, usize)> = None;
-    for pat in [
-        &b"[Content_Types].xml"[..],
-        b"_rels/.rels",
-        b"docProps",
-        b"customXml",
-    ] {
+    for pat in [&b"[Content_Types].xml"[..], b"_rels/.rels", b"docProps", b"customXml"] {
         if let Some(p) = region.windows(pat.len()).position(|w| w == pat)
             && first.is_none_or(|(s, _)| p < s)
         {
@@ -235,9 +218,8 @@ fn msooxml(d: &[u8]) -> Option<Option<&'static str>> {
 /// sequence remain what they were).
 fn pdf_after_junk(d: &[u8]) -> bool {
     let head = &d[..d.len().min(1024 + 8)];
-    let Some(p) = head.windows(8).position(|w| {
-        w.starts_with(b"%PDF-") && w[5].is_ascii_digit() && w[6] == b'.' && w[7].is_ascii_digit()
-    }) else {
+    let Some(p) = head.windows(8).position(|w| w.starts_with(b"%PDF-") && w[5].is_ascii_digit() && w[6] == b'.' && w[7].is_ascii_digit())
+    else {
         return false;
     };
     if p == 0 || p > 1024 {
@@ -255,9 +237,7 @@ fn pdf_after_junk(d: &[u8]) -> bool {
             let n = s[..t].iter().rev().take_while(|b| b.is_ascii_digit()).count();
             (t < s.len() && n > 0).then_some(t - n)
         };
-        digits_then_space(before)
-            .and_then(|k| digits_then_space(&before[..k]))
-            .is_some()
+        digits_then_space(before).and_then(|k| digits_then_space(&before[..k])).is_some()
     })
 }
 
@@ -272,9 +252,7 @@ fn ooxml_by_entries(d: &[u8]) -> Option<&'static str> {
     let mut collect = |sig: &[u8], name_len_at: usize, name_at: usize| {
         let mut i = 0;
         while let Some(p) = find(d, sig, i, d.len()) {
-            let nl = d
-                .get(p + name_len_at..p + name_len_at + 2)
-                .map(|b| u16::from_le_bytes([b[0], b[1]]) as usize);
+            let nl = d.get(p + name_len_at..p + name_len_at + 2).map(|b| u16::from_le_bytes([b[0], b[1]]) as usize);
             if let Some(name) = nl.and_then(|nl| d.get(p + name_at..p + name_at + nl)) {
                 names.push(name);
             }
@@ -340,9 +318,7 @@ fn cdf_magic(d: &[u8]) -> &'static str {
 }
 
 /// Classification of an opened compound file (also for tests with generated CFB files).
-pub fn cdf_classify<F: std::io::Read + std::io::Seek>(
-    mut cf: cfb::CompoundFile<F>,
-) -> &'static str {
+pub fn cdf_classify<F: std::io::Read + std::io::Seek>(mut cf: cfb::CompoundFile<F>) -> &'static str {
     let mut names: Vec<String> = Vec::new();
     for e in cf.walk() {
         names.push(e.name().to_owned());
@@ -393,10 +369,7 @@ pub fn cdf_classify<F: std::io::Read + std::io::Seek>(
 
 /// PIDSI_APPNAME (0x12) from a `\x05SummaryInformation` property set.
 pub(crate) fn summary_app_name(b: &[u8]) -> Option<String> {
-    let rd32 = |o: usize| -> Option<u32> {
-        b.get(o..o + 4)
-            .map(|x| u32::from_le_bytes([x[0], x[1], x[2], x[3]]))
-    };
+    let rd32 = |o: usize| -> Option<u32> { b.get(o..o + 4).map(|x| u32::from_le_bytes([x[0], x[1], x[2], x[3]])) };
     let nsets = rd32(24)?;
     if nsets == 0 {
         return None;
@@ -420,13 +393,7 @@ pub(crate) fn summary_app_name(b: &[u8]) -> Option<String> {
             }
             0x1f => {
                 let raw = b.get(p + 8..p + 8 + (len * 2).min(8192))?;
-                let u: Vec<u16> = raw
-                    .as_chunks::<2>()
-                    .0
-                    .iter()
-                    .map(|c| u16::from_le_bytes([c[0], c[1]]))
-                    .take_while(|&c| c != 0)
-                    .collect();
+                let u: Vec<u16> = raw.as_chunks::<2>().0.iter().map(|c| u16::from_le_bytes([c[0], c[1]])).take_while(|&c| c != 0).collect();
                 Some(String::from_utf16_lossy(&u))
             }
             _ => None,
@@ -453,13 +420,7 @@ fn text_view(d: &[u8]) -> Option<Vec<u8>> {
             .as_chunks::<2>()
             .0
             .iter()
-            .map(|c| {
-                if be {
-                    u16::from_be_bytes([c[0], c[1]])
-                } else {
-                    u16::from_le_bytes([c[0], c[1]])
-                }
-            })
+            .map(|c| if be { u16::from_be_bytes([c[0], c[1]]) } else { u16::from_le_bytes([c[0], c[1]]) })
             .collect();
         if units.iter().all(|&u| u >= 0x80 || !is_forbidden(u as u8)) {
             return Some(String::from_utf16_lossy(&units).into_bytes());
@@ -467,11 +428,7 @@ fn text_view(d: &[u8]) -> Option<Vec<u8>> {
         return None;
     }
     // A single trailing NUL does not bother libmagic (empirical)
-    let body = if d.len() > 1 && d[d.len() - 1] == 0 {
-        &d[..d.len() - 1]
-    } else {
-        d
-    };
+    let body = if d.len() > 1 && d[d.len() - 1] == 0 { &d[..d.len() - 1] } else { d };
     if body.iter().any(|&b| is_forbidden(b)) {
         return None;
     }
@@ -512,8 +469,7 @@ fn search_ci_w(t: &[u8], pat: &[u8], range: usize) -> bool {
 }
 
 fn lines(t: &[u8]) -> impl Iterator<Item = &[u8]> {
-    t.split(|&b| b == b'\n')
-        .map(|l| l.strip_suffix(b"\r").unwrap_or(l))
+    t.split(|&b| b == b'\n').map(|l| l.strip_suffix(b"\r").unwrap_or(l))
 }
 
 fn text_magic(raw: &[u8], t: &[u8]) -> &'static str {
@@ -563,25 +519,13 @@ fn text_magic(raw: &[u8], t: &[u8]) -> &'static str {
         return "text/calendar";
     }
     for (p, m) in [
-        (
-            &b"-----BEGIN PGP MESSAGE-----"[..],
-            "application/pgp-encrypted",
-        ),
-        (
-            b"-----BEGIN PGP SIGNATURE-----",
-            "application/pgp-signature",
-        ),
-        (
-            b"-----BEGIN PGP PUBLIC KEY BLOCK-----",
-            "application/pgp-keys",
-        ),
+        (&b"-----BEGIN PGP MESSAGE-----"[..], "application/pgp-encrypted"),
+        (b"-----BEGIN PGP SIGNATURE-----", "application/pgp-signature"),
+        (b"-----BEGIN PGP PUBLIC KEY BLOCK-----", "application/pgp-keys"),
         (b"-----BEGIN PGP SIGNED MESSAGE-----", "text/PGP"),
         (b"-----BEGIN CERTIFICATE-----", "application/x-pem-file"),
         (b"-----BEGIN PRIVATE KEY-----", "text/x-ssh-private-key"),
-        (
-            b"-----BEGIN OPENSSH PRIVATE KEY-----",
-            "text/x-ssh-private-key",
-        ),
+        (b"-----BEGIN OPENSSH PRIVATE KEY-----", "text/x-ssh-private-key"),
         (b"-----BEGIN RSA PRIVATE KEY-----", "text/x-ssl-private-key"),
         (b"ssh-rsa ", "text/x-ssh-public-key"),
         (b"ssh-ed25519 ", "text/x-ssh-public-key"),
@@ -652,17 +596,7 @@ fn mail_magic(t: &[u8]) -> Option<&'static str> {
     if starts_ci(t, b"return-path:") || starts_ci(t, b"delivered-to:") {
         return Some("message/rfc822");
     }
-    for p in [
-        &b"Received:"[..],
-        b"From:",
-        b"To:",
-        b"Cc:",
-        b"Date:",
-        b"Subject:",
-        b"Relay-Version:",
-        b"Forward to ",
-        b"Pipe to ",
-    ] {
+    for p in [&b"Received:"[..], b"From:", b"To:", b"Cc:", b"Date:", b"Subject:", b"Relay-Version:", b"Forward to ", b"Pipe to "] {
         if t.starts_with(p) {
             return Some("message/rfc822");
         }
@@ -693,10 +627,7 @@ fn source_magic(t: &[u8]) -> Option<&'static str> {
             c = true;
         }
         let trimmed: &[u8] = {
-            let s = l
-                .iter()
-                .position(|b| !b.is_ascii_whitespace())
-                .unwrap_or(l.len());
+            let s = l.iter().position(|b| !b.is_ascii_whitespace()).unwrap_or(l.len());
             &l[s..]
         };
         if trimmed.starts_with(b"char *") || trimmed.starts_with(b"char*") {
@@ -781,10 +712,7 @@ fn py_line(l: &[u8]) -> bool {
         // def name(...):
         if let Some(open) = r.find('(') {
             let name = r[..open].trim();
-            if !name.is_empty()
-                && name.chars().all(|c| c.is_alphanumeric() || c == '_')
-                && r.trim_end().ends_with(':')
-            {
+            if !name.is_empty() && name.chars().all(|c| c.is_alphanumeric() || c == '_') && r.trim_end().ends_with(':') {
                 return true;
             }
         }
@@ -792,10 +720,7 @@ fn py_line(l: &[u8]) -> bool {
     if let Some(r) = s.strip_prefix("class ") {
         let r = r.trim_end();
         if r.ends_with(':') {
-            let name: String = r
-                .chars()
-                .take_while(|c| c.is_alphanumeric() || *c == '_')
-                .collect();
+            let name: String = r.chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect();
             if !name.is_empty() {
                 return true;
             }
@@ -860,11 +785,7 @@ fn csv_parse(t: &[u8]) -> bool {
 /// libmagic `is_json.c` (lenient: comma before `}`/`]` allowed). Only object/array at top
 /// level; several values separated by line breaks → NDJSON.
 fn json_magic(t: &[u8]) -> Option<&'static str> {
-    let mut p = JsonP {
-        s: t,
-        i: 0,
-        depth: 0,
-    };
+    let mut p = JsonP { s: t, i: 0, depth: 0 };
     let mut count = 0;
     loop {
         p.ws();
@@ -874,12 +795,7 @@ fn json_magic(t: &[u8]) -> Option<&'static str> {
         if count > 0 {
             // there must have been a line break between values
             let between = &t[..p.i];
-            if !between
-                .iter()
-                .rev()
-                .take_while(|b| b.is_ascii_whitespace())
-                .any(|&b| b == b'\n')
-            {
+            if !between.iter().rev().take_while(|b| b.is_ascii_whitespace()).any(|&b| b == b'\n') {
                 return None;
             }
         }
@@ -1122,7 +1038,13 @@ mod tests {
             ("word/styles.xml", b"<s/>"),
         ]);
         assert_eq!(detect_bytes(&docx), "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-        let xlsx = zip_stored(&[("[Content_Types].xml", &ct), ("_rels/.rels", b"<r/>"), ("docProps/core.xml", b"<c/>"), ("docProps/app.xml", b"<a/>"), ("xl/workbook.xml", b"<w/>")]);
+        let xlsx = zip_stored(&[
+            ("[Content_Types].xml", &ct),
+            ("_rels/.rels", b"<r/>"),
+            ("docProps/core.xml", b"<c/>"),
+            ("docProps/app.xml", b"<a/>"),
+            ("xl/workbook.xml", b"<w/>"),
+        ]);
         assert_eq!(detect_bytes(&xlsx), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         // ordinary ZIP with a word/ folder but without [Content_Types].xml: stays ZIP
         let plain = zip_stored(&[("readme.txt", b"hi"), ("word/notes.txt", b"x")]);
@@ -1185,20 +1107,11 @@ mod cdf_tests {
 
     #[test]
     fn cdf_classification() {
-        let word = cfb_with(&[
-            ("/\u{5}SummaryInformation", summary("Microsoft Office Word")),
-            ("/WordDocument", vec![0; 600]),
-        ]);
+        let word = cfb_with(&[("/\u{5}SummaryInformation", summary("Microsoft Office Word")), ("/WordDocument", vec![0; 600])]);
         assert_eq!(detect_bytes(&word), "application/msword");
-        let xls = cfb_with(&[
-            ("/\u{5}SummaryInformation", summary("Microsoft Excel")),
-            ("/Workbook", vec![0; 600]),
-        ]);
+        let xls = cfb_with(&[("/\u{5}SummaryInformation", summary("Microsoft Excel")), ("/Workbook", vec![0; 600])]);
         assert_eq!(detect_bytes(&xls), "application/vnd.ms-excel");
-        let unknown_app = cfb_with(&[
-            ("/\u{5}SummaryInformation", summary("Foo")),
-            ("/WordDocument", vec![0; 600]),
-        ]);
+        let unknown_app = cfb_with(&[("/\u{5}SummaryInformation", summary("Foo")), ("/WordDocument", vec![0; 600])]);
         assert_eq!(detect_bytes(&unknown_app), "application/vnd.ms-office");
         let no_summary = cfb_with(&[("/PowerPoint Document", vec![0; 600])]);
         assert_eq!(detect_bytes(&no_summary), "application/vnd.ms-powerpoint");

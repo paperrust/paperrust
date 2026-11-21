@@ -59,7 +59,11 @@ async fn v1_error(r: reqwest::Response) -> Error {
         .unwrap_or_else(|| body.to_string());
     match status {
         StatusCode::UNAUTHORIZED => Error::Unauthenticated,
-        _ => Error::Api { status: status.as_u16(), code: if status == StatusCode::BAD_REQUEST { "invalid".into() } else { "error".into() }, message },
+        _ => Error::Api {
+            status: status.as_u16(),
+            code: if status == StatusCode::BAD_REQUEST { "invalid".into() } else { "error".into() },
+            message,
+        },
     }
 }
 
@@ -233,11 +237,7 @@ impl NgxRemote {
         }
         let rb = self.client.get(self.url(&pq)?).headers(h).timeout(Duration::from_secs(600));
         let r = self.auth(rb).send().await.map_err(map_reqwest)?;
-        if r.status().is_success() || r.status() == StatusCode::NOT_MODIFIED {
-            Ok(r)
-        } else {
-            Err(v1_error(r).await)
-        }
+        if r.status().is_success() || r.status() == StatusCode::NOT_MODIFIED { Ok(r) } else { Err(v1_error(r).await) }
     }
 
     /// Rohweiterleitung (Gateway, Online-Modus).
@@ -312,17 +312,26 @@ pub fn obj_v2(kind: &str, o: &Value, users: &Users) -> Value {
 pub fn fingerprint(d: &Value) -> String {
     let mut tags: Vec<i64> = d["tags"].as_array().map(|a| a.iter().filter_map(Value::as_i64).collect()).unwrap_or_default();
     tags.sort();
-    let notes: Vec<Value> = d["notes"]
-        .as_array()
-        .map(|a| a.iter().map(|n| json!([n["id"], n["note"]])).collect())
-        .unwrap_or_default();
-    let fp = json!([d["id"], d["modified"], tags, d["correspondent"], d["document_type"], d["storage_path"], d["custom_fields"],
-                    notes, d["archive_serial_number"], d["title"], d["created"]]);
+    let notes: Vec<Value> = d["notes"].as_array().map(|a| a.iter().map(|n| json!([n["id"], n["note"]])).collect()).unwrap_or_default();
+    let fp = json!([
+        d["id"],
+        d["modified"],
+        tags,
+        d["correspondent"],
+        d["document_type"],
+        d["storage_path"],
+        d["custom_fields"],
+        notes,
+        d["archive_serial_number"],
+        d["title"],
+        d["created"]
+    ]);
     Sha256::digest(fp.to_string().as_bytes()).iter().map(|b| format!("{b:02x}")).collect()
 }
 
 /// Fields of the fingerprint query (`fields=`).
-pub const FINGERPRINT_FIELDS: &str = "id,modified,tags,correspondent,document_type,storage_path,custom_fields,notes,archive_serial_number,title,created";
+pub const FINGERPRINT_FIELDS: &str =
+    "id,modified,tags,correspondent,document_type,storage_path,custom_fields,notes,archive_serial_number,title,created";
 
 /// v1-Dokument (+ Metadaten) → v2-Form inkl. `content`/`notes`.
 pub fn doc_v2(d: &Value, meta: Option<&Value>, users: &Users, doclink_fields: &[i64]) -> Value {
@@ -353,7 +362,9 @@ pub fn doc_v2(d: &Value, meta: Option<&Value>, users: &Users, doclink_fields: &[
             a.iter()
                 .map(|n| {
                     let user = match &n["user"] {
-                        Value::Object(u) => json!({"uuid": u.get("id").and_then(Value::as_i64).map(|i| ngx_uuid(8, i)), "username": u.get("username")}),
+                        Value::Object(u) => {
+                            json!({"uuid": u.get("id").and_then(Value::as_i64).map(|i| ngx_uuid(8, i)), "username": u.get("username")})
+                        }
                         other => uref(other, users),
                     };
                     json!({"legacy_id": n["id"], "note": n["note"], "created": n["created"], "user": user})
@@ -421,7 +432,11 @@ mod tests {
         assert_eq!(fingerprint(&d), fingerprint(&d2));
         d2["tags"] = json!([1, 2, 3]);
         assert_ne!(fingerprint(&d), fingerprint(&d2));
-        let t = obj_v2("tag", &json!({"id": 2, "name": "A", "matching_algorithm": 6, "match": "", "is_insensitive": true, "parent": 1, "owner": null}), &users);
+        let t = obj_v2(
+            "tag",
+            &json!({"id": 2, "name": "A", "matching_algorithm": 6, "match": "", "is_insensitive": true, "parent": 1, "owner": null}),
+            &users,
+        );
         assert_eq!(t["matching"]["algorithm"], "auto");
         assert_eq!(t["parent"], ngx_uuid(2, 1));
     }

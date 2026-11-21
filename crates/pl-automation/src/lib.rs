@@ -88,7 +88,9 @@ mod tests {
     /// both must work side by side and the more specific prefix wins.
     #[tokio::test]
     async fn nests_beside_api_v2() {
-        let v2: axum::Router = axum::Router::new().route("/server", axum::routing::get(|| async { "v2" })).fallback(|| async { (StatusCode::IM_A_TEAPOT, "v2 fallback") });
+        let v2: axum::Router = axum::Router::new()
+            .route("/server", axum::routing::get(|| async { "v2" }))
+            .fallback(|| async { (StatusCode::IM_A_TEAPOT, "v2 fallback") });
         let auto: axum::Router = axum::Router::new().route("/workflows", axum::routing::get(|| async { "auto" }));
         let app = axum::Router::new().nest(super::PREFIX, auto).nest("/rs/api/v2", v2);
         let call = |uri: &'static str| {

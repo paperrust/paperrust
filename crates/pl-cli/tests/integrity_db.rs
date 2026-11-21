@@ -173,7 +173,11 @@ async fn integrity_full_vs_incremental() {
     assert_eq!(flat(&inc), flat(&full), "incremental reports the same as full after changes");
     assert_eq!(st3.files_hashed, 1, "only the changed original is read");
     let errors: Vec<_> = flat(&full).into_iter().filter(|x| x.1 == ERROR).collect();
-    assert!(errors.contains(&(Some(i64::from(a)), ERROR, format!("Checksum mismatch. Stored: {}, actual: {}.", sha(&orig_body(a)), sha(b"tampered content")))));
+    assert!(errors.contains(&(
+        Some(i64::from(a)),
+        ERROR,
+        format!("Checksum mismatch. Stored: {}, actual: {}.", sha(&orig_body(a)), sha(b"tampered content"))
+    )));
     assert!(errors.contains(&(Some(i64::from(b)), ERROR, "Archived version of document does not exist.".into())));
     assert!(errors.contains(&(Some(i64::from(c)), ERROR, "Thumbnail of document does not exist.".into())));
     assert_eq!(errors.len(), 3);
@@ -209,7 +213,8 @@ async fn integrity_full_vs_incremental() {
     assert_eq!(report["files"]["orphaned"], 1);
     let title: String = sqlx::query_scalar("SELECT title FROM documents_document WHERE id = $1").bind(b).fetch_one(&pool).await.unwrap();
     assert!(
-        report["issues"].as_array().unwrap().iter().any(|i| i["document_id"] == b && i["title"] == title.as_str()
+        report["issues"].as_array().unwrap().iter().any(|i| i["document_id"] == b
+            && i["title"] == title.as_str()
             && i["message"] == "Archived version of document does not exist."),
         "{report:#}"
     );

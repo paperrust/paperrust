@@ -19,9 +19,7 @@ pub type NavFailed = Arc<dyn Fn() + Send + Sync>;
 #[cfg(windows)]
 pub fn install(window: &tauri::WebviewWindow, cert: CertCheck, nav_failed: NavFailed) {
     use webview2_com::Microsoft::Web::WebView2::Win32::*;
-    use webview2_com::{
-        NavigationCompletedEventHandler, ServerCertificateErrorDetectedEventHandler, take_pwstr,
-    };
+    use webview2_com::{NavigationCompletedEventHandler, ServerCertificateErrorDetectedEventHandler, take_pwstr};
     use windows::core::{BOOL, Interface, PWSTR};
 
     let r = window.with_webview(move |pw| unsafe {
@@ -44,9 +42,7 @@ pub fn install(window: &tauri::WebviewWindow, cert: CertCheck, nav_failed: NavFa
                     let mut pem = PWSTR::null();
                     certificate.ToPemEncoding(&mut pem)?;
                     let pem = take_pwstr(pem);
-                    let pin = crate::remote::pem_to_der(&pem)
-                        .and_then(|d| crate::remote::spki_pin(&d))
-                        .unwrap_or_default();
+                    let pin = crate::remote::pem_to_der(&pem).and_then(|d| crate::remote::spki_pin(&d)).unwrap_or_default();
                     let allow = !pin.is_empty() && cert(&uri, &pin, hard);
                     tracing::info!(%uri, status = status.0, allow, "WebView2: Zertifikatsfehler");
                     args.SetAction(if allow {

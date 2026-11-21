@@ -23,8 +23,8 @@ use sqlx::{PgConnection, PgPool, Row};
 
 use crate::db::DocRow;
 use crate::workflows::{
-    ACTION_APPLY_AI_SUGGESTIONS, ACTION_ASSIGNMENT, ACTION_EMAIL, ACTION_MOVE_TO_TRASH, ACTION_PASSWORD_REMOVAL,
-    ACTION_REMOTE_OCR, ACTION_REMOVAL, ACTION_WEBHOOK, ActionDef, WorkflowDef,
+    ACTION_APPLY_AI_SUGGESTIONS, ACTION_ASSIGNMENT, ACTION_EMAIL, ACTION_MOVE_TO_TRASH, ACTION_PASSWORD_REMOVAL, ACTION_REMOTE_OCR,
+    ACTION_REMOVAL, ACTION_WEBHOOK, ActionDef, WorkflowDef,
 };
 
 /// Migration (name, SQL) for `paperrust manage migrate`.
@@ -205,9 +205,18 @@ impl Branch {
 /// Result of [`decide`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum Decision {
-    Run { branch: Branch, code: &'static str, note: Option<String> },
+    Run {
+        branch: Branch,
+        code: &'static str,
+        note: Option<String>,
+    },
     /// Execute nothing. `log`: note in the history; `error`: as an error.
-    Skip { code: &'static str, note: Option<String>, log: bool, error: bool },
+    Skip {
+        code: &'static str,
+        note: Option<String>,
+        log: bool,
+        error: bool,
+    },
     /// Catch up as a task after the commit (AI condition, [`AiMode::Defer`]).
     Defer,
 }
@@ -217,7 +226,9 @@ pub enum Decision {
 pub enum MatchState {
     Matched,
     /// Trigger of the type present, filter not met (`reason` only if determined).
-    NotMatched { reason: Option<String> },
+    NotMatched {
+        reason: Option<String>,
+    },
     /// No trigger of this type on the workflow – the workflow is not responsible for this trigger.
     NotFired,
     /// Matching failed (e.g. unknown algorithm) – like upstream: do not execute.
@@ -242,7 +253,13 @@ pub fn branch_actions(wf: &WorkflowDef, branch: Branch) -> &[ActionDef] {
 ///    AI off: ignored (main branch, marked); [`AiMode::Defer`] → catch up;
 ///    [`AiMode::NotChecked`] → main branch, marked; otherwise ask the AI: yes → main, no → else or
 ///    nothing, error → nothing (noted as an error, else branch does not run).
-pub fn decide<'a>(wf: &'a WorkflowDef, trigger_type: i64, state: MatchState, document_id: Option<i64>, opts: ExtOptions) -> BoxFuture<'a, Decision> {
+pub fn decide<'a>(
+    wf: &'a WorkflowDef,
+    trigger_type: i64,
+    state: MatchState,
+    document_id: Option<i64>,
+    opts: ExtOptions,
+) -> BoxFuture<'a, Decision> {
     Box::pin(decide_inner(wf, trigger_type, state, document_id, opts))
 }
 
@@ -271,16 +288,26 @@ async fn decide_inner(wf: &WorkflowDef, trigger_type: i64, state: MatchState, do
         };
     }
     let Some(judge) = ai_judge() else {
-        return Decision::Run { branch: Branch::Main, code: "ai_ignored_unavailable", note: Some("AI condition ignored: AI is not available".into()) };
+        return Decision::Run {
+            branch: Branch::Main,
+            code: "ai_ignored_unavailable",
+            note: Some("AI condition ignored: AI is not available".into()),
+        };
     };
     if !judge.enabled().await {
-        return Decision::Run { branch: Branch::Main, code: "ai_ignored_disabled", note: Some("AI condition ignored: AI is switched off".into()) };
+        return Decision::Run {
+            branch: Branch::Main,
+            code: "ai_ignored_disabled",
+            note: Some("AI condition ignored: AI is switched off".into()),
+        };
     }
     match opts.ai_mode {
         AiMode::Defer => Decision::Defer,
-        AiMode::NotChecked => {
-            Decision::Run { branch: Branch::Main, code: "ai_not_checked", note: Some("AI condition not checked (dry run without AI)".into()) }
-        }
+        AiMode::NotChecked => Decision::Run {
+            branch: Branch::Main,
+            code: "ai_not_checked",
+            note: Some("AI condition not checked (dry run without AI)".into()),
+        },
         AiMode::Inline => {
             let Some(doc) = document_id else {
                 return Decision::Run { branch: Branch::Main, code: "ai_ignored_consumption", note: None };
@@ -571,10 +598,12 @@ pub async fn load_ai_conditions(conn: &mut PgConnection, wf_ids: &[i64]) -> Resu
     }
     ensure_conn(conn).await?;
     let ids: Vec<i32> = wf_ids.iter().filter_map(|i| i32::try_from(*i).ok()).collect();
-    let rows = sqlx::query("SELECT workflow_id, ai_condition FROM paperrust_workflow_ext WHERE workflow_id = ANY($1) AND ai_condition IS NOT NULL")
-        .bind(&ids)
-        .fetch_all(&mut *conn)
-        .await?;
+    let rows = sqlx::query(
+        "SELECT workflow_id, ai_condition FROM paperrust_workflow_ext WHERE workflow_id = ANY($1) AND ai_condition IS NOT NULL",
+    )
+    .bind(&ids)
+    .fetch_all(&mut *conn)
+    .await?;
     for r in rows {
         let id = i64::from(r.try_get::<i32, _>(0)?);
         let v: serde_json::Value = r.try_get(1)?;

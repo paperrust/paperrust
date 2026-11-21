@@ -3,9 +3,9 @@
 
 use std::collections::{HashMap, HashSet};
 
-use pl_authz::models::ObjectModel;
 use pl_authz::User;
-use pl_domain::model::{Access, GroupRef, Grantees, Kind, Sharing, UserRef};
+use pl_authz::models::ObjectModel;
+use pl_domain::model::{Access, Grantees, GroupRef, Kind, Sharing, UserRef};
 use pl_domain::{DomainError, DomainResult};
 use sqlx::PgPool;
 
@@ -76,14 +76,14 @@ pub(crate) async fn grants(
         LEGACY_GRANTS_SQL
     };
     let rows: Vec<(String, String)> = sqlx::query_as(sql)
-    .bind(model.app_label)
-    .bind(model.model_name)
-    .bind(user.id)
-    .bind(&pks)
-    .bind(&codes)
-    .fetch_all(db)
-    .await
-    .map_err(db_err)?;
+        .bind(model.app_label)
+        .bind(model.model_name)
+        .bind(user.id)
+        .bind(&pks)
+        .bind(&codes)
+        .fetch_all(db)
+        .await
+        .map_err(db_err)?;
     for (pk, code) in rows {
         if let Ok(id) = pk.parse::<i64>() {
             out.entry(id).or_default().insert(code);
@@ -92,8 +92,7 @@ pub(crate) async fn grants(
     Ok(out)
 }
 
-const LEGACY_GRANTS_SQL: &str =
-        "WITH ct AS (SELECT id FROM django_content_type WHERE app_label = $1 AND model = $2)
+const LEGACY_GRANTS_SQL: &str = "WITH ct AS (SELECT id FROM django_content_type WHERE app_label = $1 AND model = $2)
          SELECT g.object_pk, p.codename FROM guardian_userobjectpermission g
            JOIN auth_permission p ON p.id = g.permission_id
           WHERE g.user_id = $3::int4 AND g.content_type_id IN (SELECT id FROM ct)
@@ -107,13 +106,7 @@ const LEGACY_GRANTS_SQL: &str =
 
 /// `Access` of a visible object: change/delete = model permission **and** (superuser,
 /// without owner, own object or guardian permission) – like `check_object_perms` in v1.
-pub(crate) fn access(
-    user: &User,
-    model: &ObjectModel,
-    id: i64,
-    owner_id: Option<i64>,
-    grants: &HashMap<i64, HashSet<String>>,
-) -> Access {
+pub(crate) fn access(user: &User, model: &ObjectModel, id: i64, owner_id: Option<i64>, grants: &HashMap<i64, HashSet<String>>) -> Access {
     let obj = |action: &str| -> bool {
         if !user.has_perm(&model.perm(action)) {
             return false;
@@ -188,17 +181,11 @@ pub(crate) async fn sharing(
     model: &ObjectModel,
     objs: &[(i64, Option<i64>)],
 ) -> DomainResult<HashMap<i64, Sharing>> {
-    let pks: Vec<i64> = objs
-        .iter()
-        .filter(|(_, owner)| user.is_superuser || *owner == Some(user.id))
-        .map(|(id, _)| *id)
-        .collect();
+    let pks: Vec<i64> = objs.iter().filter(|(_, owner)| user.is_superuser || *owner == Some(user.id)).map(|(id, _)| *id).collect();
     if pks.is_empty() {
         return Ok(HashMap::new());
     }
-    let g = pl_authz::owned::get_permission_grantees(db, model, &pks)
-        .await
-        .map_err(|e| DomainError::Internal(e.detail()))?;
+    let g = pl_authz::owned::get_permission_grantees(db, model, &pks).await.map_err(|e| DomainError::Internal(e.detail()))?;
     let mut uids = Vec::new();
     let mut gids = Vec::new();
     for og in g.values() {

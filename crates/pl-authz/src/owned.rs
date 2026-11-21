@@ -16,8 +16,8 @@ use crate::error::AuthError;
 use crate::models::ObjectModel;
 use crate::objects::content_type_id_subquery;
 use crate::user::User;
-use sea_query::{Alias, Expr, OnConflict, PostgresQueryBuilder, Query};
 use pl_core::sqlbind::SqlxBinder as _;
+use sea_query::{Alias, Expr, OnConflict, PostgresQueryBuilder, Query};
 use serde_json::{Map, Value, json};
 use sqlx::{PgConnection, PgPool};
 use std::collections::{BTreeSet, HashMap, HashSet};
@@ -94,18 +94,9 @@ impl ObjectGrantees {
 /// (`get_permission_grantees`); `None` returns every grant row (`get_shared_object_pks` needs
 /// the pks with any grant), each with `model_perm` = the permission belongs to `model`'s
 /// content type. Rows: users first, then groups, each ordered by user/group id.
-async fn grant_rows(
-    db: &PgPool,
-    model: &ObjectModel,
-    pks: &[i64],
-    codenames: Option<(&str, &str)>,
-) -> Result<Vec<GrantRow>, AuthError> {
+async fn grant_rows(db: &PgPool, model: &ObjectModel, pks: &[i64], codenames: Option<(&str, &str)>) -> Result<Vec<GrantRow>, AuthError> {
     const CT: &str = "(SELECT id FROM django_content_type WHERE app_label = $1 AND model = $2)";
-    let filter = if codenames.is_some() {
-        format!(" AND p.content_type_id IN {CT} AND p.codename IN ($4, $5)")
-    } else {
-        String::new()
-    };
+    let filter = if codenames.is_some() { format!(" AND p.content_type_id IN {CT} AND p.codename IN ($4, $5)") } else { String::new() };
     if crate::grants::use_grants() {
         // L5: index instead of the two guardian tables; same rows (kind, pk, codename, id,
         // model permission), same sorting.
@@ -164,13 +155,8 @@ fn add_grantees(out: &mut HashMap<i64, ObjectGrantees>, rows: &[GrantRow], view:
 
 /// `get_permission_grantees(model, pks)`: one query for any number of objects.
 /// Every requested pk gets an entry.
-pub async fn get_permission_grantees(
-    db: &PgPool,
-    model: &ObjectModel,
-    pks: &[i64],
-) -> Result<HashMap<i64, ObjectGrantees>, AuthError> {
-    let mut out: HashMap<i64, ObjectGrantees> =
-        pks.iter().map(|pk| (*pk, ObjectGrantees::default())).collect();
+pub async fn get_permission_grantees(db: &PgPool, model: &ObjectModel, pks: &[i64]) -> Result<HashMap<i64, ObjectGrantees>, AuthError> {
+    let mut out: HashMap<i64, ObjectGrantees> = pks.iter().map(|pk| (*pk, ObjectGrantees::default())).collect();
     if pks.is_empty() {
         return Ok(out);
     }
@@ -187,11 +173,7 @@ fn shared_pks(rows: &[GrantRow]) -> HashSet<i64> {
 }
 
 /// `OwnedObjectSerializer.get_shared_object_pks(objects)`: pks with any user or group grant.
-pub async fn get_shared_object_pks(
-    db: &PgPool,
-    model: &ObjectModel,
-    pks: &[i64],
-) -> Result<HashSet<i64>, AuthError> {
+pub async fn get_shared_object_pks(db: &PgPool, model: &ObjectModel, pks: &[i64]) -> Result<HashSet<i64>, AuthError> {
     if pks.is_empty() {
         return Ok(HashSet::new());
     }
@@ -201,11 +183,7 @@ pub async fn get_shared_object_pks(
 /// `get_user_can_change(obj)` with the page-level batch (`permission_grantees`).
 ///
 /// `user = None` is AnonymousUser; `grantees = None` means "no entry for this pk" (→ false).
-pub fn user_can_change(
-    user: Option<&User>,
-    owner_id: Option<i64>,
-    grantees: Option<&ObjectGrantees>,
-) -> bool {
+pub fn user_can_change(user: Option<&User>, owner_id: Option<i64>, grantees: Option<&ObjectGrantees>) -> bool {
     let Some(owner) = owner_id else { return true };
     let Some(user) = user else { return false };
     if owner == user.id {
@@ -222,12 +200,7 @@ pub fn user_can_change(
 }
 
 /// `get_is_shared_by_requester(obj)`: `obj.owner == user and obj.id in shared_object_pks`.
-pub fn is_shared_by_requester(
-    user: Option<&User>,
-    owner_id: Option<i64>,
-    id: i64,
-    shared: &HashSet<i64>,
-) -> bool {
+pub fn is_shared_by_requester(user: Option<&User>, owner_id: Option<i64>, id: i64, shared: &HashSet<i64>) -> bool {
     match (user, owner_id) {
         (Some(u), Some(o)) => o == u.id && shared.contains(&id),
         _ => false,
@@ -245,13 +218,7 @@ pub struct OwnedInfo {
 impl OwnedInfo {
     /// Load grantees (needed for `permissions` and `user_can_change`) and, if
     /// `with_shared` (serializers with `is_shared_by_requester`), the shared pks.
-    pub async fn load(
-        db: &PgPool,
-        model: &ObjectModel,
-        pks: &[i64],
-        fields: OwnedFields,
-        with_shared: bool,
-    ) -> Result<Self, AuthError> {
+    pub async fn load(db: &PgPool, model: &ObjectModel, pks: &[i64], fields: OwnedFields, with_shared: bool) -> Result<Self, AuthError> {
         let need_grantees = fields.permissions || fields.user_can_change;
         let need_shared = with_shared && fields.is_shared_by_requester;
         if need_grantees && need_shared && !pks.is_empty() {
@@ -259,21 +226,12 @@ impl OwnedInfo {
             let view = model.codename("view");
             let change = model.codename("change");
             let rows = grant_rows(db, model, pks, None).await?;
-            let mut grantees: HashMap<i64, ObjectGrantees> =
-                pks.iter().map(|pk| (*pk, ObjectGrantees::default())).collect();
+            let mut grantees: HashMap<i64, ObjectGrantees> = pks.iter().map(|pk| (*pk, ObjectGrantees::default())).collect();
             add_grantees(&mut grantees, &rows, &view, &change);
             return Ok(Self { grantees, shared: shared_pks(&rows) });
         }
-        let grantees = if need_grantees {
-            get_permission_grantees(db, model, pks).await?
-        } else {
-            HashMap::new()
-        };
-        let shared = if need_shared {
-            get_shared_object_pks(db, model, pks).await?
-        } else {
-            HashSet::new()
-        };
+        let grantees = if need_grantees { get_permission_grantees(db, model, pks).await? } else { HashMap::new() };
+        let shared = if need_shared { get_shared_object_pks(db, model, pks).await? } else { HashSet::new() };
         Ok(Self { grantees, shared })
     }
 
@@ -312,10 +270,7 @@ impl OwnedInfo {
             out.insert("user_can_change".into(), Value::Bool(self.user_can_change(user, id, owner_id)));
         }
         if with_shared && fields.is_shared_by_requester {
-            out.insert(
-                "is_shared_by_requester".into(),
-                Value::Bool(self.is_shared_by_requester(user, id, owner_id)),
-            );
+            out.insert("is_shared_by_requester".into(), Value::Bool(self.is_shared_by_requester(user, id, owner_id)));
         }
     }
 }
@@ -346,7 +301,13 @@ fn py_type_name(v: &Value) -> &'static str {
 fn py_str(v: &Value) -> String {
     match v {
         Value::String(s) => s.clone(),
-        Value::Bool(b) => if *b { "True".into() } else { "False".into() },
+        Value::Bool(b) => {
+            if *b {
+                "True".into()
+            } else {
+                "False".into()
+            }
+        }
         Value::Null => "None".into(),
         Value::Number(n) => {
             if let Some(f) = n.as_f64().filter(|_| n.is_f64()) {
@@ -479,10 +440,7 @@ fn parse_id_list(v: &Value) -> Result<Option<Vec<Option<i64>>>, Value> {
             }
             if errors.is_empty() { Ok(Some(out)) } else { Err(Value::Object(errors)) }
         }
-        other => Err(json!([format!(
-            "Expected a list of items but got type \"{}\".",
-            py_type_name(other)
-        )])),
+        other => Err(json!([format!("Expected a list of items but got type \"{}\".", py_type_name(other))])),
     }
 }
 
@@ -586,26 +544,19 @@ async fn validate_ids(
 
 /// `OwnedObjectSerializer.validate_set_permissions(set_permissions)`:
 /// users/groups must exist and be unique. Outer `Err` = database error, inner `Err` = 400.
-pub async fn validate_set_permissions(
-    db: &PgPool,
-    raw: &RawSetPermissions,
-) -> Result<Result<PermissionsSpec, FieldError>, AuthError> {
+pub async fn validate_set_permissions(db: &PgPool, raw: &RawSetPermissions) -> Result<Result<PermissionsSpec, FieldError>, AuthError> {
     let mut spec = PermissionsSpec::default();
     for (src, dst) in [(&raw.view, &mut spec.view), (&raw.change, &mut spec.change)] {
         let Some(g) = src else { continue };
         let mut upd = GranteesUpdate::default();
         if let Some(users) = &g.users {
-            match validate_ids(db, "auth_user", users, "Some users in don't exist or were specified twice.")
-                .await?
-            {
+            match validate_ids(db, "auth_user", users, "Some users in don't exist or were specified twice.").await? {
                 Ok(v) => upd.users = Some(v),
                 Err(e) => return Ok(Err(e)),
             }
         }
         if let Some(groups) = &g.groups {
-            match validate_ids(db, "auth_group", groups, "Some groups in don't exist or were specified twice.")
-                .await?
-            {
+            match validate_ids(db, "auth_group", groups, "Some groups in don't exist or were specified twice.").await? {
                 Ok(v) => upd.groups = Some(v),
                 Err(e) => return Ok(Err(e)),
             }
@@ -634,10 +585,7 @@ pub async fn set_permissions_for_objects(
     let (ct_sql, ct_vals) = ct_q.build_sqlx(PostgresQueryBuilder);
     let ct: Option<(i32,)> = sqlx::query_as_with(&ct_sql, ct_vals).fetch_optional(&mut *conn).await?;
     let Some((ct,)) = ct else {
-        return Err(AuthError::internal(format!(
-            "ContentType matching query does not exist: {}.{}",
-            model.app_label, model.model_name
-        )));
+        return Err(AuthError::internal(format!("ContentType matching query does not exist: {}.{}", model.app_label, model.model_name)));
     };
 
     // Resolve every action before writing (_resolve_permissions).
@@ -660,15 +608,11 @@ pub async fn set_permissions_for_objects(
             .to_owned();
         let (sql, values) = q.build_sqlx(PostgresQueryBuilder);
         let rows: Vec<(i32, String)> = sqlx::query_as_with(&sql, values).fetch_all(&mut *conn).await?;
-        let mut missing: Vec<&String> =
-            codenames.iter().filter(|c| !rows.iter().any(|(_, rc)| rc == *c)).collect();
+        let mut missing: Vec<&String> = codenames.iter().filter(|c| !rows.iter().any(|(_, rc)| rc == *c)).collect();
         if !missing.is_empty() {
             missing.sort();
             let list: Vec<&str> = missing.iter().map(|s| s.as_str()).collect();
-            return Err(AuthError::internal(format!(
-                "Permission matching query does not exist for codename(s): {}",
-                list.join(", ")
-            )));
+            return Err(AuthError::internal(format!("Permission matching query does not exist for codename(s): {}", list.join(", "))));
         }
         resolved.push((action, entry, rows.into_iter().map(|(id, _)| id).collect()));
     }
@@ -709,11 +653,7 @@ pub async fn set_permissions_for_objects(
                     .to_owned();
                 let (sql, values) = q.build_sqlx(PostgresQueryBuilder);
                 let existing: Vec<(i64,)> = sqlx::query_as_with(&sql, values).fetch_all(&mut *conn).await?;
-                let remove: Vec<i64> = existing
-                    .into_iter()
-                    .map(|(i,)| i)
-                    .filter(|i| !add_ids.contains(i))
-                    .collect();
+                let remove: Vec<i64> = existing.into_iter().map(|(i,)| i).filter(|i| !add_ids.contains(i)).collect();
                 if !remove.is_empty() {
                     let d = Query::delete()
                         .from_table(a(table))
@@ -740,8 +680,7 @@ pub async fn set_permissions_for_objects(
             }
             for chunk in rows.chunks(1000) {
                 let mut ins = Query::insert();
-                ins.into_table(a(table))
-                    .columns([a("content_type_id"), a("object_pk"), a("permission_id"), a(ident)]);
+                ins.into_table(a(table)).columns([a("content_type_id"), a("object_pk"), a("permission_id"), a(ident)]);
                 for (p, pk, id) in chunk {
                     ins.values_panic([ct.into(), (*pk).clone().into(), (*p).into(), (*id).into()]);
                 }
@@ -757,12 +696,7 @@ pub async fn set_permissions_for_objects(
 /// DRF `PrimaryKeyRelatedField(queryset=User.objects.all(), allow_null=True)` for `owner`.
 /// `Ok(Ok(id))` (`None` = null / unowned), `Ok(Err(_))` = 400 field error, `Err` = DB error.
 pub async fn parse_owner(db: &PgPool, v: &Value) -> Result<Result<Option<i64>, FieldError>, AuthError> {
-    let incorrect = |v: &Value| {
-        FieldError(json!([format!(
-            "Incorrect type. Expected pk value, received {}.",
-            py_type_name(v)
-        )]))
-    };
+    let incorrect = |v: &Value| FieldError(json!([format!("Incorrect type. Expected pk value, received {}.", py_type_name(v))]));
     let id: Option<i64> = match v {
         Value::Null => return Ok(Ok(None)),
         Value::String(s) if s.is_empty() => return Ok(Ok(None)),
@@ -792,10 +726,7 @@ pub async fn parse_owner(db: &PgPool, v: &Value) -> Result<Result<Option<i64>, F
         // Outside the int4 range the row does not exist (as the int8 comparison did before).
         Some(id) => match i32::try_from(id) {
             Ok(id32) => {
-                let (b,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM auth_user WHERE id = $1)")
-                    .bind(id32)
-                    .fetch_one(db)
-                    .await?;
+                let (b,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM auth_user WHERE id = $1)").bind(id32).fetch_one(db).await?;
                 b
             }
             Err(_) => false,
@@ -803,10 +734,7 @@ pub async fn parse_owner(db: &PgPool, v: &Value) -> Result<Result<Option<i64>, F
     };
     match (exists, id) {
         (true, Some(id)) => Ok(Ok(Some(id))),
-        _ => Ok(Err(FieldError(json!([format!(
-            "Invalid pk \"{}\" - object does not exist.",
-            py_str(v)
-        )])))),
+        _ => Ok(Err(FieldError(json!([format!("Invalid pk \"{}\" - object does not exist.", py_str(v))])))),
     }
 }
 
@@ -844,14 +772,8 @@ mod tests {
 
     #[test]
     fn fields_selection() {
-        assert_eq!(
-            OwnedFields::new(true, false),
-            OwnedFields { permissions: true, user_can_change: false, is_shared_by_requester: false }
-        );
-        assert_eq!(
-            OwnedFields::new(false, false),
-            OwnedFields { permissions: false, user_can_change: true, is_shared_by_requester: true }
-        );
+        assert_eq!(OwnedFields::new(true, false), OwnedFields { permissions: true, user_can_change: false, is_shared_by_requester: false });
+        assert_eq!(OwnedFields::new(false, false), OwnedFields { permissions: false, user_can_change: true, is_shared_by_requester: true });
         assert!(parse_full_perms(Some("TRUE")));
         assert!(parse_full_perms(Some("1")));
         assert!(!parse_full_perms(Some("on")));
@@ -880,14 +802,9 @@ mod tests {
 
     #[test]
     fn permissions_json_order() {
-        let g = ObjectGrantees {
-            view: Grantees { users: vec![1, 2], groups: vec![] },
-            change: Grantees { users: vec![], groups: vec![3] },
-        };
-        assert_eq!(
-            g.to_json().to_string(),
-            r#"{"view":{"users":[1,2],"groups":[]},"change":{"users":[],"groups":[3]}}"#
-        );
+        let g =
+            ObjectGrantees { view: Grantees { users: vec![1, 2], groups: vec![] }, change: Grantees { users: vec![], groups: vec![3] } };
+        assert_eq!(g.to_json().to_string(), r#"{"view":{"users":[1,2],"groups":[]},"change":{"users":[],"groups":[3]}}"#);
     }
 
     #[test]
@@ -897,10 +814,7 @@ mod tests {
         let mut m = Map::new();
         m.insert("id".into(), json!(5));
         info.write_fields(&mut m, OwnedFields::new(false, false), true, Some(&u), 5, Some(1));
-        assert_eq!(
-            Value::Object(m).to_string(),
-            r#"{"id":5,"owner":1,"user_can_change":true,"is_shared_by_requester":false}"#
-        );
+        assert_eq!(Value::Object(m).to_string(), r#"{"id":5,"owner":1,"user_can_change":true,"is_shared_by_requester":false}"#);
     }
 
     #[test]
@@ -931,10 +845,7 @@ mod tests {
             json!({"change": {"non_field_errors": ["Invalid data. Expected a dictionary, but got int."]}})
         );
         let ok = parse_set_permissions(&json!({"view": {"users": [1, "2", 3.0, " 4 "], "groups": null}})).unwrap();
-        assert_eq!(
-            ok.view,
-            Some(RawGrantees { users: Some(Some(vec![Some(1), Some(2), Some(3), Some(4)])), groups: Some(None) })
-        );
+        assert_eq!(ok.view, Some(RawGrantees { users: Some(Some(vec![Some(1), Some(2), Some(3), Some(4)])), groups: Some(None) }));
         assert_eq!(ok.change, None);
     }
 
@@ -957,10 +868,7 @@ mod tests {
         assert_eq!(owner_on_create(Some(&u), Some(None)), None);
         assert_eq!(owner_on_create(Some(&u), Some(Some(4))), Some(4));
         assert!(check_owner_update(Some(&u), Some(2), Some(Some(2)), false).is_ok());
-        assert_eq!(
-            check_owner_update(Some(&u), Some(2), Some(Some(1)), false).unwrap_err().detail(),
-            "Insufficient permissions."
-        );
+        assert_eq!(check_owner_update(Some(&u), Some(2), Some(Some(1)), false).unwrap_err().detail(), "Insufficient permissions.");
         assert!(check_owner_update(Some(&u), Some(2), None, true).is_err());
         assert!(check_owner_update(Some(&u), None, Some(Some(3)), true).is_ok());
         assert!(check_owner_update(Some(&u), Some(1), Some(None), true).is_ok());

@@ -160,11 +160,7 @@ impl PaperRustRemote {
 
     async fn send(&self, rb: reqwest::RequestBuilder) -> Result<reqwest::Response> {
         let r = self.auth(rb).send().await.map_err(map_reqwest)?;
-        if r.status().is_success() || r.status() == StatusCode::NOT_MODIFIED {
-            Ok(r)
-        } else {
-            Err(api_error(r).await)
-        }
+        if r.status().is_success() || r.status() == StatusCode::NOT_MODIFIED { Ok(r) } else { Err(api_error(r).await) }
     }
 
     async fn get_json<T: serde::de::DeserializeOwned>(&self, rel: &str, query: &[(&str, String)], timeout: Duration) -> Result<T> {
@@ -270,7 +266,13 @@ impl PaperRustRemote {
 
     /// Fetch a file. `if_none_match`: ETag of the cache state (→ 304). `resume`: (start byte,
     /// ETag of the partial state) → `Range` + `If-Range` (206 = continuation, 200 = the file has changed).
-    pub async fn file(&self, uuid: &str, variant: &str, if_none_match: Option<&str>, resume: Option<(u64, &str)>) -> Result<reqwest::Response> {
+    pub async fn file(
+        &self,
+        uuid: &str,
+        variant: &str,
+        if_none_match: Option<&str>,
+        resume: Option<(u64, &str)>,
+    ) -> Result<reqwest::Response> {
         let mut h = HeaderMap::new();
         if let Some(e) = if_none_match.and_then(|e| HeaderValue::from_str(e).ok()) {
             h.insert(reqwest::header::IF_NONE_MATCH, e);
@@ -304,11 +306,7 @@ impl PaperRustRemote {
         }
         let r = self.auth(rb).send().await.map_err(map_reqwest)?;
         let status = r.status().as_u16();
-        let headers = r
-            .headers()
-            .iter()
-            .filter_map(|(k, v)| v.to_str().ok().map(|v| (k.as_str().to_string(), v.to_string())))
-            .collect();
+        let headers = r.headers().iter().filter_map(|(k, v)| v.to_str().ok().map(|v| (k.as_str().to_string(), v.to_string()))).collect();
         let body = r.bytes().await.map_err(map_reqwest)?;
         Ok(RawResponse { status, headers, body })
     }

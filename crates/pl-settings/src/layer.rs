@@ -54,9 +54,7 @@ pub struct DbEntry {
 
 impl std::fmt::Debug for DbEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("DbEntry")
-            .field("rev", &self.rev)
-            .finish_non_exhaustive()
+        f.debug_struct("DbEntry").field("rev", &self.rev).finish_non_exhaustive()
     }
 }
 
@@ -75,22 +73,13 @@ pub struct Layers {
 
 impl Layers {
     pub fn new(env: Env) -> Self {
-        Self {
-            env,
-            ..Self::default()
-        }
+        Self { env, ..Self::default() }
     }
 
     fn managed(&self) -> BTreeSet<String> {
         self.env
             .get(MANAGED_KEYS_VAR)
-            .map(|v| {
-                v.split(',')
-                    .map(str::trim)
-                    .filter(|s| !s.is_empty())
-                    .map(String::from)
-                    .collect()
-            })
+            .map(|v| v.split(',').map(str::trim).filter(|s| !s.is_empty()).map(String::from).collect())
             .unwrap_or_default()
     }
 }
@@ -127,11 +116,7 @@ pub struct Entry {
 
 impl std::fmt::Debug for Entry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let v: Option<&str> = if self.def.secret {
-            self.value.as_ref().map(|_| "***")
-        } else {
-            self.value.as_deref()
-        };
+        let v: Option<&str> = if self.def.secret { self.value.as_ref().map(|_| "***") } else { self.value.as_deref() };
         f.debug_struct("Entry")
             .field("key", &self.def.key)
             .field("value", &v)
@@ -156,10 +141,7 @@ pub struct Settings {
 
 impl std::fmt::Debug for Settings {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Settings")
-            .field("rev", &self.rev)
-            .field("entries", &self.entries.len())
-            .finish()
+        f.debug_struct("Settings").field("rev", &self.rev).field("entries", &self.entries.len()).finish()
     }
 }
 
@@ -169,11 +151,7 @@ pub fn rule_n(def: &SettingDef) -> bool {
 }
 
 /// First set name with matching origin.
-fn lookup_origin<'e>(
-    env: &'e Env,
-    def: &SettingDef,
-    file: bool,
-) -> Option<(String, &'e str, EnvOrigin)> {
+fn lookup_origin<'e>(env: &'e Env, def: &SettingDef, file: bool) -> Option<(String, &'e str, EnvOrigin)> {
     for name in def.env_names() {
         if let Some(origin) = env.origin_exact(&name)
             && matches!(origin, EnvOrigin::File(_)) == file
@@ -222,11 +200,7 @@ impl Settings {
             let file = lookup_origin(&layers.env, def, true);
             if let Some(field) = def.ac_field {
                 // Rule AC
-                let column = layers
-                    .ac
-                    .as_ref()
-                    .map(|r| r.get(field).clone())
-                    .unwrap_or(serde_json::Value::Null);
+                let column = layers.ac.as_ref().map(|r| r.get(field).clone()).unwrap_or(serde_json::Value::Null);
                 let env_hit = process.as_ref().or(file.as_ref());
                 let r = appconfig::resolve(def, &column, env_hit.map(|h| h.1), def.default);
                 e.value = r.value;
@@ -234,10 +208,7 @@ impl Settings {
                     e.source = Source::AppConfig;
                     e.source_detail = Some(format!("AC:{field}"));
                     if let Some((name, v, origin)) = env_hit {
-                        e.shadowed = Some(Shadowed {
-                            source: origin_source(origin, name, &managed).0,
-                            value: Some(v.to_string()),
-                        });
+                        e.shadowed = Some(Shadowed { source: origin_source(origin, name, &managed).0, value: Some(v.to_string()) });
                     }
                 } else if let Some((name, _, origin)) = env_hit {
                     let (s, d) = origin_source(origin, name, &managed);
@@ -262,25 +233,15 @@ impl Settings {
                     e.source = s;
                     e.source_detail = Some(d);
                     e.locked = true;
-                    e.lock_reason = Some(if s == Source::Desktop {
-                        "desktop"
-                    } else {
-                        "environment"
-                    });
+                    e.lock_reason = Some(if s == Source::Desktop { "desktop" } else { "environment" });
                     if let Some(dv) = db_value {
-                        e.shadowed = Some(Shadowed {
-                            source: Source::Db,
-                            value: Some(dv),
-                        });
+                        e.shadowed = Some(Shadowed { source: Source::Db, value: Some(dv) });
                     }
                 } else if let Some(dv) = db_value {
                     e.value = Some(dv.clone());
                     e.source = Source::Db;
                     if let Some((_, fv, _)) = &file {
-                        e.shadowed = Some(Shadowed {
-                            source: Source::File,
-                            value: Some(fv.to_string()),
-                        });
+                        e.shadowed = Some(Shadowed { source: Source::File, value: Some(fv.to_string()) });
                     }
                     overlay.push((def, dv));
                 } else if let Some((name, v, origin)) = &file {
@@ -312,8 +273,7 @@ impl Settings {
                     }
                     None => e.value = def.default.map(String::from),
                 }
-                let writable = crate::desktop::WRITABLE.contains(&def.key)
-                    && crate::desktop::control_dir(&layers.env).is_some();
+                let writable = crate::desktop::WRITABLE.contains(&def.key) && crate::desktop::control_dir(&layers.env).is_some();
                 e.locked = !writable;
                 e.lock_reason = (!writable).then_some("desktop");
             }
@@ -342,13 +302,7 @@ impl Settings {
 
     /// Start values of all S keys of this snapshot.
     pub fn boot_values(&self) -> BootValues {
-        BootValues(
-            self.entries
-                .iter()
-                .filter(|e| e.def.effect == Effect::Server)
-                .map(|e| (e.def.key, e.value.clone()))
-                .collect(),
-        )
+        BootValues(self.entries.iter().filter(|e| e.def.effect == Effect::Server).map(|e| (e.def.key, e.value.clone())).collect())
     }
 
     pub fn entries(&self) -> &[Entry] {
@@ -385,12 +339,7 @@ mod tests {
     use std::path::Path;
 
     fn db(v: &str) -> DbEntry {
-        DbEntry {
-            value: DbValue::Plain(v.into()),
-            rev: 1,
-            updated_at: None,
-            updated_by: Some("admin".into()),
-        }
+        DbEntry { value: DbValue::Plain(v.into()), rev: 1, updated_at: None, updated_by: Some("admin".into()) }
     }
 
     #[test]
@@ -398,11 +347,7 @@ mod tests {
         let env = Env::from_pairs_with_file(
             [("PAPERLESS_EMAIL_PORT", "2525")],
             Path::new("/etc/paperless.conf"),
-            [
-                ("PAPERLESS_EMAIL_HOST", "file.example"),
-                ("PAPERLESS_EMAIL_PORT", "26"),
-                ("PAPERRUST_LOG", "debug"),
-            ],
+            [("PAPERLESS_EMAIL_HOST", "file.example"), ("PAPERLESS_EMAIL_PORT", "26"), ("PAPERRUST_LOG", "debug")],
         );
         let mut l = Layers::new(env);
         l.db.insert("PAPERLESS_EMAIL_HOST".into(), db("db.example"));
@@ -410,46 +355,23 @@ mod tests {
         let s = Settings::build(&l, 7, None);
         // DB > file
         let h = s.get("PAPERLESS_EMAIL_HOST").unwrap();
-        assert_eq!(
-            (h.value.as_deref(), h.source, h.locked),
-            (Some("db.example"), Source::Db, false)
-        );
+        assert_eq!((h.value.as_deref(), h.source, h.locked), (Some("db.example"), Source::Db, false));
         assert_eq!(h.shadowed.as_ref().unwrap().source, Source::File);
         assert_eq!(s.env().get("PAPERLESS_EMAIL_HOST"), Some("db.example"));
         // Environment > DB, locked
         let p = s.get("PAPERLESS_EMAIL_PORT").unwrap();
-        assert_eq!(
-            (p.value.as_deref(), p.source, p.locked),
-            (Some("2525"), Source::Env, true)
-        );
+        assert_eq!((p.value.as_deref(), p.source, p.locked), (Some("2525"), Source::Env, true));
         assert_eq!(p.source_detail.as_deref(), Some("PAPERLESS_EMAIL_PORT"));
         assert_eq!(p.shadowed.as_ref().unwrap().value.as_deref(), Some("587"));
         // File > default
         let lg = s.get("PAPERRUST_LOG").unwrap();
-        assert_eq!(
-            (lg.value.as_deref(), lg.source),
-            (Some("debug"), Source::File)
-        );
-        assert_eq!(
-            lg.source_detail.as_deref(),
-            Some(
-                Path::new("/etc/paperless.conf")
-                    .display()
-                    .to_string()
-                    .as_str()
-            )
-        );
+        assert_eq!((lg.value.as_deref(), lg.source), (Some("debug"), Source::File));
+        assert_eq!(lg.source_detail.as_deref(), Some(Path::new("/etc/paperless.conf").display().to_string().as_str()));
         // Standard
         let tls = s.get("PAPERLESS_EMAIL_USE_TLS").unwrap();
-        assert_eq!(
-            (tls.value.as_deref(), tls.source),
-            (Some("no"), Source::Default)
-        );
+        assert_eq!((tls.value.as_deref(), tls.source), (Some("no"), Source::Default));
         // Alias name finds the entry
-        assert!(std::ptr::eq(
-            s.get("PAPERRUST_EMAIL_HOST").unwrap().def,
-            h.def
-        ));
+        assert!(std::ptr::eq(s.get("PAPERRUST_EMAIL_HOST").unwrap().def, h.def));
         assert_eq!(s.rev, 7);
     }
 
@@ -462,22 +384,15 @@ mod tests {
         ]);
         let s = Settings::build(&Layers::new(env), 0, None);
         let tz = s.get("PAPERLESS_TIME_ZONE").unwrap();
-        assert_eq!(
-            (tz.value.as_deref(), tz.source, tz.lock_reason),
-            (Some("Europe/Zurich"), Source::Desktop, Some("desktop"))
-        );
+        assert_eq!((tz.value.as_deref(), tz.source, tz.lock_reason), (Some("Europe/Zurich"), Source::Desktop, Some("desktop")));
     }
 
     #[test]
     fn ac_rule_no_lock_and_shadow() {
-        let env = Env::from_pairs([
-            ("PAPERLESS_OCR_LANGUAGE", "deu"),
-            ("PAPERLESS_OCR_PAGES", "4"),
-        ]);
+        let env = Env::from_pairs([("PAPERLESS_OCR_LANGUAGE", "deu"), ("PAPERLESS_OCR_PAGES", "4")]);
         let mut l = Layers::new(env);
         let mut row = AcRow::default();
-        row.values
-            .insert("language".into(), serde_json::json!("deu+eng"));
+        row.values.insert("language".into(), serde_json::json!("deu+eng"));
         row.values.insert("pages".into(), serde_json::json!(0));
         row.values.insert("deskew".into(), serde_json::json!(false));
         l.ac = Some(row);
@@ -485,19 +400,10 @@ mod tests {
         l.db.insert("PAPERLESS_OCR_LANGUAGE".into(), db("fra"));
         let s = Settings::build(&l, 0, None);
         let lang = s.get("PAPERLESS_OCR_LANGUAGE").unwrap();
-        assert_eq!(
-            (lang.value.as_deref(), lang.source, lang.locked),
-            (Some("deu+eng"), Source::AppConfig, false)
-        );
-        assert_eq!(
-            lang.shadowed.as_ref().unwrap().value.as_deref(),
-            Some("deu")
-        );
+        assert_eq!((lang.value.as_deref(), lang.source, lang.locked), (Some("deu+eng"), Source::AppConfig, false));
+        assert_eq!(lang.shadowed.as_ref().unwrap().value.as_deref(), Some("deu"));
         let pages = s.get("PAPERLESS_OCR_PAGES").unwrap();
-        assert_eq!(
-            (pages.value.as_deref(), pages.source),
-            (Some("4"), Source::Env)
-        );
+        assert_eq!((pages.value.as_deref(), pages.source), (Some("4"), Source::Env));
         assert_eq!(s.value("PAPERLESS_OCR_DESKEW"), Some("false"));
         // Django's settings.OCR_LANGUAGE stays the environment
         assert_eq!(s.env().get("PAPERLESS_OCR_LANGUAGE"), Some("deu"));
@@ -508,12 +414,7 @@ mod tests {
         let mut l = Layers::new(Env::from_pairs([("X", "1")]));
         l.db.insert(
             "PAPERLESS_EMAIL_HOST_PASSWORD".into(),
-            DbEntry {
-                value: DbValue::Unreadable,
-                rev: 1,
-                updated_at: None,
-                updated_by: None,
-            },
+            DbEntry { value: DbValue::Unreadable, rev: 1, updated_at: None, updated_by: None },
         );
         let s = Settings::build(&l, 1, None);
         let e = s.get("PAPERLESS_EMAIL_HOST_PASSWORD").unwrap();
@@ -528,10 +429,7 @@ mod tests {
         l.db.insert("PAPERLESS_DBHOST".into(), db("ignored"));
         let s0 = Settings::build(&l, 0, None);
         let h = s0.get("PAPERLESS_DBHOST").unwrap();
-        assert_eq!(
-            (h.value.as_deref(), h.locked, h.lock_reason),
-            (Some("db"), true, Some("bootstrap"))
-        );
+        assert_eq!((h.value.as_deref(), h.locked, h.lock_reason), (Some("db"), true, Some("bootstrap")));
         let boot = s0.boot_values();
         assert_eq!(s0.restart_pending_count(), 0);
         l.db.insert("PAPERLESS_TIME_ZONE".into(), db("Europe/Berlin"));
@@ -540,11 +438,6 @@ mod tests {
         assert_eq!(s1.restart_pending_count(), 1);
         // L keys never "restart needed"
         l.db.insert("PAPERLESS_EMAIL_HOST".into(), db("x"));
-        assert!(
-            !Settings::build(&l, 2, Some(&boot))
-                .get("PAPERLESS_EMAIL_HOST")
-                .unwrap()
-                .restart_pending
-        );
+        assert!(!Settings::build(&l, 2, Some(&boot)).get("PAPERLESS_EMAIL_HOST").unwrap().restart_pending);
     }
 }

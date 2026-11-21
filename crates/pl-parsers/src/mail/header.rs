@@ -25,10 +25,7 @@ impl HeaderValue {
     /// Python `str` of the value: ASCII directly; with 8-bit bytes compat32 yields a
     /// `Header(…, 'unknown-8bit')` whose `str()` replaces every non-ASCII byte with U+FFFD.
     pub fn py_str(&self) -> String {
-        self.0
-            .iter()
-            .map(|&b| if b < 0x80 { b as char } else { '\u{fffd}' })
-            .collect()
+        self.0.iter().map(|&b| if b < 0x80 { b as char } else { '\u{fffd}' }).collect()
     }
     /// imap_tools: `''.join(decode_value(*p) for p in decode_header(raw))`.
     pub fn decoded(&self) -> String {
@@ -41,11 +38,7 @@ impl HeaderValue {
     }
     /// Value for `parse_email_addresses`: header object → `decode_value(*decode_header(h)[0])`.
     pub fn for_addresses(&self) -> String {
-        if self.is_ascii() {
-            self.py_str()
-        } else {
-            pystr::decode_utf8_ignore(&self.0)
-        }
+        if self.is_ascii() { self.py_str() } else { pystr::decode_utf8_ignore(&self.0) }
     }
 }
 
@@ -79,14 +72,8 @@ pub fn decode_header(header: &str) -> Vec<(Vec<u8>, Option<String>)> {
         for c in caps {
             let m = c.get(0).map(|m| (m.start(), m.end())).unwrap_or((0, 0));
             push_unenc(&line[last..m.0], &mut first, &mut words);
-            let charset = c
-                .get(1)
-                .map(|x| x.as_str().to_lowercase())
-                .unwrap_or_default();
-            let encoding = c
-                .get(2)
-                .map(|x| x.as_str().to_lowercase())
-                .unwrap_or_default();
+            let charset = c.get(1).map(|x| x.as_str().to_lowercase()).unwrap_or_default();
+            let encoding = c.get(2).map(|x| x.as_str().to_lowercase()).unwrap_or_default();
             let encoded = c.get(3).map(|x| x.as_str().to_owned()).unwrap_or_default();
             words.push((encoded, Some(encoding), Some(charset)));
             last = m.1;
@@ -96,11 +83,7 @@ pub fn decode_header(header: &str) -> Vec<(Vec<u8>, Option<String>)> {
     // Remove whitespace between two encoded words
     let mut drop = Vec::new();
     for n in 2..words.len() {
-        if words[n].1.is_some()
-            && words[n - 2].1.is_some()
-            && !words[n - 1].0.is_empty()
-            && words[n - 1].0.chars().all(pystr::py_isspace)
-        {
+        if words[n].1.is_some() && words[n - 2].1.is_some() && !words[n - 1].0.is_empty() && words[n - 1].0.chars().all(pystr::py_isspace) {
             drop.push(n - 1);
         }
     }
@@ -135,10 +118,7 @@ pub fn decode_header_joined(s: &str) -> String {
     if !ecre().is_match(s) {
         return s.to_owned();
     }
-    decode_header(s)
-        .into_iter()
-        .map(|(b, cs)| pystr::decode_value(&b, cs.as_deref()))
-        .collect()
+    decode_header(s).into_iter().map(|(b, cs)| pystr::decode_value(&b, cs.as_deref())).collect()
 }
 
 /// `decode_value(*decode_header(s)[0])` (only the first piece – imap_tools quirk for names).
@@ -146,11 +126,7 @@ pub fn decode_header_first(s: &str) -> String {
     if !ecre().is_match(s) {
         return s.to_owned();
     }
-    decode_header(s)
-        .into_iter()
-        .next()
-        .map(|(b, cs)| pystr::decode_value(&b, cs.as_deref()))
-        .unwrap_or_default()
+    decode_header(s).into_iter().next().map(|(b, cs)| pystr::decode_value(&b, cs.as_deref())).unwrap_or_default()
 }
 
 /// `bytes(s, 'raw-unicode-escape')`.
@@ -267,16 +243,11 @@ pub fn parseparam(s: &str) -> Vec<String> {
         s.remove(0);
         let count_q = |t: &str, end: usize| -> usize {
             let sub = &t[..end];
-            sub.matches('"')
-                .count()
-                .saturating_sub(sub.matches("\\\"").count())
+            sub.matches('"').count().saturating_sub(sub.matches("\\\"").count())
         };
         let mut end = s.find(';').map(|e| e as isize).unwrap_or(-1);
         while end > 0 && count_q(&s, end as usize) % 2 == 1 {
-            end = s[end as usize + 1..]
-                .find(';')
-                .map(|e| (e + end as usize + 1) as isize)
-                .unwrap_or(-1);
+            end = s[end as usize + 1..].find(';').map(|e| (e + end as usize + 1) as isize).unwrap_or(-1);
         }
         let endu = if end < 0 { s.len() } else { end as usize };
         let mut f = s[..endu].to_owned();
@@ -292,9 +263,7 @@ pub fn parseparam(s: &str) -> Vec<String> {
 pub fn unquote(s: &str) -> String {
     if s.chars().count() > 1 {
         if s.starts_with('"') && s.ends_with('"') {
-            return s[1..s.len() - 1]
-                .replace("\\\\", "\\")
-                .replace("\\\"", "\"");
+            return s[1..s.len() - 1].replace("\\\\", "\\").replace("\\\"", "\"");
         }
         if s.starts_with('<') && s.ends_with('>') {
             return s[1..s.len() - 1].to_owned();
@@ -405,19 +374,9 @@ pub fn params(value: &str) -> Vec<(String, ParamValue)> {
         if extended {
             let sp: Vec<&str> = value.splitn(3, '\'').collect();
             if sp.len() <= 2 {
-                out.push((
-                    name,
-                    ParamValue::Rfc2231(None, None, format!("\"{value}\"")),
-                ));
+                out.push((name, ParamValue::Rfc2231(None, None, format!("\"{value}\""))));
             } else {
-                out.push((
-                    name,
-                    ParamValue::Rfc2231(
-                        Some(sp[0].to_owned()),
-                        Some(sp[1].to_owned()),
-                        format!("\"{}\"", sp[2]),
-                    ),
-                ));
+                out.push((name, ParamValue::Rfc2231(Some(sp[0].to_owned()), Some(sp[1].to_owned()), format!("\"{}\"", sp[2]))));
             }
         } else {
             out.push((name, ParamValue::Plain(format!("\"{value}\""))));
@@ -584,10 +543,7 @@ impl AddrList {
         } else if self.at() == '<' {
             let r = self.getrouteaddr();
             if !self.commentlist.is_empty() {
-                ret = vec![(
-                    format!("{} ({})", plist.join(" "), self.commentlist.join(" ")),
-                    r,
-                )];
+                ret = vec![(format!("{} ({})", plist.join(" "), self.commentlist.join(" ")), r)];
             } else {
                 ret = vec![(plist.join(" "), r)];
             }
@@ -737,11 +693,7 @@ impl AddrList {
         let mut s = String::new();
         while self.pos < self.f.len() {
             let c = self.at();
-            let end = if phrase {
-                Self::is_phraseend(c)
-            } else {
-                Self::is_atomend(c)
-            };
+            let end = if phrase { Self::is_phraseend(c) } else { Self::is_atomend(c) };
             if end {
                 break;
             }
@@ -841,25 +793,12 @@ fn check_parenthesis(addr: &str) -> bool {
 
 /// `email.utils.getaddresses([value], strict=True)`.
 pub fn getaddresses(values: &[String]) -> Vec<(String, String)> {
-    let vals: Vec<String> = values
-        .iter()
-        .map(|v| {
-            if check_parenthesis(v) {
-                v.clone()
-            } else {
-                "('', '')".to_owned()
-            }
-        })
-        .collect();
+    let vals: Vec<String> = values.iter().map(|v| if check_parenthesis(v) { v.clone() } else { "('', '')".to_owned() }).collect();
     let addr = vals.join(", ");
     let mut list = if addr.is_empty() {
         Vec::new()
     } else {
-        let mut p = AddrList {
-            f: addr.chars().collect(),
-            pos: 0,
-            commentlist: Vec::new(),
-        };
+        let mut p = AddrList { f: addr.chars().collect(), pos: 0, commentlist: Vec::new() };
         p.getaddrlist()
     };
     for v in list.iter_mut() {
@@ -867,10 +806,7 @@ pub fn getaddresses(values: &[String]) -> Vec<(String, String)> {
             *v = (String::new(), String::new());
         }
     }
-    let n: usize = vals
-        .iter()
-        .map(|v| 1 + strip_quoted_realnames(v).matches(',').count())
-        .sum();
+    let n: usize = vals.iter().map(|v| 1 + strip_quoted_realnames(v).matches(',').count()).sum();
     if list.len() != n {
         return vec![(String::new(), String::new())];
     }
@@ -949,11 +885,7 @@ fn py_int(s: &str) -> Option<i64> {
         Some(b'-') => (true, &t[1..]),
         _ => (false, t),
     };
-    if digits.is_empty()
-        || digits.starts_with('_')
-        || digits.ends_with('_')
-        || digits.contains("__")
-    {
+    if digits.is_empty() || digits.starts_with('_') || digits.ends_with('_') || digits.contains("__") {
         return None;
     }
     let clean: String = digits.chars().filter(|&c| c != '_').collect();
@@ -1000,13 +932,7 @@ pub fn parsedate_tz(data: &str) -> Option<(i64, i64, i64, i64, i64, i64, Option<
         return None;
     }
     data.truncate(5);
-    let (mut dd, mut mm, mut yy, mut tm, mut tz) = (
-        data[0].clone(),
-        data[1].clone(),
-        data[2].clone(),
-        data[3].clone(),
-        data[4].clone(),
-    );
+    let (mut dd, mut mm, mut yy, mut tm, mut tz) = (data[0].clone(), data[1].clone(), data[2].clone(), data[3].clone(), data[4].clone());
     if dd.is_empty() || mm.is_empty() || yy.is_empty() {
         return None;
     }
@@ -1084,11 +1010,7 @@ pub fn parsedate_tz(data: &str) -> Option<(i64, i64, i64, i64, i64, i64, Option<
         "PDT" => Some(-700),
         _ => {
             let v = py_int(&tzu);
-            if v == Some(0) && tzu.starts_with('-') {
-                None
-            } else {
-                v
-            }
+            if v == Some(0) && tzu.starts_with('-') { None } else { v }
         }
     };
     if let Some(o) = tzoffset
@@ -1143,26 +1065,11 @@ pub fn parse_email_date(value: &str) -> MailDate {
     if let Some(c) = re.captures(value) {
         let date: Vec<&str> = c["date"].split_whitespace().collect();
         let time: Vec<&str> = c["time"].split(':').collect();
-        let sign = if c.name("zone_sign").map(|m| m.as_str()) == Some("-") {
-            -1
-        } else {
-            1
-        };
-        let months = [
-            "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-        ];
-        let mo = months
-            .iter()
-            .position(|m| *m == date[1])
-            .map(|p| p as i64 + 1)
-            .unwrap_or(1);
+        let sign = if c.name("zone_sign").map(|m| m.as_str()) == Some("-") { -1 } else { 1 };
+        let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        let mo = months.iter().position(|m| *m == date[1]).map(|p| p as i64 + 1).unwrap_or(1);
         let parse = |s: &str| s.parse::<i64>().ok();
-        if let (Some(y), Some(d), Some(h), Some(mi)) = (
-            parse(date[2]),
-            parse(date[0]),
-            parse(time[0]),
-            parse(time[1]),
-        ) {
+        if let (Some(y), Some(d), Some(h), Some(mi)) = (parse(date[2]), parse(date[0]), parse(time[0]), parse(time[1])) {
             let s = time.get(2).and_then(|x| parse(x)).unwrap_or(0);
             if let Some(naive) = mk_naive(y, mo, d, h, mi, s) {
                 match c.name("zone") {
@@ -1183,11 +1090,7 @@ pub fn parse_email_date(value: &str) -> MailDate {
             }
         }
     }
-    MailDate::Naive(
-        NaiveDate::from_ymd_opt(1900, 1, 1)
-            .and_then(|d| d.and_hms_opt(0, 0, 0))
-            .unwrap_or_default(),
-    )
+    MailDate::Naive(NaiveDate::from_ymd_opt(1900, 1, 1).and_then(|d| d.and_hms_opt(0, 0, 0)).unwrap_or_default())
 }
 
 /// Python `timezone(timedelta(seconds=off)).tzname(None)`.
@@ -1198,11 +1101,7 @@ pub fn fixed_tzname(off_secs: i32) -> String {
     let sign = if off_secs < 0 { '-' } else { '+' };
     let a = off_secs.unsigned_abs();
     let (h, m, s) = (a / 3600, (a % 3600) / 60, a % 60);
-    if s != 0 {
-        format!("UTC{sign}{h:02}:{m:02}:{s:02}")
-    } else {
-        format!("UTC{sign}{h:02}:{m:02}")
-    }
+    if s != 0 { format!("UTC{sign}{h:02}:{m:02}:{s:02}") } else { format!("UTC{sign}{h:02}:{m:02}") }
 }
 
 /// A `PyCodec` for a charset name (public for `msg`).
@@ -1216,36 +1115,20 @@ mod tests {
 
     #[test]
     fn decode_header_cases() {
-        assert_eq!(
-            decode_header_joined("=?utf-8?B?SWhyZSBCZXN0ZWxsdW5nIMOEIDEyMw==?="),
-            "Ihre Bestellung Ä 123"
-        );
-        assert_eq!(
-            decode_header_joined("=?iso-8859-1?Q?M=FCller?= Hans"),
-            "Müller Hans"
-        );
-        assert_eq!(
-            decode_header_first("=?iso-8859-1?Q?M=FCller?= Hans"),
-            "Müller"
-        );
+        assert_eq!(decode_header_joined("=?utf-8?B?SWhyZSBCZXN0ZWxsdW5nIMOEIDEyMw==?="), "Ihre Bestellung Ä 123");
+        assert_eq!(decode_header_joined("=?iso-8859-1?Q?M=FCller?= Hans"), "Müller Hans");
+        assert_eq!(decode_header_first("=?iso-8859-1?Q?M=FCller?= Hans"), "Müller");
         assert_eq!(decode_header_joined("=?utf-8?q?a?= =?utf-8?q?b?="), "ab");
         assert_eq!(decode_header_joined("plain\r\n text"), "plain\r\n text");
     }
 
     #[test]
     fn params_rfc2231() {
-        let v = get_param(
-            "attachment; filename*=utf-8''gr%C3%B6sse%20liste.bin",
-            "filename",
-        )
-        .unwrap();
+        let v = get_param("attachment; filename*=utf-8''gr%C3%B6sse%20liste.bin", "filename").unwrap();
         assert_eq!(collapse_rfc2231(&v), "grösse liste.bin");
         let v = get_param("text/plain; name=\"a;b.txt\"; charset=UTF-8", "name").unwrap();
         assert_eq!(collapse_rfc2231(&v), "a;b.txt");
-        assert_eq!(
-            content_charset("text/plain; charset=\"UTF-8\"").as_deref(),
-            Some("utf-8")
-        );
+        assert_eq!(content_charset("text/plain; charset=\"UTF-8\"").as_deref(), Some("utf-8"));
         let v = get_param("x; filename*0=\"a\"; filename*1=\"b.txt\"", "filename").unwrap();
         assert_eq!(collapse_rfc2231(&v), "ab.txt");
     }
@@ -1271,29 +1154,11 @@ mod tests {
     fn dates() {
         assert_eq!(
             parse_email_date("Wed, 8 Jan 2025 10:00:00 +0100 (CET)"),
-            MailDate::Fixed(
-                FixedOffset::east_opt(3600)
-                    .unwrap()
-                    .with_ymd_and_hms(2025, 1, 8, 10, 0, 0)
-                    .unwrap()
-            )
+            MailDate::Fixed(FixedOffset::east_opt(3600).unwrap().with_ymd_and_hms(2025, 1, 8, 10, 0, 0).unwrap())
         );
-        assert!(matches!(
-            parse_email_date("Thu, 9 Jan 2025 07:05:00 -0000"),
-            MailDate::Naive(_)
-        ));
-        assert!(
-            matches!(parse_email_date("1 Jul 2024 14:00 GMT"), MailDate::Fixed(d) if d.offset().local_minus_utc() == 0)
-        );
-        assert_eq!(
-            parse_email_date(""),
-            MailDate::Naive(
-                NaiveDate::from_ymd_opt(1900, 1, 1)
-                    .unwrap()
-                    .and_hms_opt(0, 0, 0)
-                    .unwrap()
-            )
-        );
+        assert!(matches!(parse_email_date("Thu, 9 Jan 2025 07:05:00 -0000"), MailDate::Naive(_)));
+        assert!(matches!(parse_email_date("1 Jul 2024 14:00 GMT"), MailDate::Fixed(d) if d.offset().local_minus_utc() == 0));
+        assert_eq!(parse_email_date(""), MailDate::Naive(NaiveDate::from_ymd_opt(1900, 1, 1).unwrap().and_hms_opt(0, 0, 0).unwrap()));
         assert_eq!(fixed_tzname(3600), "UTC+01:00");
         assert_eq!(fixed_tzname(-16200), "UTC-04:30");
     }

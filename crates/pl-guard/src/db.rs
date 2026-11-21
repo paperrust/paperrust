@@ -21,16 +21,20 @@ impl Catalog for DbCatalog {
     fn lookup<'a>(&'a self, area: Area, rel: &'a str) -> BoxFuture<'a, Result<Option<Expected>, String>> {
         Box::pin(async move {
             let row = match area {
-                Area::Originals => sqlx::query("SELECT id::bigint AS id, checksum AS c FROM documents_document WHERE filename = $1 LIMIT 1")
-                    .bind(rel)
-                    .fetch_optional(&self.pool)
-                    .await
-                    .map_err(|e| e.to_string())?,
-                Area::Archive => sqlx::query("SELECT id::bigint AS id, archive_checksum AS c FROM documents_document WHERE archive_filename = $1 LIMIT 1")
-                    .bind(rel)
-                    .fetch_optional(&self.pool)
-                    .await
-                    .map_err(|e| e.to_string())?,
+                Area::Originals => {
+                    sqlx::query("SELECT id::bigint AS id, checksum AS c FROM documents_document WHERE filename = $1 LIMIT 1")
+                        .bind(rel)
+                        .fetch_optional(&self.pool)
+                        .await
+                        .map_err(|e| e.to_string())?
+                }
+                Area::Archive => sqlx::query(
+                    "SELECT id::bigint AS id, archive_checksum AS c FROM documents_document WHERE archive_filename = $1 LIMIT 1",
+                )
+                .bind(rel)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(|e| e.to_string())?,
                 Area::Thumbnails => {
                     // `0000123.webp` (or `.png` from older versions)
                     let stem = rel.rsplit('/').next().unwrap_or(rel).split('.').next().unwrap_or("");

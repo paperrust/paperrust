@@ -32,42 +32,136 @@ pub enum NameKind {
 /// Legal forms (after contracting the dots, without spaces), multilingual.
 pub const LEGAL_FORMS: &[&str] = &[
     // DE/AT/CH
-    "gmbh", "ag", "kg", "ohg", "gbr", "ug", "eg", "ev", "mbh", "kgaa", "se", "co", "cokg", "gmbhcokg",
-    "haftungsbeschrankt", "stiftung", "genossenschaft", "verein", "einzelfirma", "einzelunternehmen",
-    "aktiengesellschaft", "gesellschaft", "holding",
+    "gmbh",
+    "ag",
+    "kg",
+    "ohg",
+    "gbr",
+    "ug",
+    "eg",
+    "ev",
+    "mbh",
+    "kgaa",
+    "se",
+    "co",
+    "cokg",
+    "gmbhcokg",
+    "haftungsbeschrankt",
+    "stiftung",
+    "genossenschaft",
+    "verein",
+    "einzelfirma",
+    "einzelunternehmen",
+    "aktiengesellschaft",
+    "gesellschaft",
+    "holding",
     // FR/CH/BE/LU
-    "sa", "sarl", "sas", "sasu", "eurl", "snc", "sca", "scs", "sci", "sprl", "srl", "cie",
-    "societeanonyme", "societe", "association", "fondation", "cooperative",
+    "sa",
+    "sarl",
+    "sas",
+    "sasu",
+    "eurl",
+    "snc",
+    "sca",
+    "scs",
+    "sci",
+    "sprl",
+    "srl",
+    "cie",
+    "societeanonyme",
+    "societe",
+    "association",
+    "fondation",
+    "cooperative",
     // IT/CH
-    "spa", "sagl", "snc", "sas", "srls", "societa", "fondazione", "cooperativa",
+    "spa",
+    "sagl",
+    "snc",
+    "sas",
+    "srls",
+    "societa",
+    "fondazione",
+    "cooperativa",
     // EN
-    "ltd", "limited", "inc", "incorporated", "corp", "corporation", "company", "plc", "llc", "llp",
-    "lp", "pty", "pvt", "group", "grp",
+    "ltd",
+    "limited",
+    "inc",
+    "incorporated",
+    "corp",
+    "corporation",
+    "company",
+    "plc",
+    "llc",
+    "llp",
+    "lp",
+    "pty",
+    "pvt",
+    "group",
+    "grp",
     // NL/Nordics/andere
-    "bv", "nv", "vof", "oy", "oyj", "ab", "as", "asa", "aps", "sl", "sau", "lda", "kft", "spzoo", "sro",
+    "bv",
+    "nv",
+    "vof",
+    "oy",
+    "oyj",
+    "ab",
+    "as",
+    "asa",
+    "aps",
+    "sl",
+    "sau",
+    "lda",
+    "kft",
+    "spzoo",
+    "sro",
 ];
 
 /// Country/region suffixes that often appear in organization names.
 pub const REGION_QUALIFIERS: &[&str] = &[
-    "schweiz", "suisse", "svizzera", "svizra", "switzerland", "swiss", "ch",
-    "deutschland", "germany", "allemagne", "germania", "de",
-    "osterreich", "oesterreich", "austria", "autriche", "at",
-    "france", "frankreich", "francia", "fr",
-    "italia", "italien", "italy", "italie", "it",
-    "liechtenstein", "li", "europe", "europa", "international", "intl", "worldwide", "global",
+    "schweiz",
+    "suisse",
+    "svizzera",
+    "svizra",
+    "switzerland",
+    "swiss",
+    "ch",
+    "deutschland",
+    "germany",
+    "allemagne",
+    "germania",
+    "de",
+    "osterreich",
+    "oesterreich",
+    "austria",
+    "autriche",
+    "at",
+    "france",
+    "frankreich",
+    "francia",
+    "fr",
+    "italia",
+    "italien",
+    "italy",
+    "italie",
+    "it",
+    "liechtenstein",
+    "li",
+    "europe",
+    "europa",
+    "international",
+    "intl",
+    "worldwide",
+    "global",
 ];
 
 /// Filler words (articles, conjunctions, prepositions), DE/FR/IT/EN.
 pub const FILLER_WORDS: &[&str] = &[
     // DE
-    "der", "die", "das", "des", "dem", "den", "ein", "eine", "einer", "und", "u", "fur", "fuer", "von",
-    "vom", "zu", "zur", "zum", "im", "in", "am", "an", "auf", "mit",
-    // FR
-    "le", "la", "les", "l", "un", "une", "et", "de", "du", "d", "pour", "au", "aux", "en", "sur",
-    // IT
-    "il", "lo", "gli", "i", "uno", "una", "e", "ed", "di", "del", "della", "dello", "dei", "degli",
-    "delle", "per", "al", "alla", "nel", "nella",
-    // EN
+    "der", "die", "das", "des", "dem", "den", "ein", "eine", "einer", "und", "u", "fur", "fuer", "von", "vom", "zu", "zur", "zum", "im",
+    "in", "am", "an", "auf", "mit", // FR
+    "le", "la", "les", "l", "un", "une", "et", "de", "du", "d", "pour", "au", "aux", "en", "sur", // IT
+    "il", "lo", "gli", "i", "uno", "una", "e", "ed", "di", "del", "della", "dello", "dei", "degli", "delle", "per", "al", "alla", "nel",
+    "nella", // EN
     "the", "a", "an", "and", "of", "for", "to", "on", "at", "by",
 ];
 
@@ -134,9 +228,45 @@ fn tokenize(folded: &str, kind: NameKind) -> Vec<String> {
     let mut raw = String::new();
     for c in folded.chars() {
         let sep = c.is_whitespace()
-            || matches!(c, ',' | ';' | ':' | '(' | ')' | '[' | ']' | '{' | '}' | '"' | '\'' | '`' | '´'
-                | '/' | '\\' | '|' | '-' | '–' | '—' | '_' | '!' | '?' | '*' | '#' | '~' | '<' | '>'
-                | '«' | '»' | '„' | '“' | '”' | '‘' | '’' | '=' | '@' | '%')
+            || matches!(
+                c,
+                ',' | ';'
+                    | ':'
+                    | '('
+                    | ')'
+                    | '['
+                    | ']'
+                    | '{'
+                    | '}'
+                    | '"'
+                    | '\''
+                    | '`'
+                    | '´'
+                    | '/'
+                    | '\\'
+                    | '|'
+                    | '-'
+                    | '–'
+                    | '—'
+                    | '_'
+                    | '!'
+                    | '?'
+                    | '*'
+                    | '#'
+                    | '~'
+                    | '<'
+                    | '>'
+                    | '«'
+                    | '»'
+                    | '„'
+                    | '“'
+                    | '”'
+                    | '‘'
+                    | '’'
+                    | '='
+                    | '@'
+                    | '%'
+            )
             || (kind == NameKind::Path && c == '/');
         if c == '&' || c == '+' {
             if !raw.is_empty() {
@@ -175,10 +305,7 @@ fn tokenize(folded: &str, kind: NameKind) -> Vec<String> {
             out.push(t);
         }
     }
-    out.into_iter()
-        .map(|t| t.chars().filter(|c| c.is_alphanumeric()).collect::<String>())
-        .filter(|t| !t.is_empty())
-        .collect()
+    out.into_iter().map(|t| t.chars().filter(|c| c.is_alphanumeric()).collect::<String>()).filter(|t| !t.is_empty()).collect()
 }
 
 fn is_number(t: &str) -> bool {

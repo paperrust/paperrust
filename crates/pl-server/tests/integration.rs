@@ -59,7 +59,13 @@ async fn start_with(routes: Vec<ApiRoute>, state: pl_core::AppState) -> SocketAd
     addr
 }
 
-async fn send(addr: SocketAddr, method: Method, path: &str, headers: &[(&str, &str)], body: impl Into<Body>) -> (StatusCode, HeaderMap, Bytes) {
+async fn send(
+    addr: SocketAddr,
+    method: Method,
+    path: &str,
+    headers: &[(&str, &str)],
+    body: impl Into<Body>,
+) -> (StatusCode, HeaderMap, Bytes) {
     let mut b = hyper::Request::builder().method(method).uri(format!("http://{addr}{path}"));
     for (k, v) in headers {
         b = b.header(*k, *v);
@@ -199,15 +205,10 @@ async fn large_bodies() {
     let app = Router::new()
         .route(
             "/d/",
-            post(maybe_delegate).layer(axum::middleware::from_fn_with_state(
-                mk(pl_core::RouteFlags { delegatable: true, ..Default::default() }),
-                gate,
-            )),
+            post(maybe_delegate)
+                .layer(axum::middleware::from_fn_with_state(mk(pl_core::RouteFlags { delegatable: true, ..Default::default() }), gate)),
         )
-        .route(
-            "/s/",
-            post(maybe_delegate).layer(axum::middleware::from_fn_with_state(mk(pl_core::RouteFlags::default()), gate)),
-        );
+        .route("/s/", post(maybe_delegate).layer(axum::middleware::from_fn_with_state(mk(pl_core::RouteFlags::default()), gate)));
     let addr = spawn_router(app).await;
 
     let (_, _, b) = send(addr, Method::POST, "/d/", &[], "small").await;
@@ -289,7 +290,11 @@ async fn token_view_other_methods_and_throttle() {
     let (s, hd, b) = send(app, Method::OPTIONS, "/api/token/", &h, Body::empty()).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(hd["allow"], "POST, OPTIONS");
-    assert!(text(&b).starts_with(r#"{"name":"Paperless Obtain Auth Token","description":"","renders":["application/json"],"#), "{}", text(&b));
+    assert!(
+        text(&b).starts_with(r#"{"name":"Paperless Obtain Auth Token","description":"","renders":["application/json"],"#),
+        "{}",
+        text(&b)
+    );
     for _ in 0..4 {
         let (s, hd, b) = send(app, Method::GET, "/api/token/", &h, Body::empty()).await;
         assert_eq!(s, StatusCode::METHOD_NOT_ALLOWED);
@@ -298,7 +303,8 @@ async fn token_view_other_methods_and_throttle() {
         assert_eq!(text(&b), r#"{"detail":"Method \"GET\" not allowed."}"#);
     }
     // 5/min: the sixth request (after OPTIONS + 4 GETs) is throttled, whatever the method
-    let (s, _, b) = send(app, Method::POST, "/api/token/", &[("x-forwarded-for", "10.77.0.1"), ("content-type", "application/json")], "{}").await;
+    let (s, _, b) =
+        send(app, Method::POST, "/api/token/", &[("x-forwarded-for", "10.77.0.1"), ("content-type", "application/json")], "{}").await;
     assert_eq!(s, StatusCode::TOO_MANY_REQUESTS);
     assert!(text(&b).starts_with(r#"{"detail":"Request was throttled. Expected available in "#), "{}", text(&b));
     let (s, _, _) = send(app, Method::DELETE, "/api/token/", &h, Body::empty()).await;

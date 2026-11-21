@@ -153,7 +153,12 @@ async fn read_repo_config(store: &Store) -> Result<RepoConfig, String> {
 }
 
 /// Set up the target. Returns (public key, secret key for safekeeping).
-pub async fn init(target: &crate::config::Target, data_dir: &Path, passphrase: &str, work_factor: Option<u8>) -> Result<(String, String), String> {
+pub async fn init(
+    target: &crate::config::Target,
+    data_dir: &Path,
+    passphrase: &str,
+    work_factor: Option<u8>,
+) -> Result<(String, String), String> {
     use age::secrecy::ExposeSecret;
     if passphrase.chars().count() < 12 {
         return Err("the passphrase must have at least 12 characters".into());
@@ -166,7 +171,12 @@ pub async fn init(target: &crate::config::Target, data_dir: &Path, passphrase: &
     let wrapped = crypto::wrap_identity(&secret, passphrase, work_factor)?;
     let until = store.retain_until(Utc::now());
     store.put("keys/repo.key.age", wrapped, until).await?;
-    let cfg = RepoConfig { format: FORMAT, tool: format!("{} {}", pl_core::brand::PRODUCT_NAME, pl_core::brand::PAPERRUST_VERSION), created: Utc::now(), recipient: public.clone() };
+    let cfg = RepoConfig {
+        format: FORMAT,
+        tool: format!("{} {}", pl_core::brand::PRODUCT_NAME, pl_core::brand::PAPERRUST_VERSION),
+        created: Utc::now(),
+        recipient: public.clone(),
+    };
     store.put("config.json", serde_json::to_vec_pretty(&cfg).map_err(|e| e.to_string())?, None).await?;
     write_local_repo(data_dir, &target.display(), &public)?;
     Ok((public, secret.expose_secret().to_string()))
@@ -240,7 +250,10 @@ fn walk_media(root: &Path) -> Vec<(String, u64, i64)> {
 /// Checksums from the cache (only if size and modification time are equal).
 async fn cached_hashes(pool: &PgPool, chunk: &[(String, u64, i64)]) -> Result<HashMap<String, String>, sqlx::Error> {
     let paths: Vec<&str> = chunk.iter().map(|(p, _, _)| p.as_str()).collect();
-    let rows = sqlx::query("SELECT path, size, mtime_ns, sha256 FROM paperrust_backup_filecache WHERE path = ANY($1)").bind(&paths).fetch_all(pool).await?;
+    let rows = sqlx::query("SELECT path, size, mtime_ns, sha256 FROM paperrust_backup_filecache WHERE path = ANY($1)")
+        .bind(&paths)
+        .fetch_all(pool)
+        .await?;
     let want: HashMap<&str, (u64, i64)> = chunk.iter().map(|(p, s, m)| (p.as_str(), (*s, *m))).collect();
     let mut out = HashMap::new();
     for r in rows {
@@ -279,7 +292,14 @@ async fn remember_object(pool: &PgPool, target: &str, id: &str, size: u64, until
 }
 
 /// Encrypt and upload an object (if not yet present at the target).
-async fn upload_object(store: &Store, recipient: &age::x25519::Recipient, src: &Path, sha: &str, tmp_dir: &Path, until: Option<DateTime<Utc>>) -> Result<u64, String> {
+async fn upload_object(
+    store: &Store,
+    recipient: &age::x25519::Recipient,
+    src: &Path,
+    sha: &str,
+    tmp_dir: &Path,
+    until: Option<DateTime<Utc>>,
+) -> Result<u64, String> {
     let key = object_key(sha);
     // do not upload twice after loss of local knowledge (new DB)
     if store.exists(&key).await? {
@@ -308,7 +328,10 @@ pub async fn run(pool: &PgPool, src: &Sources, cfg: &BackupConfig, trigger: &str
     // in the middle the lock ends with the closed connection instead of staying attached
     // to a pool connection.
     let mut lock_conn = pool.acquire().await.map_err(|e| e.to_string())?.detach();
-    let got: bool = sqlx::query_scalar("SELECT pg_try_advisory_lock(hashtext('paperrust_backup_run'))").fetch_one(&mut lock_conn).await.map_err(|e| e.to_string())?;
+    let got: bool = sqlx::query_scalar("SELECT pg_try_advisory_lock(hashtext('paperrust_backup_run'))")
+        .fetch_one(&mut lock_conn)
+        .await
+        .map_err(|e| e.to_string())?;
     if !got {
         return Err("another backup is running".into());
     }
@@ -348,7 +371,13 @@ pub async fn run(pool: &PgPool, src: &Sources, cfg: &BackupConfig, trigger: &str
     }
 }
 
-async fn run_inner(pool: &PgPool, src: &Sources, cfg: &BackupConfig, target: &crate::config::Target, rec: &mut BackupRun) -> Result<(), String> {
+async fn run_inner(
+    pool: &PgPool,
+    src: &Sources,
+    cfg: &BackupConfig,
+    target: &crate::config::Target,
+    rec: &mut BackupRun,
+) -> Result<(), String> {
     let store = Store::open(target)?;
     let tname = target.display();
     let repo = read_repo_config(&store).await?;
@@ -571,18 +600,24 @@ pub async fn prune(pool: &PgPool, store: &Store, tname: &str, data_dir: &Path, c
         if referenced.contains(&id) {
             continue;
         }
-        let until: Option<DateTime<Utc>> = sqlx::query_scalar("SELECT retain_until FROM paperrust_backup_object WHERE target = $1 AND id = $2")
-            .bind(tname)
-            .bind(&id)
-            .fetch_optional(pool)
-            .await
-            .map_err(|e| e.to_string())?
-            .flatten();
+        let until: Option<DateTime<Utc>> =
+            sqlx::query_scalar("SELECT retain_until FROM paperrust_backup_object WHERE target = $1 AND id = $2")
+                .bind(tname)
+                .bind(&id)
+                .fetch_optional(pool)
+                .await
+                .map_err(|e| e.to_string())?
+                .flatten();
         if until.is_some_and(|u| u > now) {
             continue;
         }
         if store.delete(&object_key(&id)).await? {
-            sqlx::query("DELETE FROM paperrust_backup_object WHERE target = $1 AND id = $2").bind(tname).bind(&id).execute(pool).await.map_err(|e| e.to_string())?;
+            sqlx::query("DELETE FROM paperrust_backup_object WHERE target = $1 AND id = $2")
+                .bind(tname)
+                .bind(&id)
+                .execute(pool)
+                .await
+                .map_err(|e| e.to_string())?;
             st.objects += 1;
         }
     }
@@ -604,7 +639,11 @@ pub async fn list_snapshots(target: &crate::config::Target) -> Result<Vec<(Strin
 }
 
 /// Key of the target: from a key file or with the passphrase.
-pub async fn identity(target: &crate::config::Target, passphrase: Option<&str>, key_file: Option<&Path>) -> Result<age::x25519::Identity, String> {
+pub async fn identity(
+    target: &crate::config::Target,
+    passphrase: Option<&str>,
+    key_file: Option<&Path>,
+) -> Result<age::x25519::Identity, String> {
     if let Some(p) = key_file {
         let s = std::fs::read_to_string(p).map_err(|e| format!("{}: {e}", p.display()))?;
         return crypto::parse_identity(&s);
@@ -651,7 +690,11 @@ pub struct RestoreOptions<'a> {
 }
 
 /// Restore; each file is checked against its checksum after decryption.
-pub async fn restore(target: &crate::config::Target, identity: &age::x25519::Identity, opts: &RestoreOptions<'_>) -> Result<RestoreStats, String> {
+pub async fn restore(
+    target: &crate::config::Target,
+    identity: &age::x25519::Identity,
+    opts: &RestoreOptions<'_>,
+) -> Result<RestoreStats, String> {
     let snap = load_snapshot(target, identity, opts.snapshot).await?;
     let store = Store::open(target)?;
     let mut st = RestoreStats { snapshot: snap.header.id.clone(), ..Default::default() };
@@ -664,7 +707,8 @@ pub async fn restore(target: &crate::config::Target, identity: &age::x25519::Ide
             let dest = f.path.split('/').fold(dir.to_path_buf(), |p, c| p.join(c));
             if dest.exists() {
                 let d2 = dest.clone();
-                let have = tokio::task::spawn_blocking(move || sha256_file(&d2)).await.map_err(|e| e.to_string())?.map_err(|e| e.to_string())?;
+                let have =
+                    tokio::task::spawn_blocking(move || sha256_file(&d2)).await.map_err(|e| e.to_string())?.map_err(|e| e.to_string())?;
                 if have == f.sha256 {
                     st.skipped_existing += 1;
                     continue;
@@ -673,13 +717,17 @@ pub async fn restore(target: &crate::config::Target, identity: &age::x25519::Ide
                     return Err(format!("{} exists with different content (use --overwrite)", dest.display()));
                 }
             }
-            let enc = store.get(&object_key(&f.sha256)).await?.ok_or_else(|| format!("object for {} missing at the backup target", f.path))?;
+            let enc =
+                store.get(&object_key(&f.sha256)).await?.ok_or_else(|| format!("object for {} missing at the backup target", f.path))?;
             let (id, want, d) = (identity.clone(), f.sha256.clone(), dest.clone());
             let n = tokio::task::spawn_blocking(move || -> Result<u64, String> {
                 if let Some(parent) = d.parent() {
                     std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
                 }
-                let tmp = d.with_file_name(format!(".{}.restore.paperrust-tmp", d.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default()));
+                let tmp = d.with_file_name(format!(
+                    ".{}.restore.paperrust-tmp",
+                    d.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default()
+                ));
                 let mut out = std::io::BufWriter::new(std::fs::File::create(&tmp).map_err(|e| e.to_string())?);
                 let n = crypto::decrypt_stream(&id, enc.as_slice(), &mut out)?;
                 out.flush().map_err(|e| e.to_string())?;
@@ -717,7 +765,11 @@ pub async fn restore(target: &crate::config::Target, identity: &age::x25519::Ide
 }
 
 /// Verify: all objects of the directory present (without decrypting the contents).
-pub async fn check(target: &crate::config::Target, identity: &age::x25519::Identity, snapshot: &str) -> Result<(usize, Vec<String>), String> {
+pub async fn check(
+    target: &crate::config::Target,
+    identity: &age::x25519::Identity,
+    snapshot: &str,
+) -> Result<(usize, Vec<String>), String> {
     let snap = load_snapshot(target, identity, snapshot).await?;
     let store = Store::open(target)?;
     let present: HashSet<String> = store.list("objects/").await?.into_iter().collect();

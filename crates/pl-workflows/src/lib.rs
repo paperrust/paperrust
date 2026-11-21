@@ -33,21 +33,10 @@ macro_rules! viewset {
         async fn list_h(State(s): State<AppState>, ctx: RequestContext, auth: AuthUser, q: QueryParams) -> Response {
             api::flatten(api::list($kind, s, ctx, auth, q).await)
         }
-        async fn create_h(
-            State(s): State<AppState>,
-            _ctx: RequestContext,
-            auth: AuthUser,
-            headers: HeaderMap,
-            body: Bytes,
-        ) -> Response {
+        async fn create_h(State(s): State<AppState>, _ctx: RequestContext, auth: AuthUser, headers: HeaderMap, body: Bytes) -> Response {
             api::flatten(api::create($kind, s, auth, headers, body).await)
         }
-        async fn retrieve_h(
-            State(s): State<AppState>,
-            _ctx: RequestContext,
-            auth: AuthUser,
-            Path(pk): Path<String>,
-        ) -> Response {
+        async fn retrieve_h(State(s): State<AppState>, _ctx: RequestContext, auth: AuthUser, Path(pk): Path<String>) -> Response {
             api::flatten(api::retrieve($kind, s, auth, pk).await)
         }
         async fn update_h(
@@ -70,18 +59,37 @@ macro_rules! viewset {
         ) -> Response {
             api::flatten(api::update($kind, true, s, auth, pk, headers, body).await)
         }
-        async fn destroy_h(
-            State(s): State<AppState>,
-            _ctx: RequestContext,
-            auth: AuthUser,
-            Path(pk): Path<String>,
-        ) -> Response {
+        async fn destroy_h(State(s): State<AppState>, _ctx: RequestContext, auth: AuthUser, Path(pk): Path<String>) -> Response {
             api::flatten(api::destroy($kind, s, auth, pk).await)
         }
-        $out.push(ApiRoute::new(concat!($prefix, ".list"), Method::GET, $base, concat!("src/documents/views.py::", $view, ".list"), drf_view(get(list_h), ALLOW_MODEL_LIST)));
-        $out.push(ApiRoute::new(concat!($prefix, ".create"), Method::POST, $base, concat!("src/documents/views.py::", $view, ".create"), drf_view(post(create_h), ALLOW_MODEL_LIST)));
-        $out.push(ApiRoute::new(concat!($prefix, ".retrieve"), Method::GET, $detail, concat!("src/documents/views.py::", $view, ".retrieve"), drf_view(get(retrieve_h), ALLOW_MODEL_DETAIL)));
-        $out.push(ApiRoute::new(concat!($prefix, ".update"), Method::PUT, $detail, concat!("src/documents/views.py::", $view, ".update"), drf_view(put(update_h), ALLOW_MODEL_DETAIL)));
+        $out.push(ApiRoute::new(
+            concat!($prefix, ".list"),
+            Method::GET,
+            $base,
+            concat!("src/documents/views.py::", $view, ".list"),
+            drf_view(get(list_h), ALLOW_MODEL_LIST),
+        ));
+        $out.push(ApiRoute::new(
+            concat!($prefix, ".create"),
+            Method::POST,
+            $base,
+            concat!("src/documents/views.py::", $view, ".create"),
+            drf_view(post(create_h), ALLOW_MODEL_LIST),
+        ));
+        $out.push(ApiRoute::new(
+            concat!($prefix, ".retrieve"),
+            Method::GET,
+            $detail,
+            concat!("src/documents/views.py::", $view, ".retrieve"),
+            drf_view(get(retrieve_h), ALLOW_MODEL_DETAIL),
+        ));
+        $out.push(ApiRoute::new(
+            concat!($prefix, ".update"),
+            Method::PUT,
+            $detail,
+            concat!("src/documents/views.py::", $view, ".update"),
+            drf_view(put(update_h), ALLOW_MODEL_DETAIL),
+        ));
         $out.push(ApiRoute::new(
             concat!($prefix, ".partial_update"),
             Method::PATCH,
@@ -89,7 +97,13 @@ macro_rules! viewset {
             concat!("src/documents/views.py::", $view, ".partial_update"),
             drf_view(patch(partial_update_h), ALLOW_MODEL_DETAIL),
         ));
-        $out.push(ApiRoute::new(concat!($prefix, ".destroy"), Method::DELETE, $detail, concat!("src/documents/views.py::", $view, ".destroy"), drf_view(delete(destroy_h), ALLOW_MODEL_DETAIL)));
+        $out.push(ApiRoute::new(
+            concat!($prefix, ".destroy"),
+            Method::DELETE,
+            $detail,
+            concat!("src/documents/views.py::", $view, ".destroy"),
+            drf_view(delete(destroy_h), ALLOW_MODEL_DETAIL),
+        ));
     }};
 }
 

@@ -153,10 +153,7 @@ impl Report {
             s.push_str(&format!("Nachgeholt (ältere Quelle): {}\n", self.catchup.join(", ")));
         }
         s.push_str(&format!("Dauer:  {:.1} s\n\n", self.duration_s));
-        s.push_str(&format!(
-            "{:<45} {:>10} {:>10} {:>8} {:>7} {:>7}\n",
-            "Tabelle", "Quelle", "Ziel", "Prüfung", "Fehler", "Geänd."
-        ));
+        s.push_str(&format!("{:<45} {:>10} {:>10} {:>8} {:>7} {:>7}\n", "Tabelle", "Quelle", "Ziel", "Prüfung", "Fehler", "Geänd."));
         for t in &self.tables {
             s.push_str(&format!(
                 "{:<45} {:>10} {:>10} {:>8} {:>7} {:>7}\n",

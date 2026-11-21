@@ -80,12 +80,8 @@ impl SessionState {
     /// `Set-Cookie` value Django's `SessionMiddleware` would send to delete the cookie,
     /// if it would (`cookie present and session empty`).
     pub fn delete_cookie_header(&self, cfg: &AuthConfig) -> Option<String> {
-        (self.accessed && self.cookie_sent && self.empty).then(|| {
-            format!(
-                "{}=\"\"; expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; Path=/; SameSite=Lax",
-                cfg.session_cookie_name()
-            )
-        })
+        (self.accessed && self.cookie_sent && self.empty)
+            .then(|| format!("{}=\"\"; expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; Path=/; SameSite=Lax", cfg.session_cookie_name()))
     }
 }
 
@@ -121,14 +117,7 @@ pub struct AuthContext {
 impl AuthContext {
     /// An anonymous context (for tests and internal calls).
     pub fn anonymous(http_method: Method, www_authenticate: Option<String>) -> Self {
-        Self {
-            user: None,
-            method: None,
-            token_key: None,
-            http_method,
-            www_authenticate,
-            session: SessionState::default(),
-        }
+        Self { user: None, method: None, token_key: None, http_method, www_authenticate, session: SessionState::default() }
     }
 
     /// An authenticated context (for tests and internal calls).
@@ -166,11 +155,7 @@ impl AuthContext {
 
     /// `permission_denied(request, message=...)`.
     pub fn deny_with(&self, message: &str) -> AuthError {
-        if self.method.is_none() {
-            self.not_authenticated()
-        } else {
-            AuthError::PermissionDenied { detail: message.into() }
-        }
+        if self.method.is_none() { self.not_authenticated() } else { AuthError::PermissionDenied { detail: message.into() } }
     }
 
     /// `IsAuthenticated`: the user, or the DRF error.
@@ -214,20 +199,11 @@ impl Authz {
         }
         // PaperlessBasicAuthentication.authenticate_header
         let auth = csrf::meta_header(headers, "HTTP_AUTHORIZATION").unwrap_or_default();
-        if auth.to_lowercase().starts_with("basic ") {
-            Some("Basic realm=\"api\"".into())
-        } else {
-            Some("Token".into())
-        }
+        if auth.to_lowercase().starts_with("basic ") { Some("Basic realm=\"api\"".into()) } else { Some("Token".into()) }
     }
 
     /// Authenticate a DRF API request (`Request._authenticate`).
-    pub async fn authenticate(
-        &self,
-        method: &Method,
-        path: &str,
-        headers: &HeaderMap,
-    ) -> Result<AuthContext, AuthError> {
+    pub async fn authenticate(&self, method: &Method, path: &str, headers: &HeaderMap) -> Result<AuthContext, AuthError> {
         self.authenticate_with(method, path, headers, &RequestMeta::default()).await
     }
 
@@ -242,10 +218,7 @@ impl Authz {
         let cfg = self.config();
         let www = self.authenticate_header(headers);
         let mut ctx = AuthContext::anonymous(method.clone(), www.clone());
-        let fail = |detail: &str| AuthError::AuthenticationFailed {
-            detail: detail.into(),
-            www_authenticate: www.clone(),
-        };
+        let fail = |detail: &str| AuthError::AuthenticationFailed { detail: detail.into(), www_authenticate: www.clone() };
 
         // 1. PaperlessRemoteUserAuthentication
         if cfg.remote_user_api {
@@ -269,19 +242,14 @@ impl Authz {
                 return Err(fail("Invalid basic header. No credentials provided."));
             }
             if parts.len() > 2 {
-                return Err(fail(
-                    "Invalid basic header. Credentials string should not contain spaces.",
-                ));
+                return Err(fail("Invalid basic header. Credentials string should not contain spaces."));
             }
             let decoded = py_b64decode(parts[1]).map(|b| match String::from_utf8(b.clone()) {
                 Ok(s) => s,
                 Err(_) => csrf::latin1(&b),
             });
-            let Some((userid, password)) = decoded.as_deref().and_then(|d| d.split_once(':'))
-            else {
-                return Err(fail(
-                    "Invalid basic header. Credentials not correctly base64 encoded.",
-                ));
+            let Some((userid, password)) = decoded.as_deref().and_then(|d| d.split_once(':')) else {
+                return Err(fail("Invalid basic header. Credentials not correctly base64 encoded."));
             };
             // PaperRust: throttle failed attempts via Basic auth like the login page (finding S-2).
             // IP only from X-Forwarded-For of trusted proxies (security review 2026-11-19 F7).
@@ -314,16 +282,10 @@ impl Authz {
                 return Err(fail("Invalid token header. Token string should not contain spaces."));
             }
             let Ok(key) = std::str::from_utf8(parts[1]) else {
-                return Err(fail(
-                    "Invalid token header. Token string should not contain invalid characters.",
-                ));
+                return Err(fail("Invalid token header. Token string should not contain invalid characters."));
             };
             // NUL cannot be sent to PostgreSQL; such a key cannot exist.
-            let u = if key.contains('\0') {
-                None
-            } else {
-                retry_stale_once(|| user::load_user_by_token(self.db(), key)).await?
-            };
+            let u = if key.contains('\0') { None } else { retry_stale_once(|| user::load_user_by_token(self.db(), key)).await? };
             let Some(u) = u else {
                 return Err(fail("Invalid token."));
             };
@@ -338,10 +300,7 @@ impl Authz {
 
         // 3b. PaperRust device token (`Bearer prt_…`). Other `Bearer` values stay ignored by all
         // authenticators (unchanged DRF behaviour); Django never sees this scheme.
-        if parts.len() == 2
-            && parts[0].eq_ignore_ascii_case(b"bearer")
-            && parts[1].starts_with(crate::device::PREFIX.as_bytes())
-        {
+        if parts.len() == 2 && parts[0].eq_ignore_ascii_case(b"bearer") && parts[1].starts_with(crate::device::PREFIX.as_bytes()) {
             let key = std::str::from_utf8(parts[1]).unwrap_or("");
             let uid = retry_stale_once(|| crate::device::lookup_user_id(self.db(), key)).await?;
             let u = match uid {
@@ -392,11 +351,7 @@ impl Authz {
     /// backends: ModelBackend (exact username) then allauth (case-insensitive username).
     /// Rehashes the password like Django's `check_password` setter. Logs failed logins like
     /// `paperless.signals.handle_failed_login`. Also used by `/api/token/`.
-    pub async fn authenticate_credentials(
-        &self,
-        username: &str,
-        password: &str,
-    ) -> Result<Option<User>, AuthError> {
+    pub async fn authenticate_credentials(&self, username: &str, password: &str) -> Result<Option<User>, AuthError> {
         self.authenticate_credentials_from(username, password, &HeaderMap::new(), &RequestMeta::default()).await
     }
 
@@ -451,14 +406,10 @@ impl Authz {
     /// later `get_session_auth_hash()` / `update_session_auth_hash` sees the new hash).
     async fn check_password_with_setter(&self, u: &mut User, password: &str) -> Result<bool, AuthError> {
         let (pw, enc) = (password.to_string(), u.password.clone());
-        let v = tokio::task::spawn_blocking(move || hashers::verify_password(&pw, &enc))
-            .await
-            .map_err(AuthError::internal)?;
+        let v = tokio::task::spawn_blocking(move || hashers::verify_password(&pw, &enc)).await.map_err(AuthError::internal)?;
         if v.is_correct && v.must_update {
             let pw = password.to_string();
-            let new = tokio::task::spawn_blocking(move || hashers::make_password(&pw))
-                .await
-                .map_err(AuthError::internal)?;
+            let new = tokio::task::spawn_blocking(move || hashers::make_password(&pw)).await.map_err(AuthError::internal)?;
             user::update_password(self.db(), u.id, &new).await?;
             u.password = new;
         }
@@ -510,11 +461,7 @@ impl Authz {
     }
 
     /// `django.contrib.auth.get_user(request)` from the session cookie.
-    pub async fn session_user(
-        &self,
-        headers: &HeaderMap,
-        state: &mut SessionState,
-    ) -> Result<Option<User>, AuthError> {
+    pub async fn session_user(&self, headers: &HeaderMap, state: &mut SessionState) -> Result<Option<User>, AuthError> {
         let cfg = self.config();
         let cookies = csrf::parse_cookies(headers);
         let Some(key) = csrf::cookie(&cookies, &cfg.session_cookie_name()).map(str::to_string) else {
@@ -528,11 +475,9 @@ impl Authz {
             return Ok(None);
         }
         let row: Option<(String,)> = retry_stale_once(|| {
-            sqlx::query_as(
-                "SELECT session_data FROM django_session WHERE session_key = $1 AND expire_date > now()",
-            )
-            .bind(&key)
-            .fetch_optional(self.db())
+            sqlx::query_as("SELECT session_data FROM django_session WHERE session_key = $1 AND expire_date > now()")
+                .bind(&key)
+                .fetch_optional(self.db())
         })
         .await?;
         let Some((data,)) = row else {
@@ -552,9 +497,7 @@ impl Authz {
         let (Some(user_id), Some(backend)) = (user_id, backend) else {
             return Ok(None);
         };
-        if !cfg.authentication_backends().contains(&backend)
-            || backend == "guardian.backends.ObjectPermissionBackend"
-        {
+        if !cfg.authentication_backends().contains(&backend) || backend == "guardian.backends.ObjectPermissionBackend" {
             return Ok(None);
         }
         // ModelBackend.get_user: user if user_can_authenticate (is_active)
@@ -562,17 +505,11 @@ impl Authz {
             return Ok(None);
         };
         let session_hash = session.get("_auth_user_hash").and_then(|v| v.as_str()).unwrap_or("");
-        let verified = !session_hash.is_empty()
-            && signing::constant_time_eq(
-                session_hash.as_bytes(),
-                u.session_auth_hash(&cfg.secret_key).as_bytes(),
-            );
+        let verified =
+            !session_hash.is_empty() && signing::constant_time_eq(session_hash.as_bytes(), u.session_auth_hash(&cfg.secret_key).as_bytes());
         if !verified {
             // request.session.flush(); SECRET_KEY_FALLBACKS is never set by paperless.
-            sqlx::query("DELETE FROM django_session WHERE session_key = $1")
-                .bind(&key)
-                .execute(self.db())
-                .await?;
+            sqlx::query("DELETE FROM django_session WHERE session_key = $1").bind(&key).execute(self.db()).await?;
             state.flushed = true;
             state.empty = true;
             return Ok(None);
@@ -625,9 +562,7 @@ fn authorization_bytes(headers: &HeaderMap) -> Option<Vec<u8>> {
 
 /// Python `bytes.split()` (ASCII whitespace, runs collapsed).
 pub fn py_bytes_split(b: &[u8]) -> Vec<&[u8]> {
-    b.split(|c| matches!(c, b' ' | b'\t' | b'\n' | b'\r' | 0x0b | 0x0c))
-        .filter(|p| !p.is_empty())
-        .collect()
+    b.split(|c| matches!(c, b' ' | b'\t' | b'\n' | b'\r' | 0x0b | 0x0c)).filter(|p| !p.is_empty()).collect()
 }
 
 /// `base64.b64decode(s)` (non-strict `binascii.a2b_base64`): characters outside the standard
@@ -724,19 +659,14 @@ mod tests {
 
     fn authz() -> Authz {
         // connect_lazy never connects unless a query runs.
-        let pool = sqlx::postgres::PgPoolOptions::new()
-            .connect_lazy("postgres://invalid:invalid@127.0.0.1:1/invalid")
-            .unwrap();
+        let pool = sqlx::postgres::PgPoolOptions::new().connect_lazy("postgres://invalid:invalid@127.0.0.1:1/invalid").unwrap();
         Authz::new(pool, AuthConfig::for_tests("s"))
     }
 
     fn hm(pairs: &[(&str, &[u8])]) -> HeaderMap {
         let mut h = HeaderMap::new();
         for (k, v) in pairs {
-            h.append(
-                axum::http::HeaderName::from_bytes(k.as_bytes()).unwrap(),
-                axum::http::HeaderValue::from_bytes(v).unwrap(),
-            );
+            h.append(axum::http::HeaderName::from_bytes(k.as_bytes()).unwrap(), axum::http::HeaderValue::from_bytes(v).unwrap());
         }
         h
     }
@@ -764,10 +694,7 @@ mod tests {
         let e = run(hm(&[("authorization", b"token a b")])).await.unwrap_err();
         assert_eq!(e.detail(), "Invalid token header. Token string should not contain spaces.");
         let e = run(hm(&[("authorization", b"Token \xff\xfe")])).await.unwrap_err();
-        assert_eq!(
-            e.detail(),
-            "Invalid token header. Token string should not contain invalid characters."
-        );
+        assert_eq!(e.detail(), "Invalid token header. Token string should not contain invalid characters.");
         // No credentials at all: anonymous, challenge "Token".
         let ctx = run(hm(&[])).await.unwrap();
         assert!(ctx.user.is_none());
@@ -784,9 +711,7 @@ mod tests {
 
     #[tokio::test]
     async fn remote_user_api_has_no_challenge() {
-        let pool = sqlx::postgres::PgPoolOptions::new()
-            .connect_lazy("postgres://invalid:invalid@127.0.0.1:1/invalid")
-            .unwrap();
+        let pool = sqlx::postgres::PgPoolOptions::new().connect_lazy("postgres://invalid:invalid@127.0.0.1:1/invalid").unwrap();
         let mut c = AuthConfig::for_tests("s");
         c.remote_user_api = true;
         let a = Authz::new(pool, c);

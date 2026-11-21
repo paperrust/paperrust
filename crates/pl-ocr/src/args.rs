@@ -66,11 +66,7 @@ pub struct ArgsRequest<'a> {
 }
 
 /// `construct_ocrmypdf_parameters`.
-pub fn construct_ocrmypdf_parameters(
-    cfg: &OcrConfig,
-    req: &ArgsRequest<'_>,
-    images: &dyn ImageOps,
-) -> Result<OcrArgs> {
+pub fn construct_ocrmypdf_parameters(cfg: &OcrConfig, req: &ArgsRequest<'_>, images: &dyn ImageOps) -> Result<OcrArgs> {
     let mut a = Map::new();
     a.insert("input_file_or_options".into(), json!(req.input_file));
     a.insert("output_file".into(), json!(req.output_file));
@@ -81,10 +77,7 @@ pub fn construct_ocrmypdf_parameters(
     a.insert("progress_bar".into(), json!(false));
 
     if cfg.output_type.is_pdfa() {
-        a.insert(
-            "color_conversion_strategy".into(),
-            json!(cfg.color_conversion_strategy.as_str()),
-        );
+        a.insert("color_conversion_strategy".into(), json!(cfg.color_conversion_strategy.as_str()));
     }
 
     if req.safe_fallback || cfg.mode == Mode::Force {
@@ -135,10 +128,7 @@ pub fn construct_ocrmypdf_parameters(
         let a4_dpi = images.calculate_a4_dpi(req.input_file);
 
         if images.has_alpha(req.input_file)? {
-            tracing::info!(
-                "Removing alpha layer from {} for compatibility with img2pdf",
-                req.input_file
-            );
+            tracing::info!("Removing alpha layer from {} for compatibility with img2pdf", req.input_file);
             let no_alpha = images.remove_alpha(req.input_file)?;
             a.insert("input_file_or_options".into(), json!(no_alpha));
         }
@@ -186,15 +176,16 @@ pub fn construct_ocrmypdf_parameters(
     }
 
     if let Some(px) = cfg.max_image_pixel
-        && px >= 0.0 {
-            let mp = px / 1_000_000.0;
-            if mp == 0.0 {
-                tracing::debug!("OCR pixel limit is disabled!");
-            } else {
-                tracing::debug!("Calculated {mp} megapixels for OCR");
-            }
-            a.insert("max_image_mpixels".into(), json!(mp));
+        && px >= 0.0
+    {
+        let mp = px / 1_000_000.0;
+        if mp == 0.0 {
+            tracing::debug!("OCR pixel limit is disabled!");
+        } else {
+            tracing::debug!("Calculated {mp} megapixels for OCR");
         }
+        a.insert("max_image_mpixels".into(), json!(mp));
+    }
 
     Ok(OcrArgs(a))
 }
@@ -281,9 +272,19 @@ mod tests {
         assert_eq!(
             p.keys(),
             vec![
-                "input_file_or_options", "output_file", "use_threads", "jobs", "language",
-                "output_type", "progress_bar", "color_conversion_strategy", "clean", "deskew",
-                "rotate_pages", "rotate_pages_threshold", "sidecar"
+                "input_file_or_options",
+                "output_file",
+                "use_threads",
+                "jobs",
+                "language",
+                "output_type",
+                "progress_bar",
+                "color_conversion_strategy",
+                "clean",
+                "deskew",
+                "rotate_pages",
+                "rotate_pages_threshold",
+                "sidecar"
             ]
         );
     }
@@ -314,9 +315,7 @@ mod tests {
 
     #[test]
     fn deskew_option() {
-        for (mode, deskew, expect) in
-            [(Mode::Auto, true, true), (Mode::Redo, true, false), (Mode::Auto, false, false)]
-        {
+        for (mode, deskew, expect) in [(Mode::Auto, true, true), (Mode::Redo, true, false), (Mode::Auto, false, false)] {
             let p = params(&cfg(|s| {
                 s.ocr_mode = mode;
                 s.ocr_deskew = deskew;
@@ -344,25 +343,21 @@ mod tests {
     }
     #[test]
     fn db_settings_ocr_language() {
-        let c = cfg_db(AppConfigOverrides { language: Some("fra+ita".into()), ..Default::default() }, |s| {
-            s.ocr_language = "eng+deu".into()
-        });
+        let c =
+            cfg_db(AppConfigOverrides { language: Some("fra+ita".into()), ..Default::default() }, |s| s.ocr_language = "eng+deu".into());
         assert_eq!(params(&c).str("language"), Some("fra+ita"));
     }
     #[test]
     fn db_settings_ocr_output_type() {
-        let c = cfg_db(AppConfigOverrides { output_type: Some("pdfa".into()), ..Default::default() }, |s| {
-            s.ocr_output_type = "pdfa-3".into()
-        });
+        let c =
+            cfg_db(AppConfigOverrides { output_type: Some("pdfa".into()), ..Default::default() }, |s| s.ocr_output_type = "pdfa-3".into());
         assert_eq!(params(&c).str("output_type"), Some("pdfa"));
         assert_eq!(c.output_type, OutputType::PdfA);
     }
     #[test]
     fn db_settings_ocr_mode() {
         // AUTO from the DB + skip_text=True explicit → skip_text
-        let c = cfg_db(AppConfigOverrides { mode: Some("auto".into()), ..Default::default() }, |s| {
-            s.ocr_mode = Mode::Redo
-        });
+        let c = cfg_db(AppConfigOverrides { mode: Some("auto".into()), ..Default::default() }, |s| s.ocr_mode = Mode::Redo);
         let p = params_flags(&c, false, true);
         assert!(p.flag("skip_text"));
         assert!(!p.0.contains_key("redo_ocr") && !p.0.contains_key("force_ocr"));
@@ -370,9 +365,7 @@ mod tests {
         let p = params(&c);
         assert!(!p.0.contains_key("skip_text") && !p.0.contains_key("redo_ocr") && !p.0.contains_key("force_ocr"));
         // OFF → skip_text
-        let c = cfg_db(AppConfigOverrides { mode: Some("off".into()), ..Default::default() }, |s| {
-            s.ocr_mode = Mode::Redo
-        });
+        let c = cfg_db(AppConfigOverrides { mode: Some("off".into()), ..Default::default() }, |s| s.ocr_mode = Mode::Redo);
         assert!(params(&c).flag("skip_text"));
     }
     #[test]
@@ -395,13 +388,10 @@ mod tests {
     }
     #[test]
     fn db_settings_ocr_rotate() {
-        let c = cfg_db(
-            AppConfigOverrides { rotate_pages: Some(true), rotate_pages_threshold: Some(15.0), ..Default::default() },
-            |s| {
-                s.ocr_rotate_pages = false;
-                s.ocr_rotate_pages_threshold = 30.0;
-            },
-        );
+        let c = cfg_db(AppConfigOverrides { rotate_pages: Some(true), rotate_pages_threshold: Some(15.0), ..Default::default() }, |s| {
+            s.ocr_rotate_pages = false;
+            s.ocr_rotate_pages_threshold = 30.0;
+        });
         let p = params(&c);
         assert!(p.flag("rotate_pages"));
         assert_eq!(p.f64("rotate_pages_threshold"), Some(15.0));
@@ -415,10 +405,10 @@ mod tests {
     }
     #[test]
     fn db_settings_ocr_color_convert() {
-        let c = cfg_db(
-            AppConfigOverrides { color_conversion_strategy: Some("UseDeviceIndependentColor".into()), ..Default::default() },
-            |s| s.ocr_color_conversion_strategy = "LeaveColorUnchanged".into(),
-        );
+        let c =
+            cfg_db(AppConfigOverrides { color_conversion_strategy: Some("UseDeviceIndependentColor".into()), ..Default::default() }, |s| {
+                s.ocr_color_conversion_strategy = "LeaveColorUnchanged".into()
+            });
         assert_eq!(params(&c).str("color_conversion_strategy"), Some("UseDeviceIndependentColor"));
         // without PDF/A no color_conversion_strategy
         let c = cfg(|s| s.ocr_output_type = "pdf".into());
@@ -427,10 +417,9 @@ mod tests {
     #[test]
     fn ocr_user_args() {
         // DB value beats environment
-        let c = cfg_db(
-            AppConfigOverrides { user_args: Some(json!({"unpaper_args": "--pre-rotate 90"})), ..Default::default() },
-            |s| s.ocr_user_args = Some(r#"{"continue_on_soft_render_error": true}"#.into()),
-        );
+        let c = cfg_db(AppConfigOverrides { user_args: Some(json!({"unpaper_args": "--pre-rotate 90"})), ..Default::default() }, |s| {
+            s.ocr_user_args = Some(r#"{"continue_on_soft_render_error": true}"#.into())
+        });
         let p = params(&c);
         assert_eq!(p.str("unpaper_args"), Some("--pre-rotate 90"));
         assert!(!p.0.contains_key("continue_on_soft_render_error"));

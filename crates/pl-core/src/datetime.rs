@@ -37,15 +37,7 @@ fn fmt_offset(secs: i32) -> String {
 pub fn python_isoformat<Z: TimeZone>(dt: &DateTime<Z>) -> String {
     let off = dt.offset().fix().local_minus_utc();
     let n = dt.naive_local();
-    let mut s = format!(
-        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}",
-        n.year(),
-        n.month(),
-        n.day(),
-        n.hour(),
-        n.minute(),
-        n.second()
-    );
+    let mut s = format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}", n.year(), n.month(), n.day(), n.hour(), n.minute(), n.second());
     let micros = n.nanosecond() / 1000;
     if micros != 0 {
         s.push_str(&format!(".{micros:06}"));
@@ -87,15 +79,7 @@ pub fn format_date(d: &NaiveDate) -> String {
 
 /// Python `str(datetime)` (naive): `YYYY-MM-DD HH:MM:SS[.ffffff]`.
 pub fn python_str_naive(n: &NaiveDateTime) -> String {
-    let mut s = format!(
-        "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
-        n.year(),
-        n.month(),
-        n.day(),
-        n.hour(),
-        n.minute(),
-        n.second()
-    );
+    let mut s = format!("{:04}-{:02}-{:02} {:02}:{:02}:{:02}", n.year(), n.month(), n.day(), n.hour(), n.minute(), n.second());
     let micros = n.nanosecond() / 1000;
     if micros != 0 {
         s.push_str(&format!(".{micros:06}"));
@@ -166,11 +150,7 @@ fn iso_date_len(s: &[u8]) -> usize {
         return 7;
     }
     if s[4] == b'-' {
-        if s[5] == b'W' {
-            if s.len() > 8 && s[8] == b'-' { 10.min(s.len()) } else { 8 }
-        } else {
-            10.min(s.len())
-        }
+        if s[5] == b'W' { if s.len() > 8 && s[8] == b'-' { 10.min(s.len()) } else { 8 } } else { 10.min(s.len()) }
     } else if s[4] == b'W' {
         if s.len() > 7 && s[7].is_ascii_digit() { 8 } else { 7 }
     } else {
@@ -315,8 +295,7 @@ pub fn django_parse_datetime(s: &str) -> Result<Option<ParsedDateTime>, ()> {
         None => 0,
     };
     let date = NaiveDate::from_ymd_opt(p("year")?.ok_or(())? as i32, p("month")?.ok_or(())?, p("day")?.ok_or(())?).ok_or(())?;
-    let time = NaiveTime::from_hms_micro_opt(p("hour")?.ok_or(())?, p("minute")?.ok_or(())?, p("second")?.unwrap_or(0), micro)
-        .ok_or(())?;
+    let time = NaiveTime::from_hms_micro_opt(p("hour")?.ok_or(())?, p("minute")?.ok_or(())?, p("second")?.unwrap_or(0), micro).ok_or(())?;
     let offset = match g("tzinfo") {
         None => None,
         Some("Z") => FixedOffset::east_opt(0),
@@ -368,11 +347,7 @@ pub fn from_current_timezone(naive: &NaiveDateTime, tz: &Tz) -> Result<DateTime<
 /// [`from_current_timezone`]).
 pub fn resolve_parsed(p: &ParsedDateTime, tz: &Tz) -> Result<DateTime<Utc>, String> {
     match p.offset {
-        Some(off) => off
-            .from_local_datetime(&p.naive)
-            .single()
-            .map(|d| d.with_timezone(&Utc))
-            .ok_or_else(|| "invalid offset".to_string()),
+        Some(off) => off.from_local_datetime(&p.naive).single().map(|d| d.with_timezone(&Utc)).ok_or_else(|| "invalid offset".to_string()),
         None => from_current_timezone(&p.naive, tz),
     }
 }
@@ -381,10 +356,8 @@ pub fn resolve_parsed(p: &ParsedDateTime, tz: &Tz) -> Result<DateTime<Utc>, Stri
 // strptime (CPython _strptime) and locale input formats
 // =============================================================================================
 
-const MONTHS: [&str; 12] = [
-    "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november",
-    "december",
-];
+const MONTHS: [&str; 12] =
+    ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
 const MONTHS_ABBR: [&str; 12] = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 const DAYS: [&str; 7] = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
 const DAYS_ABBR: [&str; 7] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
@@ -667,7 +640,8 @@ mod tests {
         assert_eq!(r, Utc.with_ymd_and_hms(2024, 3, 1, 10, 0, 0).unwrap());
         assert_eq!(
             parse_iso_datetime_input("2024-03-31T02:30:00", &Berlin),
-            Err("2024-03-31 02:30:00 couldn\u{2019}t be interpreted in time zone Europe/Berlin; it may be ambiguous or it may not exist.".into())
+            Err("2024-03-31 02:30:00 couldn\u{2019}t be interpreted in time zone Europe/Berlin; it may be ambiguous or it may not exist."
+                .into())
         );
         assert_eq!(parse_iso_datetime_input("03/01/2024", &Berlin), Err(MSG_INVALID_DATETIME.into()));
         assert!(parse_datetime_input("03/01/2024 10:00", "en-us", &Berlin).unwrap().is_some());
@@ -679,9 +653,6 @@ mod tests {
         assert_eq!(drf_parse_date("05.01.2024"), Err(DRF_DATE_INVALID.into()));
         assert!(drf_parse_datetime("2024-01-05T10:00", &Berlin).is_ok());
         assert_eq!(drf_parse_datetime("x", &Berlin), Err(DRF_DATETIME_INVALID.into()));
-        assert_eq!(
-            drf_parse_datetime("2024-10-27T02:30:00", &Berlin),
-            Err("Invalid datetime for the timezone \"Europe/Berlin\".".into())
-        );
+        assert_eq!(drf_parse_datetime("2024-10-27T02:30:00", &Berlin), Err("Invalid datetime for the timezone \"Europe/Berlin\".".into()));
     }
 }

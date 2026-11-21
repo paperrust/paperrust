@@ -142,9 +142,10 @@ impl PyDecimal {
         }
         for nan in ["nan", "snan"] {
             if let Some(payload) = lower.strip_prefix(nan)
-                && (payload.is_empty() || digits_with_underscores(payload).is_some()) {
-                    return Some(PyDecimal::NaN);
-                }
+                && (payload.is_empty() || digits_with_underscores(payload).is_some())
+            {
+                return Some(PyDecimal::NaN);
+            }
         }
         let (mantissa, exp_part) = match rest.find(['e', 'E']) {
             Some(i) => (&rest[..i], Some(&rest[i + 1..])),
@@ -157,16 +158,8 @@ impl PyDecimal {
         if int_part.is_empty() && frac_part.is_empty() {
             return None;
         }
-        let int_digits = if int_part.is_empty() {
-            String::new()
-        } else {
-            digits_with_underscores(int_part)?
-        };
-        let frac_digits = if frac_part.is_empty() {
-            String::new()
-        } else {
-            digits_with_underscores(frac_part)?
-        };
+        let int_digits = if int_part.is_empty() { String::new() } else { digits_with_underscores(int_part)? };
+        let frac_digits = if frac_part.is_empty() { String::new() } else { digits_with_underscores(frac_part)? };
         let mut exp: i64 = 0;
         if let Some(e) = exp_part {
             let (eneg, edigits) = match e.as_bytes().first() {
@@ -190,16 +183,8 @@ impl PyDecimal {
         all.push_str(&frac_digits);
         exp -= frac_digits.len() as i64;
         let trimmed = all.trim_start_matches('0');
-        let digits = if trimmed.is_empty() {
-            "0".to_string()
-        } else {
-            trimmed.to_string()
-        };
-        Some(PyDecimal::Finite {
-            negative,
-            digits,
-            exp,
-        })
+        let digits = if trimmed.is_empty() { "0".to_string() } else { trimmed.to_string() };
+        Some(PyDecimal::Finite { negative, digits, exp })
     }
 
     pub fn is_finite(&self) -> bool {
@@ -208,12 +193,7 @@ impl PyDecimal {
 
     /// `int(Decimal)` – truncation towards zero. Only for finite values.
     pub fn trunc(&self) -> Option<PyInt> {
-        let PyDecimal::Finite {
-            negative,
-            digits,
-            exp,
-        } = self
-        else {
+        let PyDecimal::Finite { negative, digits, exp } = self else {
             return None;
         };
         if digits == "0" {
@@ -222,9 +202,7 @@ impl PyDecimal {
         let len = digits.len() as i64;
         if *exp >= 0 {
             if len + exp > 39 {
-                return Some(PyInt::Big {
-                    negative: *negative,
-                });
+                return Some(PyInt::Big { negative: *negative });
             }
             let mut s = digits.clone();
             for _ in 0..*exp {
@@ -245,11 +223,7 @@ impl PyDecimal {
         match self {
             PyDecimal::NaN => false,
             PyDecimal::Infinite { negative } => !negative,
-            PyDecimal::Finite {
-                negative,
-                digits,
-                exp,
-            } => {
+            PyDecimal::Finite { negative, digits, exp } => {
                 if *negative || digits == "0" {
                     return false;
                 }
@@ -275,9 +249,7 @@ impl PyDecimal {
                 match int_digits.as_str().cmp(threshold) {
                     std::cmp::Ordering::Greater => true,
                     std::cmp::Ordering::Less => false,
-                    std::cmp::Ordering::Equal => {
-                        *exp < 0 && digits[int_len as usize..].bytes().any(|b| b != b'0')
-                    }
+                    std::cmp::Ordering::Equal => *exp < 0 && digits[int_len as usize..].bytes().any(|b| b != b'0'),
                 }
             }
         }
@@ -289,11 +261,7 @@ impl PyDecimal {
             PyDecimal::NaN => "NaN".into(),
             PyDecimal::Infinite { negative: true } => "-Infinity".into(),
             PyDecimal::Infinite { negative: false } => "Infinity".into(),
-            PyDecimal::Finite {
-                negative,
-                digits,
-                exp,
-            } => format!("{}{}e{}", if *negative { "-" } else { "" }, digits, exp),
+            PyDecimal::Finite { negative, digits, exp } => format!("{}{}e{}", if *negative { "-" } else { "" }, digits, exp),
         }
     }
 }
@@ -339,11 +307,7 @@ pub fn py_float_repr(f: f64) -> String {
         return if f > 0.0 { "inf".into() } else { "-inf".into() };
     }
     if f == 0.0 {
-        return if f.is_sign_negative() {
-            "-0.0".into()
-        } else {
-            "0.0".into()
-        };
+        return if f.is_sign_negative() { "-0.0".into() } else { "0.0".into() };
     }
     let s = format!("{:e}", f);
     let (mant, exp) = s.split_once('e').unwrap_or((&s, "0"));
@@ -381,12 +345,7 @@ pub fn py_float_repr(f: f64) -> String {
             out.push('.');
             out.push_str(&digits[1..]);
         }
-        let _ = write!(
-            out,
-            "e{}{:02}",
-            if exp < 0 { '-' } else { '+' },
-            exp.unsigned_abs()
-        );
+        let _ = write!(out, "e{}{:02}", if exp < 0 { '-' } else { '+' }, exp.unsigned_abs());
     }
     out
 }
@@ -406,11 +365,7 @@ fn py_is_printable(c: char) -> bool {
 
 /// Python `repr(str)`.
 pub fn py_str_repr(s: &str) -> String {
-    let quote = if s.contains('\'') && !s.contains('"') {
-        '"'
-    } else {
-        '\''
-    };
+    let quote = if s.contains('\'') && !s.contains('"') { '"' } else { '\'' };
     let mut out = String::with_capacity(s.len() + 2);
     out.push(quote);
     for c in s.chars() {
@@ -446,7 +401,10 @@ pub enum PyJson {
     Null,
     Bool(bool),
     /// Integer; `digits` normalized (no leading zeros, "0" for zero).
-    Int { negative: bool, digits: String },
+    Int {
+        negative: bool,
+        digits: String,
+    },
     Float(f64),
     Str(String),
     List(Vec<PyJson>),
@@ -455,10 +413,7 @@ pub enum PyJson {
 
 impl PyJson {
     pub fn int(v: i64) -> PyJson {
-        PyJson::Int {
-            negative: v < 0,
-            digits: v.unsigned_abs().to_string(),
-        }
+        PyJson::Int { negative: v < 0, digits: v.unsigned_abs().to_string() }
     }
 
     /// `isinstance(x, int)` (bool counts as int in Python).
@@ -511,10 +466,7 @@ impl PyJson {
                 format!("[{}]", parts.join(", "))
             }
             PyJson::Dict(items) => {
-                let parts: Vec<String> = items
-                    .iter()
-                    .map(|(k, v)| format!("{}: {}", py_str_repr(k), v.py_repr()))
-                    .collect();
+                let parts: Vec<String> = items.iter().map(|(k, v)| format!("{}: {}", py_str_repr(k), v.py_repr())).collect();
                 format!("{{{}}}", parts.join(", "))
             }
         }
@@ -545,27 +497,18 @@ impl PyJson {
             PyJson::Null => serde_json::Value::Null,
             PyJson::Bool(b) => serde_json::Value::Bool(*b),
             PyJson::Int { negative, digits } => {
-                let s = if *negative {
-                    format!("-{digits}")
-                } else {
-                    digits.clone()
-                };
-                s.parse::<i64>()
-                    .map(serde_json::Value::from)
-                    .or_else(|_| s.parse::<u64>().map(serde_json::Value::from))
-                    .unwrap_or_else(|_| {
+                let s = if *negative { format!("-{digits}") } else { digits.clone() };
+                s.parse::<i64>().map(serde_json::Value::from).or_else(|_| s.parse::<u64>().map(serde_json::Value::from)).unwrap_or_else(
+                    |_| {
                         serde_json::Number::from_f64(s.parse::<f64>().unwrap_or(0.0))
                             .map(serde_json::Value::Number)
                             .unwrap_or(serde_json::Value::Null)
-                    })
+                    },
+                )
             }
-            PyJson::Float(f) => serde_json::Number::from_f64(*f)
-                .map(serde_json::Value::Number)
-                .unwrap_or(serde_json::Value::Null),
+            PyJson::Float(f) => serde_json::Number::from_f64(*f).map(serde_json::Value::Number).unwrap_or(serde_json::Value::Null),
             PyJson::Str(s) => serde_json::Value::String(s.clone()),
-            PyJson::List(items) => {
-                serde_json::Value::Array(items.iter().map(|i| i.to_serde()).collect())
-            }
+            PyJson::List(items) => serde_json::Value::Array(items.iter().map(|i| i.to_serde()).collect()),
             PyJson::Dict(items) => {
                 let mut m = serde_json::Map::new();
                 for (k, v) in items {
@@ -578,12 +521,7 @@ impl PyJson {
 
     /// Python `json.loads(s)` (strict). `None` corresponds to `JSONDecodeError`.
     pub fn loads(s: &str) -> Option<PyJson> {
-        let mut p = JsonParser {
-            s: s.as_bytes(),
-            src: s,
-            pos: 0,
-            depth: 0,
-        };
+        let mut p = JsonParser { s: s.as_bytes(), src: s, pos: 0, depth: 0 };
         p.ws();
         let v = p.value()?;
         p.ws();
@@ -720,9 +658,7 @@ impl JsonParser<'_> {
         }
         let int_end = self.pos;
         let mut is_float = false;
-        if self.s.get(self.pos) == Some(&b'.')
-            && matches!(self.s.get(self.pos + 1), Some(b'0'..=b'9'))
-        {
+        if self.s.get(self.pos) == Some(&b'.') && matches!(self.s.get(self.pos + 1), Some(b'0'..=b'9')) {
             is_float = true;
             self.pos += 1;
             while matches!(self.s.get(self.pos), Some(b'0'..=b'9')) {
@@ -789,9 +725,7 @@ impl JsonParser<'_> {
                         b't' => out.push('\t'),
                         b'u' => {
                             let hi = self.hex4()?;
-                            if (0xd800..0xdc00).contains(&hi)
-                                && self.s[self.pos..].starts_with(b"\\u")
-                            {
+                            if (0xd800..0xdc00).contains(&hi) && self.s[self.pos..].starts_with(b"\\u") {
                                 let save = self.pos;
                                 self.pos += 2;
                                 let lo = self.hex4()?;
@@ -835,10 +769,7 @@ mod tests {
         assert_eq!(py_int("1.0"), None);
         assert_eq!(py_int(""), None);
         assert_eq!(py_int("007"), Some(PyInt::Small(7)));
-        assert_eq!(
-            py_int("99999999999999999999999999999999999999999999"),
-            Some(PyInt::Big { negative: false })
-        );
+        assert_eq!(py_int("99999999999999999999999999999999999999999999"), Some(PyInt::Big { negative: false }));
     }
 
     #[test]
@@ -857,10 +788,7 @@ mod tests {
         assert!(PyDecimal::parse("1e51").unwrap().gt_integer(NUMBER_FILTER_MAX));
         assert!(!PyDecimal::parse("1e50").unwrap().gt_integer(NUMBER_FILTER_MAX));
         assert!(!PyDecimal::parse("-1e60").unwrap().gt_integer(NUMBER_FILTER_MAX));
-        assert_eq!(
-            PyDecimal::parse("1e60").unwrap().trunc(),
-            Some(PyInt::Big { negative: false })
-        );
+        assert_eq!(PyDecimal::parse("1e60").unwrap().trunc(), Some(PyInt::Big { negative: false }));
     }
 
     #[test]
@@ -889,30 +817,18 @@ mod tests {
     #[test]
     fn json_loads() {
         assert_eq!(PyJson::loads("not valid json"), None);
-        assert_eq!(
-            PyJson::loads(" [1, \"a\", true, null] ").unwrap().py_repr(),
-            "[1, 'a', True, None]"
-        );
+        assert_eq!(PyJson::loads(" [1, \"a\", true, null] ").unwrap().py_repr(), "[1, 'a', True, None]");
         assert!(matches!(PyJson::loads("NaN"), Some(PyJson::Float(f)) if f.is_nan()));
         assert_eq!(
             PyJson::loads("123456789012345678901234567890").unwrap(),
-            PyJson::Int {
-                negative: false,
-                digits: "123456789012345678901234567890".into()
-            }
+            PyJson::Int { negative: false, digits: "123456789012345678901234567890".into() }
         );
         assert_eq!(PyJson::loads("1.0").unwrap(), PyJson::Float(1.0));
         assert_eq!(PyJson::loads("[1,]"), None);
         assert_eq!(PyJson::loads("\"a\u{1}\""), None);
         assert_eq!(PyJson::loads("1 2"), None);
-        assert_eq!(
-            PyJson::loads("{\"a\": 1, \"a\": 2}").unwrap().py_repr(),
-            "{'a': 2}"
-        );
-        assert_eq!(
-            PyJson::loads("\"\\ud83d\\ude00\"").unwrap(),
-            PyJson::Str("😀".into())
-        );
+        assert_eq!(PyJson::loads("{\"a\": 1, \"a\": 2}").unwrap().py_repr(), "{'a': 2}");
+        assert_eq!(PyJson::loads("\"\\ud83d\\ude00\"").unwrap(), PyJson::Str("😀".into()));
     }
 
     #[test]

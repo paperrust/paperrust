@@ -207,14 +207,7 @@ impl Mlp {
 
     /// Train like sklearn `MLPClassifier.fit` with solver adam. `y` is the binarized target
     /// (n x n_out, row-major), `sample_weight` optional.
-    pub fn fit(
-        x: &Csr,
-        y: &[f32],
-        n_out: usize,
-        out: OutAct,
-        sample_weight: Option<&[f32]>,
-        p: &MlpParams,
-    ) -> Mlp {
+    pub fn fit(x: &Csr, y: &[f32], n_out: usize, out: OutAct, sample_weight: Option<&[f32]>, p: &MlpParams) -> Mlp {
         let n = x.n_rows();
         let mut rng = Rng::new(p.seed);
         // layer sizes
@@ -226,23 +219,11 @@ impl Mlp {
             let (fi, fo) = (sizes[k], sizes[k + 1]);
             // _init_coef: Glorot uniform, factor 6 for relu
             let bound = (6.0 / (fi + fo) as f64).sqrt();
-            let w = (0..fi * fo)
-                .map(|_| rng.uniform(-bound, bound) as f32)
-                .collect();
+            let w = (0..fi * fo).map(|_| rng.uniform(-bound, bound) as f32).collect();
             let b = (0..fo).map(|_| rng.uniform(-bound, bound) as f32).collect();
-            layers.push(Layer {
-                fan_in: fi,
-                fan_out: fo,
-                w,
-                b,
-            });
+            layers.push(Layer { fan_in: fi, fan_out: fo, w, b });
         }
-        let mut model = Mlp {
-            layers,
-            out,
-            n_iter: 0,
-            final_loss: f64::NAN,
-        };
+        let mut model = Mlp { layers, out, n_iter: 0, final_loss: f64::NAN };
         if n == 0 {
             return model;
         }
@@ -302,11 +283,7 @@ impl Mlp {
                     loss += sw[r] as f64 * l;
                 }
                 loss /= sw_sum;
-                let sq: f64 = model
-                    .layers
-                    .iter()
-                    .map(|l| l.w.iter().map(|&v| (v as f64) * (v as f64)).sum::<f64>())
-                    .sum();
+                let sq: f64 = model.layers.iter().map(|l| l.w.iter().map(|&v| (v as f64) * (v as f64)).sum::<f64>()).sum();
                 loss += 0.5 * p.alpha * sq / sw_sum;
                 accumulated += loss * bs as f64;
 
@@ -317,8 +294,7 @@ impl Mlp {
                         (outp[i] - y[idx[r] * n_out + k]) * sw[r]
                     })
                     .collect();
-                let mut gb: Vec<Vec<f32>> =
-                    model.layers.iter().map(|l| vec![0f32; l.b.len()]).collect();
+                let mut gb: Vec<Vec<f32>> = model.layers.iter().map(|l| vec![0f32; l.b.len()]).collect();
                 for k in (0..nl).rev() {
                     let fo = model.layers[k].fan_out;
                     let fi = model.layers[k].fan_in;
@@ -372,8 +348,7 @@ impl Mlp {
 
                 // Adam update (all parameters, like sklearn)
                 t += 1;
-                let lr = (p.learning_rate_init * (1.0 - p.beta_2.powi(t)).sqrt()
-                    / (1.0 - p.beta_1.powi(t))) as f32;
+                let lr = (p.learning_rate_init * (1.0 - p.beta_2.powi(t)).sqrt() / (1.0 - p.beta_1.powi(t))) as f32;
                 let inv = (1.0 / sw_sum) as f32;
                 let alpha = p.alpha as f32;
                 let eps = p.epsilon as f32;
@@ -442,18 +417,11 @@ mod tests {
         for (i, &c) in cls.iter().enumerate() {
             y[i * 3 + c] = 1.0;
         }
-        let p = MlpParams {
-            tol: 1e-4,
-            ..Default::default()
-        };
+        let p = MlpParams { tol: 1e-4, ..Default::default() };
         let m = Mlp::fit(&x, &y, 3, OutAct::Softmax, None, &p);
         for c in 0..3u32 {
             let o = m.output(&[(c, 2.0), (3, 1.0)]);
-            let best = o
-                .iter()
-                .enumerate()
-                .max_by(|a, b| a.1.total_cmp(b.1))
-                .map(|x| x.0);
+            let best = o.iter().enumerate().max_by(|a, b| a.1.total_cmp(b.1)).map(|x| x.0);
             assert_eq!(best, Some(c as usize), "{o:?}");
         }
         // deterministic
@@ -485,24 +453,22 @@ mod tests {
         let t = std::time::Instant::now();
         let m = Mlp::fit(&x, &y, 1, OutAct::Logistic, Some(&sw), &p);
         let el = t.elapsed();
-        let sum: f64 = m.layers.iter().flat_map(|l| l.w.iter().chain(&l.b)).enumerate().map(|(i, w)| f64::from(*w) * ((i % 97) as f64 + 1.0)).sum();
+        let sum: f64 =
+            m.layers.iter().flat_map(|l| l.w.iter().chain(&l.b)).enumerate().map(|(i, w)| f64::from(*w) * ((i % 97) as f64 + 1.0)).sum();
         let bits: u64 = m.layers.iter().flat_map(|l| l.w.iter().chain(&l.b)).fold(0u64, |h, w| h.rotate_left(5) ^ u64::from(w.to_bits()));
-        println!("rows {n}: 2 epochs {:.2} s ({:.2} ms/batch), loss {:.12}, checksum {sum:.9}, bits {bits:016x}", el.as_secs_f64(), el.as_secs_f64() * 1e3 / (2.0 * (n as f64 / 200.0).ceil()), m.final_loss);
+        println!(
+            "rows {n}: 2 epochs {:.2} s ({:.2} ms/batch), loss {:.12}, checksum {sum:.9}, bits {bits:016x}",
+            el.as_secs_f64(),
+            el.as_secs_f64() * 1e3 / (2.0 * (n as f64 / 200.0).ceil()),
+            m.final_loss
+        );
     }
 
     #[test]
     fn linear_binary() {
         let (x, cls) = toy();
-        let y: Vec<f32> = cls
-            .iter()
-            .map(|&c| if c == 1 { 1.0 } else { 0.0 })
-            .collect();
-        let p = MlpParams {
-            hidden: vec![],
-            tol: 1e-5,
-            learning_rate_init: 0.05,
-            ..Default::default()
-        };
+        let y: Vec<f32> = cls.iter().map(|&c| if c == 1 { 1.0 } else { 0.0 }).collect();
+        let p = MlpParams { hidden: vec![], tol: 1e-5, learning_rate_init: 0.05, ..Default::default() };
         let m = Mlp::fit(&x, &y, 1, OutAct::Logistic, None, &p);
         assert!(m.output(&[(1, 2.0), (3, 1.0)])[0] > 0.5);
         assert!(m.output(&[(0, 2.0), (3, 1.0)])[0] < 0.5);

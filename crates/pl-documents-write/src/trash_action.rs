@@ -8,8 +8,8 @@
 use axum::body::Bytes;
 use axum::extract::State;
 use axum::response::{IntoResponse, Response};
-use sea_query::{Alias, Expr, Order, PostgresQueryBuilder, Query};
 use pl_core::sqlbind::SqlxBinder;
+use sea_query::{Alias, Expr, Order, PostgresQueryBuilder, Query};
 use serde_json::{Map, Value, json};
 
 use pl_authz::AuthUser;
@@ -50,7 +50,13 @@ pub async fn trash_action_handler(
     }
 }
 
-async fn inner(state: &AppState, ctx: &RequestContext, auth: &AuthUser, peer: Option<std::net::SocketAddr>, body: &Bytes) -> ApiResult<Response> {
+async fn inner(
+    state: &AppState,
+    ctx: &RequestContext,
+    auth: &AuthUser,
+    peer: Option<std::net::SocketAddr>,
+    body: &Bytes,
+) -> ApiResult<Response> {
     let user = auth.require_perms_by_method(TRASH_PERMISSIONS).map_err(|e| ApiError::Core(e.into()))?.clone();
     let data = match crate::form::parse(&ctx.headers, body).await? {
         Some(form) => form_data(&form),

@@ -37,10 +37,8 @@ async fn start(static_dir: &std::path::Path, ids: &[&str]) -> SocketAddr {
     m.insert("PAPERLESS_ALLOWED_HOSTS".into(), "127.0.0.1".into());
     let cfg = ServerConfig::from_lookup(|k| m.get(k).cloned()).unwrap();
     // only the listed routes on (all others "off"), like the former opt-in table
-    let toml: BTreeMap<String, Backend> = pl_server::all_routes()
-        .iter()
-        .map(|r| (r.id.to_owned(), if ids.contains(&r.id) { Backend::Rust } else { Backend::Off }))
-        .collect();
+    let toml: BTreeMap<String, Backend> =
+        pl_server::all_routes().iter().map(|r| (r.id.to_owned(), if ids.contains(&r.id) { Backend::Rust } else { Backend::Off })).collect();
     let plan = routing::plan(pl_server::all_routes(), &toml).unwrap();
     let app = pl_server::build_app(&cfg, plan, state(static_dir)).unwrap();
     let l = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -55,7 +53,8 @@ async fn send(addr: SocketAddr, method: Method, path: &str, headers: &[(&str, &s
         b = b.header(*k, *v);
     }
     let client: Client<HttpConnector, Body> = Client::builder(TokioExecutor::new()).build(HttpConnector::new());
-    let resp = tokio::time::timeout(T, client.request(b.body(Body::empty()).unwrap())).await.unwrap().unwrap_or_else(|e| panic!("{path}: {e:?}"));
+    let resp =
+        tokio::time::timeout(T, client.request(b.body(Body::empty()).unwrap())).await.unwrap().unwrap_or_else(|e| panic!("{path}: {e:?}"));
     let (parts, body) = resp.into_parts();
     let bytes = tokio::time::timeout(T, body.collect()).await.unwrap().unwrap().to_bytes();
     (parts.status, parts.headers, bytes)
@@ -73,7 +72,16 @@ fn static_dir() -> tempfile::TempDir {
     dir
 }
 
-const ALL_UI: &[&str] = &["ui.index", "static.files", "ui.api_root", "ui.assets", "ui.fetch_doc", "ui.fetch_thumb", "ui.fetch_preview", "static.swagger_ui_dist"];
+const ALL_UI: &[&str] = &[
+    "ui.index",
+    "static.files",
+    "ui.api_root",
+    "ui.assets",
+    "ui.fetch_doc",
+    "ui.fetch_thumb",
+    "ui.fetch_preview",
+    "static.swagger_ui_dist",
+];
 
 #[tokio::test]
 async fn frontend_without_django() {
@@ -106,7 +114,8 @@ async fn frontend_without_django() {
     }
 
     // WhiteNoise: precompressed alternative, only security headers
-    let (s, hd, b) = send(addr, Method::GET, "/static/frontend/en-US/main.js", &[("host", "127.0.0.1"), ("accept-encoding", "gzip, br")]).await;
+    let (s, hd, b) =
+        send(addr, Method::GET, "/static/frontend/en-US/main.js", &[("host", "127.0.0.1"), ("accept-encoding", "gzip, br")]).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(hd["content-encoding"], "br");
     assert_eq!(b.len(), 50);
@@ -149,7 +158,13 @@ async fn frontend_without_django() {
     assert_eq!(s, StatusCode::NOT_FOUND);
 
     // decisions Django takes before any view
-    let (s, hd, _) = send(addr, Method::OPTIONS, "/api/tags/", &[("host", "127.0.0.1"), ("origin", "http://localhost:8000"), ("access-control-request-method", "GET")]).await;
+    let (s, hd, _) = send(
+        addr,
+        Method::OPTIONS,
+        "/api/tags/",
+        &[("host", "127.0.0.1"), ("origin", "http://localhost:8000"), ("access-control-request-method", "GET")],
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(hd["access-control-allow-origin"], "http://localhost:8000");
     assert!(hd.get("x-frame-options").is_none());

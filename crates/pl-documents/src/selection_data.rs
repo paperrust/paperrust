@@ -25,8 +25,8 @@
 
 use std::collections::HashMap;
 
-use sea_query::{PostgresQueryBuilder, Query, SelectStatement};
 use pl_core::sqlbind::SqlxBinder;
+use sea_query::{PostgresQueryBuilder, Query, SelectStatement};
 use sea_query_binder::SqlxValues;
 use serde_json::{Map, Value, json};
 use sqlx::Row;
@@ -70,11 +70,8 @@ fn counts_sql(variant: Variant) -> String {
         Rel::Fk(fk) => format!("SELECT s.{fk} AS k, COUNT(*) AS n FROM sel s WHERE s.{fk} IS NOT NULL GROUP BY s.{fk}"),
         Rel::Through(through, col) => {
             // List: CustomFieldInstance.objects (without deleted); POST: join without manager
-            let deleted = if variant == Variant::List && through == "documents_customfieldinstance" {
-                " AND j.deleted_at IS NULL"
-            } else {
-                ""
-            };
+            let deleted =
+                if variant == Variant::List && through == "documents_customfieldinstance" { " AND j.deleted_at IS NULL" } else { "" };
             format!(
                 "SELECT j.{col} AS k, COUNT(*) AS n FROM {through} j \
                  WHERE j.document_id IN (SELECT s.id FROM sel s){deleted} GROUP BY j.{col}"
@@ -242,12 +239,7 @@ const COUNTER_KIND: [i16; 5] = [3, 2, 4, 5, 6];
 /// (`CustomFieldInstance.objects`); POST upstream also counts deleted field values
 /// (join without manager) – these are added directly for the selection (partial index
 /// `paperrust_field_value_deleted`).
-pub async fn for_all_unfiltered(
-    db: &sqlx::PgPool,
-    user: &pl_authz::User,
-    excluded: &[i64],
-    variant: Variant,
-) -> ApiResult<Option<Value>> {
+pub async fn for_all_unfiltered(db: &sqlx::PgPool, user: &pl_authz::User, excluded: &[i64], variant: Variant) -> ApiResult<Option<Value>> {
     if !user.is_active || !counters_available(db).await {
         return Ok(None);
     }
@@ -313,12 +305,7 @@ fn all_unfiltered_sql(user: &pl_authz::User, excluded: &[i64], variant: Variant)
         ));
     }
     let buckets = if su { String::new() } else { format!(" WHERE owner_bucket IN ({uid}, 0)") };
-    let rel_of_kind = COUNTER_KIND
-        .iter()
-        .enumerate()
-        .map(|(i, k)| format!("WHEN {k} THEN {i}"))
-        .collect::<Vec<_>>()
-        .join(" ");
+    let rel_of_kind = COUNTER_KIND.iter().enumerate().map(|(i, k)| format!("WHEN {k} THEN {i}")).collect::<Vec<_>>().join(" ");
     let mut cnt = vec![
         format!("SELECT CASE kind {rel_of_kind} END AS rel, k, n FROM lc"),
         "SELECT 0, a.correspondent_id, a.sgn FROM adj a WHERE a.correspondent_id IS NOT NULL".to_string(),

@@ -45,7 +45,8 @@ pub fn enabled() -> bool {
 /// Limits: memory like the PDF tool, time from `PAPERRUST_OFFICE_TO_PDF_TIMEOUT` (≥ 1).
 pub fn limits() -> Limits {
     let mut l = Limits::from_env();
-    if let Some(s) = pl_core::config::var("PAPERRUST_OFFICE_TO_PDF_TIMEOUT").and_then(|v| v.trim().parse::<u64>().ok()).filter(|s| *s >= 1) {
+    if let Some(s) = pl_core::config::var("PAPERRUST_OFFICE_TO_PDF_TIMEOUT").and_then(|v| v.trim().parse::<u64>().ok()).filter(|s| *s >= 1)
+    {
         l.timeout = Duration::from_secs(s);
     }
     l
@@ -82,9 +83,11 @@ pub fn convert_blocking(input: &Path, mime_type: &str, output: &Path) -> Result<
     if pl_parsers::office::is_presentation(mime_type) {
         let ctx = pl_parsers::ParseContext::default();
         let data = std::fs::read(input).map_err(|e| RunError::Failed(format!("The file could not be read: {}", e.kind())))?;
-        let slides = pl_parsers::office::slides(&data, mime_type, &ctx).map_err(|e| RunError::Failed(format!("The slides could not be read: {e}")))?;
+        let slides = pl_parsers::office::slides(&data, mime_type, &ctx)
+            .map_err(|e| RunError::Failed(format!("The slides could not be read: {e}")))?;
         let html = output.with_extension("slides.html");
-        std::fs::write(&html, pl_parsers::office::slides_html(&slides)).map_err(|e| RunError::Failed(format!("The slides could not be prepared: {}", e.kind())))?;
+        std::fs::write(&html, pl_parsers::office::slides_html(&slides))
+            .map_err(|e| RunError::Failed(format!("The slides could not be prepared: {}", e.kind())))?;
         let r = run(Op::Slides { input: s(&html), output: s(output) });
         let _ = std::fs::remove_file(&html);
         return r;

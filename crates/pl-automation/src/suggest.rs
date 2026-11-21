@@ -27,7 +27,8 @@ use crate::error::{AErr, AResult, json as json_resp};
 const TTL: Duration = Duration::from_secs(600);
 const MAX_CACHE: usize = 64;
 /// Generic file name beginnings without meaning.
-const STOP_PREFIXES: &[&str] = &["scan", "img", "image", "doc", "document", "dokument", "file", "datei", "untitled", "pdf", "page", "seite", "export"];
+const STOP_PREFIXES: &[&str] =
+    &["scan", "img", "image", "doc", "document", "dokument", "file", "datei", "untitled", "pdf", "page", "seite", "export"];
 
 type CacheKey = (i64, i64, u32);
 static CACHE: Mutex<Option<HashMap<CacheKey, (Instant, Value)>>> = Mutex::new(None);
@@ -325,7 +326,8 @@ pub fn is_covered(c: &HashSet<(String, String, i64)>, p: &Pattern) -> bool {
 
 /// Workflow draft (ngx format, `enabled: false`, nothing saved) for a pattern.
 pub fn draft_for(p: &Pattern, from_name: Option<&str>, to_name: Option<&str>) -> Value {
-    let from_label = from_name.map(str::to_string).or_else(|| p.from_prefix.as_ref().map(|x| format!("{x}*"))).unwrap_or_else(|| "?".into());
+    let from_label =
+        from_name.map(str::to_string).or_else(|| p.from_prefix.as_ref().map(|x| format!("{x}*"))).unwrap_or_else(|| "?".into());
     let to_label = to_name.unwrap_or("?");
     let name = format!("{from_label} \u{2192} {to_label}");
     let action = match p.kind {
@@ -418,7 +420,8 @@ mod tests {
         assert_eq!(d["triggers"][0]["filter_has_correspondent"], 4);
         assert_eq!(d["triggers"][1]["type"], 3);
         assert_eq!(d["actions"][0]["assign_tags"][0], 9);
-        let f = Pattern { kind: "filename_document_type", from_id: None, from_prefix: Some("rechnung".into()), to_id: 2, matches: 1, total: 1 };
+        let f =
+            Pattern { kind: "filename_document_type", from_id: None, from_prefix: Some("rechnung".into()), to_id: 2, matches: 1, total: 1 };
         let d = draft_for(&f, None, Some("Invoice"));
         assert_eq!(d["triggers"][0]["filter_filename"], "rechnung*");
         assert_eq!(d["actions"][0]["assign_document_type"], 2);

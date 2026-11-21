@@ -37,13 +37,7 @@ impl Arena {
             (None, None) => 0,
             (None, Some(p)) => self.syms[p].level + 1,
         };
-        self.syms.push(Sym {
-            level,
-            parent,
-            refs: HashMap::new(),
-            loads: HashMap::new(),
-            stores: HashSet::new(),
-        });
+        self.syms.push(Sym { level, parent, refs: HashMap::new(), loads: HashMap::new(), stores: HashSet::new() });
         self.syms.len() - 1
     }
 
@@ -75,10 +69,7 @@ impl Arena {
 
     fn reference(&self, id: usize, name: &str) -> Result<String, JErr> {
         self.find_ref(id, name).ok_or_else(|| {
-            JErr::internal(format!(
-                "Tried to resolve a name to a reference that was unknown to the frame ({})",
-                str_repr(name)
-            ))
+            JErr::internal(format!("Tried to resolve a name to a reference that was unknown to the frame ({})", str_repr(name)))
         })
     }
 
@@ -86,10 +77,11 @@ impl Arena {
         self.syms[id].stores.insert(name.to_string());
         if !self.syms[id].refs.contains_key(name) {
             if let Some(p) = self.syms[id].parent
-                && let Some(outer) = self.find_ref(p, name) {
-                    self.define_ref(id, name, Some((Load::Alias, Some(outer))));
-                    return;
-                }
+                && let Some(outer) = self.find_ref(p, name)
+            {
+                self.define_ref(id, name, Some((Load::Alias, Some(outer))));
+                return;
+            }
             self.define_ref(id, name, Some((Load::Undefined, None)));
         }
     }
@@ -126,10 +118,11 @@ impl Arena {
         for name in stores {
             let Some(target) = self.find_ref(id, &name) else { continue };
             if let Some(p) = self.syms[id].parent
-                && let Some(outer) = self.find_ref(p, &name) {
-                    self.syms[id].loads.insert(target, (Load::Alias, Some(outer)));
-                    continue;
-                }
+                && let Some(outer) = self.find_ref(p, &name)
+            {
+                self.syms[id].loads.insert(target, (Load::Alias, Some(outer)));
+                continue;
+            }
             self.syms[id].loads.insert(target, (Load::Resolve, Some(name)));
         }
     }
@@ -338,9 +331,9 @@ impl From<JErr> for Stop {
 type VR = Result<(), Stop>;
 
 const PY_KEYWORDS: &[&str] = &[
-    "False", "None", "True", "and", "as", "assert", "async", "await", "break", "class", "continue", "def", "del",
-    "elif", "else", "except", "finally", "for", "from", "global", "if", "import", "in", "is", "lambda", "nonlocal",
-    "not", "or", "pass", "raise", "return", "try", "while", "with", "yield",
+    "False", "None", "True", "and", "as", "assert", "async", "await", "break", "class", "continue", "def", "del", "elif", "else", "except",
+    "finally", "for", "from", "global", "if", "import", "in", "is", "lambda", "nonlocal", "not", "or", "pass", "raise", "return", "try",
+    "while", "with", "yield",
 ];
 
 pub struct Env<'a> {
@@ -393,9 +386,10 @@ impl<'a> Gen<'a> {
         for (action, param) in self.ar.syms[f.sym].loads.values() {
             if *action == Load::Resolve
                 && let Some(p) = param
-                    && !self.env.globals.contains(&p.as_str()) {
-                        self.undeclared.insert(p.clone());
-                    }
+                && !self.env.globals.contains(&p.as_str())
+            {
+                self.undeclared.insert(p.clone());
+            }
         }
     }
 
@@ -447,11 +441,8 @@ impl<'a> Gen<'a> {
     }
 
     fn macro_body(&mut self, node: &Node, frame: &Frame) -> VR {
-        let (args, defaults, body) = if node.k == K::Macro {
-            (node.list(0), node.list(1), node.list(2))
-        } else {
-            (node.list(1), node.list(2), node.list(3))
-        };
+        let (args, defaults, body) =
+            if node.k == K::Macro { (node.list(0), node.list(1), node.list(2)) } else { (node.list(1), node.list(2), node.list(3)) };
         let mut mf = self.inner(frame);
         self.ar.analyze(mf.sym, node, "")?;
         let mut explicit_caller = None;
@@ -471,8 +462,7 @@ impl<'a> Gen<'a> {
                 // node.defaults[explicit_caller - len(node.args)]
                 if args.len() - idx > defaults.len() {
                     return Err(self.fail(
-                        "When defining macros or call blocks the special \"caller\" argument must be omitted or be given a default."
-                            .into(),
+                        "When defining macros or call blocks the special \"caller\" argument must be omitted or be given a default.".into(),
                         node.lineno,
                     ));
                 }
@@ -661,9 +651,7 @@ impl<'a> Gen<'a> {
         let else_ = node.list(3);
         let mut blocks = Vec::new();
         node.find_all(K::Block, &mut blocks);
-        let extended = recursive
-            || find_undeclared(body.iter(), &["loop"]).contains("loop")
-            || blocks.iter().any(|b| b.flag1);
+        let extended = recursive || find_undeclared(body.iter(), &["loop"]).contains("loop") || blocks.iter().any(|b| b.flag1);
         if extended {
             self.ar.declare_parameter(loop_frame.sym, "loop");
         }

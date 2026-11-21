@@ -553,7 +553,12 @@ impl ZipReader {
     /// Like [`ZipReader::extract_all`], sum of the unpacked sizes ≤ `max_total` (zip bombs,
     /// review M6). Each entry must yield exactly its stated size.
     pub fn extract_all_limited(&mut self, dir: &Path, max_total: u64) -> io::Result<()> {
-        let too_big = || io::Error::new(io::ErrorKind::InvalidData, format!("ZIP archive expands to more than {max_total} bytes (limit, see PAPERRUST_IMPORT_MAX_UNZIPPED_BYTES)"));
+        let too_big = || {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("ZIP archive expands to more than {max_total} bytes (limit, see PAPERRUST_IMPORT_MAX_UNZIPPED_BYTES)"),
+            )
+        };
         let mut total: u64 = 0;
         for e in &self.entries {
             total = total.checked_add(e.file_size).ok_or_else(too_big)?;

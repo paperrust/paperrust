@@ -49,26 +49,10 @@ pub struct SerializeOpts {
 impl SerializeOpts {
     /// Like `DocumentViewSet.get_serializer` from the query parameters.
     pub fn from_query(params: &QueryParams, action: SerializeAction) -> Self {
-        let fields = params
-            .get("fields")
-            .filter(|f| !f.is_empty())
-            .map(|f| f.split(',').map(str::to_string).collect());
-        let truncate_content = matches!(
-            params
-                .get("truncate_content")
-                .unwrap_or("False")
-                .to_lowercase()
-                .as_str(),
-            "true" | "1"
-        );
+        let fields = params.get("fields").filter(|f| !f.is_empty()).map(|f| f.split(',').map(str::to_string).collect());
+        let truncate_content = matches!(params.get("truncate_content").unwrap_or("False").to_lowercase().as_str(), "true" | "1");
         let full_perms = pl_authz::owned::parse_full_perms(params.get("full_perms"));
-        SerializeOpts {
-            fields,
-            truncate_content,
-            full_perms,
-            action,
-            viewset_queryset: true,
-        }
+        SerializeOpts { fields, truncate_content, full_perms, action, viewset_queryset: true }
     }
 }
 
@@ -105,11 +89,7 @@ pub const DOCUMENT_FIELDS: [&str; 26] = [
 /// Active fields according to `DynamicFieldsModelSerializer` and `OwnedObjectSerializer.__init__`.
 pub fn active_fields(opts: &SerializeOpts) -> Vec<&'static str> {
     let mut f: Vec<&'static str> = match &opts.fields {
-        Some(list) => DOCUMENT_FIELDS
-            .iter()
-            .copied()
-            .filter(|n| list.iter().any(|x| x == n))
-            .collect(),
+        Some(list) => DOCUMENT_FIELDS.iter().copied().filter(|n| list.iter().any(|x| x == n)).collect(),
         None => DOCUMENT_FIELDS.to_vec(),
     };
     if opts.full_perms {
@@ -188,9 +168,7 @@ struct VersionRow {
 
 /// `sort_versions_newest_first`: key `(version_index or 0, id)` descending.
 fn sort_newest_first(v: &mut [VersionRow]) {
-    v.sort_by(|x, y| {
-        (y.version_index.unwrap_or(0), y.id).cmp(&(x.version_index.unwrap_or(0), x.id))
-    });
+    v.sort_by(|x, y| (y.version_index.unwrap_or(0), y.id).cmp(&(x.version_index.unwrap_or(0), x.id)));
 }
 
 fn doc_columns(with_content: bool) -> Vec<&'static str> {
@@ -250,10 +228,7 @@ async fn load_docs(db: &sqlx::PgPool, ids: &[i64], b: Bundle) -> ApiResult<Vec<D
             a("c"),
             Expr::col((a("c"), a("id"))).equals((a("d"), a("correspondent_id"))),
         )
-        .and_where(crate::db::id_in_list(
-            Expr::col((a("d"), a("id"))).into(),
-            ids,
-        ));
+        .and_where(crate::db::id_in_list(Expr::col((a("d"), a("id"))).into(), ids));
     let rows = fetch_all(db, &q).await?;
     let mut out = Vec::with_capacity(rows.len());
     for r in rows {
@@ -264,11 +239,7 @@ async fn load_docs(db: &sqlx::PgPool, ids: &[i64], b: Bundle) -> ApiResult<Vec<D
             document_type: opt_i64(&r, "document_type_id")?,
             storage_path: opt_i64(&r, "storage_path_id")?,
             title: get(&r, "title")?,
-            content: if b.content {
-                Some(get(&r, "content")?)
-            } else {
-                None
-            },
+            content: if b.content { Some(get(&r, "content")?) } else { None },
             created: get(&r, "created")?,
             modified: get(&r, "modified")?,
             added: get(&r, "added")?,
@@ -295,23 +266,9 @@ async fn load_docs(db: &sqlx::PgPool, ids: &[i64], b: Bundle) -> ApiResult<Vec<D
 /// Non-deleted versions of the roots `ids`, grouped by root.
 async fn load_versions(db: &sqlx::PgPool, ids: &[i64]) -> ApiResult<HashMap<i64, Vec<VersionRow>>> {
     let q = Query::select()
-        .columns(
-            [
-                "id",
-                "added",
-                "checksum",
-                "version_label",
-                "root_document_id",
-                "version_index",
-                "page_count",
-            ]
-            .map(a),
-        )
+        .columns(["id", "added", "checksum", "version_label", "root_document_id", "version_index", "page_count"].map(a))
         .from(a("documents_document"))
-        .and_where(crate::db::id_in_list(
-            Expr::col(a("root_document_id")).into(),
-            ids,
-        ))
+        .and_where(crate::db::id_in_list(Expr::col(a("root_document_id")).into(), ids))
         .and_where(Expr::col(a("deleted_at")).is_null())
         .to_owned();
     let mut out: HashMap<i64, Vec<VersionRow>> = HashMap::new();
@@ -341,35 +298,21 @@ async fn load_latest_content(db: &sqlx::PgPool, ids: &[i64], truncate: bool) -> 
         .column(a("root_document_id"))
         .expr_as(content, a("content"))
         .from(a("documents_document"))
-        .and_where(crate::db::id_in_list(
-            Expr::col(a("root_document_id")).into(),
-            ids,
-        ))
+        .and_where(crate::db::id_in_list(Expr::col(a("root_document_id")).into(), ids))
         .and_where(Expr::col(a("deleted_at")).is_null())
         .order_by(a("root_document_id"), Order::Asc)
-        .order_by_with_nulls(
-            a("version_index"),
-            Order::Desc,
-            sea_query::NullOrdering::Last,
-        )
+        .order_by_with_nulls(a("version_index"), Order::Desc, sea_query::NullOrdering::Last)
         .order_by(a("id"), Order::Desc)
         .to_owned();
     let mut out = HashMap::new();
     for r in fetch_all(db, &q).await? {
-        out.insert(
-            i64_col(&r, "root_document_id")?,
-            get::<String>(&r, "content")?,
-        );
+        out.insert(i64_col(&r, "root_document_id")?, get::<String>(&r, "content")?);
     }
     Ok(out)
 }
 
 /// Notes (non-deleted, `ORDER BY created`) in the format of `NotesSerializer`.
-pub(crate) async fn load_notes(
-    db: &sqlx::PgPool,
-    ids: &[i64],
-    tz: Tz,
-) -> ApiResult<HashMap<i64, Vec<Value>>> {
+pub(crate) async fn load_notes(db: &sqlx::PgPool, ids: &[i64], tz: Tz) -> ApiResult<HashMap<i64, Vec<Value>>> {
     let q = Query::select()
         .column((a("n"), a("id")))
         .column((a("n"), a("note")))
@@ -380,16 +323,8 @@ pub(crate) async fn load_notes(
         .expr_as(Expr::col((a("u"), a("first_name"))), a("u_first_name"))
         .expr_as(Expr::col((a("u"), a("last_name"))), a("u_last_name"))
         .from_as(a("documents_note"), a("n"))
-        .join_as(
-            sea_query::JoinType::LeftJoin,
-            a("auth_user"),
-            a("u"),
-            Expr::col((a("u"), a("id"))).equals((a("n"), a("user_id"))),
-        )
-        .and_where(crate::db::id_in_list(
-            Expr::col((a("n"), a("document_id"))).into(),
-            ids,
-        ))
+        .join_as(sea_query::JoinType::LeftJoin, a("auth_user"), a("u"), Expr::col((a("u"), a("id"))).equals((a("n"), a("user_id"))))
+        .and_where(crate::db::id_in_list(Expr::col((a("n"), a("document_id"))).into(), ids))
         .and_where(Expr::col((a("n"), a("deleted_at"))).is_null())
         .order_by((a("n"), a("created")), Order::Asc)
         .to_owned();
@@ -411,9 +346,7 @@ pub(crate) async fn load_notes(
             "created": format_datetime(&created, &tz),
             "user": user,
         });
-        out.entry(i64_col(&r, "document_id")?)
-            .or_default()
-            .push(note);
+        out.entry(i64_col(&r, "document_id")?).or_default().push(note);
     }
     Ok(out)
 }
@@ -424,38 +357,18 @@ pub(crate) async fn load_notes(
 /// only the same query shape as Django's prefetch yields the same order.
 fn custom_field_value(r: &sqlx::postgres::PgRow, data_type: &str) -> ApiResult<Value> {
     Ok(match data_type {
-        "string" => get::<Option<String>>(r, "value_text")?
-            .map(Value::String)
-            .unwrap_or(Value::Null),
-        "url" => get::<Option<String>>(r, "value_url")?
-            .map(Value::String)
-            .unwrap_or(Value::Null),
-        "date" => get::<Option<NaiveDate>>(r, "value_date")?
-            .map(|d| Value::String(format_date(&d)))
-            .unwrap_or(Value::Null),
-        "boolean" => get::<Option<bool>>(r, "value_bool")?
-            .map(Value::Bool)
-            .unwrap_or(Value::Null),
-        "integer" => opt_i64(r, "value_int")?
-            .map(Value::from)
-            .unwrap_or(Value::Null),
+        "string" => get::<Option<String>>(r, "value_text")?.map(Value::String).unwrap_or(Value::Null),
+        "url" => get::<Option<String>>(r, "value_url")?.map(Value::String).unwrap_or(Value::Null),
+        "date" => get::<Option<NaiveDate>>(r, "value_date")?.map(|d| Value::String(format_date(&d))).unwrap_or(Value::Null),
+        "boolean" => get::<Option<bool>>(r, "value_bool")?.map(Value::Bool).unwrap_or(Value::Null),
+        "integer" => opt_i64(r, "value_int")?.map(Value::from).unwrap_or(Value::Null),
         "float" => get::<Option<f64>>(r, "value_float")?
-            .map(|f| {
-                serde_json::Number::from_f64(f)
-                    .map(Value::Number)
-                    .unwrap_or(Value::Null)
-            })
+            .map(|f| serde_json::Number::from_f64(f).map(Value::Number).unwrap_or(Value::Null))
             .unwrap_or(Value::Null),
-        "monetary" => get::<Option<String>>(r, "value_monetary")?
-            .map(Value::String)
-            .unwrap_or(Value::Null),
+        "monetary" => get::<Option<String>>(r, "value_monetary")?.map(Value::String).unwrap_or(Value::Null),
         "documentlink" => get::<Option<Value>>(r, "value_document_ids")?.unwrap_or(Value::Null),
-        "select" => get::<Option<String>>(r, "value_select")?
-            .map(Value::String)
-            .unwrap_or(Value::Null),
-        "longtext" => get::<Option<String>>(r, "value_long_text")?
-            .map(Value::String)
-            .unwrap_or(Value::Null),
+        "select" => get::<Option<String>>(r, "value_select")?.map(Value::String).unwrap_or(Value::Null),
+        "longtext" => get::<Option<String>>(r, "value_long_text")?.map(Value::String).unwrap_or(Value::Null),
         _ => Value::Null,
     })
 }
@@ -486,10 +399,7 @@ async fn load_custom_fields(db: &sqlx::PgPool, ids: &[i64]) -> ApiResult<HashMap
             a("f"),
             Expr::col((a("f"), a("id"))).equals((a("ci"), a("field_id"))),
         )
-        .and_where(crate::db::id_in_list(
-            Expr::col((a("ci"), a("document_id"))).into(),
-            ids,
-        ))
+        .and_where(crate::db::id_in_list(Expr::col((a("ci"), a("document_id"))).into(), ids))
         .and_where(Expr::col((a("ci"), a("deleted_at"))).is_null())
         .order_by((a("ci"), a("created")), Order::Asc);
     let mut out: HashMap<i64, Vec<Value>> = HashMap::new();
@@ -522,13 +432,7 @@ async fn load_duplicates(db: &sqlx::PgPool, v: &User, d: &DocRow) -> ApiResult<V
         .order_by(a("created"), Order::Desc);
     // .filter(id__in=permitted_document_ids(user, include_deleted=True))
     if !pl_authz::objects::user_is_active_superuser(Some(v)) {
-        q.and_where(
-            Expr::col(a("id")).in_subquery(pl_authz::objects::permitted_document_ids(
-                Some(v),
-                "view_document",
-                true,
-            )),
-        );
+        q.and_where(Expr::col(a("id")).in_subquery(pl_authz::objects::permitted_document_ids(Some(v), "view_document", true)));
     }
     let mut out = Vec::new();
     for r in fetch_all(db, &q).await? {
@@ -574,11 +478,7 @@ pub fn sanitize_filename(name: &str) -> String {
 }
 
 /// `Document.get_public_filename(archive=True)` for a root document.
-pub fn public_archive_filename(
-    created: &NaiveDate,
-    correspondent: Option<&str>,
-    title: &str,
-) -> String {
+pub fn public_archive_filename(created: &NaiveDate, correspondent: Option<&str>, title: &str) -> String {
     let tail = ".pdf";
     let head_bytes = 255 - tail.len();
     let full = document_str(created, correspondent, title);
@@ -603,21 +503,18 @@ async fn load_redacted(db: &sqlx::PgPool, checksums: Vec<String>) -> ApiResult<H
     }
     let map = |e: sqlx::Error| pl_core::ApiError::internal(format!("redaction marks: {e}"));
     if !READY.load(Ordering::Relaxed) {
-        let exists: bool = sqlx::query_scalar("SELECT to_regclass('public.paperrust_redaction') IS NOT NULL")
-            .fetch_one(db)
-            .await
-            .map_err(map)?;
+        let exists: bool =
+            sqlx::query_scalar("SELECT to_regclass('public.paperrust_redaction') IS NOT NULL").fetch_one(db).await.map_err(map)?;
         if !exists {
             return Ok(HashSet::new());
         }
         READY.store(true, Ordering::Relaxed);
     }
-    let rows: Vec<String> =
-        sqlx::query_scalar("SELECT DISTINCT checksum::text FROM paperrust_redaction WHERE checksum = ANY($1)")
-            .bind(checksums)
-            .fetch_all(db)
-            .await
-            .map_err(map)?;
+    let rows: Vec<String> = sqlx::query_scalar("SELECT DISTINCT checksum::text FROM paperrust_redaction WHERE checksum = ANY($1)")
+        .bind(checksums)
+        .fetch_all(db)
+        .await
+        .map_err(map)?;
     Ok(rows.into_iter().collect())
 }
 
@@ -651,23 +548,12 @@ impl DocRow {
 ///
 /// `user` is `request.user` (for `user_can_change`, `is_shared_by_requester` and the
 /// visible `duplicate_documents`).
-pub async fn serialize_documents(
-    state: &pl_core::AppState,
-    user: &User,
-    ids: &[i64],
-    opts: &SerializeOpts,
-) -> ApiResult<Vec<Value>> {
+pub async fn serialize_documents(state: &pl_core::AppState, user: &User, ids: &[i64], opts: &SerializeOpts) -> ApiResult<Vec<Value>> {
     serialize_documents_db(state.db(), *state.tz(), user, ids, opts).await
 }
 
 /// Like [`serialize_documents`] with an explicit pool and `PAPERLESS_TIME_ZONE`.
-pub async fn serialize_documents_db(
-    db: &sqlx::PgPool,
-    tz: Tz,
-    user: &User,
-    ids: &[i64],
-    opts: &SerializeOpts,
-) -> ApiResult<Vec<Value>> {
+pub async fn serialize_documents_db(db: &sqlx::PgPool, tz: Tz, user: &User, ids: &[i64], opts: &SerializeOpts) -> ApiResult<Vec<Value>> {
     if ids.is_empty() {
         return Ok(Vec::new());
     }
@@ -700,39 +586,23 @@ pub async fn serialize_documents_db(
     }
 
     // Root documents of the versions (for versions/archived_file_name)
-    let missing_roots: Vec<i64> = docs
-        .iter()
-        .filter_map(|d| d.root_document)
-        .filter(|r| !doc_ids.contains(r))
-        .collect::<HashSet<_>>()
-        .into_iter()
-        .collect();
-    let extra_roots = if missing_roots.is_empty() || !(has("versions") || has("archived_file_name"))
-    {
+    let missing_roots: Vec<i64> =
+        docs.iter().filter_map(|d| d.root_document).filter(|r| !doc_ids.contains(r)).collect::<HashSet<_>>().into_iter().collect();
+    let extra_roots = if missing_roots.is_empty() || !(has("versions") || has("archived_file_name")) {
         Vec::new()
     } else {
         load_docs(db, &missing_roots, Bundle::default()).await?
     };
-    let by_id: HashMap<i64, &DocRow> = docs
-        .iter()
-        .chain(extra_roots.iter())
-        .map(|d| (d.id, d))
-        .collect();
+    let by_id: HashMap<i64, &DocRow> = docs.iter().chain(extra_roots.iter()).map(|d| (d.id, d)).collect();
     let requested: HashMap<i64, &DocRow> = docs.iter().map(|d| (d.id, d)).collect();
 
     // versions of the documents themselves (prefetch: only those with versions) or of the roots (without prefetch)
     let version_keys: Vec<i64> = if opts.viewset_queryset {
         docs.iter().filter(|d| d.has_versions).map(|d| d.id).collect()
     } else {
-        docs.iter()
-            .map(|d| d.root_document.unwrap_or(d.id))
-            .collect()
+        docs.iter().map(|d| d.root_document.unwrap_or(d.id)).collect()
     };
-    let versions = if need_versions && !version_keys.is_empty() {
-        load_versions(db, &version_keys).await?
-    } else {
-        HashMap::new()
-    };
+    let versions = if need_versions && !version_keys.is_empty() { load_versions(db, &version_keys).await? } else { HashMap::new() };
     let redacted = if has("versions") && !versions.is_empty() {
         load_redacted(db, versions.values().flatten().map(|v| v.checksum.clone()).collect()).await?
     } else {
@@ -743,11 +613,7 @@ pub async fn serialize_documents_db(
     } else {
         HashMap::new()
     };
-    let mut cfs = if has("custom_fields") {
-        load_custom_fields(db, &doc_ids).await?
-    } else {
-        HashMap::new()
-    };
+    let mut cfs = if has("custom_fields") { load_custom_fields(db, &doc_ids).await? } else { HashMap::new() };
     // BulkPermissionMixin / get_shared_object_pks: one batch for all documents.
     // The field selection follows `active_fields` (quirk with full_perms + fields).
     let owned_fields = OwnedFields {
@@ -782,33 +648,17 @@ pub async fn serialize_documents_db(
                         None => take_or_clone(&mut contents, d.id, unique).unwrap_or_default(),
                     })
                 }
-                "tags" => Value::Array(
-                    take_or_clone(&mut tags, d.id, unique)
-                        .unwrap_or_default()
-                        .into_iter()
-                        .map(Value::from)
-                        .collect(),
-                ),
+                "tags" => Value::Array(take_or_clone(&mut tags, d.id, unique).unwrap_or_default().into_iter().map(Value::from).collect()),
                 "created" | "created_date" => Value::String(format_date(&d.created)),
                 "modified" => Value::String(format_datetime(&d.modified, &tz)),
                 "added" => Value::String(format_datetime(&d.added, &tz)),
-                "deleted_at" => d
-                    .deleted_at
-                    .map(|x| Value::String(format_datetime(&x, &tz)))
-                    .unwrap_or(Value::Null),
+                "deleted_at" => d.deleted_at.map(|x| Value::String(format_datetime(&x, &tz))).unwrap_or(Value::Null),
                 "archive_serial_number" => json!(d.asn),
                 "original_file_name" => json!(d.original_filename),
                 "archived_file_name" => match &d.archive_filename {
                     Some(_) => {
-                        let ctx = d
-                            .root_document
-                            .and_then(|r| by_id.get(&r).copied())
-                            .unwrap_or(d);
-                        Value::String(public_archive_filename(
-                            &ctx.created,
-                            ctx.correspondent_name.as_deref(),
-                            &ctx.title,
-                        ))
+                        let ctx = d.root_document.and_then(|r| by_id.get(&r).copied()).unwrap_or(d);
+                        Value::String(public_archive_filename(&ctx.created, ctx.correspondent_name.as_deref(), &ctx.title))
                     }
                     None => Value::Null,
                 },
@@ -826,9 +676,7 @@ pub async fn serialize_documents_db(
                     json!(owned.is_shared_by_requester(Some(user), d.id, d.owner))
                 }
                 "notes" => notes_json(take_or_clone(&mut notes, d.id, unique).flatten(), tz)?,
-                "custom_fields" => {
-                    Value::Array(take_or_clone(&mut cfs, d.id, unique).unwrap_or_default())
-                }
+                "custom_fields" => Value::Array(take_or_clone(&mut cfs, d.id, unique).unwrap_or_default()),
                 "page_count" => {
                     let pc = if opts.viewset_queryset && d.root_document.is_none() {
                         match versions.get(&d.id) {
@@ -904,8 +752,7 @@ fn notes_json(agg: Option<Value>, tz: Tz) -> ApiResult<Value> {
         if c.len() != 7 {
             return Err(bundle_err("note row"));
         }
-        let created = DateTime::from_timestamp_micros(json_i64(&c[2])?)
-            .ok_or_else(|| bundle_err("note created"))?;
+        let created = DateTime::from_timestamp_micros(json_i64(&c[2])?).ok_or_else(|| bundle_err("note created"))?;
         let user = if c[3].is_null() {
             Value::Null
         } else {
@@ -931,11 +778,7 @@ mod tests {
     use super::*;
 
     fn opts(fields: Option<&str>, full: bool) -> SerializeOpts {
-        SerializeOpts {
-            fields: fields.map(|f| f.split(',').map(str::to_string).collect()),
-            full_perms: full,
-            ..Default::default()
-        }
+        SerializeOpts { fields: fields.map(|f| f.split(',').map(str::to_string).collect()), full_perms: full, ..Default::default() }
     }
 
     #[test]
@@ -963,10 +806,7 @@ mod tests {
     #[test]
     fn archive_name() {
         let d = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
-        assert_eq!(
-            public_archive_filename(&d, Some("ACME"), "a/b"),
-            "2024-01-15 ACME a-b.pdf"
-        );
+        assert_eq!(public_archive_filename(&d, Some("ACME"), "a/b"), "2024-01-15 ACME a-b.pdf");
         assert_eq!(public_archive_filename(&d, None, ""), "2024-01-15.pdf");
         let long = "ä".repeat(300);
         let n = public_archive_filename(&d, None, &long);
@@ -976,14 +816,7 @@ mod tests {
     #[test]
     fn versions_sorting() {
         let t = Utc::now();
-        let mk = |id, vi| VersionRow {
-            id,
-            added: t,
-            checksum: String::new(),
-            version_label: None,
-            version_index: vi,
-            page_count: None,
-        };
+        let mk = |id, vi| VersionRow { id, added: t, checksum: String::new(), version_label: None, version_index: vi, page_count: None };
         let mut v = vec![mk(1, None), mk(5, Some(1)), mk(3, Some(2))];
         sort_newest_first(&mut v);
         assert_eq!(v.iter().map(|x| x.id).collect::<Vec<_>>(), vec![3, 5, 1]);

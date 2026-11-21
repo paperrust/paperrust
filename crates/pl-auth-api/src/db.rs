@@ -5,9 +5,9 @@
 //! (delete_and_cleanup, delete_dangling_recovery_codes), mfa/totp/internal/auth.py
 //! (TOTP.activate), mfa/recovery_codes/internal/auth.py (RecoveryCodes.activate).
 
+use pl_core::sqlbind::SqlxBinder as _;
 use rand::RngCore;
 use sea_query::{Alias, Expr, Order, PostgresQueryBuilder, Query};
-use pl_core::sqlbind::SqlxBinder as _;
 use serde_json::Value;
 use sqlx::{PgPool, Row};
 
@@ -62,10 +62,8 @@ pub async fn get_or_create_token(db: &PgPool, user_id: i64) -> Result<String, sq
 
 /// `GenerateAuthTokenView.post`: delete the existing token, create a new one.
 pub async fn regenerate_token(db: &PgPool, user_id: i64) -> Result<String, sqlx::Error> {
-    let (sql, values) = Query::delete()
-        .from_table(a("authtoken_token"))
-        .and_where(Expr::col(a("user_id")).eq(user_id))
-        .build_sqlx(PostgresQueryBuilder);
+    let (sql, values) =
+        Query::delete().from_table(a("authtoken_token")).and_where(Expr::col(a("user_id")).eq(user_id)).build_sqlx(PostgresQueryBuilder);
     sqlx::query_with(&sql, values).execute(db).await?;
     insert_token(db, user_id).await?;
     token_for_user(db, user_id).await?.ok_or(sqlx::Error::RowNotFound)
@@ -95,11 +93,7 @@ pub async fn authenticators(db: &PgPool, user_id: i64, kind: Option<&str>) -> Re
     let rows = sqlx::query_with(&sql, values).fetch_all(db).await?;
     rows.iter()
         .map(|r| {
-            Ok(Authenticator {
-                id: r.try_get("id")?,
-                kind: r.try_get("type")?,
-                data: r.try_get::<sqlx::types::Json<Value>, _>("data")?.0,
-            })
+            Ok(Authenticator { id: r.try_get("id")?, kind: r.try_get("type")?, data: r.try_get::<sqlx::types::Json<Value>, _>("data")?.0 })
         })
         .collect()
 }
@@ -108,10 +102,8 @@ pub async fn authenticators(db: &PgPool, user_id: i64, kind: Option<&str>) -> Re
 /// non-recovery-code authenticator left, delete all remaining ones (dangling recovery codes).
 pub async fn delete_and_cleanup(db: &PgPool, auth_id: i64, user_id: i64) -> Result<(), sqlx::Error> {
     let mut tx = db.begin().await?;
-    let (sql, values) = Query::delete()
-        .from_table(a("mfa_authenticator"))
-        .and_where(Expr::col(a("id")).eq(auth_id))
-        .build_sqlx(PostgresQueryBuilder);
+    let (sql, values) =
+        Query::delete().from_table(a("mfa_authenticator")).and_where(Expr::col(a("id")).eq(auth_id)).build_sqlx(PostgresQueryBuilder);
     sqlx::query_with(&sql, values).execute(&mut *tx).await?;
     let (sql, values) = Query::select()
         .expr(Expr::col(a("id")).count())

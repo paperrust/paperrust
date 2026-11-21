@@ -39,13 +39,7 @@ impl IndexFileLock {
     /// contention, e.g. a Windows name pending deletion after a Python release).
     pub fn try_acquire(index_dir: &Path) -> Result<Option<Self>> {
         let path = index_dir.join(LOCK_FILE);
-        let file = match OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .truncate(false)
-            .open(&path)
-        {
+        let file = match OpenOptions::new().read(true).write(true).create(true).truncate(false).open(&path) {
             Ok(f) => f,
             Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => return Ok(None),
             Err(e) => return Err(e.into()),
@@ -84,17 +78,10 @@ impl IndexFileLock {
             }
             let upper = LOCK_BACKOFF_CAP.min(LOCK_BACKOFF_BASE * 2f64.powi(attempt as i32));
             let sleep_s = rand::random::<f64>() * upper;
-            tracing::debug!(
-                "Index lock contention; retrying in {sleep_s:.2}s (attempt {}/{})",
-                attempt + 1,
-                LOCK_RETRY_ATTEMPTS
-            );
+            tracing::debug!("Index lock contention; retrying in {sleep_s:.2}s (attempt {}/{})", attempt + 1, LOCK_RETRY_ATTEMPTS);
             tokio::time::sleep(Duration::from_secs_f64(sleep_s)).await;
         }
-        Err(IndexerError::LockExhausted {
-            attempts: LOCK_RETRY_ATTEMPTS,
-            timeout_secs: timeout.as_secs_f64(),
-        })
+        Err(IndexerError::LockExhausted { attempts: LOCK_RETRY_ATTEMPTS, timeout_secs: timeout.as_secs_f64() })
     }
 
     pub fn path(&self) -> &Path {
@@ -122,12 +109,7 @@ mod tests {
         assert!(a.is_some());
         // a second handle on the same file must not get the lock
         assert!(IndexFileLock::try_acquire(dir.path()).unwrap().is_none());
-        assert!(
-            IndexFileLock::acquire(dir.path(), Duration::from_millis(120))
-                .await
-                .unwrap()
-                .is_none()
-        );
+        assert!(IndexFileLock::acquire(dir.path(), Duration::from_millis(120)).await.unwrap().is_none());
         drop(a);
         assert!(IndexFileLock::try_acquire(dir.path()).unwrap().is_some());
         assert!(dir.path().join(LOCK_FILE).exists());

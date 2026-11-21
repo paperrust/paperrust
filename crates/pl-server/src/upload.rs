@@ -277,7 +277,9 @@ fn get_value<'a>(form: &'a FormData, key: &str, allow_null: bool) -> Raw<'a> {
 pub enum PyInt {
     Int(i128),
     /// Valid, but beyond i128 (sign).
-    Huge { negative: bool },
+    Huge {
+        negative: bool,
+    },
     Invalid,
 }
 
@@ -617,9 +619,7 @@ async fn validate_custom_fields(v: Value, lookups: &dyn Lookups) -> Result<Resul
                 }
                 normalized.insert(id, value);
             }
-            Ok(Ok(Some(CustomFieldsInput::Map(
-                order.into_iter().filter_map(|id| normalized.remove(&id).map(|v| (id, v))).collect(),
-            ))))
+            Ok(Ok(Some(CustomFieldsInput::Map(order.into_iter().filter_map(|id| normalized.remove(&id).map(|v| (id, v))).collect()))))
         }
         Value::Array(items) => {
             let mut ids = Vec::with_capacity(items.len());
@@ -743,9 +743,7 @@ async fn validate_custom_field_value(
             let Some(options) = extra.and_then(|e| e.get("select_options")) else {
                 return Err(type_error());
             };
-            let found = options
-                .as_array()
-                .is_some_and(|opts| opts.iter().any(|o| o.get("id").is_some_and(|id| py_eq(id, value))));
+            let found = options.as_array().is_some_and(|opts| opts.iter().any(|o| o.get("id").is_some_and(|id| py_eq(id, value))));
             if !found {
                 return Ok(Err(format!("Value must be an id of an element in {}", pl_core::pyrepr::repr_value(options))));
             }
@@ -841,11 +839,8 @@ async fn post_document_inner(ctx: &RequestContext, auth: &AuthUser, state: &AppS
     if !auth.user().has_perm("documents.add_document") {
         return Err(ApiError::django_text(StatusCode::FORBIDDEN, "Insufficient permissions"));
     }
-    let content_type = req
-        .headers()
-        .get(header::CONTENT_TYPE)
-        .map(|v| String::from_utf8_lossy(v.as_bytes()).into_owned())
-        .unwrap_or_default();
+    let content_type =
+        req.headers().get(header::CONTENT_TYPE).map(|v| String::from_utf8_lossy(v.as_bytes()).into_owned()).unwrap_or_default();
     // Request._parse: no body → empty data (no parser selected, no 415)
     let empty_body = hyper::body::Body::size_hint(req.body()).exact() == Some(0);
     let media = content_type.split(';').next().unwrap_or("").trim().to_ascii_lowercase();
@@ -891,8 +886,7 @@ async fn post_document_inner(ctx: &RequestContext, auth: &AuthUser, state: &AppS
     let target = spool.path.join(&target_name);
     std::fs::rename(&file.path, &target).map_err(spool_error)?;
     // os.utime(temp_file_path, times=(t, t)) with t = int(mktime(now))
-    let now = std::time::SystemTime::UNIX_EPOCH
-        + std::time::Duration::from_secs(chrono::Utc::now().timestamp().max(0) as u64);
+    let now = std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(chrono::Utc::now().timestamp().max(0) as u64);
     std::fs::File::options()
         .write(true)
         .open(&target)
@@ -900,11 +894,7 @@ async fn post_document_inner(ctx: &RequestContext, auth: &AuthUser, state: &AppS
         .map_err(spool_error)?;
 
     let from_webui = v.from_webui.unwrap_or(false);
-    let source = if from_webui {
-        pl_consumer::DocumentSource::WebUI
-    } else {
-        pl_consumer::DocumentSource::ApiUpload
-    };
+    let source = if from_webui { pl_consumer::DocumentSource::WebUI } else { pl_consumer::DocumentSource::ApiUpload };
     let input = pl_consumer::ConsumableDocument::new(source, &target).map_err(spool_error)?;
     let custom_fields = match v.custom_fields {
         Some(CustomFieldsInput::Map(m)) if !m.is_empty() => Some(m.into_iter().collect::<BTreeMap<i64, Value>>()),
@@ -957,10 +947,7 @@ mod tests {
                 5 => Some(("integer".to_string(), None)),
                 7 => Some(("monetary".to_string(), None)),
                 9 => Some(("documentlink".to_string(), None)),
-                10 => Some((
-                    "select".to_string(),
-                    Some(serde_json::json!({"select_options": [{"id": "a1", "label": "Low"}]})),
-                )),
+                10 => Some(("select".to_string(), Some(serde_json::json!({"select_options": [{"id": "a1", "label": "Low"}]})))),
                 _ => None,
             };
             Box::pin(async move { Ok(r) })
@@ -1054,7 +1041,8 @@ mod tests {
                 Some(m) => assert_eq!(r.unwrap_err()["custom_fields"][0], m, "{cf}"),
             }
         }
-        let e = run(&form(&[("archive_serial_number", "12abc"), ("tags", "abc")], Some(("t.txt", b"hello")), dir.path())).await.unwrap_err();
+        let e =
+            run(&form(&[("archive_serial_number", "12abc"), ("tags", "abc")], Some(("t.txt", b"hello")), dir.path())).await.unwrap_err();
         assert_eq!(
             e.to_string(),
             r#"{"tags":["Incorrect type. Expected pk value, received str."],"archive_serial_number":["A valid integer is required."]}"#

@@ -93,16 +93,10 @@ Exit-Code: 0 = OK, 3 = WARN (Hinweise), 1 = FAIL, 2 = falscher Aufruf.
 ";
 
 fn env_var(get: &dyn Fn(&str) -> Option<String>, name: &str) -> Option<String> {
-    get(&format!("PAPERRUST_{name}"))
-        .or_else(|| get(&format!("PAPERLESS_{name}")))
-        .filter(|s| !s.is_empty())
+    get(&format!("PAPERRUST_{name}")).or_else(|| get(&format!("PAPERLESS_{name}"))).filter(|s| !s.is_empty())
 }
 
-pub fn parse(
-    cmd: &str,
-    args: &[String],
-    get: &dyn Fn(&str) -> Option<String>,
-) -> Result<SwitchOptions, String> {
+pub fn parse(cmd: &str, args: &[String], get: &dyn Fn(&str) -> Option<String>) -> Result<SwitchOptions, String> {
     let mut o = SwitchOptions {
         cmd: match cmd {
             "switch" => Cmd::Switch,
@@ -123,10 +117,7 @@ pub fn parse(
         paperrust: None,
         threads: 4,
         quiet: false,
-        policy: Policy {
-            nul: NulPolicy::Fail,
-            utf8: Utf8Policy::Fail,
-        },
+        policy: Policy { nul: NulPolicy::Fail, utf8: Utf8Policy::Fail },
         skip_unknown_tables: false,
         no_backup: false,
         backup_dir: None,
@@ -135,11 +126,7 @@ pub fn parse(
     let mut report_dir = None;
     let mut it = args.iter();
     while let Some(a) = it.next() {
-        let mut val = |n: &str| {
-            it.next()
-                .cloned()
-                .ok_or_else(|| format!("{n} braucht einen Wert"))
-        };
+        let mut val = |n: &str| it.next().cloned().ok_or_else(|| format!("{n} braucht einen Wert"));
         match a.as_str() {
             "--from" | "--source" => from = Some(val(a)?),
             "--media" => o.media = Some(PathBuf::from(val(a)?)),
@@ -152,12 +139,7 @@ pub fn parse(
             "--sample" => o.sample = val(a)?.parse().map_err(|_| "--sample: Zahl erwartet")?,
             "--no-download" => o.download = false,
             "--paperrust" => o.paperrust = Some(PathBuf::from(val(a)?)),
-            "--threads" => {
-                o.threads = val(a)?
-                    .parse::<usize>()
-                    .map_err(|_| "--threads: Zahl erwartet")?
-                    .clamp(1, 64)
-            }
+            "--threads" => o.threads = val(a)?.parse::<usize>().map_err(|_| "--threads: Zahl erwartet")?.clamp(1, 64),
             "--dry-run" if o.cmd == Cmd::Switch => o.cmd = Cmd::DryRun,
             "--quiet" => o.quiet = true,
             "--skip-unknown-tables" => o.skip_unknown_tables = true,
@@ -182,13 +164,8 @@ pub fn parse(
             x => return Err(format!("unbekannte Option {x}")),
         }
     }
-    o.from = from
-        .or_else(|| env_var(get, "MIGRATE_SOURCE"))
-        .ok_or("--from fehlt (Export, Datenordner oder Datenbank-URL)")?;
-    o.target = o
-        .target
-        .or_else(|| env_var(get, "MIGRATE_TARGET"))
-        .or_else(|| detect::target_from_env(|k| get(k)));
+    o.from = from.or_else(|| env_var(get, "MIGRATE_SOURCE")).ok_or("--from fehlt (Export, Datenordner oder Datenbank-URL)")?;
+    o.target = o.target.or_else(|| env_var(get, "MIGRATE_TARGET")).or_else(|| detect::target_from_env(|k| get(k)));
     if let Some(t) = &o.target
         && !(t.starts_with("postgres://") || t.starts_with("postgresql://"))
     {
@@ -198,17 +175,13 @@ pub fn parse(
         return Err("Ziel fehlt: --target postgres://… (oder PAPERRUST_DBHOST/… bzw. PAPERRUST_MIGRATE_TARGET)".into());
     }
     if o.api_url.is_some() && o.api_token.is_none() && !o.api_temp_token {
-        return Err(
-            "--api-url braucht --api-token, PAPERRUST_MIGRATE_API_TOKEN oder --api-temp-token"
-                .into(),
-        );
+        return Err("--api-url braucht --api-token, PAPERRUST_MIGRATE_API_TOKEN oder --api-temp-token".into());
     }
     if o.target_media.is_none() {
         o.target_media = env_var(get, "MEDIA_ROOT").map(PathBuf::from);
     }
-    o.report_dir = report_dir
-        .or_else(|| env_var(get, "DATA_DIR").map(|d| PathBuf::from(d).join("umstieg")))
-        .unwrap_or_else(|| PathBuf::from("."));
+    o.report_dir =
+        report_dir.or_else(|| env_var(get, "DATA_DIR").map(|d| PathBuf::from(d).join("umstieg"))).unwrap_or_else(|| PathBuf::from("."));
     Ok(o)
 }
 
@@ -238,28 +211,12 @@ fn same_dir(a: &Path, b: &Path) -> bool {
 /// foreign takes precedence).
 pub fn manage_env(target: &str, media: Option<&Path>) -> Result<Vec<(String, String)>> {
     let u = url::Url::parse(target).context("Ziel-URL ungültig")?;
-    let dec = |s: &str| {
-        percent_encoding::percent_decode_str(s)
-            .decode_utf8_lossy()
-            .into_owned()
-    };
+    let dec = |s: &str| percent_encoding::percent_decode_str(s).decode_utf8_lossy().into_owned();
     let mut env = vec![
         ("PAPERLESS_DBENGINE".to_string(), "postgresql".to_string()),
-        (
-            "PAPERLESS_DBHOST".into(),
-            u.host_str()
-                .unwrap_or("localhost")
-                .trim_matches(['[', ']'])
-                .to_string(),
-        ),
-        (
-            "PAPERLESS_DBPORT".into(),
-            u.port().unwrap_or(5432).to_string(),
-        ),
-        (
-            "PAPERLESS_DBNAME".into(),
-            dec(u.path().trim_start_matches('/')),
-        ),
+        ("PAPERLESS_DBHOST".into(), u.host_str().unwrap_or("localhost").trim_matches(['[', ']']).to_string()),
+        ("PAPERLESS_DBPORT".into(), u.port().unwrap_or(5432).to_string()),
+        ("PAPERLESS_DBNAME".into(), dec(u.path().trim_start_matches('/'))),
         ("PAPERLESS_DBUSER".into(), dec(u.username())),
         ("PAPERLESS_DBPASS".into(), dec(u.password().unwrap_or(""))),
     ];
@@ -300,12 +257,7 @@ async fn run_manage(o: &SwitchOptions, target: &str, args: &[&str]) -> Result<()
     if o.quiet {
         c.stdout(std::process::Stdio::null());
     }
-    let st = c.status().await.with_context(|| {
-        format!(
-            "{} lässt sich nicht starten (--paperrust angeben)",
-            bin.display()
-        )
-    })?;
+    let st = c.status().await.with_context(|| format!("{} lässt sich nicht starten (--paperrust angeben)", bin.display()))?;
     if !st.success() {
         bail!("paperrust manage {} fehlgeschlagen ({st})", args.join(" "));
     }
@@ -524,13 +476,7 @@ async fn run_inner(o: &SwitchOptions, rep: &mut Report) -> Result<()> {
         _ => String::new(),
     };
     rep.source_media = det.media.as_ref().map(|p| p.display().to_string());
-    step(
-        rep,
-        q,
-        Level::Ok,
-        "Quelle erkannt",
-        format!("{} – {}", det.kind.label(), rep.source),
-    );
+    step(rep, q, Level::Ok, "Quelle erkannt", format!("{} – {}", det.kind.label(), rep.source));
     for n in &det.notes {
         step(rep, q, Level::Info, "Hinweis", n.clone());
     }
@@ -558,13 +504,9 @@ async fn run_inner(o: &SwitchOptions, rep: &mut Report) -> Result<()> {
             return Ok(());
         }
         match rep.source_version.as_deref() {
-            Some(v) if v.trim_start_matches('v') == crate::schema::VERSION => step(
-                rep,
-                q,
-                Level::Ok,
-                "Version",
-                format!("Export aus paperless-ngx {v}"),
-            ),
+            Some(v) if v.trim_start_matches('v') == crate::schema::VERSION => {
+                step(rep, q, Level::Ok, "Version", format!("Export aus paperless-ngx {v}"))
+            }
             Some(v) if v.trim_start_matches('v').starts_with("3.") => step(
                 rep,
                 q,
@@ -585,48 +527,17 @@ async fn run_inner(o: &SwitchOptions, rep: &mut Report) -> Result<()> {
                     crate::schema::VERSION
                 ),
             ),
-            None => step(
-                rep,
-                q,
-                Level::Warn,
-                "Version",
-                "Export ohne metadata.json – Version unbekannt (sehr alter Export?)",
-            ),
+            None => step(rep, q, Level::Warn, "Version", "Export ohne metadata.json – Version unbekannt (sehr alter Export?)"),
         }
         let sum = exp.summarize()?;
-        step(
-            rep,
-            q,
-            Level::Ok,
-            "Manifest gelesen",
-            format!(
-                "{} Manifest-Datei(en), {} Dokumente",
-                sum.manifests.len(),
-                sum.docs.len()
-            ),
-        );
-        SourceData {
-            counts: verify::export_counts(&sum),
-            docs: sum.docs,
-        }
+        step(rep, q, Level::Ok, "Manifest gelesen", format!("{} Manifest-Datei(en), {} Dokumente", sum.manifests.len(), sum.docs.len()));
+        SourceData { counts: verify::export_counts(&sum), docs: sum.docs }
     } else {
-        let url = det
-            .url
-            .as_deref()
-            .ok_or_else(|| anyhow!("Quelle ohne URL"))?;
+        let url = det.url.as_deref().ok_or_else(|| anyhow!("Quelle ohne URL"))?;
         match schema_check(url).await? {
             SchemaState::Current(newer) if newer.is_empty() => {
                 rep.source_version = Some(crate::schema::VERSION.into());
-                step(
-                    rep,
-                    q,
-                    Level::Ok,
-                    "Schema",
-                    format!(
-                        "Migrationsstand entspricht paperless-ngx {}",
-                        crate::schema::VERSION
-                    ),
-                );
+                step(rep, q, Level::Ok, "Schema", format!("Migrationsstand entspricht paperless-ngx {}", crate::schema::VERSION));
             }
             SchemaState::Current(newer) => {
                 rep.source_version = Some(format!("neuer als {}", crate::schema::VERSION));
@@ -666,55 +577,30 @@ async fn run_inner(o: &SwitchOptions, rep: &mut Report) -> Result<()> {
             }
         }
         let d = read_db(url).await?;
-        step(
-            rep,
-            q,
-            Level::Ok,
-            "Quelle gelesen",
-            format!("{} Dokumente", d.docs.len()),
-        );
+        step(rep, q, Level::Ok, "Quelle gelesen", format!("{} Dokumente", d.docs.len()));
         d
     };
 
     // Files of the source
     let src_files = match (&export, &det.media) {
-        (Some(exp), _) => Some(verify::check_files(
-            &Files::Export(exp),
-            &src.docs,
-            o.threads,
-        )),
+        (Some(exp), _) => Some(verify::check_files(&Files::Export(exp), &src.docs, o.threads)),
         (None, Some(m)) => Some(verify::check_files(&Files::Media(m), &src.docs, o.threads)),
         (None, None) => None,
     };
     if let Some(f) = &src_files {
-        let level = if f.problems.is_empty() {
-            Level::Ok
-        } else {
-            Level::Warn
-        };
+        let level = if f.problems.is_empty() { Level::Ok } else { Level::Warn };
         step(
             rep,
             q,
             level,
             "Dateien der Quelle",
-            format!(
-                "{} geprüft, {} Befund(e)",
-                f.originals + f.archives + f.thumbnails,
-                f.problems.len()
-            ),
+            format!("{} geprüft, {} Befund(e)", f.originals + f.archives + f.thumbnails, f.problems.len()),
         );
     }
     rep.source_files = src_files;
 
-    let same_db =
-        matches!((&det.url, &o.target), (Some(s), Some(t)) if detect::same_database(s, t));
-    let target_media: Option<PathBuf> = o.target_media.clone().or_else(|| {
-        if export.is_none() {
-            det.media.clone()
-        } else {
-            None
-        }
-    });
+    let same_db = matches!((&det.url, &o.target), (Some(s), Some(t)) if detect::same_database(s, t));
+    let target_media: Option<PathBuf> = o.target_media.clone().or_else(|| if export.is_none() { det.media.clone() } else { None });
     rep.target_media = target_media.as_ref().map(|p| p.display().to_string());
 
     // ---- Up front: target reachable, enough space, backup ------------------------------------
@@ -814,10 +700,7 @@ async fn run_inner(o: &SwitchOptions, rep: &mut Report) -> Result<()> {
                         q,
                         Level::Ok,
                         "Probelauf Datenbank",
-                        format!(
-                            "{} Tabellen vollständig gelesen und umgewandelt, Ziel bereit",
-                            db.tables.len()
-                        ),
+                        format!("{} Tabellen vollständig gelesen und umgewandelt, Ziel bereit", db.tables.len()),
                     ),
                     Ok(()) => step(rep, q, Level::Fail, "Probelauf Datenbank", db_problems(&db)),
                     Err(e) => step(rep, q, Level::Fail, "Probelauf Datenbank", format!("{e:#}")),
@@ -826,34 +709,16 @@ async fn run_inner(o: &SwitchOptions, rep: &mut Report) -> Result<()> {
         } else {
             if let Some(t) = &o.target {
                 match target_documents(t).await {
-                    Ok(Some(n)) if n > 0 => step(
-                        rep,
-                        q,
-                        Level::Fail,
-                        "Ziel",
-                        format!(
-                            "Ziel-Datenbank enthält schon {n} Dokumente – Import würde abbrechen"
-                        ),
-                    ),
-                    Ok(_) => step(
-                        rep,
-                        q,
-                        Level::Ok,
-                        "Ziel",
-                        "Ziel-Datenbank erreichbar und ohne Dokumente",
-                    ),
+                    Ok(Some(n)) if n > 0 => {
+                        step(rep, q, Level::Fail, "Ziel", format!("Ziel-Datenbank enthält schon {n} Dokumente – Import würde abbrechen"))
+                    }
+                    Ok(_) => step(rep, q, Level::Ok, "Ziel", "Ziel-Datenbank erreichbar und ohne Dokumente"),
                     Err(e) => step(rep, q, Level::Fail, "Ziel", format!("{e:#}")),
                 }
             }
             let bin = paperrust_bin(o);
             if o.paperrust.is_some() && !bin.is_file() {
-                step(
-                    rep,
-                    q,
-                    Level::Fail,
-                    "paperrust",
-                    format!("{} nicht gefunden", bin.display()),
-                );
+                step(rep, q, Level::Fail, "paperrust", format!("{} nicht gefunden", bin.display()));
             }
         }
         rep.file_findings();
@@ -870,17 +735,9 @@ async fn run_inner(o: &SwitchOptions, rep: &mut Report) -> Result<()> {
     if o.cmd == Cmd::Switch {
         if let Some(exp_path) = &det.export {
             let p = exp_path.display().to_string();
-            run_manage(o, &target, &["migrate"])
-                .await
-                .context("Ziel-Schema anlegen")?;
+            run_manage(o, &target, &["migrate"]).await.context("Ziel-Schema anlegen")?;
             match run_manage(o, &target, &["document_importer", &p]).await {
-                Ok(()) => step(
-                    rep,
-                    q,
-                    Level::Ok,
-                    "Import",
-                    "document_importer abgeschlossen",
-                ),
+                Ok(()) => step(rep, q, Level::Ok, "Import", "document_importer abgeschlossen"),
                 Err(e) => {
                     step(rep, q, Level::Fail, "Import", format!("{e:#}"));
                     return Ok(());
@@ -894,13 +751,7 @@ async fn run_inner(o: &SwitchOptions, rep: &mut Report) -> Result<()> {
                         return Ok(());
                     }
                 }
-                None => step(
-                    rep,
-                    q,
-                    Level::Info,
-                    "Datenbank",
-                    "Quelle und Ziel sind dieselbe Datenbank – nichts zu kopieren, nur prüfen",
-                ),
+                None => step(rep, q, Level::Info, "Datenbank", "Quelle und Ziel sind dieselbe Datenbank – nichts zu kopieren, nur prüfen"),
             }
         } else {
             let url = det.url.as_deref().unwrap_or_default();
@@ -929,10 +780,7 @@ async fn run_inner(o: &SwitchOptions, rep: &mut Report) -> Result<()> {
                     q,
                     Level::Fail,
                     "Datenbank-Umzug",
-                    format!(
-                        "{} – Ziel zurückgerollt (leer), Quelle unverändert",
-                        db.error.clone().unwrap_or_else(|| db_problems(&db))
-                    ),
+                    format!("{} – Ziel zurückgerollt (leer), Quelle unverändert", db.error.clone().unwrap_or_else(|| db_problems(&db))),
                 );
                 return Ok(());
             }
@@ -942,10 +790,7 @@ async fn run_inner(o: &SwitchOptions, rep: &mut Report) -> Result<()> {
                 q,
                 Level::Ok,
                 "Datenbank-Umzug",
-                format!(
-                    "{} Tabellen, {rows} Zeilen übernommen, Prüfsumme je Tabelle gleich",
-                    db.tables.len()
-                ),
+                format!("{} Tabellen, {rows} Zeilen übernommen, Prüfsumme je Tabelle gleich", db.tables.len()),
             );
             if catchup.as_ref().is_some_and(|p| p.is_v2()) {
                 step(
@@ -973,24 +818,10 @@ async fn run_inner(o: &SwitchOptions, rep: &mut Report) -> Result<()> {
                     let (c, k) = tokio::task::spawn_blocking(move || crate::assist::copy_tree_progress(&from2, &to2, total, quiet))
                         .await
                         .map_err(|e| anyhow!("Kopieren: {e}"))?
-                        .with_context(|| {
-                            format!("{} → {} kopieren", from.display(), to.display())
-                        })?;
-                    step(
-                        rep,
-                        q,
-                        Level::Ok,
-                        "Dateien kopiert",
-                        format!("{c} kopiert, {k} schon vorhanden (nicht überschrieben)"),
-                    );
+                        .with_context(|| format!("{} → {} kopieren", from.display(), to.display()))?;
+                    step(rep, q, Level::Ok, "Dateien kopiert", format!("{c} kopiert, {k} schon vorhanden (nicht überschrieben)"));
                 }
-                (Some(_), Some(_)) => step(
-                    rep,
-                    q,
-                    Level::Info,
-                    "Dateien",
-                    "Ziel nutzt denselben Medienordner – nichts zu kopieren",
-                ),
+                (Some(_), Some(_)) => step(rep, q, Level::Info, "Dateien", "Ziel nutzt denselben Medienordner – nichts zu kopieren"),
                 _ => step(
                     rep,
                     q,
@@ -1006,25 +837,13 @@ async fn run_inner(o: &SwitchOptions, rep: &mut Report) -> Result<()> {
     let tgt = read_db(&target).await.context("Ziel lesen")?;
     rep.set_counts(&src.counts, Some(&tgt.counts));
     rep.compare_docs(&src.docs, &tgt.docs);
-    let bad_counts = rep
-        .counts
-        .iter()
-        .filter(|c| c.level() == Level::Fail)
-        .count();
+    let bad_counts = rep.counts.iter().filter(|c| c.level() == Level::Fail).count();
     step(
         rep,
         q,
-        if bad_counts == 0 {
-            Level::Ok
-        } else {
-            Level::Fail
-        },
+        if bad_counts == 0 { Level::Ok } else { Level::Fail },
         "Vergleich",
-        format!(
-            "{} Objektarten, {} Dokumentzeilen verglichen",
-            rep.counts.len(),
-            src.docs.len()
-        ),
+        format!("{} Objektarten, {} Dokumentzeilen verglichen", rep.counts.len(), src.docs.len()),
     );
     match &target_media {
         Some(m) => {
@@ -1033,11 +852,7 @@ async fn run_inner(o: &SwitchOptions, rep: &mut Report) -> Result<()> {
             step(
                 rep,
                 q,
-                if f.problems.is_empty() {
-                    Level::Ok
-                } else {
-                    Level::Warn
-                },
+                if f.problems.is_empty() { Level::Ok } else { Level::Warn },
                 "Dateien des Ziels",
                 format!(
                     "{} geprüft, {} Befund(e), {} verwaist",
@@ -1048,13 +863,7 @@ async fn run_inner(o: &SwitchOptions, rep: &mut Report) -> Result<()> {
             );
             rep.target_files = Some(f);
         }
-        None => step(
-            rep,
-            q,
-            Level::Warn,
-            "Dateien des Ziels",
-            "Ziel-Medienordner unbekannt – nicht geprüft (--target-media)",
-        ),
+        None => step(rep, q, Level::Warn, "Dateien des Ziels", "Ziel-Medienordner unbekannt – nicht geprüft (--target-media)"),
     }
     rep.file_findings();
 
@@ -1062,25 +871,15 @@ async fn run_inner(o: &SwitchOptions, rep: &mut Report) -> Result<()> {
     match &o.api_url {
         Some(api) if o.sample > 0 => {
             let token = match &o.api_token {
-                Some(t) => Ok(crate::api::TempToken {
-                    key: t.clone(),
-                    created: false,
-                }),
+                Some(t) => Ok(crate::api::TempToken { key: t.clone(), created: false }),
                 None => crate::api::temp_token(&target).await,
             };
             match token {
                 Ok(t) => {
                     let sample = crate::api::pick_sample(&src.docs, o.sample);
-                    rep.spot =
-                        crate::api::spot_check(api, &t.key, &src.docs, &sample, o.download).await;
+                    rep.spot = crate::api::spot_check(api, &t.key, &src.docs, &sample, o.download).await;
                     if let Err(e) = crate::api::drop_temp_token(&target, &t).await {
-                        step(
-                            rep,
-                            q,
-                            Level::Warn,
-                            "API-Token",
-                            format!("vorübergehender Token nicht gelöscht: {e:#}"),
-                        );
+                        step(rep, q, Level::Warn, "API-Token", format!("vorübergehender Token nicht gelöscht: {e:#}"));
                     }
                 }
                 Err(e) => {
@@ -1090,19 +889,12 @@ async fn run_inner(o: &SwitchOptions, rep: &mut Report) -> Result<()> {
             }
             rep.spot_findings();
             if !q {
-                eprintln!(
-                    "[....] Stichprobe API v1: {} ({} Dokumente)",
-                    rep.spot.status,
-                    rep.spot.rows.len()
-                );
+                eprintln!("[....] Stichprobe API v1: {} ({} Dokumente)", rep.spot.status, rep.spot.rows.len());
             }
         }
         _ => {
             rep.spot.status = "skipped".into();
-            rep.spot.message = Some(
-                "ohne --api-url; nach dem Start von PaperRust mit `verify --api-url …` nachholen"
-                    .into(),
-            );
+            rep.spot.message = Some("ohne --api-url; nach dem Start von PaperRust mit `verify --api-url …` nachholen".into());
         }
     }
     Ok(())
@@ -1132,11 +924,7 @@ fn db_problems(db: &DbReport) -> String {
     if let Some(e) = &db.error {
         v.push(e.clone());
     }
-    if v.is_empty() {
-        db.result.clone()
-    } else {
-        v.join("; ")
-    }
+    if v.is_empty() { db.result.clone() } else { v.join("; ") }
 }
 
 async fn target_documents(target: &str) -> Result<Option<i64>> {
@@ -1233,10 +1021,7 @@ pub async fn main(cmd: &str, args: &[String]) -> i32 {
                 }
             }
         }
-        Err(e) => eprintln!(
-            "Bericht in {} nicht schreibbar: {e}",
-            o.report_dir.display()
-        ),
+        Err(e) => eprintln!("Bericht in {} nicht schreibbar: {e}", o.report_dir.display()),
     }
     match rep.verdict() {
         Level::Ok | Level::Info => 0,
@@ -1256,51 +1041,16 @@ mod tests {
     #[test]
     fn parse_options_and_env() {
         let none = |_: &str| None;
-        let o = parse(
-            "switch",
-            &a(&["--from", "x", "--target", "postgres://h/db", "--dry-run"]),
-            &none,
-        )
-        .unwrap();
+        let o = parse("switch", &a(&["--from", "x", "--target", "postgres://h/db", "--dry-run"]), &none).unwrap();
         assert_eq!(o.cmd, Cmd::DryRun);
         assert_eq!(o.report_dir, PathBuf::from("."));
-        assert!(
-            parse("switch", &a(&["--from", "x"]), &none)
-                .unwrap_err()
-                .contains("Ziel fehlt")
-        );
+        assert!(parse("switch", &a(&["--from", "x"]), &none).unwrap_err().contains("Ziel fehlt"));
         // Dry run without a target allowed
         assert!(parse("switch", &a(&["--from", "x", "--dry-run"]), &none).is_ok());
+        assert!(parse("verify", &a(&["--from", "x", "--target", "mysql://h"]), &none).is_err());
+        assert!(parse("verify", &a(&["--from", "x", "--target", "postgres://h/d", "--api-url", "http://a"]), &none).is_err());
         assert!(
-            parse(
-                "verify",
-                &a(&["--from", "x", "--target", "mysql://h"]),
-                &none
-            )
-            .is_err()
-        );
-        assert!(
-            parse(
-                "verify",
-                &a(&[
-                    "--from",
-                    "x",
-                    "--target",
-                    "postgres://h/d",
-                    "--api-url",
-                    "http://a"
-                ]),
-                &none
-            )
-            .is_err()
-        );
-        assert!(
-            parse(
-                "verify",
-                &a(&["--from", "x", "--target", "postgres://h/d", "--dry-run"]),
-                &none
-            )
-            .is_err(),
+            parse("verify", &a(&["--from", "x", "--target", "postgres://h/d", "--dry-run"]), &none).is_err(),
             "--dry-run nur bei switch"
         );
         let env = |k: &str| match k {
@@ -1312,42 +1062,17 @@ mod tests {
         };
         let o = parse("switch", &[], &env).unwrap();
         assert_eq!(o.from, "/export");
-        assert_eq!(
-            o.target.as_deref(),
-            Some("postgres://paperless:paperless@db:5432/paperless")
-        );
-        assert_eq!(
-            o.target_media,
-            Some(PathBuf::from("/usr/src/paperless/media"))
-        );
-        assert_eq!(
-            o.report_dir,
-            PathBuf::from("/usr/src/paperless/data").join("umstieg")
-        );
-        let o = parse(
-            "verify",
-            &a(&[
-                "--from",
-                "x",
-                "--target",
-                "postgres://h/d",
-                "--api-url",
-                "http://a",
-                "--api-temp-token",
-            ]),
-            &none,
-        )
-        .unwrap();
+        assert_eq!(o.target.as_deref(), Some("postgres://paperless:paperless@db:5432/paperless"));
+        assert_eq!(o.target_media, Some(PathBuf::from("/usr/src/paperless/media")));
+        assert_eq!(o.report_dir, PathBuf::from("/usr/src/paperless/data").join("umstieg"));
+        let o = parse("verify", &a(&["--from", "x", "--target", "postgres://h/d", "--api-url", "http://a", "--api-temp-token"]), &none)
+            .unwrap();
         assert!(o.api_temp_token);
     }
 
     #[test]
     fn manage_env_from_url() {
-        let e = manage_env(
-            "postgres://us%40r:p%3Aw@127.0.0.1:54329/db1?sslmode=disable",
-            Some(Path::new("/m")),
-        )
-        .unwrap();
+        let e = manage_env("postgres://us%40r:p%3Aw@127.0.0.1:54329/db1?sslmode=disable", Some(Path::new("/m"))).unwrap();
         let get = |k: &str| e.iter().find(|(a, _)| a == k).map(|(_, v)| v.as_str());
         assert_eq!(get("PAPERLESS_DBUSER"), Some("us@r"));
         assert_eq!(get("PAPERLESS_DBPASS"), Some("p:w"));
@@ -1367,10 +1092,7 @@ mod tests {
         std::fs::create_dir_all(dst.join("documents/originals")).unwrap();
         std::fs::write(dst.join("documents/originals/a"), "alt").unwrap();
         assert_eq!(copy_tree(&src, &dst).unwrap(), (1, 1));
-        assert_eq!(
-            std::fs::read_to_string(dst.join("documents/originals/a")).unwrap(),
-            "alt"
-        );
+        assert_eq!(std::fs::read_to_string(dst.join("documents/originals/a")).unwrap(), "alt");
         assert!(same_dir(&src, &src.join(".")));
     }
 
@@ -1393,60 +1115,40 @@ mod tests {
         )
         .unwrap();
         std::fs::write(exp.join("metadata.json"), r#"{"version":"3.4.2"}"#).unwrap();
-        let mut o = parse(
-            "switch",
-            &a(&["--from", exp.to_str().unwrap(), "--dry-run", "--quiet"]),
-            &|_| None,
-        )
-        .unwrap();
+        let mut o = parse("switch", &a(&["--from", exp.to_str().unwrap(), "--dry-run", "--quiet"]), &|_| None).unwrap();
         o.report_dir = d.path().join("bericht");
         let rep = run(&o).await;
         assert_eq!(rep.verdict(), Level::Warn, "{}", rep.to_text());
         let j = rep.to_json();
         assert_eq!(j["files"]["source"]["problems"], 1);
-        assert_eq!(
-            j["files"]["source"]["problem_list"][0]["issue"],
-            "checksum-mismatch"
-        );
+        assert_eq!(j["files"]["source"]["problem_list"][0]["issue"], "checksum-mismatch");
         assert_eq!(j["files"]["source"]["problem_list"][0]["document"], 2);
         assert_eq!(j["counts"][0]["source"], 2);
         // Source unchanged
-        assert_eq!(
-            std::fs::read(exp.join("originals/2.pdf")).unwrap(),
-            b"beschaedigt"
-        );
+        assert_eq!(std::fs::read(exp.join("originals/2.pdf")).unwrap(), b"beschaedigt");
 
         // Database URL with the wrong schema: SQLite without django_migrations → FAIL with explanation
         let db = d.path().join("db.sqlite3");
         {
             use sqlx::Connection;
-            let mut c = sqlx::SqliteConnection::connect_with(
-                &sqlx::sqlite::SqliteConnectOptions::new()
-                    .filename(&db)
-                    .create_if_missing(true),
+            let mut c =
+                sqlx::SqliteConnection::connect_with(&sqlx::sqlite::SqliteConnectOptions::new().filename(&db).create_if_missing(true))
+                    .await
+                    .unwrap();
+            sqlx::raw_sql(
+                "CREATE TABLE django_migrations (id integer primary key, app text, name text, applied text); \
+                           INSERT INTO django_migrations (app, name, applied) VALUES ('documents', '0001_initial', '2020-01-01')",
             )
+            .execute(&mut c)
             .await
             .unwrap();
-            sqlx::raw_sql("CREATE TABLE django_migrations (id integer primary key, app text, name text, applied text); \
-                           INSERT INTO django_migrations (app, name, applied) VALUES ('documents', '0001_initial', '2020-01-01')")
-                .execute(&mut c)
-                .await
-                .unwrap();
             c.close().await.unwrap();
         }
-        let o = parse(
-            "switch",
-            &a(&["--from", db.to_str().unwrap(), "--dry-run", "--quiet"]),
-            &|_| None,
-        )
-        .unwrap();
+        let o = parse("switch", &a(&["--from", db.to_str().unwrap(), "--dry-run", "--quiet"]), &|_| None).unwrap();
         let rep = run(&o).await;
         assert_eq!(rep.verdict(), Level::Fail);
         let t = rep.to_text();
-        assert!(
-            t.contains("document_exporter") && t.contains("älter als"),
-            "{t}"
-        );
+        assert!(t.contains("document_exporter") && t.contains("älter als"), "{t}");
         let v = detect_json(&o).await;
         assert_eq!(v["ok"], false);
         assert_eq!(v["kind"], "sqlite-folder");

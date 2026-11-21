@@ -7,11 +7,11 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use pl_ocr::OcrArgs;
+use pl_ocr::Result;
 use pl_ocr::engine::{OcrEngine, OcrRequest, Orientation, PageOcr, Word};
 use pl_ocr::native::NativeOcrmypdf;
 use pl_ocr::pdfwrite::{self, ImagePageSpec, OutputMeta, PageImage};
 use pl_ocr::render::{PdfRenderer, Raster, RenderDoc, fit_dpi, page_pixels};
-use pl_ocr::Result;
 use serde_json::json;
 
 const SIDE_PT: f64 = 14_400.0;

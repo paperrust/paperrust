@@ -18,8 +18,8 @@ use tokio::sync::{Semaphore, watch};
 use tokio::task::JoinSet;
 use uuid::Uuid;
 
-use crate::config::QueueConfig;
 use crate::backoff::Backoff;
+use crate::config::QueueConfig;
 use crate::events::EventBus;
 use crate::paperless_task::RevokeReason;
 use crate::pg::{Failure, Heartbeat, Job, PgQueue};
@@ -210,7 +210,11 @@ impl Worker {
             let jobs = if free == 0 || first_err.is_some() {
                 Vec::new()
             } else {
-                match self.queue.claim(&self.cfg.worker_name, &self.cfg.queues, Some(&names), free as i64, self.cfg.visibility_timeout_secs).await {
+                match self
+                    .queue
+                    .claim(&self.cfg.worker_name, &self.cfg.queues, Some(&names), free as i64, self.cfg.visibility_timeout_secs)
+                    .await
+                {
                     Ok(j) => j,
                     Err(e) => {
                         first_err = Some(("claiming tasks failed", e));

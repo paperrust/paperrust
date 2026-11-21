@@ -214,14 +214,22 @@ impl MailWorkflowEffects {
                 .map_err(e);
         }
         match input.ctx.document_id {
-            Some(id) => context::for_document(conn, id, cfg.time_zone, &cfg.paperless_url, &cfg.base_url, &cfg.originals_dir).await.map_err(e),
+            Some(id) => {
+                context::for_document(conn, id, cfg.time_zone, &cfg.paperless_url, &cfg.base_url, &cfg.originals_dir).await.map_err(e)
+            }
             None => Ok(Some(context::for_consumption(&input.ctx.title, &input.ctx.original_file, &input.mime_type, cfg.time_zone))),
         }
     }
 
     /// Subject, text, attachment → finished message (`execute_email_action` up to before `send_email`).
     /// `original_file` = attachment for consumption/"added" (upstream `elif original_file:`).
-    fn build_email(&self, action: &EmailAction, c: &ActionContext, ctx: &ConsumerCtx, original_file: Option<&Path>) -> Result<OutgoingMail, String> {
+    fn build_email(
+        &self,
+        action: &EmailAction,
+        c: &ActionContext,
+        ctx: &ConsumerCtx,
+        original_file: Option<&Path>,
+    ) -> Result<OutgoingMail, String> {
         let subject = if action.subject.is_empty() {
             String::new()
         } else {
@@ -243,7 +251,11 @@ impl MailWorkflowEffects {
                     attachments.push(EmailAttachment { path: src.clone(), mime_type: c.mime_type.clone(), friendly_name: friendly });
                 }
             } else if let Some(p) = original_file {
-                let friendly = if c.current_filename.is_empty() { file_name(&ctx.original_file.to_string_lossy()) } else { file_name(&c.current_filename) };
+                let friendly = if c.current_filename.is_empty() {
+                    file_name(&ctx.original_file.to_string_lossy())
+                } else {
+                    file_name(&c.current_filename)
+                };
                 attachments.push(EmailAttachment { path: p.to_path_buf(), mime_type: c.mime_type.clone(), friendly_name: friendly });
             }
         }
@@ -305,7 +317,13 @@ impl MailWorkflowEffects {
     }
 
     /// `execute_webhook_action` → request (not yet sent), context and file from `c`/`file`.
-    fn webhook_request(&self, action: WebhookAction, c: &ActionContext, ctx: &ConsumerCtx, file: Option<&Path>) -> Result<WebhookRequest, String> {
+    fn webhook_request(
+        &self,
+        action: WebhookAction,
+        c: &ActionContext,
+        ctx: &ConsumerCtx,
+        file: Option<&Path>,
+    ) -> Result<WebhookRequest, String> {
         let mut data = Value::Object(Map::new());
         if action.use_params {
             if let Some(Value::Object(params)) = &action.params {
@@ -551,10 +569,8 @@ mod tests {
         .fetch_one(&mut *tx)
         .await
         .unwrap();
-        let corr: (i32, String) = sqlx::query_as("SELECT id, name FROM documents_correspondent ORDER BY id LIMIT 1")
-            .fetch_one(&mut *tx)
-            .await
-            .unwrap();
+        let corr: (i32, String) =
+            sqlx::query_as("SELECT id, name FROM documents_correspondent ORDER BY id LIMIT 1").fetch_one(&mut *tx).await.unwrap();
         let dir = std::env::temp_dir().join(format!("pl-w9-fx-{}", uuid::Uuid::new_v4().simple()));
         std::fs::create_dir_all(&dir).unwrap();
         let file = dir.join("scan.pdf");
@@ -577,7 +593,10 @@ mod tests {
         let s = req.data.as_str().unwrap().to_string();
         assert_eq!(s, format!("{}||2020-05-06|{}|scan", corr.1, file.display()));
         let f = req.file.unwrap();
-        assert_eq!((f.name.as_str(), f.content.as_slice(), f.mime.as_str()), (file.to_string_lossy().as_ref(), &b"%PDF-1.4 test"[..], "application/pdf"));
+        assert_eq!(
+            (f.name.as_str(), f.content.as_slice(), f.mime.as_str()),
+            (file.to_string_lossy().as_ref(), &b"%PDF-1.4 test"[..], "application/pdf")
+        );
 
         // "Document added": instance in memory with a (still) unsaved correspondent
         let mut row = pl_consumer::db::load_document(&mut tx, 1).await.unwrap().unwrap();

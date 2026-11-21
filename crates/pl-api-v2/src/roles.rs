@@ -116,14 +116,8 @@ pub const ALWAYS: &[&str] = &["documents.view_uisettings", "documents.add_uisett
 
 /// Topics of the fine-grained settings (key, models `<app_label>.<model>`).
 pub const TOPICS: &[(&str, &[&str])] = &[
-    (
-        "documents",
-        &["documents.document", "documents.note", "documents.sharelink", "documents.sharelinkbundle", "auditlog.logentry"],
-    ),
-    (
-        "organize",
-        &["documents.tag", "documents.correspondent", "documents.documenttype", "documents.storagepath", "documents.customfield"],
-    ),
+    ("documents", &["documents.document", "documents.note", "documents.sharelink", "documents.sharelinkbundle", "auditlog.logentry"]),
+    ("organize", &["documents.tag", "documents.correspondent", "documents.documenttype", "documents.storagepath", "documents.customfield"]),
     ("views", &["documents.savedview"]),
     (
         "automation",
@@ -243,12 +237,7 @@ pub fn resolve(is_superuser: bool, perms: &BTreeSet<String>, roles: &[Role], kno
         return roles.iter().find(|r| r.admin).map(|r| Resolved::Role(r.id)).unwrap_or(Resolved::Admin);
     }
     let mine: BTreeSet<String> = perms.iter().filter(|p| !ALWAYS.contains(&p.as_str())).cloned().collect();
-    roles
-        .iter()
-        .filter(|r| !r.admin)
-        .find(|r| r.effective(known) == mine)
-        .map(|r| Resolved::Role(r.id))
-        .unwrap_or(Resolved::Individual)
+    roles.iter().filter(|r| !r.admin).find(|r| r.effective(known) == mine).map(|r| Resolved::Role(r.id)).unwrap_or(Resolved::Individual)
 }
 
 /// Who assigns (from `pl_authz::User`).
@@ -463,27 +452,20 @@ fn role_from(r: RoleRow) -> Role {
 const ROLE_COLS: &str = "id, key::text, name::text, description, builtin, is_admin, permissions";
 
 async fn load_roles<'e, E: sqlx::PgExecutor<'e>>(ex: E) -> V2Result<Vec<Role>> {
-    let rows: Vec<RoleRow> = sqlx::query_as(&format!("SELECT {ROLE_COLS} FROM paperrust_role ORDER BY builtin DESC, id"))
-        .fetch_all(ex)
-        .await
-        .map_err(db)?;
+    let rows: Vec<RoleRow> =
+        sqlx::query_as(&format!("SELECT {ROLE_COLS} FROM paperrust_role ORDER BY builtin DESC, id")).fetch_all(ex).await.map_err(db)?;
     Ok(rows.into_iter().map(role_from).collect())
 }
 
 async fn load_role<'e, E: sqlx::PgExecutor<'e>>(ex: E, id: i64) -> V2Result<Role> {
-    let row: Option<RoleRow> = sqlx::query_as(&format!("SELECT {ROLE_COLS} FROM paperrust_role WHERE id = $1"))
-        .bind(id)
-        .fetch_optional(ex)
-        .await
-        .map_err(db)?;
+    let row: Option<RoleRow> =
+        sqlx::query_as(&format!("SELECT {ROLE_COLS} FROM paperrust_role WHERE id = $1")).bind(id).fetch_optional(ex).await.map_err(db)?;
     row.map(role_from).ok_or(V2Error(DomainError::NotFound))
 }
 
 async fn load_mode<'e, E: sqlx::PgExecutor<'e>>(ex: E) -> V2Result<String> {
-    let m: Option<String> = sqlx::query_scalar("SELECT mode::text FROM paperrust_role_config WHERE id = 1")
-        .fetch_optional(ex)
-        .await
-        .map_err(db)?;
+    let m: Option<String> =
+        sqlx::query_scalar("SELECT mode::text FROM paperrust_role_config WHERE id = 1").fetch_optional(ex).await.map_err(db)?;
     Ok(m.unwrap_or_else(|| MODE_CLASSIC.to_string()))
 }
 
@@ -504,8 +486,11 @@ fn ids_of(set: &BTreeSet<String>, known: &HashMap<String, i64>) -> Vec<i64> {
 }
 
 fn invalid_pks(field: &str, wanted: &[i64], found: &HashSet<i64>) -> V2Result<()> {
-    let missing: Vec<Value> =
-        wanted.iter().filter(|i| !found.contains(i)).map(|i| Value::String(format!("Invalid pk \"{i}\" - object does not exist."))).collect();
+    let missing: Vec<Value> = wanted
+        .iter()
+        .filter(|i| !found.contains(i))
+        .map(|i| Value::String(format!("Invalid pk \"{i}\" - object does not exist.")))
+        .collect();
     if missing.is_empty() {
         return Ok(());
     }
@@ -529,11 +514,7 @@ pub fn routes(r: axum::Router<AppState>) -> axum::Router<AppState> {
 /// Read: active and (superuser, staff or `auth.view_user`).
 fn may_read(p: &Principal) -> V2Result<&pl_authz::User> {
     let u = d2::user(p)?;
-    if u.is_active && (u.is_superuser || u.is_staff || u.has_perm(PERM_VIEW_USER)) {
-        Ok(u)
-    } else {
-        Err(forbidden(DENIED))
-    }
+    if u.is_active && (u.is_superuser || u.is_staff || u.has_perm(PERM_VIEW_USER)) { Ok(u) } else { Err(forbidden(DENIED)) }
 }
 
 fn require_superuser(p: &Principal) -> V2Result<&pl_authz::User> {
@@ -598,11 +579,7 @@ async fn custom_mode_or_400(pool: &PgPool) -> V2Result<()> {
 }
 
 fn name_taken(e: sqlx::Error) -> V2Error {
-    if is_unique_violation(&e) {
-        V2Error(DomainError::field("name", "A role with this name already exists."))
-    } else {
-        db(e)
-    }
+    if is_unique_violation(&e) { V2Error(DomainError::field("name", "A role with this name already exists.")) } else { db(e) }
 }
 
 /// `POST /roles` (superuser only, only in "custom" mode) → 201.

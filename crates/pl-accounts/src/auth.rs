@@ -147,7 +147,8 @@ pub async fn resolve_user(ctx: &mut Ctx) -> R<()> {
 async fn session_user(ctx: &mut Ctx) -> R<Option<User>> {
     let Some(id) = ctx.session.user_id() else { return Ok(None) };
     let backend = ctx.session.get(BACKEND_SESSION_KEY).and_then(Value::as_str).unwrap_or("").to_string();
-    let allowed = backend == MODEL_BACKEND || backend == ALLAUTH_BACKEND || (backend == REMOTE_USER_BACKEND && ctx.s.has_remote_user_backend());
+    let allowed =
+        backend == MODEL_BACKEND || backend == ALLAUTH_BACKEND || (backend == REMOTE_USER_BACKEND && ctx.s.has_remote_user_backend());
     if !allowed {
         return Ok(None);
     }
@@ -156,7 +157,8 @@ async fn session_user(ctx: &mut Ctx) -> R<Option<User>> {
         return Ok(None);
     }
     let stored = ctx.session.get(HASH_SESSION_KEY).and_then(Value::as_str).unwrap_or("");
-    let ok = !stored.is_empty() && pl_authz::signing::constant_time_eq(stored.as_bytes(), u.session_auth_hash(&ctx.s.secret_key).as_bytes());
+    let ok =
+        !stored.is_empty() && pl_authz::signing::constant_time_eq(stored.as_bytes(), u.session_auth_hash(&ctx.s.secret_key).as_bytes());
     if !ok {
         ctx.session.flush();
         return Ok(None);
@@ -170,7 +172,11 @@ pub async fn login(ctx: &mut Ctx, u: User, backend: &str) -> R<()> {
     let hash = u.session_auth_hash(&ctx.s.secret_key);
     if ctx.session.get(SESSION_KEY).is_some() {
         let same_user = ctx.session.user_id() == Some(u.id);
-        let same_hash = ctx.session.get(HASH_SESSION_KEY).and_then(Value::as_str).is_some_and(|h| pl_authz::signing::constant_time_eq(h.as_bytes(), hash.as_bytes()));
+        let same_hash = ctx
+            .session
+            .get(HASH_SESSION_KEY)
+            .and_then(Value::as_str)
+            .is_some_and(|h| pl_authz::signing::constant_time_eq(h.as_bytes(), hash.as_bytes()));
         if !same_user || !same_hash {
             ctx.session.flush();
         }

@@ -14,7 +14,6 @@ pub mod store;
 pub mod suggest;
 pub mod workflow;
 
-
 use pl_core::{ApiError, AppState};
 
 use crate::config::AiConfig;
@@ -31,8 +30,9 @@ pub mod migrations {
     pub const M0003_PAPERRUST_AI_PROMPTS_JOBS: &str = include_str!("../../migrations/0003_paperrust_ai_prompts_jobs.sql");
 
     /// All migrations in order `(name, sql)`.
-    pub const ALL: &[(&str, &str)] =
-        &[("0001_paperrust_ai", M0001_PAPERRUST_AI), ("0002_paperrust_ai_mcp_scope", M0002_PAPERRUST_AI_MCP_SCOPE),
+    pub const ALL: &[(&str, &str)] = &[
+        ("0001_paperrust_ai", M0001_PAPERRUST_AI),
+        ("0002_paperrust_ai_mcp_scope", M0002_PAPERRUST_AI_MCP_SCOPE),
         ("0003_paperrust_ai_prompts_jobs", M0003_PAPERRUST_AI_PROMPTS_JOBS),
     ];
 
@@ -100,11 +100,7 @@ pub fn py_int(s: &str) -> Option<i64> {
 
 /// Python `str(number)` of a JSON value.
 pub fn py_number_str(n: &serde_json::Number) -> String {
-    if n.is_i64() || n.is_u64() {
-        n.to_string()
-    } else {
-        pl_core::json::python_float_repr(n.as_f64().unwrap_or(0.0))
-    }
+    if n.is_i64() || n.is_u64() { n.to_string() } else { pl_core::json::python_float_repr(n.as_f64().unwrap_or(0.0)) }
 }
 
 #[cfg(test)]

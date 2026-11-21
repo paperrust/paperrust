@@ -16,12 +16,8 @@ use crate::args::{self, flag, value};
 use crate::ctx::Ctx;
 use crate::{CliError, CliResult};
 
-const OPTS: &[args::Opt] = &[
-    args::PROGRESS,
-    args::PROCESSES,
-    flag(&["-f", "--overwrite"], "overwrite"),
-    value(&["-d", "--document"], "document"),
-];
+const OPTS: &[args::Opt] =
+    &[args::PROGRESS, args::PROCESSES, flag(&["-f", "--overwrite"], "overwrite"), value(&["-d", "--document"], "document")];
 
 /// Selected document IDs (order `Document.Meta.ordering = ("-created",)`).
 pub async fn select_ids(pool: &sqlx::PgPool, document: Option<i64>, overwrite: bool) -> CliResult<Vec<i64>> {
@@ -78,9 +74,7 @@ pub async fn command(argv: Vec<String>) -> CliResult {
     // tests/chaos C2: do not hide failures (e.g. database briefly gone) with exit code 0 – otherwise
     // a script/schedule considers the archives renewed. upstream: always 0.
     if failed > 0 {
-        return Err(CliError::Command(format!(
-            "{failed} document(s) failed (see above); run the command again to retry them"
-        )));
+        return Err(CliError::Command(format!("{failed} document(s) failed (see above); run the command again to retry them")));
     }
     Ok(())
 }

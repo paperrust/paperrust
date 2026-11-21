@@ -337,9 +337,25 @@ async fn api_v2_against_db_copy() {
             let r = get(&app, &p, ALICE).await;
             assert_eq!(r.status, StatusCode::NOT_FOUND, "{p}");
         }
-        let r = call(&app, Method::PATCH, &format!("/rs/api/v2/documents/{hidden_uuid}"), Some(ALICE), Some(json!({"title": "x"})), &[("if-match", "\"1\"")]).await;
+        let r = call(
+            &app,
+            Method::PATCH,
+            &format!("/rs/api/v2/documents/{hidden_uuid}"),
+            Some(ALICE),
+            Some(json!({"title": "x"})),
+            &[("if-match", "\"1\"")],
+        )
+        .await;
         assert_eq!(r.status, StatusCode::NOT_FOUND, "no 412 leak for invisible objects");
-        let r = call(&app, Method::POST, "/rs/api/v2/objects/batch", Some(ALICE), Some(json!({"kind":"document","uuids":[hidden_uuid, shown["uuid"]]})), &[]).await;
+        let r = call(
+            &app,
+            Method::POST,
+            "/rs/api/v2/objects/batch",
+            Some(ALICE),
+            Some(json!({"kind":"document","uuids":[hidden_uuid, shown["uuid"]]})),
+            &[],
+        )
+        .await;
         let v = r.json();
         assert_eq!(v["items"].as_array().unwrap().len(), 1);
         assert_eq!(v["missing"], json!([hidden_uuid]));
@@ -448,7 +464,9 @@ async fn api_v2_against_db_copy() {
         assert_eq!(r.status, StatusCode::OK);
         let te = r.header("etag").unwrap();
         assert!(te.starts_with("W/"));
-        let r = call(&app, Method::GET, &format!("/rs/api/v2/documents/{su}/files/thumbnail"), Some(ALICE), None, &[("if-none-match", &te)]).await;
+        let r =
+            call(&app, Method::GET, &format!("/rs/api/v2/documents/{su}/files/thumbnail"), Some(ALICE), None, &[("if-none-match", &te)])
+                .await;
         assert_eq!(r.status, StatusCode::NOT_MODIFIED);
         let r = get(&app, &format!("/rs/api/v2/documents/{su}/files/preview"), ALICE).await;
         assert_eq!(r.status, StatusCode::OK);
@@ -462,7 +480,15 @@ async fn api_v2_against_db_copy() {
 
     // ---------------------------------------------------------------- Writing + If-Match
     check!("tag create / update with If-Match / delete", {
-        let r = call(&app, Method::POST, "/rs/api/v2/tags", Some(ALICE), Some(json!({"name": "p3-v2-tag", "color": "#112233", "matching": {"algorithm": "literal", "pattern": "xyz"}})), &[]).await;
+        let r = call(
+            &app,
+            Method::POST,
+            "/rs/api/v2/tags",
+            Some(ALICE),
+            Some(json!({"name": "p3-v2-tag", "color": "#112233", "matching": {"algorithm": "literal", "pattern": "xyz"}})),
+            &[],
+        )
+        .await;
         assert_eq!(r.status, StatusCode::CREATED, "{}", String::from_utf8_lossy(&r.body));
         let t = r.json();
         assert_eq!(t["owner"]["username"], "alice");
@@ -472,10 +498,26 @@ async fn api_v2_against_db_copy() {
         let rev = t["rev"].as_i64().unwrap();
         let r = call(&app, Method::POST, "/rs/api/v2/tags", Some(ALICE), Some(json!({"name": "p3-v2-tag"})), &[]).await;
         assert_eq!(r.status, StatusCode::BAD_REQUEST, "duplicate name like v1");
-        let r = call(&app, Method::PATCH, &format!("/rs/api/v2/tags/{u}"), Some(ALICE), Some(json!({"name": "p3-v2-tag-2"})), &[("if-match", &format!("\"{}\"", rev + 100))]).await;
+        let r = call(
+            &app,
+            Method::PATCH,
+            &format!("/rs/api/v2/tags/{u}"),
+            Some(ALICE),
+            Some(json!({"name": "p3-v2-tag-2"})),
+            &[("if-match", &format!("\"{}\"", rev + 100))],
+        )
+        .await;
         assert_eq!(r.status, StatusCode::PRECONDITION_FAILED);
         assert_eq!(r.json()["error"]["current_rev"], rev);
-        let r = call(&app, Method::PATCH, &format!("/rs/api/v2/tags/{u}"), Some(ALICE), Some(json!({"name": "p3-v2-tag-2"})), &[("if-match", &format!("\"{rev}\""))]).await;
+        let r = call(
+            &app,
+            Method::PATCH,
+            &format!("/rs/api/v2/tags/{u}"),
+            Some(ALICE),
+            Some(json!({"name": "p3-v2-tag-2"})),
+            &[("if-match", &format!("\"{rev}\""))],
+        )
+        .await;
         assert_eq!(r.status, StatusCode::OK, "{}", String::from_utf8_lossy(&r.body));
         let t2 = r.json();
         assert_eq!(t2["name"], "p3-v2-tag-2");
@@ -486,7 +528,8 @@ async fn api_v2_against_db_copy() {
         // Bob does not see Alice's tag → 404
         let r = call(&app, Method::DELETE, &format!("/rs/api/v2/tags/{u}"), Some(BOB), None, &[]).await;
         assert_eq!(r.status, StatusCode::NOT_FOUND);
-        let r = call(&app, Method::DELETE, &format!("/rs/api/v2/tags/{u}"), Some(ALICE), None, &[("if-match", &format!("\"{rev}\""))]).await;
+        let r =
+            call(&app, Method::DELETE, &format!("/rs/api/v2/tags/{u}"), Some(ALICE), None, &[("if-match", &format!("\"{rev}\""))]).await;
         assert_eq!(r.status, StatusCode::PRECONDITION_FAILED);
         // Alice has no model permission delete_tag (group editors): 403 like v1, access says so beforehand
         assert_eq!(t2["access"]["can_delete"], false);
@@ -504,10 +547,26 @@ async fn api_v2_against_db_copy() {
     check!("document PATCH with If-Match, notes", {
         let d = get(&app, &format!("/rs/api/v2/documents/{su}"), ALICE).await.json();
         let rev = d["rev"].as_i64().unwrap();
-        let r = call(&app, Method::PATCH, &format!("/rs/api/v2/documents/{su}"), Some(ALICE), Some(json!({"title": "P3 title"})), &[("if-match", "\"999999\"")]).await;
+        let r = call(
+            &app,
+            Method::PATCH,
+            &format!("/rs/api/v2/documents/{su}"),
+            Some(ALICE),
+            Some(json!({"title": "P3 title"})),
+            &[("if-match", "\"999999\"")],
+        )
+        .await;
         assert_eq!(r.status, StatusCode::PRECONDITION_FAILED);
         let tag = v2_all(&app, "/rs/api/v2/tags", ALICE, 1000).await[0].clone();
-        let r = call(&app, Method::PATCH, &format!("/rs/api/v2/documents/{su}"), Some(ALICE), Some(json!({"title": "P3 title", "tags": [tag["uuid"]]})), &[("if-match", &format!("\"{rev}\""))]).await;
+        let r = call(
+            &app,
+            Method::PATCH,
+            &format!("/rs/api/v2/documents/{su}"),
+            Some(ALICE),
+            Some(json!({"title": "P3 title", "tags": [tag["uuid"]]})),
+            &[("if-match", &format!("\"{rev}\""))],
+        )
+        .await;
         if d["access"]["can_change"].as_bool().unwrap() {
             assert_eq!(r.status, StatusCode::OK, "{}", String::from_utf8_lossy(&r.body));
             let v = r.json();
@@ -516,13 +575,22 @@ async fn api_v2_against_db_copy() {
             assert!(v["rev"].as_i64().unwrap() > rev);
             let v1 = get(&app, &format!("/api/documents/{}/", d["legacy_id"]), ALICE).await.json();
             assert_eq!(v1["title"], "P3 title");
-            let r = call(&app, Method::PATCH, &format!("/rs/api/v2/documents/{su}"), Some(ALICE), Some(json!({"tags": ["00000000-0000-0000-0000-000000000000"]})), &[]).await;
+            let r = call(
+                &app,
+                Method::PATCH,
+                &format!("/rs/api/v2/documents/{su}"),
+                Some(ALICE),
+                Some(json!({"tags": ["00000000-0000-0000-0000-000000000000"]})),
+                &[],
+            )
+            .await;
             assert_eq!(r.status, StatusCode::BAD_REQUEST);
             assert!(r.json()["error"]["fields"]["tags"].is_array());
         } else {
             assert_eq!(r.status, StatusCode::FORBIDDEN);
         }
-        let r = call(&app, Method::POST, &format!("/rs/api/v2/documents/{su}/notes"), Some(ALICE), Some(json!({"note": "p3 note"})), &[]).await;
+        let r =
+            call(&app, Method::POST, &format!("/rs/api/v2/documents/{su}/notes"), Some(ALICE), Some(json!({"note": "p3 note"})), &[]).await;
         assert_eq!(r.status, StatusCode::CREATED, "{}", String::from_utf8_lossy(&r.body));
         let notes = r.json()["items"].as_array().unwrap().clone();
         let mine = notes.iter().find(|n| n["note"] == "p3 note").unwrap();
@@ -534,9 +602,25 @@ async fn api_v2_against_db_copy() {
 
     // ---------------------------------------------------------------- Device tokens (P3b)
     check!("device tokens: issue, use on v1+v2, hash only, list, revoke immediately", {
-        let r = call(&app, Method::POST, "/rs/api/v2/auth/devices", None, Some(json!({"username": "alice", "password": "wrong", "device_name": "Laptop"})), &[]).await;
+        let r = call(
+            &app,
+            Method::POST,
+            "/rs/api/v2/auth/devices",
+            None,
+            Some(json!({"username": "alice", "password": "wrong", "device_name": "Laptop"})),
+            &[],
+        )
+        .await;
         assert_eq!(r.status, StatusCode::BAD_REQUEST);
-        let r = call(&app, Method::POST, "/rs/api/v2/auth/devices", None, Some(json!({"username": "alice", "password": "alice", "device_name": "Laptop"})), &[]).await;
+        let r = call(
+            &app,
+            Method::POST,
+            "/rs/api/v2/auth/devices",
+            None,
+            Some(json!({"username": "alice", "password": "alice", "device_name": "Laptop"})),
+            &[],
+        )
+        .await;
         assert_eq!(r.status, StatusCode::CREATED, "{}", String::from_utf8_lossy(&r.body));
         let v = r.json();
         let token = v["token"].as_str().unwrap().to_string();
@@ -547,13 +631,23 @@ async fn api_v2_against_db_copy() {
         assert_eq!(me["username"], "alice");
         assert_eq!(me["auth"], "device_token");
         assert_eq!(get(&app, "/api/documents/?page_size=1", &bearer).await.status, StatusCode::OK, "valid for v1 too");
-        let (stored,): (String,) = sqlx::query_as("SELECT token_hash FROM paperrust_device_token WHERE uuid = $1::uuid").bind(&dev).fetch_one(&pool).await.unwrap();
+        let (stored,): (String,) = sqlx::query_as("SELECT token_hash FROM paperrust_device_token WHERE uuid = $1::uuid")
+            .bind(&dev)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(stored, pl_authz::device::hash(&token));
-        let (plain,): (i64,) = sqlx::query_as("SELECT count(*) FROM paperrust_device_token WHERE token_hash = $1 OR name = $1").bind(&token).fetch_one(&pool).await.unwrap();
+        let (plain,): (i64,) = sqlx::query_as("SELECT count(*) FROM paperrust_device_token WHERE token_hash = $1 OR name = $1")
+            .bind(&token)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(plain, 0, "no plaintext token in the DB");
         let list = get(&app, "/rs/api/v2/auth/devices", ALICE).await.json();
         assert!(list["items"].as_array().unwrap().iter().any(|d| d["uuid"] == dev.as_str()));
-        assert!(get(&app, "/rs/api/v2/auth/devices", BOB).await.json()["items"].as_array().unwrap().iter().all(|d| d["uuid"] != dev.as_str()));
+        assert!(
+            get(&app, "/rs/api/v2/auth/devices", BOB).await.json()["items"].as_array().unwrap().iter().all(|d| d["uuid"] != dev.as_str())
+        );
         let r = call(&app, Method::DELETE, &format!("/rs/api/v2/auth/devices/{dev}"), Some(BOB), None, &[]).await;
         assert_eq!(r.status, StatusCode::NOT_FOUND, "foreign device");
         let r = call(&app, Method::DELETE, &format!("/rs/api/v2/auth/devices/{dev}"), Some(&bearer), None, &[]).await;
@@ -566,10 +660,26 @@ async fn api_v2_against_db_copy() {
             .execute(&pool)
             .await
             .unwrap();
-        let r = call(&app, Method::POST, "/rs/api/v2/auth/devices", None, Some(json!({"username": "bob", "password": "bob", "device_name": "Phone"})), &[]).await;
+        let r = call(
+            &app,
+            Method::POST,
+            "/rs/api/v2/auth/devices",
+            None,
+            Some(json!({"username": "bob", "password": "bob", "device_name": "Phone"})),
+            &[],
+        )
+        .await;
         assert_eq!(r.status, StatusCode::BAD_REQUEST);
         assert!(r.json()["error"]["fields"]["code"].is_array());
-        let r = call(&app, Method::POST, "/rs/api/v2/auth/devices", None, Some(json!({"username": "bob", "password": "bob", "device_name": "Phone", "code": "000000"})), &[]).await;
+        let r = call(
+            &app,
+            Method::POST,
+            "/rs/api/v2/auth/devices",
+            None,
+            Some(json!({"username": "bob", "password": "bob", "device_name": "Phone", "code": "000000"})),
+            &[],
+        )
+        .await;
         assert_eq!(r.status, StatusCode::BAD_REQUEST);
         sqlx::query("DELETE FROM mfa_authenticator WHERE user_id = 4").execute(&pool).await.unwrap();
     });
@@ -578,7 +688,16 @@ async fn api_v2_against_db_copy() {
         let app2 = build(st2, true);
         let mut last = StatusCode::OK;
         for _ in 0..3 {
-            last = call(&app2, Method::POST, "/rs/api/v2/auth/devices", None, Some(json!({"username": "alice", "password": "wrong", "device_name": "x"})), &[]).await.status;
+            last = call(
+                &app2,
+                Method::POST,
+                "/rs/api/v2/auth/devices",
+                None,
+                Some(json!({"username": "alice", "password": "wrong", "device_name": "x"})),
+                &[],
+            )
+            .await
+            .status;
         }
         assert_eq!(last, StatusCode::TOO_MANY_REQUESTS);
     });
@@ -612,7 +731,15 @@ async fn api_v2_against_db_copy() {
         assert_eq!(v["items"].as_array().unwrap().len(), alice_docs.len());
         assert!(v["as_of_seq"].as_i64().unwrap() > 0);
         let tag = v2_all(&app, "/rs/api/v2/tags", ALICE, 1000).await[0].clone();
-        let r = call(&app, Method::POST, "/rs/api/v2/sync/resolve", Some(ALICE), Some(json!({"tags": [tag["uuid"]], "documents": [hidden_uuid]})), &[]).await;
+        let r = call(
+            &app,
+            Method::POST,
+            "/rs/api/v2/sync/resolve",
+            Some(ALICE),
+            Some(json!({"tags": [tag["uuid"]], "documents": [hidden_uuid]})),
+            &[],
+        )
+        .await;
         assert_eq!(r.status, StatusCode::OK, "{}", String::from_utf8_lossy(&r.body));
         let res = r.json();
         let v1 = get(&app, &format!("/api/documents/?tags__id__in={}&page_size=100000", tag["legacy_id"]), ALICE).await.json();

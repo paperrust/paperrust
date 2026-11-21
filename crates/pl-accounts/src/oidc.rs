@@ -48,7 +48,11 @@ impl std::fmt::Display for OidcError {
 }
 
 fn client() -> Result<reqwest::Client, OidcError> {
-    reqwest::Client::builder().user_agent(pl_core::brand::USER_AGENT).timeout(REQUESTS_TIMEOUT).build().map_err(|e| OidcError::Internal(e.to_string()))
+    reqwest::Client::builder()
+        .user_agent(pl_core::brand::USER_AGENT)
+        .timeout(REQUESTS_TIMEOUT)
+        .build()
+        .map_err(|e| OidcError::Internal(e.to_string()))
 }
 
 /// Python `urllib.parse.quote_plus(s, safe="")` (UTF-8).
@@ -133,7 +137,9 @@ pub fn scope(ctx: &Ctx, app: &App) -> Vec<String> {
 /// `get_auth_params_from_request`: setting `auth_params`/`AUTH_PARAMS` + `?auth_params=…`.
 pub fn auth_params(ctx: &Ctx, app: &App) -> Vec<(String, String)> {
     let mut ret: Vec<(String, String)> = match app_or_provider(ctx, app, "auth_params", "AUTH_PARAMS") {
-        Some(Value::Object(m)) => m.iter().map(|(k, v)| (k.clone(), v.as_str().map(str::to_string).unwrap_or_else(|| v.to_string()))).collect(),
+        Some(Value::Object(m)) => {
+            m.iter().map(|(k, v)| (k.clone(), v.as_str().map(str::to_string).unwrap_or_else(|| v.to_string()))).collect()
+        }
         _ => Vec::new(),
     };
     if let Some(d) = ctx.get("auth_params").filter(|d| !d.is_empty()) {
@@ -198,12 +204,23 @@ pub fn basic_auth(app: &App, cfg: &Map<String, Value>) -> bool {
     if let Some(m) = app.settings.get("token_auth_method").filter(|v| social::py_truthy(v)) {
         return m.as_str() == Some("client_secret_basic");
     }
-    let methods: Vec<&str> = cfg.get("token_endpoint_auth_methods_supported").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
+    let methods: Vec<&str> = cfg
+        .get("token_endpoint_auth_methods_supported")
+        .and_then(Value::as_array)
+        .map(|a| a.iter().filter_map(Value::as_str).collect())
+        .unwrap_or_default();
     !methods.contains(&"client_secret_post") && methods.contains(&"client_secret_basic")
 }
 
 /// `OAuth2Client.get_redirect_url(authorization_url, scope, extra_params)`.
-pub fn redirect_url(authorize_url: &str, client_id: &str, callback: &str, scope: &[String], state: &str, extra: &[(String, String)]) -> String {
+pub fn redirect_url(
+    authorize_url: &str,
+    client_id: &str,
+    callback: &str,
+    scope: &[String],
+    state: &str,
+    extra: &[(String, String)],
+) -> String {
     let mut uniq: Vec<String> = Vec::new();
     for s in scope {
         if !uniq.contains(s) {
@@ -232,12 +249,16 @@ fn basic_header(id: &str, secret: &str) -> String {
 }
 
 /// `OAuth2Client.get_access_token(code, pkce_code_verifier)`.
-pub async fn access_token(app: &App, token_url: &str, callback: &str, code: &str, basic: bool, verifier: Option<&str>) -> Result<Map<String, Value>, OidcError> {
-    let mut data: Vec<(String, String)> = vec![
-        ("redirect_uri".into(), callback.into()),
-        ("grant_type".into(), "authorization_code".into()),
-        ("code".into(), code.into()),
-    ];
+pub async fn access_token(
+    app: &App,
+    token_url: &str,
+    callback: &str,
+    code: &str,
+    basic: bool,
+    verifier: Option<&str>,
+) -> Result<Map<String, Value>, OidcError> {
+    let mut data: Vec<(String, String)> =
+        vec![("redirect_uri".into(), callback.into()), ("grant_type".into(), "authorization_code".into()), ("code".into(), code.into())];
     if !basic {
         data.push(("client_id".into(), app.client_id.clone()));
         data.push(("client_secret".into(), app.secret.clone()));
@@ -401,7 +422,17 @@ mod tests {
 
     #[test]
     fn redirect_url_order() {
-        let u = redirect_url("http://i/authorize", "cid", "https://h/cb/", &["openid".into(), "openid".into()], "st", &[("login_hint".into(), "a~b".into())]);
-        assert_eq!(u, "http://i/authorize?client_id=cid&redirect_uri=https%3A%2F%2Fh%2Fcb%2F&scope=openid&response_type=code&state=st&login_hint=a~b");
+        let u = redirect_url(
+            "http://i/authorize",
+            "cid",
+            "https://h/cb/",
+            &["openid".into(), "openid".into()],
+            "st",
+            &[("login_hint".into(), "a~b".into())],
+        );
+        assert_eq!(
+            u,
+            "http://i/authorize?client_id=cid&redirect_uri=https%3A%2F%2Fh%2Fcb%2F&scope=openid&response_type=code&state=st&login_hint=a~b"
+        );
     }
 }

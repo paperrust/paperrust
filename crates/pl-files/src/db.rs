@@ -5,8 +5,8 @@
 // Read-only data access for the file routes. SQL is built with sea-query.
 
 use chrono::{DateTime, NaiveDate, Utc};
-use sea_query::{Alias, Expr, JoinType, NullOrdering, Order, PostgresQueryBuilder, Query, SelectStatement};
 use pl_core::sqlbind::SqlxBinder;
+use sea_query::{Alias, Expr, JoinType, NullOrdering, Order, PostgresQueryBuilder, Query, SelectStatement};
 use sqlx::{PgPool, Row};
 
 fn a(s: &str) -> Alias {
@@ -49,10 +49,7 @@ fn doc_select() -> SelectStatement {
         .expr_as(Expr::col((a("d"), a("filename"))), a("filename"))
         .expr_as(Expr::col((a("d"), a("archive_filename"))), a("archive_filename"))
         .expr_as(Expr::col((a("d"), a("owner_id"))).cast_as(a("BIGINT")), a("owner_id"))
-        .expr_as(
-            Expr::col((a("d"), a("root_document_id"))).cast_as(a("BIGINT")),
-            a("root_document_id"),
-        )
+        .expr_as(Expr::col((a("d"), a("root_document_id"))).cast_as(a("BIGINT")), a("root_document_id"))
         .expr_as(Expr::col((a("c"), a("name"))), a("correspondent"))
         .join_as(
             JoinType::LeftJoin,
@@ -99,9 +96,7 @@ pub async fn latest_version(db: &PgPool, root: &DocRow, include_deleted: bool) -
     if !include_deleted {
         q.and_where(Expr::col((a("d"), a("deleted_at"))).is_null());
     }
-    q.order_by_with_nulls((a("d"), a("version_index")), Order::Desc, NullOrdering::Last)
-        .order_by((a("d"), a("id")), Order::Desc)
-        .limit(1);
+    q.order_by_with_nulls((a("d"), a("version_index")), Order::Desc, NullOrdering::Last).order_by((a("d"), a("id")), Order::Desc).limit(1);
     let (sql, values) = q.build_sqlx(PostgresQueryBuilder);
     let row = sqlx::query_with(&sql, values).fetch_optional(db).await?;
     match row.as_ref().map(row_to_doc).transpose()? {
@@ -209,15 +204,10 @@ pub struct AppConfigRow {
 /// `ApplicationConfiguration.objects.first()` (singleton, ordered by pk).
 pub async fn app_config(db: &PgPool) -> Result<Option<AppConfigRow>, sqlx::Error> {
     let mut q = Query::select();
-    q.columns([
-        a("app_logo"),
-        a("remote_ocr_engine"),
-        a("remote_ocr_api_key"),
-        a("remote_ocr_endpoint"),
-    ])
-    .from(a("paperless_applicationconfiguration"))
-    .order_by(a("id"), Order::Asc)
-    .limit(1);
+    q.columns([a("app_logo"), a("remote_ocr_engine"), a("remote_ocr_api_key"), a("remote_ocr_endpoint")])
+        .from(a("paperless_applicationconfiguration"))
+        .order_by(a("id"), Order::Asc)
+        .limit(1);
     let (sql, values) = q.build_sqlx(PostgresQueryBuilder);
     let row = sqlx::query_with(&sql, values).fetch_optional(db).await?;
     match row {

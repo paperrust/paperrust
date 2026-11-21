@@ -11,14 +11,14 @@ use serde_json::Value;
 use sqlx::PgConnection;
 
 use pl_consumer::db::DocRow;
-use pl_consumer::workflows::{
-    ACTION_APPLY_AI_SUGGESTIONS, ACTION_ASSIGNMENT, ACTION_EMAIL, ACTION_MOVE_TO_TRASH, ACTION_PASSWORD_REMOVAL,
-    ACTION_REMOTE_OCR, ACTION_REMOVAL, ACTION_WEBHOOK, ActionDef, record_run, workflows_for_trigger,
-};
-/// Result of a workflow run (also for `versions.rs`/`update.rs` via `crate::workflows`).
-pub use pl_consumer::workflows::RunOutcome;
 use pl_consumer::stages::ActionInput;
 use pl_consumer::workflow_ext::{self, AiMode, Decision, DeferredRun, ExtOptions, MatchState};
+/// Result of a workflow run (also for `versions.rs`/`update.rs` via `crate::workflows`).
+pub use pl_consumer::workflows::RunOutcome;
+use pl_consumer::workflows::{
+    ACTION_APPLY_AI_SUGGESTIONS, ACTION_ASSIGNMENT, ACTION_EMAIL, ACTION_MOVE_TO_TRASH, ACTION_PASSWORD_REMOVAL, ACTION_REMOTE_OCR,
+    ACTION_REMOVAL, ACTION_WEBHOOK, ActionDef, record_run, workflows_for_trigger,
+};
 use pl_matching::workflow::{ExistingDocument, ObjRef, TRIGGER_DOCUMENT_UPDATED, WorkflowDocument, document_matches_workflow};
 
 use crate::auditlog::LogCtx;
@@ -233,14 +233,8 @@ async fn run_branch(
             }
         }
         doc.title = doc.title.chars().take(128).collect();
-        docs::save(
-            conn,
-            ctx,
-            Some(media),
-            doc,
-            Some(&["title", "correspondent", "document_type", "storage_path", "owner", "modified"]),
-        )
-        .await?;
+        docs::save(conn, ctx, Some(media), doc, Some(&["title", "correspondent", "document_type", "storage_path", "owner", "modified"]))
+            .await?;
         record_run(conn, wf.id, TRIGGER_DOCUMENT_UPDATED, Some(doc.id)).await?;
         if let Some(mut r) = workflow_ext::record_for(wf, TRIGGER_DOCUMENT_UPDATED, Some(doc.id), decision) {
             r.changed_fields = workflow_ext::changed_fields(&before, Some(doc), actions);
@@ -319,10 +313,7 @@ async fn assignment(
         let dtype = name_of(conn, "documents_documenttype", doc.document_type_id).await?.map(|o| o.name);
         let owner: Option<String> = match doc.owner_id {
             // same SQL text as pl-accounts (binds int8) → likewise i64 (FINDINGS B3)
-            Some(o) => sqlx::query_scalar("SELECT username FROM auth_user WHERE id = $1")
-                .bind(o)
-                .fetch_optional(&mut *conn)
-                .await?,
+            Some(o) => sqlx::query_scalar("SELECT username FROM auth_user WHERE id = $1").bind(o).fetch_optional(&mut *conn).await?,
             None => None,
         };
         let p = pl_templating::WorkflowPlaceholders {

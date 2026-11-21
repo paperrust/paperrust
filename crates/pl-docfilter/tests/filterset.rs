@@ -14,10 +14,7 @@ fn no_params_no_where() {
 
 #[test]
 fn number_filter_errors_like_django_forms() {
-    assert_eq!(
-        validation(filter_sql("archive_serial_number=abc")),
-        json!({"archive_serial_number": ["Enter a number."]})
-    );
+    assert_eq!(validation(filter_sql("archive_serial_number=abc")), json!({"archive_serial_number": ["Enter a number."]}));
     assert_eq!(validation(filter_sql("id__in=1,x")), json!({"id__in": ["Enter a number."]}));
     assert_eq!(validation(filter_sql("id=NaN")), json!({"id": ["Enter a number."]}));
     assert_eq!(
@@ -34,10 +31,7 @@ fn number_filter_errors_like_django_forms() {
 #[test]
 fn date_and_datetime_errors() {
     assert_eq!(validation(filter_sql("created__gt=bad")), json!({"created__gt": ["Enter a valid date."]}));
-    assert_eq!(
-        validation(filter_sql("added__date__lte=2024-02-30")),
-        json!({"added__date__lte": ["Enter a valid date."]})
-    );
+    assert_eq!(validation(filter_sql("added__date__lte=2024-02-30")), json!({"added__date__lte": ["Enter a valid date."]}));
     assert_eq!(validation(filter_sql("added__gt=bad")), json!({"added__gt": ["Enter a valid date/time."]}));
     assert_eq!(
         validation(filter_sql("modified__lt=2024-03-31T02:30:00")),
@@ -77,27 +71,15 @@ fn empty_values_are_ignored() {
 fn id_and_number_lookups() {
     assert_eq!(filter_sql("id=5").unwrap(), r#"WHERE "documents_document"."id" = 5"#);
     // int(Decimal("1.9")) == 1
-    assert_eq!(
-        filter_sql("archive_serial_number=1.9").unwrap(),
-        r#"WHERE "documents_document"."archive_serial_number" = 1"#
-    );
-    assert_eq!(
-        filter_sql("archive_serial_number__gte=%2010%20").unwrap(),
-        r#"WHERE "documents_document"."archive_serial_number" >= 10"#
-    );
+    assert_eq!(filter_sql("archive_serial_number=1.9").unwrap(), r#"WHERE "documents_document"."archive_serial_number" = 1"#);
+    assert_eq!(filter_sql("archive_serial_number__gte=%2010%20").unwrap(), r#"WHERE "documents_document"."archive_serial_number" >= 10"#);
     // IntegerFieldOverflow: PositiveIntegerField (0..2147483647)
     assert_eq!(filter_sql("archive_serial_number__gt=-1").unwrap(), "");
     assert_eq!(filter_sql("archive_serial_number=99999999999").unwrap(), "WHERE FALSE");
     assert_eq!(filter_sql("archive_serial_number__lt=99999999999").unwrap(), "");
     assert_eq!(filter_sql("archive_serial_number__lte=-5").unwrap(), "WHERE FALSE");
-    assert_eq!(
-        filter_sql("archive_serial_number__isnull=TRUE").unwrap(),
-        r#"WHERE "documents_document"."archive_serial_number" IS NULL"#
-    );
-    assert_eq!(
-        filter_sql("id__in=3,%204,5").unwrap(),
-        r#"WHERE "documents_document"."id" IN (3, 4, 5)"#
-    );
+    assert_eq!(filter_sql("archive_serial_number__isnull=TRUE").unwrap(), r#"WHERE "documents_document"."archive_serial_number" IS NULL"#);
+    assert_eq!(filter_sql("id__in=3,%204,5").unwrap(), r#"WHERE "documents_document"."id" IN (3, 4, 5)"#);
     // [None, None] → id__in=[] → EmptyResultSet
     assert_eq!(filter_sql("id__in=,").unwrap(), "WHERE FALSE");
     assert_eq!(filter_sql("id__in=1,").unwrap(), r#"WHERE "documents_document"."id" IN (1)"#);
@@ -173,10 +155,7 @@ fn char_lookups() {
         filter_sql("correspondent__name__iendswith=x").unwrap(),
         r#"WHERE "documents_document"."correspondent_id" IN (SELECT "fkn"."id" FROM "documents_correspondent" AS "fkn" WHERE UPPER(("fkn"."name")::text) LIKE UPPER('%x'))"#
     );
-    assert_eq!(
-        filter_sql("mime_type=%20pdf%20").unwrap(),
-        r#"WHERE UPPER(("documents_document"."mime_type")::text) LIKE UPPER('%pdf%')"#
-    );
+    assert_eq!(filter_sql("mime_type=%20pdf%20").unwrap(), r#"WHERE UPPER(("documents_document"."mime_type")::text) LIKE UPPER('%pdf%')"#);
 }
 
 #[test]
@@ -192,27 +171,21 @@ fn content_filters_use_effective_content() {
 
 #[test]
 fn date_filters() {
-    assert_eq!(
-        filter_sql("created__gt=2024-01-05").unwrap(),
-        r#"WHERE "documents_document"."created" > '2024-01-05'"#
-    );
-    assert_eq!(
-        filter_sql("created__date__lte=10/25/2006").unwrap(),
-        r#"WHERE "documents_document"."created" <= '2006-10-25'"#
-    );
-    assert_eq!(
-        filter_sql("created__year=2024").unwrap(),
-        r#"WHERE "documents_document"."created" BETWEEN '2024-01-01' AND '2024-12-31'"#
-    );
+    assert_eq!(filter_sql("created__gt=2024-01-05").unwrap(), r#"WHERE "documents_document"."created" > '2024-01-05'"#);
+    assert_eq!(filter_sql("created__date__lte=10/25/2006").unwrap(), r#"WHERE "documents_document"."created" <= '2006-10-25'"#);
+    assert_eq!(filter_sql("created__year=2024").unwrap(), r#"WHERE "documents_document"."created" BETWEEN '2024-01-01' AND '2024-12-31'"#);
     // upstream ValueError → 500; PaperRust 400 (B-305/D-039)
-    for q in ["created__year=0", "created__year=-1", "created__year=10000", "created__year=99999999999", "created__year=999999999999999999999999"] {
+    for q in [
+        "created__year=0",
+        "created__year=-1",
+        "created__year=10000",
+        "created__year=99999999999",
+        "created__year=999999999999999999999999",
+    ] {
         assert_eq!(validation(filter_sql(q)), serde_json::json!({"created__year": ["Ensure this value is between 1 and 9999."]}), "{q}");
     }
     assert_eq!(validation(filter_sql("added__year=-1")), serde_json::json!({"added__year": ["Ensure this value is between 1 and 9999."]}));
-    assert_eq!(
-        filter_sql("created__month=5").unwrap(),
-        r#"WHERE (EXTRACT(MONTH FROM "documents_document"."created")) = 5"#
-    );
+    assert_eq!(filter_sql("created__month=5").unwrap(), r#"WHERE (EXTRACT(MONTH FROM "documents_document"."created")) = 5"#);
     assert_eq!(filter_sql("created__day=99999999999").unwrap(), "WHERE FALSE");
     // added__date__gt=2024-01-01 in Europe/Berlin ⇔ added >= 2024-01-01T23:00:00Z
     assert_eq!(
@@ -248,19 +221,28 @@ fn shared_by_and_duplicates() {
     assert!(is_internal(&filter_sql("shared_by__id=")));
     assert_eq!(filter_sql("shared_by__id=99999999999").unwrap(), "WHERE FALSE");
     let s = filter_sql("shared_by__id=5").unwrap();
-    assert!(s.starts_with(r#"WHERE "documents_document"."owner_id" = 5 AND (EXISTS(SELECT 1 FROM "guardian_userobjectpermission" AS "sbu""#), "{s}");
+    assert!(
+        s.starts_with(r#"WHERE "documents_document"."owner_id" = 5 AND (EXISTS(SELECT 1 FROM "guardian_userobjectpermission" AS "sbu""#),
+        "{s}"
+    );
     assert!(s.contains(r#""sbu"."object_pk" = (CAST("documents_document"."id" AS varchar))"#), "{s}");
     assert!(s.contains(r#"OR EXISTS(SELECT 1 FROM "guardian_groupobjectpermission" AS "sbg""#));
 
     let su = filter_sql("has_duplicates=true").unwrap();
     // Candidate prefilter (superset via the checksum indexes), then the exact condition
     let (cand, exact) = su.split_once(" AND EXISTS(").expect("Kandidaten + EXISTS");
-    assert!(cand.starts_with(r#"WHERE ("documents_document"."id" = ANY(ARRAY(SELECT "dupc"."id" FROM "documents_document" AS "dupc""#), "{su}");
+    assert!(
+        cand.starts_with(r#"WHERE ("documents_document"."id" = ANY(ARRAY(SELECT "dupc"."id" FROM "documents_document" AS "dupc""#),
+        "{su}"
+    );
     assert!(cand.contains(r#"GROUP BY "dupk1"."checksum" HAVING COUNT(*) > 1"#), "{su}");
     assert!(cand.contains(r#"GROUP BY "dupk2"."archive_checksum" HAVING COUNT(*) > 1"#), "{su}");
     assert!(!cand.contains("guardian"));
     let su = format!("WHERE EXISTS({exact}");
-    assert_eq!(su,r#"WHERE EXISTS(SELECT 1 FROM "documents_document" AS "dup" WHERE "dup"."root_document_id" IS NULL AND (NOT "dup"."id" = "documents_document"."id") AND ("dup"."checksum" = "documents_document"."checksum" OR "dup"."checksum" = (NULLIF("documents_document"."archive_checksum", '')) OR "dup"."archive_checksum" = "documents_document"."checksum" OR "dup"."archive_checksum" = (NULLIF("documents_document"."archive_checksum", ''))))"#);
+    assert_eq!(
+        su,
+        r#"WHERE EXISTS(SELECT 1 FROM "documents_document" AS "dup" WHERE "dup"."root_document_id" IS NULL AND (NOT "dup"."id" = "documents_document"."id") AND ("dup"."checksum" = "documents_document"."checksum" OR "dup"."checksum" = (NULLIF("documents_document"."archive_checksum", '')) OR "dup"."archive_checksum" = "documents_document"."checksum" OR "dup"."archive_checksum" = (NULLIF("documents_document"."archive_checksum", ''))))"#
+    );
     assert!(!su.contains("guardian"));
     let reg = filter_sql_with("has_duplicates=0", &regular_user(), &ctx(), &upstream_fields()).unwrap();
     assert!(reg.starts_with("WHERE NOT EXISTS"), "{reg}");
@@ -300,11 +282,11 @@ fn search_filter() {
     let sql = filter_sql("search=foo%20%22bar%20baz%22").unwrap();
     assert!(sql.contains(r#"UPPER(("documents_document"."title")::text) LIKE UPPER('%foo%')"#), "{sql}");
     assert!(sql.contains(r#"LIKE UPPER('%bar baz%')"#), "{sql}");
-    assert!(sql.contains(r#""documents_document"."correspondent_id" IN (SELECT "sc"."id" FROM "documents_correspondent" AS "sc""#), "{sql}");
-    assert_eq!(
-        validation(filter_sql("search=a%00")),
-        json!(["Null characters are not allowed."])
+    assert!(
+        sql.contains(r#""documents_document"."correspondent_id" IN (SELECT "sc"."id" FROM "documents_correspondent" AS "sc""#),
+        "{sql}"
     );
+    assert_eq!(validation(filter_sql("search=a%00")), json!(["Null characters are not allowed."]));
 }
 
 #[test]
@@ -318,13 +300,34 @@ fn filters_only_add_and_conditions() {
 fn filter_names_cover_upstream_filterset() {
     let names = pl_docfilter::filterset::filter_names();
     for n in [
-        "id", "id__in", "title__icontains", "archive_serial_number__isnull", "created__year",
-        "added__date__gte", "modified__lte", "correspondent__isnull", "correspondent__id__in",
-        "tags__id__all", "tags__id__none", "tags__id__in", "is_tagged", "is_in_inbox",
-        "title_content", "content__iexact", "owner__id__none", "custom_fields__icontains",
-        "custom_fields__id__all", "custom_fields__id__none", "custom_fields__id__in",
-        "has_custom_fields", "custom_field_query", "shared_by__id", "mime_type",
-        "has_duplicates", "created__date__gt", "storage_path__name__iexact",
+        "id",
+        "id__in",
+        "title__icontains",
+        "archive_serial_number__isnull",
+        "created__year",
+        "added__date__gte",
+        "modified__lte",
+        "correspondent__isnull",
+        "correspondent__id__in",
+        "tags__id__all",
+        "tags__id__none",
+        "tags__id__in",
+        "is_tagged",
+        "is_in_inbox",
+        "title_content",
+        "content__iexact",
+        "owner__id__none",
+        "custom_fields__icontains",
+        "custom_fields__id__all",
+        "custom_fields__id__none",
+        "custom_fields__id__in",
+        "has_custom_fields",
+        "custom_field_query",
+        "shared_by__id",
+        "mime_type",
+        "has_duplicates",
+        "created__date__gt",
+        "storage_path__name__iexact",
     ] {
         assert!(names.contains(&n), "{n}");
     }

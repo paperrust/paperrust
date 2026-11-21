@@ -45,8 +45,7 @@ impl SecretBox {
     pub fn from_secret_key(secret_key: &str) -> Self {
         let hk = Hkdf::<Sha256>::new(Some(SALT), secret_key.as_bytes());
         let mut key = [0u8; 32];
-        hk.expand(INFO, &mut key)
-            .expect("32 bytes is a valid HKDF-SHA256 output length");
+        hk.expand(INFO, &mut key).expect("32 bytes is a valid HKDF-SHA256 output length");
         let digest = Sha256::digest(key);
         let kid = digest[..8].iter().map(|b| format!("{b:02x}")).collect();
         Self { key, kid }
@@ -63,13 +62,7 @@ impl SecretBox {
         let mut nonce = [0u8; NONCE_LEN];
         rand::thread_rng().fill_bytes(&mut nonce);
         let ct = cipher
-            .encrypt(
-                XNonce::from_slice(&nonce),
-                Payload {
-                    msg: plain.as_bytes(),
-                    aad: name.as_bytes(),
-                },
-            )
+            .encrypt(XNonce::from_slice(&nonce), Payload { msg: plain.as_bytes(), aad: name.as_bytes() })
             .expect("XChaCha20-Poly1305 encryption cannot fail for in-memory buffers");
         let mut out = nonce.to_vec();
         out.extend_from_slice(&ct);
@@ -86,15 +79,8 @@ impl SecretBox {
         }
         let (nonce, ct) = data.split_at(NONCE_LEN);
         let cipher = XChaCha20Poly1305::new(chacha20poly1305::Key::from_slice(&self.key));
-        let plain = cipher
-            .decrypt(
-                XNonce::from_slice(nonce),
-                Payload {
-                    msg: ct,
-                    aad: name.as_bytes(),
-                },
-            )
-            .map_err(|_| CryptoError::Corrupt)?;
+        let plain =
+            cipher.decrypt(XNonce::from_slice(nonce), Payload { msg: ct, aad: name.as_bytes() }).map_err(|_| CryptoError::Corrupt)?;
         String::from_utf8(plain).map_err(|_| CryptoError::Corrupt)
     }
 }
@@ -108,18 +94,11 @@ mod tests {
         let b = SecretBox::from_secret_key("s3cret-key-for-tests");
         let ct = b.seal("PAPERLESS_EMAIL_HOST_PASSWORD", "hunter2");
         assert!(!ct.windows(7).any(|w| w == b"hunter2"));
-        assert_eq!(
-            b.open("PAPERLESS_EMAIL_HOST_PASSWORD", b.kid(), &ct)
-                .unwrap(),
-            "hunter2"
-        );
+        assert_eq!(b.open("PAPERLESS_EMAIL_HOST_PASSWORD", b.kid(), &ct).unwrap(), "hunter2");
         // new nonce every time
         assert_ne!(ct, b.seal("PAPERLESS_EMAIL_HOST_PASSWORD", "hunter2"));
         assert_eq!(b.kid().len(), 16);
-        assert_eq!(
-            b.kid(),
-            SecretBox::from_secret_key("s3cret-key-for-tests").kid()
-        );
+        assert_eq!(b.kid(), SecretBox::from_secret_key("s3cret-key-for-tests").kid());
     }
 
     #[test]
@@ -127,15 +106,9 @@ mod tests {
         let a = SecretBox::from_secret_key("key-a");
         let b = SecretBox::from_secret_key("key-b");
         let ct = a.seal("K", "v");
-        assert_eq!(
-            b.open("K", a.kid(), &ct),
-            Err(CryptoError::WrongKey(a.kid().to_string()))
-        );
+        assert_eq!(b.open("K", a.kid(), &ct), Err(CryptoError::WrongKey(a.kid().to_string())));
         // same identifier faked → AEAD fails
-        let forged = SecretBox {
-            key: b.key,
-            kid: a.kid().to_string(),
-        };
+        let forged = SecretBox { key: b.key, kid: a.kid().to_string() };
         assert_eq!(forged.open("K", a.kid(), &ct), Err(CryptoError::Corrupt));
         // AAD: not readable under a different name
         assert_eq!(a.open("OTHER", a.kid(), &ct), Err(CryptoError::Corrupt));

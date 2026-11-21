@@ -39,13 +39,7 @@ pub(crate) async fn file(store: &Store, p: &Principal, uuid: Uuid, variant: File
     if use_archive {
         let path = arch.ok_or(DomainError::NotFound)?;
         let filename = pl_files::docfile::public_filename(cx, &row, &root, true, 0).await.map_err(db_err)?;
-        return Ok(FileRef {
-            path,
-            content_type: "application/pdf".into(),
-            filename,
-            checksum: f.archive_checksum.clone(),
-            inline,
-        });
+        return Ok(FileRef { path, content_type: "application/pdf".into(), filename, checksum: f.archive_checksum.clone(), inline });
     }
     let path = orig.ok_or(DomainError::NotFound)?;
     let filename = pl_files::docfile::public_filename(cx, &row, &root, false, 0).await.map_err(db_err)?;

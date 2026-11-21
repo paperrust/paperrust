@@ -49,11 +49,7 @@ pub fn float_repr(f: f64) -> String {
         };
         format!("{sign}{s}")
     } else {
-        let m = if digits.len() > 1 {
-            format!("{}.{}", &digits[..1], &digits[1..])
-        } else {
-            digits.clone()
-        };
+        let m = if digits.len() > 1 { format!("{}.{}", &digits[..1], &digits[1..]) } else { digits.clone() };
         let es = if exp < 0 { "-" } else { "+" };
         format!("{sign}{m}e{es}{:02}", exp.abs())
     }
@@ -88,13 +84,9 @@ pub fn repr(v: &Value) -> String {
     match v {
         Value::String(s) => py_repr_str(s),
         Value::Array(a) => format!("[{}]", a.iter().map(repr).collect::<Vec<_>>().join(", ")),
-        Value::Object(o) => format!(
-            "{{{}}}",
-            o.iter()
-                .map(|(k, v)| format!("{}: {}", py_repr_str(k), repr(v)))
-                .collect::<Vec<_>>()
-                .join(", ")
-        ),
+        Value::Object(o) => {
+            format!("{{{}}}", o.iter().map(|(k, v)| format!("{}: {}", py_repr_str(k), repr(v))).collect::<Vec<_>>().join(", "))
+        }
         other => to_str(other),
     }
 }
@@ -180,11 +172,7 @@ pub fn py_int(v: &Value) -> PyInt {
                 PyInt::Ok(u as i128)
             } else {
                 let f = n.as_f64().unwrap_or(f64::NAN);
-                if f.is_finite() {
-                    PyInt::Ok(f.trunc() as i128)
-                } else {
-                    PyInt::Invalid
-                }
+                if f.is_finite() { PyInt::Ok(f.trunc() as i128) } else { PyInt::Invalid }
             }
         }
         Value::String(s) => match parse_py_int(s) {

@@ -62,10 +62,7 @@ fn ident(t: &str) -> String {
 }
 
 async fn table_exists(conn: &mut PgConnection, t: &str) -> CliResult<bool> {
-    let ok: bool = sqlx::query_scalar("SELECT to_regclass('public.' || quote_ident($1)) IS NOT NULL")
-        .bind(t)
-        .fetch_one(&mut *conn)
-        .await?;
+    let ok: bool = sqlx::query_scalar("SELECT to_regclass('public.' || quote_ident($1)) IS NOT NULL").bind(t).fetch_one(&mut *conn).await?;
     Ok(ok)
 }
 

@@ -19,10 +19,7 @@ pub struct ValueError {
 }
 
 fn err(def: &SettingDef, message: impl Into<String>) -> ValueError {
-    ValueError {
-        key: def.key.to_string(),
-        message: message.into(),
-    }
+    ValueError { key: def.key.to_string(), message: message.into() }
 }
 
 /// Typed value after parsing (for parity tests and consumers).
@@ -55,8 +52,7 @@ pub fn parse_from_env(def: &SettingDef, env: &Env) -> Result<Option<Parsed>, Val
         Ty::OnOff => Parsed::Bool(match raw.trim().to_ascii_lowercase().as_str() {
             "on" => true,
             "off" => false,
-            v => pl_core::config::str_to_bool(v)
-                .ok_or_else(|| err(def, format!("expected on or off, got '{raw}'")))?,
+            v => pl_core::config::str_to_bool(v).ok_or_else(|| err(def, format!("expected on or off, got '{raw}'")))?,
         }),
         Ty::Int { min, max } => {
             let v = env.int(def.key).map_err(ce)?.unwrap_or_default();
@@ -81,9 +77,7 @@ pub fn parse_from_env(def: &SettingDef, env: &Env) -> Result<Option<Parsed>, Val
         Ty::Json { shape } => {
             let v = env.json(def.key).map_err(ce)?.unwrap_or(Value::Null);
             match (shape, &v) {
-                (JsonShape::Any, _)
-                | (JsonShape::Object, Value::Object(_))
-                | (JsonShape::Array, Value::Array(_)) => {}
+                (JsonShape::Any, _) | (JsonShape::Object, Value::Object(_)) | (JsonShape::Array, Value::Array(_)) => {}
                 (JsonShape::Object, _) => return Err(err(def, "must be a JSON object")),
                 (JsonShape::Array, _) => return Err(err(def, "must be a JSON list")),
             }
@@ -92,26 +86,18 @@ pub fn parse_from_env(def: &SettingDef, env: &Env) -> Result<Option<Parsed>, Val
         Ty::List => Parsed::List(env.list(def.key, &[])),
         Ty::Choice { choices } => {
             if !choices.contains(&raw) {
-                return Err(err(
-                    def,
-                    format!(
-                        "invalid value '{raw}'. Valid choices are: {}",
-                        choices.join(", ")
-                    ),
-                ));
+                return Err(err(def, format!("invalid value '{raw}'. Valid choices are: {}", choices.join(", "))));
             }
             Parsed::Str(raw.to_string())
         }
         Ty::Cron => {
             if raw != "disable" {
-                pl_queue::cron::Crontab::from_paperless(raw)
-                    .map_err(|e| err(def, e.to_string()))?;
+                pl_queue::cron::Crontab::from_paperless(raw).map_err(|e| err(def, e.to_string()))?;
             }
             Parsed::Str(raw.to_string())
         }
         Ty::TimeZone => {
-            raw.parse::<chrono_tz::Tz>()
-                .map_err(|_| err(def, format!("Incorrect timezone setting: {raw}")))?;
+            raw.parse::<chrono_tz::Tz>().map_err(|_| err(def, format!("Incorrect timezone setting: {raw}")))?;
             Parsed::Str(raw.to_string())
         }
         Ty::Url => {
@@ -128,8 +114,7 @@ pub fn parse_from_env(def: &SettingDef, env: &Env) -> Result<Option<Parsed>, Val
 
 /// Additional checks per key (§2.4).
 fn extra_checks(def: &SettingDef, p: &Parsed) -> Result<(), ValueError> {
-    if let ("PAPERLESS_CONSUMER_IGNORE_PATTERNS", Parsed::Json(Value::Array(items))) = (def.key, p)
-    {
+    if let ("PAPERLESS_CONSUMER_IGNORE_PATTERNS", Parsed::Json(Value::Array(items))) = (def.key, p) {
         for it in items {
             let Some(s) = it.as_str() else {
                 return Err(err(def, "every pattern must be a string"));
@@ -158,9 +143,7 @@ pub fn to_json(def: &SettingDef, raw: &str) -> Value {
     match parse(def, raw) {
         Ok(Parsed::Bool(b)) => Value::Bool(b),
         Ok(Parsed::Int(i)) => Value::from(i),
-        Ok(Parsed::Float(f)) => serde_json::Number::from_f64(f)
-            .map(Value::Number)
-            .unwrap_or(Value::String(raw.into())),
+        Ok(Parsed::Float(f)) => serde_json::Number::from_f64(f).map(Value::Number).unwrap_or(Value::String(raw.into())),
         Ok(Parsed::List(l)) => Value::Array(l.into_iter().map(Value::String).collect()),
         Ok(Parsed::Json(v)) => v,
         Ok(Parsed::Str(s)) => Value::String(s),
@@ -179,9 +162,7 @@ pub fn from_json(def: &SettingDef, v: &Value) -> Result<String, ValueError> {
         (Ty::List, Value::Array(items)) => {
             let mut parts = Vec::new();
             for i in items {
-                let s = i
-                    .as_str()
-                    .ok_or_else(|| err(def, "list entries must be strings"))?;
+                let s = i.as_str().ok_or_else(|| err(def, "list entries must be strings"))?;
                 if s.contains(',') {
                     return Err(err(def, "list entries must not contain ','"));
                 }
@@ -192,10 +173,7 @@ pub fn from_json(def: &SettingDef, v: &Value) -> Result<String, ValueError> {
         (Ty::Json { .. }, v) => serde_json::to_string(v).map_err(|e| err(def, e.to_string()))?,
         (_, Value::String(s)) => s.clone(),
         (_, other) => {
-            return Err(err(
-                def,
-                format!("unexpected JSON type for this setting: {other}"),
-            ));
+            return Err(err(def, format!("unexpected JSON type for this setting: {other}")));
         }
     };
     parse(def, &raw)?;
@@ -228,9 +206,7 @@ mod tests {
         let ch = find("PAPERLESS_OCR_MODE").unwrap();
         assert!(parse(ch, "redo").is_ok() && parse(ch, "nope").is_err());
         let up = find("PAPERLESS_ENABLE_UPDATE_CHECK").unwrap();
-        assert!(
-            parse(up, "default").is_ok() && parse(up, "no").is_ok() && parse(up, "bla").is_err()
-        );
+        assert!(parse(up, "default").is_ok() && parse(up, "no").is_ok() && parse(up, "bla").is_err());
     }
 
     #[test]
@@ -238,10 +214,7 @@ mod tests {
         let l = find("PAPERLESS_ALLOWED_HOSTS").unwrap();
         let raw = from_json(l, &serde_json::json!(["a.example", "b.example"])).unwrap();
         assert_eq!(raw, "a.example,b.example");
-        assert_eq!(
-            to_json(l, &raw),
-            serde_json::json!(["a.example", "b.example"])
-        );
+        assert_eq!(to_json(l, &raw), serde_json::json!(["a.example", "b.example"]));
         let b = find("PAPERLESS_EMAIL_USE_SSL").unwrap();
         assert_eq!(from_json(b, &Value::Bool(true)).unwrap(), "true");
         assert!(from_json(b, &Value::from(1)).is_err());

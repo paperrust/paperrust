@@ -26,12 +26,7 @@ pub const DOC: &str = pl_docfilter::DOC;
 
 /// `self.filter_queryset(self.get_queryset())` as `SELECT documents_document.id …` with
 /// full ordering. Filter errors (400/500) as upstream.
-pub async fn filtered_documents(
-    db: &sqlx::PgPool,
-    tz: chrono_tz::Tz,
-    user: &User,
-    params: &QueryParams,
-) -> ApiResult<SelectStatement> {
+pub async fn filtered_documents(db: &sqlx::PgPool, tz: chrono_tz::Tz, user: &User, params: &QueryParams) -> ApiResult<SelectStatement> {
     Ok(filtered_documents_ext(db, tz, user, params).await?.0)
 }
 
@@ -51,7 +46,6 @@ pub async fn filtered_documents_ext(
     let fctx = FilterContext::new(tz);
     Ok(pl_store::docsql::v1_list(db, &fctx, user, params).await?)
 }
-
 
 /// Convert a pl-search response (400/403) into an `ApiError` with an identical body.
 pub fn view_response(r: ViewResponse) -> ApiError {
@@ -77,9 +71,7 @@ impl FilteredDocuments for Filtered<'_> {
             // filtered_qs.filter(pk__in=ids) – in ORM order
             let mut q = self.q.clone();
             q.and_where(id_in_list(Expr::col((a(DOC), a("id"))).into(), ids));
-            id_list(self.db, &q)
-                .await
-                .map_err(|e| ViewError::Internal(e.to_string()))
+            id_list(self.db, &q).await.map_err(|e| ViewError::Internal(e.to_string()))
         })
     }
 
@@ -87,21 +79,14 @@ impl FilteredDocuments for Filtered<'_> {
         Box::pin(async move {
             let mut q = self.q.clone();
             q.clear_order_by();
-            id_list(self.db, &q)
-                .await
-                .map_err(|e| ViewError::Internal(e.to_string()))
+            id_list(self.db, &q).await.map_err(|e| ViewError::Internal(e.to_string()))
         })
     }
 }
 
 /// Search branch of `UnifiedSearchViewSet.list`. `q` = filtered set (already built, so that
 /// filter errors come before query errors as upstream).
-pub async fn search_list(
-    state: &AppState,
-    ctx: &RequestContext,
-    user: &User,
-    q: SelectStatement,
-) -> ApiResult<Value> {
+pub async fn search_list(state: &AppState, ctx: &RequestContext, user: &User, q: SelectStatement) -> ApiResult<Value> {
     // `more_like_id` (docs/STANDALONE-GAPS.md §4.2): in Rust since 2026-11-10. The order
     // of equally weighted MLT terms is already random upstream (rule
     // `more-like-this-upstream-nondeterministic`); version→root is mapped by `more_like_lookup`.
@@ -113,13 +98,11 @@ pub async fn search_list(
     let ruser = pl_search::routes::request_user(user);
     let page_size = usize::try_from(req.page_size).unwrap_or(usize::MAX);
     // L3: all hit IDs only for API v9 `all` and selection_data, otherwise only up to the end of the page
-    let need_all_ids = ctx.version().includes_all()
-        || pl_authz::owned::get_boolean(ctx.query.get("include_selection_data").unwrap_or("false"));
+    let need_all_ids =
+        ctx.version().includes_all() || pl_authz::owned::get_boolean(ctx.query.get("include_selection_data").unwrap_or("false"));
     let opts = pl_search::views::SearchOptions { need_all_ids, ..Default::default() };
     let outcome =
-        pl_search::views::document_search_with(db, backend, &ruser, params, page_size, &filtered, opts)
-            .await
-            .map_err(view_error)?;
+        pl_search::views::document_search_with(db, backend, &ruser, params, page_size, &filtered, opts).await.map_err(view_error)?;
     let page = match outcome {
         DocumentSearchOutcome::Page(p) => p,
         DocumentSearchOutcome::Response(r) => return Err(view_response(r)),
@@ -139,25 +122,14 @@ pub async fn search_list(
     if docs.len() != hits.len() {
         return Err(ApiError::internal("search hit without document"));
     }
-    let results: Vec<Value> = docs
-        .into_iter()
-        .zip(hits.iter())
-        .map(|(d, h)| with_hit(d, h))
-        .collect();
-    let all = ctx
-        .version()
-        .includes_all()
-        .then(|| page.ordered_ids.iter().copied().map(Value::from).collect());
+    let results: Vec<Value> = docs.into_iter().zip(hits.iter()).map(|(d, h)| with_hit(d, h)).collect();
+    let all = ctx.version().includes_all().then(|| page.ordered_ids.iter().copied().map(Value::from).collect());
     let mut body = pl_core::pagination::paginated_body(ctx, &info, results, all);
     if let Some(m) = body.as_object_mut() {
         m.insert("corrected_query".into(), Value::Null);
-        if pl_authz::owned::get_boolean(ctx.query.get("include_selection_data").unwrap_or("false"))
-        {
+        if pl_authz::owned::get_boolean(ctx.query.get("include_selection_data").unwrap_or("false")) {
             // _get_selection_data_for_queryset(filtered_qs.filter(pk__in=ordered_ids))
-            m.insert(
-                "selection_data".into(),
-                crate::views::selection_data_list(db, &page.ordered_ids).await?,
-            );
+            m.insert("selection_data".into(), crate::views::selection_data_list(db, &page.ordered_ids).await?);
         }
     }
     Ok(body)

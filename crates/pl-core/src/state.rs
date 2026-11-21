@@ -19,9 +19,9 @@ use chrono_tz::Tz;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions, PgSslMode};
 use sqlx::{Connection, PgPool};
 
+use crate::Config;
 use crate::cache::{Backend as CacheBackend, DjangoCache, GuardTable, LocalCache};
 use crate::config::{ConfigError, DbConfig, DbEngine};
-use crate::Config;
 
 /// Error while building the state.
 #[derive(Debug, thiserror::Error)]

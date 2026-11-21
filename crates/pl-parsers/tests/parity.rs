@@ -19,10 +19,7 @@ fn reference() -> Value {
 }
 
 fn ctx() -> ParseContext {
-    ParseContext {
-        time_zone: chrono_tz::Europe::Zurich,
-        ..ParseContext::default()
-    }
+    ParseContext { time_zone: chrono_tz::Europe::Zurich, ..ParseContext::default() }
 }
 
 /// Known, documented deviations of the MIME detection (contract: Known differences).
@@ -77,15 +74,10 @@ fn parser_selection_matches_upstream() {
     let r = reference();
     let mut bad = Vec::new();
     for (tika, key) in [(false, "parser_no_tika"), (true, "parser_tika")] {
-        let reg = ParserRegistry::new(RegistryConfig {
-            tika_enabled: tika,
-            extended_formats: false,
-        });
+        let reg = ParserRegistry::new(RegistryConfig { tika_enabled: tika, extended_formats: false });
         for (name, e) in r["files"].as_object().unwrap() {
             let m = e["mime"].as_str().unwrap();
-            let got = reg
-                .get_parser_for_file(m, name, None, true)
-                .map(|p| p.class_name());
+            let got = reg.get_parser_for_file(m, name, None, true).map(|p| p.class_name());
             let want = e[key].as_str();
             if got != want {
                 bad.push(format!("{key} {name} ({m}): got {got:?}, want {want:?}"));
@@ -100,21 +92,13 @@ fn default_extensions_match_upstream() {
     let r = reference();
     let mut bad = Vec::new();
     for (tika, key) in [(false, "no_tika"), (true, "tika")] {
-        let reg = ParserRegistry::new(RegistryConfig {
-            tika_enabled: tika,
-            extended_formats: false,
-        });
+        let reg = ParserRegistry::new(RegistryConfig { tika_enabled: tika, extended_formats: false });
         for (m, want) in r["default_extension"][key].as_object().unwrap() {
             // Ignore Windows registry entries of the reference: compare with the Python default table
             let py_default = r["mimetypes_default_guess_extension"][m].as_str();
             let got = reg.get_default_file_extension(m);
             let want = want.as_str().unwrap();
-            let want =
-                if py_default.is_none() && reg.get_parser_for_file(m, "", None, true).is_none() {
-                    ""
-                } else {
-                    want
-                };
+            let want = if py_default.is_none() && reg.get_parser_for_file(m, "", None, true).is_none() { "" } else { want };
             if got != want {
                 bad.push(format!("{key} {m}: got {got:?}, want {want:?}"));
             }
@@ -145,8 +129,7 @@ fn text_reading_matches_upstream() {
         let Some(want) = e["text_read"].as_str() else {
             continue;
         };
-        let got = text::read_file_handle_unicode_errors(&dir().join("samples").join(name), &ctx())
-            .unwrap();
+        let got = text::read_file_handle_unicode_errors(&dir().join("samples").join(name), &ctx()).unwrap();
         if got != want {
             bad.push(format!("{name}: got {got:?}, want {want:?}"));
         }
@@ -161,10 +144,7 @@ fn fake_tika(html: &str, _max: usize) -> pl_parsers::Result<String> {
 #[test]
 fn mail_matches_upstream() {
     let r = reference();
-    let parser = MailDocumentParser {
-        html_to_text: fake_tika,
-        ..Default::default()
-    };
+    let parser = MailDocumentParser { html_to_text: fake_tika, ..Default::default() };
     let c = ctx();
     let mut bad = Vec::new();
     for (name, e) in r["files"].as_object().unwrap() {
@@ -173,10 +153,7 @@ fn mail_matches_upstream() {
         match parser.parse(&path, "message/rfc822", &c) {
             Ok(doc) => {
                 if Some(doc.text.as_str()) != m["text"].as_str() {
-                    bad.push(format!(
-                        "{name} text:\n got {:?}\nwant {:?}",
-                        doc.text, m["text"]
-                    ));
+                    bad.push(format!("{name} text:\n got {:?}\nwant {:?}", doc.text, m["text"]));
                 }
                 let d = doc.date.map(|d| d.to_rfc3339());
                 if d.as_deref() != m["date"].as_str() {
@@ -184,31 +161,22 @@ fn mail_matches_upstream() {
                 }
             }
             Err(err) => {
-                let got = err
-                    .to_string()
-                    .replace(&path.display().to_string(), "<path>");
+                let got = err.to_string().replace(&path.display().to_string(), "<path>");
                 if Some(got.as_str()) != m["parse_error"].as_str() {
-                    bad.push(format!(
-                        "{name} error: got {got:?}, want {:?}",
-                        m["parse_error"]
-                    ));
+                    bad.push(format!("{name} error: got {got:?}, want {:?}", m["parse_error"]));
                 }
             }
         }
         let md = parser.extract_metadata(&path, "message/rfc822", &c);
-        let want_md: Vec<pl_parsers::MetadataEntry> =
-            serde_json::from_value(m["metadata"].clone()).unwrap();
+        let want_md: Vec<pl_parsers::MetadataEntry> = serde_json::from_value(m["metadata"].clone()).unwrap();
         if md != want_md {
             bad.push(format!("{name} metadata:\n got {md:?}\nwant {want_md:?}"));
         }
         if let Some(atts) = m.get("attachments").and_then(|a| a.as_array())
             && let Ok(mail) = MailDocumentParser::parse_file_to_message(&path, &c)
         {
-            let got: Vec<(String, usize, String)> = mail
-                .attachments()
-                .iter()
-                .map(|a| (a.filename.clone(), a.size(), a.content_id.clone()))
-                .collect();
+            let got: Vec<(String, usize, String)> =
+                mail.attachments().iter().map(|a| (a.filename.clone(), a.size(), a.content_id.clone())).collect();
             let want: Vec<(String, usize, String)> = atts
                 .iter()
                 .map(|a| {
@@ -223,18 +191,10 @@ fn mail_matches_upstream() {
                 bad.push(format!("{name} attachments: got {got:?}, want {want:?}"));
             }
             if Some(mail.html().as_str()) != m["html"].as_str() {
-                bad.push(format!(
-                    "{name} html: got {:?}, want {:?}",
-                    mail.html(),
-                    m["html"]
-                ));
+                bad.push(format!("{name} html: got {:?}, want {:?}", mail.html(), m["html"]));
             }
             if Some(mail.text().as_str()) != m["plain"].as_str() {
-                bad.push(format!(
-                    "{name} plain: got {:?}, want {:?}",
-                    mail.text(),
-                    m["plain"]
-                ));
+                bad.push(format!("{name} plain: got {:?}, want {:?}", mail.text(), m["plain"]));
             }
         }
     }
@@ -253,18 +213,14 @@ fn pdf_matches_upstream() {
         let path = dir().join("samples").join(name);
         let pc = pdf::get_page_count(&path, &c);
         if pc.map(u64::from) != e["pdf_page_count"].as_u64() {
-            bad.push(format!(
-                "{name} page_count: got {pc:?}, want {:?}",
-                e["pdf_page_count"]
-            ));
+            bad.push(format!("{name} page_count: got {pc:?}, want {:?}", e["pdf_page_count"]));
         }
         let tagged = pdf::is_tagged_pdf(&path, &c);
         if Some(tagged) != e["pdf_tagged"].as_bool() {
             bad.push(format!("{name} tagged: got {tagged}"));
         }
         let md = pdf::extract_pdf_metadata(&path, &c);
-        let want: Vec<pl_parsers::MetadataEntry> =
-            serde_json::from_value(e["pdf_metadata"].clone()).unwrap();
+        let want: Vec<pl_parsers::MetadataEntry> = serde_json::from_value(e["pdf_metadata"].clone()).unwrap();
         if md != want {
             bad.push(format!("{name} metadata:\n got {md:?}\nwant {want:?}"));
         }
@@ -293,53 +249,24 @@ fn own_expectations_text() {
     ] {
         let path = dir().join("samples").join(name);
         let m = mime::detect_file(&path).unwrap();
-        let p = reg
-            .get_parser_for_file(&m, name, Some(&path), true)
-            .expect(name);
-        let doc = p
-            .parse(&path, &m, &c)
-            .unwrap_or_else(|e| panic!("{name}: {e}"));
+        let p = reg.get_parser_for_file(&m, name, Some(&path), true).expect(name);
+        let doc = p.parse(&path, &m, &c).unwrap_or_else(|e| panic!("{name}: {e}"));
         got.insert(name, (doc.text, doc.date.map(|d| d.to_rfc3339())));
     }
     let docx = "Überschrift\nErster Absatz\tmit Tab\nund Umbruch\nZelle A1\tZelle B1\nZelle A2\tZelle B2\nText & Zeichen <ok> eingefuegt";
     assert_eq!(got["office_word_order.docx"].0, docx);
     assert_eq!(got["office_lo_order.docx"].0, docx);
-    assert_eq!(
-        got["office_word_order.docx"].1.as_deref(),
-        Some("2025-01-06T08:00:00+00:00")
-    );
-    assert_eq!(
-        got["office.xlsx"].0,
-        "Umsatz\n\tMonat\tBetrag\n\tJänner\t1234.5\n\tFebruar\tinline\n\tTRUE\tFormel\n\nLeer & Zwei"
-    );
-    assert_eq!(
-        got["office.pptx"].0,
-        "Folie Eins Titel\nErster Punkt & mehr\n\nFolie Zwei Titel\nZweiter Punkt"
-    );
+    assert_eq!(got["office_word_order.docx"].1.as_deref(), Some("2025-01-06T08:00:00+00:00"));
+    assert_eq!(got["office.xlsx"].0, "Umsatz\n\tMonat\tBetrag\n\tJänner\t1234.5\n\tFebruar\tinline\n\tTRUE\tFormel\n\nLeer & Zwei");
+    assert_eq!(got["office.pptx"].0, "Folie Eins Titel\nErster Punkt & mehr\n\nFolie Zwei Titel\nZweiter Punkt");
     assert_eq!(got["office.ppsx"].0, got["office.pptx"].0);
-    assert_eq!(
-        got["office.odt"].0,
-        "ODF Überschrift\nErster Absatz\tmit Tab\nUmbruch\nZweiter Absatz & mehr   Ende\nListenpunkt\nT1\tT2"
-    );
-    assert_eq!(
-        got["office.odt"].1.as_deref(),
-        Some("2025-01-06T08:00:00+01:00")
-    );
-    assert_eq!(
-        got["office.ods"].0,
-        "Tabelle1\n\tMonat\t12,50\n\nZweite\n\twdh\twdh"
-    );
+    assert_eq!(got["office.odt"].0, "ODF Überschrift\nErster Absatz\tmit Tab\nUmbruch\nZweiter Absatz & mehr   Ende\nListenpunkt\nT1\tT2");
+    assert_eq!(got["office.odt"].1.as_deref(), Some("2025-01-06T08:00:00+01:00"));
+    assert_eq!(got["office.ods"].0, "Tabelle1\n\tMonat\t12,50\n\nZweite\n\twdh\twdh");
     assert_eq!(got["office.odp"].0, "Folie eins\nFolie zwei");
     assert_eq!(got["office.odg"].0, "Grafiktext");
-    assert_eq!(
-        got["office.rtf"].0,
-        "Erster Absatz mit Umlaut: üä\nZweiter\tAbsatz mit fett und Unicode €.\nEnde\nZeile"
-    );
-    assert!(
-        got["pdf_text.pdf"].0.contains("born-digital PDF"),
-        "{:?}",
-        got["pdf_text.pdf"].0
-    );
+    assert_eq!(got["office.rtf"].0, "Erster Absatz mit Umlaut: üä\nZweiter\tAbsatz mit fett und Unicode €.\nEnde\nZeile");
+    assert!(got["pdf_text.pdf"].0.contains("born-digital PDF"), "{:?}", got["pdf_text.pdf"].0);
 }
 
 #[test]
@@ -350,40 +277,18 @@ fn robustness_limits() {
     let reg = ParserRegistry::default();
     let m = mime::detect_file(&path).unwrap();
     let p = reg.get_parser_for_file(&m, "x", None, true).unwrap();
-    assert!(matches!(
-        p.parse(&path, &m, &c),
-        Err(pl_parsers::ParseError::LimitExceeded(_))
-    ));
+    assert!(matches!(p.parse(&path, &m, &c), Err(pl_parsers::ParseError::LimitExceeded(_))));
     // Default limits: 20 MiB fit, text limit applies when smaller
-    c.limits = pl_parsers::Limits {
-        max_text_chars: 1000,
-        ..pl_parsers::Limits::default()
-    };
+    c.limits = pl_parsers::Limits { max_text_chars: 1000, ..pl_parsers::Limits::default() };
     assert!(p.parse(&path, &m, &c).is_err());
     // Broken files → error, no panic
     for name in ["office_truncated.docx", "office_not_zip.docx"] {
         let path = dir().join("samples").join(name);
-        let res = p.parse(
-            &path,
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            &ctx(),
-        );
+        let res = p.parse(&path, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", &ctx());
         assert!(res.is_err(), "{name}");
-        assert!(
-            p.extract_metadata(
-                &path,
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                &ctx()
-            )
-            .is_empty()
-        );
+        assert!(p.extract_metadata(&path, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", &ctx()).is_empty());
     }
-    for name in [
-        "pdf_truncated.pdf",
-        "pdf_garbage.pdf",
-        "pdf_garbage_binary.pdf",
-        "pdf_encrypted_password.pdf",
-    ] {
+    for name in ["pdf_truncated.pdf", "pdf_garbage.pdf", "pdf_garbage_binary.pdf", "pdf_encrypted_password.pdf"] {
         let path = dir().join("samples").join(name);
         let _ = pdf::pdf_born_digital_text(&path, &ctx());
         let _ = pdf::extract_pdf_metadata(&path, &ctx());
@@ -411,9 +316,7 @@ fn pdf_born_digital_decisions() {
     }
     let (text, _) = pdf::pdf_born_digital_text(&dir().join("samples/pdf_multipage.pdf"), &c);
     assert_eq!(
-        text.as_deref()
-            .map(|t| t.split_whitespace().collect::<Vec<_>>().join(" "))
-            .as_deref(),
+        text.as_deref().map(|t| t.split_whitespace().collect::<Vec<_>>().join(" ")).as_deref(),
         Some("Seite eins Seite zwei Seite drei")
     );
 }

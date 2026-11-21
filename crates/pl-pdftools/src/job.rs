@@ -237,13 +237,18 @@ pub struct ConvertReport {
 #[serde(tag = "status", rename_all = "lowercase")]
 pub enum Reply {
     Redacted(RedactReport),
-    Hits { hits: Vec<Hit>, truncated: bool },
+    Hits {
+        hits: Vec<Hit>,
+        truncated: bool,
+    },
     Shrunk(ShrinkReport),
     Repaired(RepairReport),
     Converted(ConvertReport),
     /// Domain error (file not readable, redaction not provable, …). The text is intended for
     /// users and contains no paths.
-    Failed { error: String },
+    Failed {
+        error: String,
+    },
 }
 
 #[cfg(test)]

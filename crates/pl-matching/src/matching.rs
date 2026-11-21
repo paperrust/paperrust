@@ -192,14 +192,7 @@ pub fn matches(m: &Matchable, doc: &MatchDocument) -> Result<bool, UnsupportedMa
         MATCH_REGEX => {
             let found = safe_regex_search(&m.match_text, content, insensitive);
             if let Some(f) = &found {
-                log_reason(
-                    m,
-                    doc,
-                    &format!(
-                        "the string {} matches the regular expression {}",
-                        f.text, m.match_text
-                    ),
-                );
+                log_reason(m, doc, &format!("the string {} matches the regular expression {}", f.text, m.match_text));
             }
             Ok(found.is_some())
         }
@@ -211,11 +204,7 @@ pub fn matches(m: &Matchable, doc: &MatchDocument) -> Result<bool, UnsupportedMa
                 text = text.to_lowercase();
             }
             if partial_ratio(&pattern, &text, 90.0) != 0.0 {
-                log_reason(
-                    m,
-                    doc,
-                    &format!("parts of the document content somehow match the string {}", m.match_text),
-                );
+                log_reason(m, doc, &format!("parts of the document content somehow match the string {}", m.match_text));
                 Ok(true)
             } else {
                 Ok(false)

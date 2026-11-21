@@ -56,7 +56,12 @@ async fn status_error(client: &Client, job: &Url, code: u16) -> ScanError {
 }
 
 /// Fetch the pages of a job from the scanner.
-pub async fn run_scan(client: &Client, settings: &ScanSettings, cancel: &watch::Receiver<bool>, progress: &dyn Progress) -> Result<Vec<Page>, ScanError> {
+pub async fn run_scan(
+    client: &Client,
+    settings: &ScanSettings,
+    cancel: &watch::Receiver<bool>,
+    progress: &dyn Progress,
+) -> Result<Vec<Page>, ScanError> {
     let cancelled = || *cancel.borrow();
     // 1. Status beforehand (devices without ScannerStatus: continue)
     if let Ok(s) = client.status().await {

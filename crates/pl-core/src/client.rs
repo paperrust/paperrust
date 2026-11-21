@@ -62,10 +62,7 @@ pub fn audit_remote_port(headers: &HeaderMap) -> Option<i32> {
 
 /// Both values as strings/ints ready to bind (`$n::inet`, integer).
 pub fn audit_remote(headers: &HeaderMap, peer: Option<SocketAddr>) -> (Option<String>, Option<i32>) {
-    (
-        audit_remote_addr(headers, peer.map(|p| p.ip())).map(|a| a.to_string()),
-        audit_remote_port(headers),
-    )
+    (audit_remote_addr(headers, peer.map(|p| p.ip())).map(|a| a.to_string()), audit_remote_port(headers))
 }
 
 /// How the request user became known – decides django-auditlog's `actor`.

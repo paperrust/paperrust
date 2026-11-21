@@ -164,8 +164,18 @@ fn filename_param(name: &str) -> String {
         // RFC 2231: filename*=utf-8''…
         // RFC 2231 attribute-char: ALPHA / DIGIT / ! # $ & + - . ^ _ ` | ~
         const ATTR: &percent_encoding::AsciiSet = &percent_encoding::NON_ALPHANUMERIC
-            .remove(b'!').remove(b'#').remove(b'$').remove(b'&').remove(b'+').remove(b'-')
-            .remove(b'.').remove(b'^').remove(b'_').remove(b'`').remove(b'|').remove(b'~');
+            .remove(b'!')
+            .remove(b'#')
+            .remove(b'$')
+            .remove(b'&')
+            .remove(b'+')
+            .remove(b'-')
+            .remove(b'.')
+            .remove(b'^')
+            .remove(b'_')
+            .remove(b'`')
+            .remove(b'|')
+            .remove(b'~');
         let enc: String = percent_encoding::utf8_percent_encode(name, ATTR).to_string();
         format!("filename*=utf-8''{enc}")
     }
@@ -220,7 +230,13 @@ fn qp_encode(s: &str) -> String {
 }
 
 /// `send_email(subject, body, to, attachments)` → finished message (not yet sent).
-pub fn build_message(s: &EmailSettings, subject: &str, body: &str, to: &[String], attachments: &[EmailAttachment]) -> Result<OutgoingMail, String> {
+pub fn build_message(
+    s: &EmailSettings,
+    subject: &str,
+    body: &str,
+    to: &[String],
+    attachments: &[EmailAttachment],
+) -> Result<OutgoingMail, String> {
     // collapse line breaks in the subject
     let subject = if subject.contains(['\r', '\n']) {
         pl_parsers::pystr::py_splitlines(subject).iter().map(|l| l.trim_matches([' ', '\t'])).collect::<Vec<_>>().join(" ")
@@ -318,7 +334,11 @@ impl Smtp {
         let mut lines = Vec::new();
         loop {
             let line = loop {
-                if let Some(p) = self.buf.windows(2).position(|w| w == b"\r\n").or_else(|| self.buf.iter().position(|&c| c == b'\n').map(|p| p.saturating_sub(0)))
+                if let Some(p) = self
+                    .buf
+                    .windows(2)
+                    .position(|w| w == b"\r\n")
+                    .or_else(|| self.buf.iter().position(|&c| c == b'\n').map(|p| p.saturating_sub(0)))
                 {
                     let end = if self.buf.get(p) == Some(&b'\r') { p + 2 } else { p + 1 };
                     let l = String::from_utf8_lossy(&self.buf[..p]).trim_end_matches('\r').to_string();

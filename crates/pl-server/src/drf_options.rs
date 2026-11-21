@@ -63,10 +63,7 @@ const DESCRIPTIONS: &[(&str, &str)] = &[
 ];
 
 /// `@action(name=…)` and the Python function names behind the URL-configuration labels.
-const ACTION_NAMES: &[(&str, &str)] = &[
-    ("UnifiedSearchViewSet.history", "Audit Trail"),
-    ("UnifiedSearchViewSet.next_asn", "Get Next ASN"),
-];
+const ACTION_NAMES: &[(&str, &str)] = &[("UnifiedSearchViewSet.history", "Audit Trail"), ("UnifiedSearchViewSet.next_asn", "Get Next ASN")];
 const ACTION_FUNCS: &[(&str, &str)] = &[("UnifiedSearchViewSet.versions", "delete_version")];
 
 /// What `SimpleMetadata` reports for a view.
@@ -153,28 +150,17 @@ fn lookup<'a>(table: &'a [(&str, &'a str)], key: &str) -> Option<&'a str> {
 
 /// `{id}`/`{pk}` → `{}` (Rust route path → URL-configuration pattern).
 fn normalize(path: &str) -> String {
-    path.split('/')
-        .map(|s| if s.starts_with('{') && s.ends_with('}') { "{}" } else { s })
-        .collect::<Vec<_>>()
-        .join("/")
+    path.split('/').map(|s| if s.starts_with('{') && s.ends_with('}') { "{}" } else { s }).collect::<Vec<_>>().join("/")
 }
 
 /// Metadata of the view behind the Rust route path `route_path` (e.g. `/api/tags/{id}/`).
 pub fn view_metadata(route_path: &str) -> ViewMeta {
     let norm = normalize(route_path);
-    let upstream = UPSTREAM
-        .iter()
-        .filter(|u| u.kind != Kind::Websocket)
-        .find(|u| u.pattern.replace("{d}", "{}") == norm);
+    let upstream = UPSTREAM.iter().filter(|u| u.kind != Kind::Websocket).find(|u| u.pattern.replace("{d}", "{}") == norm);
     let Some(u) = upstream else {
         // PaperRust-only route: name from the last literal path segment.
         let last = norm.split('/').rev().find(|s| !s.is_empty() && *s != "{}").unwrap_or("api");
-        return ViewMeta {
-            name: py_title(&last.replace(['_', '-'], " ")),
-            description: String::new(),
-            renders: RENDERS,
-            parses: PARSES,
-        };
+        return ViewMeta { name: py_title(&last.replace(['_', '-'], " ")), description: String::new(), renders: RENDERS, parses: PARSES };
     };
     let view = u.view;
     let (class, action) = match view.split_once('.') {
@@ -193,11 +179,7 @@ pub fn view_metadata(route_path: &str) -> ViewMeta {
         None => class_view_name(class),
     };
     let description = lookup(DESCRIPTIONS, view).or_else(|| lookup(DESCRIPTIONS, class)).unwrap_or("").to_owned();
-    let parses = PARSER_OVERRIDES
-        .iter()
-        .find(|(k, _)| *k == view || *k == class)
-        .map(|(_, p)| *p)
-        .unwrap_or(PARSES);
+    let parses = PARSER_OVERRIDES.iter().find(|(k, _)| *k == view || *k == class).map(|(_, p)| *p).unwrap_or(PARSES);
     ViewMeta { name, description, renders: RENDERS, parses }
 }
 

@@ -62,12 +62,7 @@ pub fn rects_for(text: &str, line: Rect, ink: &[Rect], range: (usize, usize)) ->
     if words.len() != ink.len() || ink.is_empty() {
         return vec![line];
     }
-    let picked: Vec<Rect> = words
-        .iter()
-        .zip(ink)
-        .filter(|((s, e), _)| *s < range.1 && range.0 < *e)
-        .map(|(_, r)| *r)
-        .collect();
+    let picked: Vec<Rect> = words.iter().zip(ink).filter(|((s, e), _)| *s < range.1 && range.0 < *e).map(|(_, r)| *r).collect();
     if picked.is_empty() { vec![line] } else { picked }
 }
 

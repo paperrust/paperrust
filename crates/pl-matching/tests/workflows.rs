@@ -48,12 +48,8 @@ fn test_workflow_match() {
 
 #[test]
 fn test_workflow_match_mailrule() {
-    let trig = WorkflowTrigger {
-        trigger_type: TRIGGER_CONSUMPTION,
-        sources: sources_all(),
-        filter_mailrule_id: Some(7),
-        ..Default::default()
-    };
+    let trig =
+        WorkflowTrigger { trigger_type: TRIGGER_CONSUMPTION, sources: sources_all(), filter_mailrule_id: Some(7), ..Default::default() };
     let mut d = consumable(DocumentSource::MailFetch, SCRATCH);
     d.mailrule_id = Some(7);
     assert!(consumable_document_matches_workflow(&d, &trig).0);
@@ -99,12 +95,8 @@ fn test_workflow_no_match_path() {
 
 #[test]
 fn test_workflow_no_match_mail_rule() {
-    let trig = WorkflowTrigger {
-        trigger_type: TRIGGER_CONSUMPTION,
-        sources: sources_all(),
-        filter_mailrule_id: Some(1),
-        ..Default::default()
-    };
+    let trig =
+        WorkflowTrigger { trigger_type: TRIGGER_CONSUMPTION, sources: sources_all(), filter_mailrule_id: Some(1), ..Default::default() };
     let mut d = consumable(DocumentSource::ConsumeFolder, SCRATCH);
     d.mailrule_id = Some(99);
     let (m, reason) = consumable_document_matches_workflow(&d, &trig);
@@ -114,12 +106,8 @@ fn test_workflow_no_match_mail_rule() {
 
 #[test]
 fn test_workflow_no_match_source() {
-    let trig = WorkflowTrigger {
-        trigger_type: TRIGGER_CONSUMPTION,
-        sources: vec![1, 3],
-        filter_path: Some("*".into()),
-        ..Default::default()
-    };
+    let trig =
+        WorkflowTrigger { trigger_type: TRIGGER_CONSUMPTION, sources: vec![1, 3], filter_path: Some("*".into()), ..Default::default() };
     let (m, reason) = consumable_document_matches_workflow(&consumable(DocumentSource::ApiUpload, SCRATCH), &trig);
     assert!(!m);
     assert_eq!(reason, "Document source ApiUpload not in ['ConsumeFolder', 'MailFetch']");
@@ -223,10 +211,7 @@ fn test_document_added_excluded_correspondent() {
     let trig = WorkflowTrigger { trigger_type: TRIGGER_DOCUMENT_ADDED, filter_has_not_correspondents: vec![c()], ..Default::default() };
     let (m, reason) = existing_document_matches_workflow(&sample_doc(), &trig, None).unwrap();
     assert!(!m);
-    assert_eq!(
-        reason.unwrap(),
-        "Document correspondent Correspondent Name is excluded by [<Correspondent: Correspondent Name>]"
-    );
+    assert_eq!(reason.unwrap(), "Document correspondent Correspondent Name is excluded by [<Correspondent: Correspondent Name>]");
 }
 
 #[test]
@@ -404,7 +389,13 @@ fn multiple_triggers_first_match_wins() {
     assert!(document_matches_workflow(WorkflowDocument::Existing(&d), "W", &[no.clone(), yes], TRIGGER_DOCUMENT_UPDATED, None).unwrap());
     assert!(!document_matches_workflow(WorkflowDocument::Existing(&d), "W", &[no], TRIGGER_DOCUMENT_UPDATED, None).unwrap());
     assert_eq!(
-        document_matches_workflow(WorkflowDocument::Existing(&d), "W", &[WorkflowTrigger { trigger_type: 9, ..Default::default() }], 9, None),
+        document_matches_workflow(
+            WorkflowDocument::Existing(&d),
+            "W",
+            &[WorkflowTrigger { trigger_type: 9, ..Default::default() }],
+            9,
+            None
+        ),
         Err(WorkflowMatchError::UnsupportedTriggerType(9))
     );
 }

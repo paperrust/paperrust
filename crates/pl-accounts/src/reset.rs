@@ -41,7 +41,8 @@ fn num_seconds_now(ctx: &Ctx) -> i64 {
 }
 
 async fn user_emails(ctx: &Ctx, u: &User) -> R<Vec<String>> {
-    let rows: Vec<(String,)> = sqlx::query_as("SELECT email FROM account_emailaddress WHERE user_id = $1").bind(u.id).fetch_all(ctx.st.db()).await?;
+    let rows: Vec<(String,)> =
+        sqlx::query_as("SELECT email FROM account_emailaddress WHERE user_id = $1").bind(u.id).fetch_all(ctx.st.db()).await?;
     let mut set: std::collections::BTreeSet<String> = rows.into_iter().map(|r| r.0).collect();
     if !u.email.is_empty() {
         set.insert(u.email.clone());
@@ -108,7 +109,8 @@ async fn users_by_email(ctx: &Ctx, email: &str) -> R<Vec<User>> {
     }
     let mut ids: Vec<i64> = mails.into_iter().map(|(u, _)| u).collect();
     if !is_verified {
-        let rows: Vec<(i64, String)> = sqlx::query_as("SELECT id::int8, email FROM auth_user WHERE email = $1").bind(&email).fetch_all(ctx.st.db()).await?;
+        let rows: Vec<(i64, String)> =
+            sqlx::query_as("SELECT id::int8, email FROM auth_user WHERE email = $1").bind(&email).fetch_all(ctx.st.db()).await?;
         ids.extend(rows.into_iter().filter(|(_, e)| e.to_lowercase() == email).map(|(i, _)| i));
     }
     ids.sort_unstable();
@@ -158,7 +160,12 @@ async fn send_reset_mails(ctx: &Ctx, email: &str, users: &[User]) -> R<()> {
             tr!(l, "auth.mail.ignore"),
             tr!(l, "auth.mail.unknown_signup"),
         );
-        let m = Mail { from: ctx.s.default_from_email.clone(), to: email.to_string(), subject: subject(ctx, tr!(l, "auth.mail.unknown_subject")), body: mail_wrap(ctx, &body) };
+        let m = Mail {
+            from: ctx.s.default_from_email.clone(),
+            to: email.to_string(),
+            subject: subject(ctx, tr!(l, "auth.mail.unknown_subject")),
+            body: mail_wrap(ctx, &body),
+        };
         deliver(&ctx.s, &m).await;
         return Ok(());
     }
@@ -173,7 +180,12 @@ async fn send_reset_mails(ctx: &Ctx, email: &str, users: &[User]) -> R<()> {
         }
         body.push_str("\n\n");
         body.push_str(tr!(l, "auth.mail.ignore"));
-        let m = Mail { from: ctx.s.default_from_email.clone(), to: email.to_string(), subject: subject(ctx, tr!(l, "auth.mail.reset_subject")), body: mail_wrap(ctx, &body) };
+        let m = Mail {
+            from: ctx.s.default_from_email.clone(),
+            to: email.to_string(),
+            subject: subject(ctx, tr!(l, "auth.mail.reset_subject")),
+            body: mail_wrap(ctx, &body),
+        };
         deliver(&ctx.s, &m).await;
     }
     Ok(())
@@ -212,7 +224,11 @@ async fn reset_view(ctx: &mut Ctx) -> R<Response> {
             let users = users_by_email(ctx, &email).await?;
             let ip = ctx.client_ip()?;
             let subj = Subject { ip: ip.as_deref(), key: Some(&email), user_id: None };
-            if ratelimit::consume(&ctx.cache, "reset_password", Settings::rate_limits("reset_password"), &subj, false).await.map_err(|e| Internal(e.0))?.is_none() {
+            if ratelimit::consume(&ctx.cache, "reset_password", Settings::rate_limits("reset_password"), &subj, false)
+                .await
+                .map_err(|e| Internal(e.0))?
+                .is_none()
+            {
                 let mut r = crate::web::html(StatusCode::TOO_MANY_REQUESTS, ratelimit::HTML_429.into());
                 r.headers_mut().insert(axum::http::header::CONTENT_TYPE, axum::http::HeaderValue::from_static("text/html"));
                 return Ok(r);
@@ -255,7 +271,9 @@ async fn token_user(ctx: &Ctx, uidb36: &str, key: &str) -> R<Option<User>> {
 
 async fn from_key_view(ctx: &mut Ctx, raw: String) -> R<Response> {
     // ^(?P<uidb36>[0-9A-Za-z]+)-(?P<key>.+)$
-    let Some((uidb36, url_key)) = raw.split_once('-').filter(|(u, k)| !u.is_empty() && u.bytes().all(|b| b.is_ascii_alphanumeric()) && !k.is_empty()) else {
+    let Some((uidb36, url_key)) =
+        raw.split_once('-').filter(|(u, k)| !u.is_empty() && u.bytes().all(|b| b.is_ascii_alphanumeric()) && !k.is_empty())
+    else {
         return Ok(crate::web::not_found(&ctx.path));
     };
     let (uidb36, url_key) = (uidb36.to_string(), url_key.to_string());
@@ -292,7 +310,12 @@ async fn set_password_form(ctx: &mut Ctx, u: User) -> R<Response> {
         if p1.is_empty() {
             e1.push(req.clone());
         } else {
-            let attrs = pl_auth_api::password::UserAttrs { username: u.username.clone(), first_name: u.first_name.clone(), last_name: u.last_name.clone(), email: u.email.clone() };
+            let attrs = pl_auth_api::password::UserAttrs {
+                username: u.username.clone(),
+                first_name: u.first_name.clone(),
+                last_name: u.last_name.clone(),
+                email: u.email.clone(),
+            };
             e1.extend(pl_auth_api::password::validate_password(&p1, Some(&attrs)));
         }
         if p2.is_empty() {
@@ -309,12 +332,15 @@ async fn set_password_form(ctx: &mut Ctx, u: User) -> R<Response> {
             // (security review 2026-11-19 F13).
             pl_authz::device::revoke_all_for_user(ctx.st.db(), u.id).await?;
             // finalize_password_reset: delete login_failed counter per email address
-            let rows: Vec<(String,)> = sqlx::query_as("SELECT email FROM account_emailaddress WHERE user_id = $1").bind(u.id).fetch_all(ctx.st.db()).await?;
+            let rows: Vec<(String,)> =
+                sqlx::query_as("SELECT email FROM account_emailaddress WHERE user_id = $1").bind(u.id).fetch_all(ctx.st.db()).await?;
             let ip = ctx.client_ip()?;
             for (email,) in rows {
                 let key = format!("{}:{}", ctx.host(), email.to_lowercase());
                 let subj = Subject { ip: ip.as_deref(), key: Some(&key), user_id: None };
-                ratelimit::clear(&ctx.cache, "login_failed", Settings::rate_limits("login_failed"), &subj).await.map_err(|e| Internal(e.0))?;
+                ratelimit::clear(&ctx.cache, "login_failed", Settings::rate_limits("login_failed"), &subj)
+                    .await
+                    .map_err(|e| Internal(e.0))?;
             }
             let t = tr!(ctx.lang, "auth.msg.password_changed").to_string();
             ctx.messages.add(messages::SUCCESS, t);
@@ -337,7 +363,11 @@ mod tests {
     async fn unreachable_smtp_is_logged_not_raised() {
         // occupy a free port and release it again → connection is refused
         let port = std::net::TcpListener::bind("127.0.0.1:0").and_then(|l| l.local_addr()).map(|a| a.port()).unwrap_or(1);
-        let env = pl_core::config::Env::from_pairs([("PAPERLESS_SECRET_KEY", "unit-test-only-secret-key-0123456789abcdef".to_string()), ("PAPERLESS_EMAIL_HOST", "127.0.0.1".to_string()), ("PAPERLESS_EMAIL_PORT", port.to_string())]);
+        let env = pl_core::config::Env::from_pairs([
+            ("PAPERLESS_SECRET_KEY", "unit-test-only-secret-key-0123456789abcdef".to_string()),
+            ("PAPERLESS_EMAIL_HOST", "127.0.0.1".to_string()),
+            ("PAPERLESS_EMAIL_PORT", port.to_string()),
+        ]);
         let cfg = pl_core::Config::from_env_map(env).expect("config");
         let s = super::Settings::from_core(&cfg);
         let m = super::Mail { from: "a@localhost".into(), to: "niemand@example.invalid".into(), subject: "x".into(), body: "y".into() };

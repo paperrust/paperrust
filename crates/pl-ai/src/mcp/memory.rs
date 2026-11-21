@@ -4,7 +4,7 @@
 use std::collections::BTreeSet;
 use std::sync::Mutex;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use super::backend::*;
 use crate::alias::MemoryAliasStore;
@@ -301,10 +301,9 @@ impl Backend for MemoryBackend {
 
     async fn task_status(&self, actor: &Actor, task_id: &str) -> BResult<Option<Value>> {
         let g = self.data.lock().map_err(|_| BackendError::Internal)?;
-        Ok(g.submissions
-            .iter()
-            .find(|(t, u, _)| t == task_id && (actor.principal.is_superuser || *u == actor.user_id()))
-            .map(|(t, _, r)| json!({"task_id": t, "task_file_name": r.filename, "status": "PENDING", "result": null, "related_document": null})))
+        Ok(g.submissions.iter().find(|(t, u, _)| t == task_id && (actor.principal.is_superuser || *u == actor.user_id())).map(
+            |(t, _, r)| json!({"task_id": t, "task_file_name": r.filename, "status": "PENDING", "result": null, "related_document": null}),
+        ))
     }
 
     async fn list_notes(&self, actor: &Actor, document_id: i64) -> BResult<Vec<NoteEntry>> {
@@ -348,7 +347,13 @@ impl Backend for MemoryBackend {
 
     /// Subset of the v1 filters: `title_content`/`text`, `correspondent__id`, `document_type__id`,
     /// `tags__id__all`, `ordering` (`-added`/`-created`, storage: by id).
-    async fn query_documents(&self, actor: &Actor, params: &[(String, String)], limit: u32, offset: u32) -> BResult<(i64, Vec<DocumentSummary>)> {
+    async fn query_documents(
+        &self,
+        actor: &Actor,
+        params: &[(String, String)],
+        limit: u32,
+        offset: u32,
+    ) -> BResult<(i64, Vec<DocumentSummary>)> {
         let g = self.data.lock().map_err(|_| BackendError::Internal)?;
         let get = |k: &str| params.iter().find(|(x, _)| x == k).map(|(_, v)| v.clone());
         let text = get("title_content").or_else(|| get("text")).map(|t| t.to_lowercase());

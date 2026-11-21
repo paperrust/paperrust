@@ -42,7 +42,10 @@ const PAPERLESSTASK_DDL: &str = "CREATE TABLE IF NOT EXISTS documents_paperlesst
 
 async fn pool() -> PgPool {
     let url = std::env::var("PAPERRUST_QUEUE_TEST_DATABASE_URL").expect("PAPERRUST_QUEUE_TEST_DATABASE_URL");
-    assert!(url.trim_end_matches('/').rsplit('/').next().is_some_and(|db| db.starts_with("pl_queue_test")), "refusing to run against a non-test database");
+    assert!(
+        url.trim_end_matches('/').rsplit('/').next().is_some_and(|db| db.starts_with("pl_queue_test")),
+        "refusing to run against a non-test database"
+    );
     let pool = sqlx::postgres::PgPoolOptions::new().max_connections(10).connect(&url).await.expect("connect");
     // Tests running in parallel: serialise DDL
     let mut tx = pool.begin().await.unwrap();
@@ -129,7 +132,12 @@ async fn lifecycle_success_and_paperlesstask() {
     // idempotent: the same ID once more
     let again = queue.enqueue("documents.tasks.sanity_check", Map::new(), EnqueueOptions { task_id: Some(id), ..o }).await.unwrap();
     assert_eq!(again, id);
-    let n: i64 = sqlx::query("SELECT count(*) AS n FROM paperrust_task_queue WHERE task_id = $1").bind(id.to_string()).fetch_one(&pool).await.unwrap().get("n");
+    let n: i64 = sqlx::query("SELECT count(*) AS n FROM paperrust_task_queue WHERE task_id = $1")
+        .bind(id.to_string())
+        .fetch_one(&pool)
+        .await
+        .unwrap()
+        .get("n");
     assert_eq!(n, 1);
     let r = ptask(&pool, id).await;
     assert_eq!(r.get::<String, _>("status"), "pending");
@@ -149,7 +157,10 @@ async fn lifecycle_success_and_paperlesstask() {
         .await
         .unwrap();
     let r = ptask(&pool, cid).await;
-    assert_eq!(r.get::<Value, _>("input_data"), json!({"filename": "Rechnung.pdf", "mime_type": "application/pdf", "overrides": {"title": "R"}}));
+    assert_eq!(
+        r.get::<Value, _>("input_data"),
+        json!({"filename": "Rechnung.pdf", "mime_type": "application/pdf", "overrides": {"title": "R"}})
+    );
     assert_eq!(r.get::<Option<i32>, _>("owner_id"), None);
 
     let seen = Arc::new(Mutex::new(Vec::<(String, Map<String, Value>)>::new()));
@@ -163,7 +174,9 @@ async fn lifecycle_success_and_paperlesstask() {
                 Ok(Value::String("No issues detected.".into()))
             }
         })
-        .register("documents.tasks.consume_file", |_ctx: TaskContext| async { Ok(json!({"duplicate_of": 7, "duplicate_in_trash": false})) });
+        .register("documents.tasks.consume_file", |_ctx: TaskContext| async {
+            Ok(json!({"duplicate_of": 7, "duplicate_in_trash": false}))
+        });
     let (stop, h) = start(&pool, handlers, cfg(&q, &[]));
     let p = pool.clone();
     wait_for("both done", 20, || {
@@ -240,7 +253,12 @@ async fn concurrent_workers_execute_each_task_once() {
         let p = p.clone();
         let qq = qq.clone();
         async move {
-            let n: i64 = sqlx::query("SELECT count(*) AS n FROM paperrust_task_queue WHERE queue = $1 AND state = 'done'").bind(qq).fetch_one(&p).await.unwrap().get("n");
+            let n: i64 = sqlx::query("SELECT count(*) AS n FROM paperrust_task_queue WHERE queue = $1 AND state = 'done'")
+                .bind(qq)
+                .fetch_one(&p)
+                .await
+                .unwrap()
+                .get("n");
             n as usize == N
         }
     })
@@ -296,7 +314,12 @@ async fn one_worker_runs_task_workers_slots_concurrently() {
     wait_for("6 done", 30, || {
         let (p, qq) = (p.clone(), qq.clone());
         async move {
-            let n: i64 = sqlx::query("SELECT count(*) AS n FROM paperrust_task_queue WHERE queue = $1 AND state = 'done'").bind(qq).fetch_one(&p).await.unwrap().get("n");
+            let n: i64 = sqlx::query("SELECT count(*) AS n FROM paperrust_task_queue WHERE queue = $1 AND state = 'done'")
+                .bind(qq)
+                .fetch_one(&p)
+                .await
+                .unwrap()
+                .get("n");
             n >= 6
         }
     })
@@ -306,7 +329,12 @@ async fn one_worker_runs_task_workers_slots_concurrently() {
     wait_for("third wave running", 10, || {
         let (p, qq) = (p.clone(), qq.clone());
         async move {
-            let n: i64 = sqlx::query("SELECT count(*) AS n FROM paperrust_task_queue WHERE queue = $1 AND state = 'running'").bind(qq).fetch_one(&p).await.unwrap().get("n");
+            let n: i64 = sqlx::query("SELECT count(*) AS n FROM paperrust_task_queue WHERE queue = $1 AND state = 'running'")
+                .bind(qq)
+                .fetch_one(&p)
+                .await
+                .unwrap()
+                .get("n");
             n == 3
         }
     })
@@ -430,7 +458,11 @@ async fn retries_time_limit_revoke_expire() {
             },
             Some(fast),
         )
-        .register_with_policy("test.always_fails", |_c: TaskContext| async { Err(TaskError::autoretry("SearchIndexLockError", "locked")) }, Some(RetryPolicy { max_retries: Some(2), ..fast }))
+        .register_with_policy(
+            "test.always_fails",
+            |_c: TaskContext| async { Err(TaskError::autoretry("SearchIndexLockError", "locked")) },
+            Some(RetryPolicy { max_retries: Some(2), ..fast }),
+        )
         .register("documents.tasks.empty_trash", |_c: TaskContext| async {
             tokio::time::sleep(Duration::from_secs(30)).await;
             Ok(Value::Null)
@@ -448,8 +480,22 @@ async fn retries_time_limit_revoke_expire() {
     let af = queue.enqueue("test.always_fails", Map::new(), opts(&q)).await.unwrap();
     let tl = queue.enqueue("documents.tasks.empty_trash", Map::new(), EnqueueOptions { time_limit: Some(0.3), ..opts(&q) }).await.unwrap();
     let fl = queue.enqueue("documents.tasks.check_scheduled_workflows", Map::new(), opts(&q)).await.unwrap();
-    let ex = queue.enqueue("documents.tasks.build_share_link_bundle", kw(json!({"bundle_id": 1})), EnqueueOptions { expires: Some(0.001), countdown: Some(0.2), ..opts(&q) }).await.unwrap();
-    let rv = queue.enqueue("documents.tasks.bulk_update_documents", kw(json!({"document_ids": [1]})), EnqueueOptions { countdown: Some(60.0), ..opts(&q) }).await.unwrap();
+    let ex = queue
+        .enqueue(
+            "documents.tasks.build_share_link_bundle",
+            kw(json!({"bundle_id": 1})),
+            EnqueueOptions { expires: Some(0.001), countdown: Some(0.2), ..opts(&q) },
+        )
+        .await
+        .unwrap();
+    let rv = queue
+        .enqueue(
+            "documents.tasks.bulk_update_documents",
+            kw(json!({"document_ids": [1]})),
+            EnqueueOptions { countdown: Some(60.0), ..opts(&q) },
+        )
+        .await
+        .unwrap();
     assert!(queue.revoke(rv, false).await.unwrap());
     assert_eq!(ptask(&pool, rv).await.get::<String, _>("status"), "revoked");
     let term = queue.enqueue("documents.tasks.llmindex_index", Map::new(), opts(&q)).await.unwrap();
@@ -467,12 +513,14 @@ async fn retries_time_limit_revoke_expire() {
         let p = p.clone();
         let all = all.clone();
         async move {
-            let n: i64 = sqlx::query("SELECT count(*) AS n FROM paperrust_task_queue WHERE task_id = ANY($1) AND state IN ('done','failed','revoked')")
-                .bind(all.iter().map(Uuid::to_string).collect::<Vec<_>>())
-                .fetch_one(&p)
-                .await
-                .unwrap()
-                .get("n");
+            let n: i64 = sqlx::query(
+                "SELECT count(*) AS n FROM paperrust_task_queue WHERE task_id = ANY($1) AND state IN ('done','failed','revoked')",
+            )
+            .bind(all.iter().map(Uuid::to_string).collect::<Vec<_>>())
+            .fetch_one(&p)
+            .await
+            .unwrap()
+            .get("n");
             n == 6
         }
     })
@@ -532,9 +580,23 @@ async fn chords_links_and_errbacks() {
     let sig = |task: &str, k: Value| Signature { options: q_opts.clone(), ..Signature::new(task, kw(k)) };
 
     // Chord ok: body gets [[0, 10, 20]]
-    queue.enqueue_chord((0..3).map(|i| sig("test.part", json!({"i": i}))).collect(), sig("test.body", json!({})), Some(sig("test.errback", json!({})))).await.unwrap();
+    queue
+        .enqueue_chord(
+            (0..3).map(|i| sig("test.part", json!({"i": i}))).collect(),
+            sig("test.body", json!({})),
+            Some(sig("test.errback", json!({}))),
+        )
+        .await
+        .unwrap();
     // Chord with 1 failure: errback per header failure + once ChordError, body does not run
-    queue.enqueue_chord(vec![sig("test.part", json!({"i": 1})), sig("test.part", json!({"i": -1}))], sig("test.body", json!({"x": 1})), Some(sig("test.errback", json!({"rule_id": 9})))).await.unwrap();
+    queue
+        .enqueue_chord(
+            vec![sig("test.part", json!({"i": 1})), sig("test.part", json!({"i": -1}))],
+            sig("test.body", json!({"x": 1})),
+            Some(sig("test.errback", json!({"rule_id": 9}))),
+        )
+        .await
+        .unwrap();
     // link (mutable) and link_error
     let mut o = opts(&q);
     o.link = vec![sig("test.after", json!({}))];
@@ -597,7 +659,12 @@ async fn graceful_shutdown_releases_running_task() {
     // short job was allowed to finish, long one was released
     assert_eq!(queue_state(&pool, short).await, "done");
     assert_eq!(queue_state(&pool, id).await, "queued");
-    let attempts: i32 = sqlx::query("SELECT attempts FROM paperrust_task_queue WHERE task_id = $1").bind(id.to_string()).fetch_one(&pool).await.unwrap().get("attempts");
+    let attempts: i32 = sqlx::query("SELECT attempts FROM paperrust_task_queue WHERE task_id = $1")
+        .bind(id.to_string())
+        .fetch_one(&pool)
+        .await
+        .unwrap()
+        .get("attempts");
     assert_eq!(attempts, 0);
 }
 

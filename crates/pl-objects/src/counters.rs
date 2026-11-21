@@ -50,10 +50,8 @@ pub async fn available(db: &PgPool) -> bool {
     {
         return v;
     }
-    let v = sqlx::query_scalar::<_, bool>("SELECT to_regclass('paperrust_label_count_live') IS NOT NULL")
-        .fetch_one(db)
-        .await
-        .unwrap_or(false);
+    let v =
+        sqlx::query_scalar::<_, bool>("SELECT to_regclass('paperrust_label_count_live') IS NOT NULL").fetch_one(db).await.unwrap_or(false);
     if let Ok(mut m) = cache.lock() {
         m.insert(key, (Instant::now(), v));
     }
@@ -145,14 +143,9 @@ fn granted_part(user: &User, kind: Kind, ids: Option<&[i64]>, versions: bool) ->
         q.and_where(Expr::col((a("pd"), a("root_document_id"))).is_null());
         "pd"
     };
-    q.and_where(Expr::col((a(root), a("owner_id"))).is_not_null())
-        .and_where(Expr::col((a(root), a("owner_id"))).ne(uid))
-        .and_where(authz_objects::granted_key_cond(
-            user,
-            &pl_authz::models::DOCUMENT,
-            "view_document",
-            Expr::col((a(root), a("id"))).into(),
-        ));
+    q.and_where(Expr::col((a(root), a("owner_id"))).is_not_null()).and_where(Expr::col((a(root), a("owner_id"))).ne(uid)).and_where(
+        authz_objects::granted_key_cond(user, &pl_authz::models::DOCUMENT, "view_document", Expr::col((a(root), a("id"))).into()),
+    );
     let key = match kind.document_fk() {
         Some(fk) => {
             q.and_where(Expr::col((a("pd"), a(fk))).is_not_null());

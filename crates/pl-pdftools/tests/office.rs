@@ -55,7 +55,9 @@ async fn docx_becomes_a_searchable_multi_page_pdf() {
 #[tokio::test]
 async fn odt_rtf_and_markdown_convert() {
     let t = tempfile::tempdir().unwrap();
-    for (name, fmt, needle, min_pages) in [("sample.odt", "odt", "Laufzeit", 2), ("sample.rtf", "rtf", "Bank", 2), ("sample.md", "md", "Notiz", 1)] {
+    for (name, fmt, needle, min_pages) in
+        [("sample.odt", "odt", "Laufzeit", 2), ("sample.rtf", "rtf", "Bank", 2), ("sample.md", "md", "Notiz", 1)]
+    {
         let out = t.path().join(format!("{fmt}.pdf"));
         let r = convert(name, fmt, &out).await.unwrap_or_else(|e| panic!("{name}: {e:?}"));
         assert_eq!(r.format, fmt);
@@ -80,9 +82,13 @@ async fn broken_docx_is_a_clean_error() {
 async fn unknown_format_and_missing_file_are_refused() {
     let t = tempfile::tempdir().unwrap();
     let out = t.path().join("x.pdf");
-    let e = run_with(&tool(), Op::Office { input: s(&fixture("sample.docx")), output: s(&out), format: "exe".into() }, limits()).await.unwrap_err();
+    let e = run_with(&tool(), Op::Office { input: s(&fixture("sample.docx")), output: s(&out), format: "exe".into() }, limits())
+        .await
+        .unwrap_err();
     assert!(matches!(e, RunError::Failed(_)), "{e:?}");
-    let e = run_with(&tool(), Op::Office { input: s(&t.path().join("nope.docx")), output: s(&out), format: "docx".into() }, limits()).await.unwrap_err();
+    let e = run_with(&tool(), Op::Office { input: s(&t.path().join("nope.docx")), output: s(&out), format: "docx".into() }, limits())
+        .await
+        .unwrap_err();
     assert!(matches!(e, RunError::Failed(_)), "{e:?}");
 }
 
@@ -94,13 +100,21 @@ async fn pdf_tools_work_on_the_converted_pdf() {
     let pdf = t.path().join("sample.pdf");
     convert("sample.docx", "docx", &pdf).await.unwrap();
     let red = t.path().join("redacted.pdf");
-    let r = run_with(&tool(), Op::Redact { input: s(&pdf), output: s(&red), areas: vec![], terms: vec!["Geheimnummer".into()], remove_metadata: true }, limits()).await.unwrap();
+    let r = run_with(
+        &tool(),
+        Op::Redact { input: s(&pdf), output: s(&red), areas: vec![], terms: vec!["Geheimnummer".into()], remove_metadata: true },
+        limits(),
+    )
+    .await
+    .unwrap();
     let Reply::Redacted(rep) = r else { panic!("{r:?}") };
     assert!(rep.term_hits >= 1 && rep.glyphs > 0, "{rep:?}");
     assert_eq!(search(&red, "Geheimnummer").await, 0, "term must be gone after redaction");
     assert!(search(&red, "Installation").await >= 1, "other text stays");
     let small = t.path().join("small.pdf");
-    let r = run_with(&tool(), Op::Shrink { input: s(&pdf), output: s(&small), preset: pl_pdftools::ShrinkPreset::Strong }, limits()).await.unwrap();
+    let r = run_with(&tool(), Op::Shrink { input: s(&pdf), output: s(&small), preset: pl_pdftools::ShrinkPreset::Strong }, limits())
+        .await
+        .unwrap();
     assert!(matches!(r, Reply::Shrunk(_)), "{r:?}");
     assert!(page_count(&small) >= 2);
 }
@@ -110,13 +124,24 @@ async fn pdf_tools_work_on_the_converted_pdf() {
 fn blocking_runner_converts_and_times_out() {
     let t = tempfile::tempdir().unwrap();
     let out = t.path().join("b.pdf");
-    let r = run_blocking_with(&tool(), Op::Office { input: s(&fixture("sample.rtf")), output: s(&out), format: "rtf".into() }, limits()).unwrap();
+    let r = run_blocking_with(&tool(), Op::Office { input: s(&fixture("sample.rtf")), output: s(&out), format: "rtf".into() }, limits())
+        .unwrap();
     assert!(matches!(r, Reply::Converted(_)), "{r:?}");
     let start = std::time::Instant::now();
-    let e = run_blocking_with(&tool(), Op::SelfTest { mode: pl_pdftools::job::SelfTest::Hang }, Limits { timeout: Duration::from_secs(2), memory_mb: 256 }).unwrap_err();
+    let e = run_blocking_with(
+        &tool(),
+        Op::SelfTest { mode: pl_pdftools::job::SelfTest::Hang },
+        Limits { timeout: Duration::from_secs(2), memory_mb: 256 },
+    )
+    .unwrap_err();
     assert_eq!(e, RunError::Timeout(2));
     assert!(start.elapsed() < Duration::from_secs(20));
-    let e = run_blocking_with(&tool(), Op::SelfTest { mode: pl_pdftools::job::SelfTest::Abort }, Limits { timeout: Duration::from_secs(30), memory_mb: 256 }).unwrap_err();
+    let e = run_blocking_with(
+        &tool(),
+        Op::SelfTest { mode: pl_pdftools::job::SelfTest::Abort },
+        Limits { timeout: Duration::from_secs(30), memory_mb: 256 },
+    )
+    .unwrap_err();
     assert!(matches!(e, RunError::Crashed(_)), "{e:?}");
 }
 
@@ -144,7 +169,11 @@ async fn legacy_doc_becomes_a_searchable_pdf() {
 #[tokio::test]
 async fn spreadsheet_becomes_a_pdf_with_tables() {
     let rows = |r: &[&[&str]]| r.iter().map(|row| row.iter().map(|c| (*c).to_string()).collect()).collect::<Vec<Vec<String>>>();
-    let xls = wordcraft_formats::sheet::xls_fixture(&[("Umsatz", rows(&[&["Kunde", "Betrag"], &["Bäckerei Huber", "1234.5"]])), ("Kosten", rows(&[&["Miete", "900"]]))]).unwrap();
+    let xls = wordcraft_formats::sheet::xls_fixture(&[
+        ("Umsatz", rows(&[&["Kunde", "Betrag"], &["Bäckerei Huber", "1234.5"]])),
+        ("Kosten", rows(&[&["Miete", "900"]])),
+    ])
+    .unwrap();
     let t = tempfile::tempdir().unwrap();
     let src = t.path().join("a.xls");
     std::fs::write(&src, xls).unwrap();
@@ -161,7 +190,8 @@ async fn spreadsheet_becomes_a_pdf_with_tables() {
 async fn slides_become_landscape_pages() {
     let t = tempfile::tempdir().unwrap();
     let src = t.path().join("s.html");
-    std::fs::write(&src, "<p>1 / 2</p><h1>Quartal</h1><p>Umsatz</p><p style=\"page-break-before:always\">2 / 2</p><h1>Ausblick</h1>").unwrap();
+    std::fs::write(&src, "<p>1 / 2</p><h1>Quartal</h1><p>Umsatz</p><p style=\"page-break-before:always\">2 / 2</p><h1>Ausblick</h1>")
+        .unwrap();
     let out = t.path().join("s.pdf");
     let r = run_with(&tool(), Op::Slides { input: s(&src), output: s(&out) }, limits()).await.unwrap();
     assert!(matches!(r, Reply::Converted(_)), "{r:?}");

@@ -42,28 +42,18 @@ impl InstanceLock {
             .open(lock_path)
             .map_err(io_err(format!("Sperrdatei {} öffnen", lock_path.display())))?;
         match file.try_lock() {
-            Ok(()) => Ok(Acquire::Acquired(InstanceLock {
-                _file: file,
-                info_path: info_path.to_path_buf(),
-            })),
+            Ok(()) => Ok(Acquire::Acquired(InstanceLock { _file: file, info_path: info_path.to_path_buf() })),
             Err(TryLockError::WouldBlock) => Ok(Acquire::Busy(read_info(info_path))),
-            Err(TryLockError::Error(e)) => Err(io_err(format!(
-                "Sperrdatei {} sperren",
-                lock_path.display()
-            ))(e)),
+            Err(TryLockError::Error(e)) => Err(io_err(format!("Sperrdatei {} sperren", lock_path.display()))(e)),
         }
     }
 
     /// Publish the URL of the running instance.
     pub fn publish(&self, url: &str) -> Result<()> {
-        let info = InstanceInfo {
-            pid: std::process::id(),
-            url: url.to_string(),
-        };
+        let info = InstanceInfo { pid: std::process::id(), url: url.to_string() };
         let text = toml::to_string(&info).map_err(|e| DesktopError::Other(e.to_string()))?;
         // D-N4: writable only by the user (Unix 0600; Windows: ACL of the data directory).
-        crate::config::write_private(&self.info_path, text.as_bytes())
-            .map_err(io_err(format!("{} schreiben", self.info_path.display())))
+        crate::config::write_private(&self.info_path, text.as_bytes()).map_err(io_err(format!("{} schreiben", self.info_path.display())))
     }
 }
 
@@ -96,18 +86,12 @@ pub enum StopOutcome {
 }
 
 /// Asks a running instance for an orderly shutdown and waits until its lock is free.
-pub async fn request_stop(
-    lock_path: &Path,
-    info_path: &Path,
-    stop_path: &Path,
-    timeout: std::time::Duration,
-) -> Result<StopOutcome> {
+pub async fn request_stop(lock_path: &Path, info_path: &Path, stop_path: &Path, timeout: std::time::Duration) -> Result<StopOutcome> {
     if let Acquire::Acquired(l) = InstanceLock::acquire(lock_path, info_path)? {
         drop(l);
         return Ok(StopOutcome::NotRunning);
     }
-    std::fs::write(stop_path, b"stop")
-        .map_err(io_err(format!("{} schreiben", stop_path.display())))?;
+    std::fs::write(stop_path, b"stop").map_err(io_err(format!("{} schreiben", stop_path.display())))?;
     let start = std::time::Instant::now();
     loop {
         tokio::time::sleep(std::time::Duration::from_millis(250)).await;
@@ -142,10 +126,7 @@ pub fn is_local_app_url(url: &str) -> bool {
         return false;
     };
     let port = rest.strip_suffix('/').unwrap_or(rest);
-    !port.is_empty()
-        && port.len() <= 5
-        && port.bytes().all(|b| b.is_ascii_digit())
-        && port.parse::<u16>().is_ok_and(|p| p != 0)
+    !port.is_empty() && port.len() <= 5 && port.bytes().all(|b| b.is_ascii_digit()) && port.parse::<u16>().is_ok_and(|p| p != 0)
 }
 
 #[cfg(test)]
@@ -155,13 +136,8 @@ mod tests {
     #[test]
     fn second_acquire_is_busy_until_drop() {
         let dir = tempfile::tempdir().unwrap();
-        let (l, i) = (
-            dir.path().join("instance.lock"),
-            dir.path().join("instance.toml"),
-        );
-        let Acquire::Acquired(first) = InstanceLock::acquire(&l, &i).unwrap() else {
-            panic!("erste Sperre")
-        };
+        let (l, i) = (dir.path().join("instance.lock"), dir.path().join("instance.toml"));
+        let Acquire::Acquired(first) = InstanceLock::acquire(&l, &i).unwrap() else { panic!("erste Sperre") };
         match InstanceLock::acquire(&l, &i).unwrap() {
             Acquire::Busy(None) => {}
             other => panic!("erwartet Busy(None), war {other:?}"),
@@ -176,10 +152,7 @@ mod tests {
         }
         drop(first);
         assert!(!i.exists());
-        assert!(matches!(
-            InstanceLock::acquire(&l, &i).unwrap(),
-            Acquire::Acquired(_)
-        ));
+        assert!(matches!(InstanceLock::acquire(&l, &i).unwrap(), Acquire::Acquired(_)));
     }
 
     #[test]
@@ -205,28 +178,16 @@ mod tests {
         std::fs::write(&f, "pid = 1\nurl = \"file:///C:/x.exe\"\n").unwrap();
         assert_eq!(read_info(&f), None);
         std::fs::write(&f, "pid = 1\nurl = \"http://127.0.0.1:5/\"\n").unwrap();
-        assert_eq!(
-            read_info(&f).map(|i| i.url).as_deref(),
-            Some("http://127.0.0.1:5/")
-        );
+        assert_eq!(read_info(&f).map(|i| i.url).as_deref(), Some("http://127.0.0.1:5/"));
     }
 
     #[tokio::test]
     async fn stop_request_roundtrip() {
         let dir = tempfile::tempdir().unwrap();
-        let (l, i, s) = (
-            dir.path().join("instance.lock"),
-            dir.path().join("instance.toml"),
-            dir.path().join("stop.request"),
-        );
+        let (l, i, s) = (dir.path().join("instance.lock"), dir.path().join("instance.toml"), dir.path().join("stop.request"));
         let t = std::time::Duration::from_secs(10);
-        assert_eq!(
-            request_stop(&l, &i, &s, t).await.unwrap(),
-            StopOutcome::NotRunning
-        );
-        let Acquire::Acquired(held) = InstanceLock::acquire(&l, &i).unwrap() else {
-            panic!()
-        };
+        assert_eq!(request_stop(&l, &i, &s, t).await.unwrap(), StopOutcome::NotRunning);
+        let Acquire::Acquired(held) = InstanceLock::acquire(&l, &i).unwrap() else { panic!() };
         let watcher = tokio::spawn({
             let s = s.clone();
             async move {
@@ -234,10 +195,7 @@ mod tests {
                 drop(held);
             }
         });
-        assert_eq!(
-            request_stop(&l, &i, &s, t).await.unwrap(),
-            StopOutcome::Stopped
-        );
+        assert_eq!(request_stop(&l, &i, &s, t).await.unwrap(), StopOutcome::Stopped);
         watcher.await.unwrap();
         assert!(!s.exists());
     }

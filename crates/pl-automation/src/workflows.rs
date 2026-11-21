@@ -79,7 +79,8 @@ pub async fn list(State(st): State<AppState>, who: Who) -> Result<Response, AErr
     let all_else: Vec<i64> = else_ids.iter().map(|(_, a)| *a).collect();
     let mut else_rows = pl_workflows::load::rows_by_ids(&mut conn, T_ACTION, &all_else).await?;
     else_rows.sort_by_key(|r| (r.get("order").and_then(Value::as_i64).unwrap_or(0), r.get("id").and_then(Value::as_i64).unwrap_or(0)));
-    let else_rendered: Vec<Value> = pl_workflows::load::render_actions(&mut conn, &else_rows).await?.into_iter().map(Value::Object).collect();
+    let else_rendered: Vec<Value> =
+        pl_workflows::load::render_actions(&mut conn, &else_rows).await?.into_iter().map(Value::Object).collect();
     let mut ai = workflow_ext::load_ai_conditions(&mut conn, &ids).await?;
     // Runs this week (from Monday 00:00 in PAPERLESS_TIME_ZONE) and last run
     let week_start = week_start_utc(*st.tz(), chrono::Utc::now());
@@ -201,7 +202,13 @@ pub async fn put(State(st): State<AppState>, who: Who, Path(id): Path<String>, h
     update(st, who, id, headers, body, false).await
 }
 
-pub async fn patch(State(st): State<AppState>, who: Who, Path(id): Path<String>, headers: HeaderMap, body: Bytes) -> Result<Response, AErr> {
+pub async fn patch(
+    State(st): State<AppState>,
+    who: Who,
+    Path(id): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Response, AErr> {
     update(st, who, id, headers, body, true).await
 }
 

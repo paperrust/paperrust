@@ -35,8 +35,14 @@ impl OcrEngine for NullEngine {
     }
     fn recognize(&self, _: &std::path::Path, _: &pl_ocr::engine::OcrRequest) -> pl_ocr::Result<pl_ocr::engine::PageOcr> {
         let w = pl_ocr::engine::Word { text: "x".into(), x0: 10.0, y0: 10.0, x1: 20.0, y1: 20.0, conf: 90.0, line: (1, 1, 1) };
-        Ok(pl_ocr::engine::PageOcr { width: 2480, height: 3508, words: vec![w], text: "x
-".into() })
+        Ok(pl_ocr::engine::PageOcr {
+            width: 2480,
+            height: 3508,
+            words: vec![w],
+            text: "x
+"
+            .into(),
+        })
     }
     fn orientation(&self, _: &std::path::Path, _: Option<std::time::Duration>) -> pl_ocr::Result<Option<pl_ocr::engine::Orientation>> {
         Ok(None)
@@ -65,8 +71,9 @@ fn main() {
                 })
                 .collect();
             drop(docs);
-            let pdf = pdfwrite::build_from_images(&specs, &OutputMeta { output_type: pl_ocr::config::OutputType::Pdf, ..Default::default() })
-                .unwrap_or_else(|e| die(&e.message()));
+            let pdf =
+                pdfwrite::build_from_images(&specs, &OutputMeta { output_type: pl_ocr::config::OutputType::Pdf, ..Default::default() })
+                    .unwrap_or_else(|e| die(&e.message()));
             std::fs::write(&out, &pdf).unwrap_or_else(|e| die(&e.to_string()));
             println!("{{\"pages\":{pages},\"dpi\":{dpi},\"bytes\":{},\"sources\":{}}}", pdf.len(), all.len());
         }
@@ -87,7 +94,11 @@ fn main() {
             for run in 0..runs {
                 let tmp = std::env::temp_dir().join(format!("pl-ingest-bench-{}-{run}", std::process::id()));
                 let _ = std::fs::remove_dir_all(&tmp);
-                let backend = NativeOcrmypdf::new(Some(if null { Box::new(NullEngine) as Box<dyn OcrEngine> } else { Box::new(tess.clone()) }), Box::new(pdfium.clone()) as Box<dyn PdfRenderer>, tmp.join("pages"));
+                let backend = NativeOcrmypdf::new(
+                    Some(if null { Box::new(NullEngine) as Box<dyn OcrEngine> } else { Box::new(tess.clone()) }),
+                    Box::new(pdfium.clone()) as Box<dyn PdfRenderer>,
+                    tmp.join("pages"),
+                );
                 let t = Instant::now();
                 let out = parse_document(&backend, &cfg, &tmp, &input, "application/pdf", true).unwrap_or_else(|e| die(&e.to_string()));
                 let secs = t.elapsed().as_secs_f64();

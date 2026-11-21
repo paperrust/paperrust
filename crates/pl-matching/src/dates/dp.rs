@@ -105,8 +105,7 @@ fn parse_with_locale(locale: &Locale, s: &str, st: &DpSettings) -> Result<Option
                     .ok_or_else(|| DateparserError("local tz".into()))?;
                 l.with_timezone(l.offset())
             } else {
-                let tz = resolve_tz(&st.timezone)
-                    .ok_or_else(|| DateparserError(format!("UnknownTimeZoneError('{}')", st.timezone)))?;
+                let tz = resolve_tz(&st.timezone).ok_or_else(|| DateparserError(format!("UnknownTimeZoneError('{}')", st.timezone)))?;
                 localize(naive, &tz)
             }
         }
@@ -117,11 +116,7 @@ fn parse_with_locale(locale: &Locale, s: &str, st: &DpSettings) -> Result<Option
 
 /// `dateparser.parse(date_string, settings=..., locales=locales)`.
 /// `locales` empty -> all languages in dateparser's default order.
-pub fn dateparser_parse(
-    date_string: &str,
-    st: &DpSettings,
-    locales: &[String],
-) -> Result<Option<DateTime<FixedOffset>>, DateparserError> {
+pub fn dateparser_parse(date_string: &str, st: &DpSettings, locales: &[String]) -> Result<Option<DateTime<FixedOffset>>, DateparserError> {
     if !DATE_ORDERS.contains(&st.date_order.as_str()) {
         return Err(DateparserError(format!("\"DATE_ORDER\" setting has invalid value: {}", st.date_order)));
     }

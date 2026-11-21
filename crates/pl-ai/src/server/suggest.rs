@@ -8,16 +8,15 @@ use axum::http::{HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use pl_authz::models::DOCUMENT;
 use pl_authz::objects::user_is_active_superuser;
-use pl_authz::perms::{has_perms_owner_aware, ObjRef};
+use pl_authz::perms::{ObjRef, has_perms_owner_aware};
 use pl_authz::{AuthUser, User};
 use pl_core::{ApiError, AppState, Drf, RequestContext};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use super::data::{self, AiDoc, Cat};
 use crate::classifier::{
-    self, build_prompt_with_rag, candidate_id_allowlist, context_blocks, fulltext_weights, node_document_weights,
-    visible_ranked, weigh_neighbours, TaxonomyCandidates, Weights, MAX_SINGLE_VALUE_CANDIDATES, MAX_TAG_CANDIDATES,
-    TAXONOMY_CANDIDATE_TOP_K,
+    self, MAX_SINGLE_VALUE_CANDIDATES, MAX_TAG_CANDIDATES, TAXONOMY_CANDIDATE_TOP_K, TaxonomyCandidates, Weights, build_prompt_with_rag,
+    candidate_id_allowlist, context_blocks, fulltext_weights, node_document_weights, visible_ranked, weigh_neighbours,
 };
 use crate::compat;
 use crate::config::AiConfig;
@@ -67,19 +66,23 @@ async fn taxonomy_context_inner(
     let su = user_is_active_superuser(user);
     let similar = if cfg.llm_embedding_backend.is_some() {
         let visible = if su { None } else { Some(data::permitted_doc_ids(db, user).await.map_err(|e| e.status().to_string())?) };
-        let hits = super::index::retrieve_similar_nodes(state, cfg, doc.id, &doc.title, &doc.content, TAXONOMY_CANDIDATE_TOP_K, visible.as_deref())
-            .await
-            .map_err(|e| e.to_string())?;
+        let hits = super::index::retrieve_similar_nodes(
+            state,
+            cfg,
+            doc.id,
+            &doc.title,
+            &doc.content,
+            TAXONOMY_CANDIDATE_TOP_K,
+            visible.as_deref(),
+        )
+        .await
+        .map_err(|e| e.to_string())?;
         let nodes: Vec<(Option<i64>, Option<f64>)> = hits.iter().map(|h| (h.node.document_id(), Some(h.score))).collect();
         node_document_weights(&nodes)
     } else {
         // _fulltext_similar_documents
         let backend = pl_search::routes::backend(state);
-        let search_user = if su {
-            None
-        } else {
-            user.map(|u| pl_search::SearchUser { id: u.id, group_ids: u.groups.clone() })
-        };
+        let search_user = if su { None } else { user.map(|u| pl_search::SearchUser { id: u.id, group_ids: u.groups.clone() }) };
         let root = data::root_id(db, doc.id).await.map_err(|e| e.status().to_string())?;
         let su2 = search_user.clone();
         let ids = tokio::task::spawn_blocking(move || backend.more_like_this_ids(root, su2.as_ref(), Some(TAXONOMY_CANDIDATE_TOP_K)))
@@ -114,7 +117,13 @@ async fn build_taxonomy_candidates(
     let ids: Vec<i64> = similar.iter().map(|s| s.document_id).collect();
     let nb = data::neighbours(db, &ids).await?;
     let w = weigh_neighbours(similar, &nb);
-    async fn ranked(db: &sqlx::PgPool, user: Option<&User>, cat: Cat, w: &Weights, limit: usize) -> Result<Vec<classifier::TaxonomyCandidate>, ApiError> {
+    async fn ranked(
+        db: &sqlx::PgPool,
+        user: Option<&User>,
+        cat: Cat,
+        w: &Weights,
+        limit: usize,
+    ) -> Result<Vec<classifier::TaxonomyCandidate>, ApiError> {
         if w.is_empty() {
             return Ok(Vec::new());
         }
@@ -143,7 +152,12 @@ pub async fn classify(
     let prompt = match custom {
         Some(t) => {
             let head: String = doc.content.chars().take(classifier::PROMPT_CONTENT_CHARS).collect();
-            let content = classifier::Truncator::truncate_content(&TiktokenTruncator, &head, cfg.llm_embedding_chunk_size as usize, cfg.llm_context_size as usize);
+            let content = classifier::Truncator::truncate_content(
+                &TiktokenTruncator,
+                &head,
+                cfg.llm_embedding_chunk_size as usize,
+                cfg.llm_context_size as usize,
+            );
             let block = classifier::format_taxonomy_for_prompt(&candidates);
             let base = crate::prompt_store::render(
                 &t,
@@ -154,7 +168,12 @@ pub async fn classify(
                     ("candidate_rules", crate::prompt_store::classification_rules(candidates.any())),
                 ],
             );
-            let ctx = classifier::Truncator::truncate_content(&TiktokenTruncator, &context, cfg.llm_embedding_chunk_size as usize, cfg.llm_context_size as usize);
+            let ctx = classifier::Truncator::truncate_content(
+                &TiktokenTruncator,
+                &context,
+                cfg.llm_embedding_chunk_size as usize,
+                cfg.llm_context_size as usize,
+            );
             crate::prompts::rag_context(&base, &ctx)
         }
         None => build_prompt_with_rag(
@@ -181,13 +200,15 @@ pub async fn classify(
 /// deduplicated by pk.
 async fn resolve_choice(state: &AppState, user: Option<&User>, cat: Cat, choice: &Value) -> Result<(Vec<i64>, Vec<String>), ApiError> {
     let db = state.db();
-    let existing: Vec<i64> = choice.get("existing_ids").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_i64).collect()).unwrap_or_default();
+    let existing: Vec<i64> =
+        choice.get("existing_ids").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_i64).collect()).unwrap_or_default();
     let names: Vec<String> = choice
         .get("new_names")
         .and_then(Value::as_array)
         .map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect())
         .unwrap_or_default();
-    let mut matched: Vec<(i64, String)> = if existing.is_empty() { Vec::new() } else { data::visible_objects(db, user, cat, &existing).await? };
+    let mut matched: Vec<(i64, String)> =
+        if existing.is_empty() { Vec::new() } else { data::visible_objects(db, user, cat, &existing).await? };
     if !names.is_empty() {
         let pool = data::permitted_pool(db, user, cat).await?;
         let refs: Vec<Option<&str>> = names.iter().map(|n| Some(n.as_str())).collect();
@@ -214,7 +235,8 @@ pub async fn ai_suggestions(
     let Some(doc) = data::load_doc(db, id).await? else {
         return Err(ApiError::not_found_model("Document"));
     };
-    if !has_perms_owner_aware(db, Some(user), "change_document", &DOCUMENT, ObjRef { id: doc.root_id, owner_id: doc.root_owner_id }).await? {
+    if !has_perms_owner_aware(db, Some(user), "change_document", &DOCUMENT, ObjRef { id: doc.root_id, owner_id: doc.root_owner_id }).await?
+    {
         return Ok(no_cache(ApiError::django_text(StatusCode::FORBIDDEN, "Insufficient permissions").into_response()));
     }
     let cfg = super::effective_config(&state).await?;

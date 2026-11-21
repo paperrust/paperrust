@@ -39,11 +39,7 @@ pub fn decode_text_bytes(raw: &[u8]) -> String {
             String::from_utf8_lossy(raw).into_owned()
         }
     };
-    if text.contains('\0') {
-        text.replace('\0', "")
-    } else {
-        text
-    }
+    if text.contains('\0') { text.replace('\0', "") } else { text }
 }
 
 /// `read_file_handle_unicode_errors(path)`.
@@ -52,11 +48,7 @@ pub fn read_file_handle_unicode_errors(path: &Path, ctx: &ParseContext) -> Resul
     Ok(decode_text_bytes(&raw))
 }
 
-pub const TEXT_MIME_TYPES: &[(&str, &str)] = &[
-    ("text/plain", ".txt"),
-    ("text/csv", ".csv"),
-    ("application/csv", ".csv"),
-];
+pub const TEXT_MIME_TYPES: &[(&str, &str)] = &[("text/plain", ".txt"), ("text/csv", ".csv"), ("application/csv", ".csv")];
 
 /// upstream `TextDocumentParser`.
 #[derive(Debug, Default)]
@@ -73,10 +65,7 @@ impl DocumentParser for TextDocumentParser {
         TEXT_MIME_TYPES
     }
     fn score(&self, mime_type: &str, _filename: &str, _path: Option<&Path>) -> Option<i32> {
-        TEXT_MIME_TYPES
-            .iter()
-            .any(|(m, _)| *m == mime_type)
-            .then_some(10)
+        TEXT_MIME_TYPES.iter().any(|(m, _)| *m == mime_type).then_some(10)
     }
     fn can_produce_archive(&self) -> bool {
         false
@@ -85,11 +74,7 @@ impl DocumentParser for TextDocumentParser {
         false
     }
     fn parse(&self, path: &Path, _mime_type: &str, ctx: &ParseContext) -> Result<ParsedDocument> {
-        Ok(ParsedDocument {
-            text: read_file_handle_unicode_errors(path, ctx)?,
-            date: None,
-            archive_path: None,
-        })
+        Ok(ParsedDocument { text: read_file_handle_unicode_errors(path, ctx)?, date: None, archive_path: None })
     }
     fn page_count(&self, _path: &Path, _mime_type: &str, _ctx: &ParseContext) -> Option<u32> {
         None

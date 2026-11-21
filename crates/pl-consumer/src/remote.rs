@@ -28,7 +28,14 @@ pub struct RemoteDocumentParser {
 
 impl RemoteDocumentParser {
     /// `parse(document_path, mime_type, produce_archive=…)` → text and archive PDF.
-    pub fn run(&self, path: &Path, mime_type: &str, produce_archive: bool, tempdir: &Path, ctx: &ParseContext) -> Result<ParsedDocument, ParseError> {
+    pub fn run(
+        &self,
+        path: &Path,
+        mime_type: &str,
+        produce_archive: bool,
+        tempdir: &Path,
+        ctx: &ParseContext,
+    ) -> Result<ParsedDocument, ParseError> {
         let extract = |p: &Path| pl_parsers::pdf::extract_pdf_text(p, ctx);
         let out = pl_ocr::remote::parse(&self.cfg, tempdir, path, mime_type, produce_archive, &extract)
             .map_err(|e| ParseError::Upstream(e.message()))?;

@@ -112,8 +112,7 @@ impl Consumer {
         let audit = self.worker_audit();
         let mut doc = DocInstance::from_db(row);
         let outcome =
-            workflows::run_workflows(conn, &self.run_env(&audit), pl_matching::workflow::TRIGGER_DOCUMENT_UPDATED, &mut doc, None)
-                .await?;
+            workflows::run_workflows(conn, &self.run_env(&audit), pl_matching::workflow::TRIGGER_DOCUMENT_UPDATED, &mut doc, None).await?;
         self.send_websocket_document_updated(conn, document_id).await?;
         Ok(outcome)
     }
@@ -130,12 +129,11 @@ impl Consumer {
     pub async fn bulk_update_signals_single(&self, document_ids: &[i64]) -> Result<(), sqlx::Error> {
         let mut conn = self.pool.acquire().await?;
         let ids32: Vec<i32> = document_ids.iter().filter_map(|i| i32::try_from(*i).ok()).collect();
-        let docs: Vec<i32> = sqlx::query_scalar(
-            "SELECT id FROM documents_document WHERE id = ANY($1) AND deleted_at IS NULL ORDER BY created DESC, id",
-        )
-        .bind(&ids32)
-        .fetch_all(&mut *conn)
-        .await?;
+        let docs: Vec<i32> =
+            sqlx::query_scalar("SELECT id FROM documents_document WHERE id = ANY($1) AND deleted_at IS NULL ORDER BY created DESC, id")
+                .bind(&ids32)
+                .fetch_all(&mut *conn)
+                .await?;
         for id in docs {
             let id = i64::from(id);
             self.caches.clear_document_caches(id).await;

@@ -116,7 +116,11 @@ pub struct Plan {
 
 fn human(bytes: u64) -> String {
     const MIB: f64 = 1024.0 * 1024.0;
-    if bytes as f64 >= 1024.0 * MIB { format!("{:.1} GiB", bytes as f64 / (1024.0 * MIB)) } else { format!("{:.1} MiB", bytes as f64 / MIB) }
+    if bytes as f64 >= 1024.0 * MIB {
+        format!("{:.1} GiB", bytes as f64 / (1024.0 * MIB))
+    } else {
+        format!("{:.1} MiB", bytes as f64 / MIB)
+    }
 }
 
 /// Plan from the individual resolutions (per entry the documents from `/sync/resolve`).
@@ -139,10 +143,7 @@ pub fn plan(resolved: Vec<(SelectionItem, Vec<ResolvedDoc>)>, limits: Limits, as
         entries.push(EntryReport { item, documents: list.len() as u64, bytes });
     }
     let total_documents = docs.len() as u64;
-    let total_bytes: u64 = docs
-        .values()
-        .map(|d| d.wants.bytes(&ResolvedSize { original: d.size.original, archive: d.size.archive }))
-        .sum();
+    let total_bytes: u64 = docs.values().map(|d| d.wants.bytes(&ResolvedSize { original: d.size.original, archive: d.size.archive })).sum();
     let within_limits = total_documents <= limits.max_documents && total_bytes <= limits.max_bytes;
     let message = (!within_limits).then(|| {
         let mut parts = vec![format!(
@@ -205,11 +206,7 @@ mod tests {
         assert_eq!(p.entries[0].bytes, 35);
         assert_eq!(p.docs["a"].wants.variants(true), vec!["original", "archive"]);
 
-        let p = plan(
-            vec![(item("tag", "t1", "both"), vec![rd("a", 60, Some(60))])],
-            Limits { max_bytes: 100, max_documents: 3 },
-            None,
-        );
+        let p = plan(vec![(item("tag", "t1", "both"), vec![rd("a", 60, Some(60))])], Limits { max_bytes: 100, max_documents: 3 }, None);
         assert!(!p.within_limits);
         assert!(p.message.unwrap().contains("tag t1: 1 Dokumente"));
         let p = plan(

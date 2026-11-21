@@ -15,18 +15,18 @@
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
+use axum::Json;
 use axum::body::Body;
 use axum::http::Request;
 use axum::routing::post;
-use axum::Json;
 use pl_ai::mcp::api::{ApiBackend, SideStore};
 use pl_ai::mcp::backend::{Actor, AuditEntry, Backend, Credential};
 use pl_ai::mcp::knowledge::{IndexState, KnowledgeIndex};
-use pl_ai::mcp::{scopes, McpService, McpSettings};
+use pl_ai::mcp::{McpService, McpSettings, scopes};
 use pl_ai::pg::PgSideStore;
 use pl_ai::taxonomy::Principal;
 use pl_authz::{AuthConfig, Authz};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tower::ServiceExt;
 
 const ADMIN: &str = "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a001";
@@ -75,7 +75,8 @@ fn actor(id: i64, token: &str, superuser: bool) -> Actor {
 }
 
 async fn call(app: &axum::Router, method: &str, path: &str, token: &str, body: Option<Value>) -> (u16, Value) {
-    let mut req = Request::builder().method(method).uri(path).header("authorization", format!("Token {token}")).header("accept", "application/json");
+    let mut req =
+        Request::builder().method(method).uri(path).header("authorization", format!("Token {token}")).header("accept", "application/json");
     let b = match body {
         Some(v) => {
             req = req.header("content-type", "application/json");
@@ -127,9 +128,12 @@ async fn mcp_extension_against_db_copy() {
         router = router.route(r.path, r.handler);
     }
     let app = router.with_state(state.clone()).layer(axum::Extension(authz));
-    let (st, _) = call(&app, "POST", "/api/x-ai/mcp-scopes/", ALICE, Some(json!({"token": ALICE, "scopes": ["read", "write", "ingest"]}))).await;
+    let (st, _) =
+        call(&app, "POST", "/api/x-ai/mcp-scopes/", ALICE, Some(json!({"token": ALICE, "scopes": ["read", "write", "ingest"]}))).await;
     assert_eq!(st, 403, "Nicht-Superuser darf keine Scopes setzen");
-    let (st, v) = call(&app, "POST", "/api/x-ai/mcp-scopes/", ADMIN, Some(json!({"token": ALICE, "scopes": ["read"], "label": "Alice Claude"}))).await;
+    let (st, v) =
+        call(&app, "POST", "/api/x-ai/mcp-scopes/", ADMIN, Some(json!({"token": ALICE, "scopes": ["read"], "label": "Alice Claude"})))
+            .await;
     assert_eq!(st, 201, "{v}");
     assert_eq!(v["token_key_prefix"].as_str().unwrap().len(), 8);
     assert!(!v.to_string().contains(ALICE), "Token im Klartext zurückgegeben");
@@ -142,7 +146,8 @@ async fn mcp_extension_against_db_copy() {
     let (st, v) = call(&app, "GET", "/api/x-ai/mcp-scopes/", ADMIN, None).await;
     assert_eq!((st, v["count"].as_i64()), (200, Some(2)), "{v}");
     // plaintext token stored nowhere
-    let leaked: i64 = sqlx::query_scalar("SELECT count(*) FROM paperrust_ai_mcp_scope WHERE token_key = $1").bind(ALICE).fetch_one(&pool).await.unwrap();
+    let leaked: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM paperrust_ai_mcp_scope WHERE token_key = $1").bind(ALICE).fetch_one(&pool).await.unwrap();
     assert_eq!(leaked, 0);
 
     // ---- resolution: token entry > user entry > none ----
@@ -184,10 +189,12 @@ async fn mcp_extension_against_db_copy() {
         .await
         .unwrap();
     assert_eq!(store.audit_count("add_document", Some(3)).await.unwrap(), 1);
-    let set: i64 = sqlx::query_scalar("SELECT count(*) FROM paperrust_ai_audit WHERE channel = 'ui' AND action IN ('mcp_scope_set', 'mcp_scope_delete')")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+    let set: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM paperrust_ai_audit WHERE channel = 'ui' AND action IN ('mcp_scope_set', 'mcp_scope_delete')",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     assert_eq!(set, 3, "zwei Setzungen + eine Löschung auditiert");
 
     // ---- existing LLM index: build via the normal path, retrieval like the chat ----

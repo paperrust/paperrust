@@ -16,12 +16,7 @@ const NS_DC: &str = "http://purl.org/dc/elements/1.1/";
 /// Upper limit for `number-columns-repeated` / `number-rows-repeated` of non-empty content.
 const MAX_REPEAT: usize = 100;
 
-pub fn extract(
-    data: &[u8],
-    mime_type: &str,
-    limits: &Limits,
-    deadline: Deadline,
-) -> Result<OfficeContent> {
+pub fn extract(data: &[u8], mime_type: &str, limits: &Limits, deadline: Deadline) -> Result<OfficeContent> {
     let zip = ZipArchive::open(data, limits)?;
     let content = zip.read("content.xml")?;
     let mut out = TextSink::new(limits.max_text_chars);
@@ -29,16 +24,9 @@ pub fn extract(
     content_text(&content, spreadsheet, limits, deadline, &mut out)?;
     let (metadata, created) = match zip.read_opt("meta.xml")? {
         Some(m) => meta(&m, mime_type, limits)?,
-        None => (
-            vec![("Content-Type".to_owned(), mime_type.to_owned())],
-            None,
-        ),
+        None => (vec![("Content-Type".to_owned(), mime_type.to_owned())], None),
     };
-    Ok(OfficeContent {
-        text: out.buf,
-        metadata,
-        created,
-    })
+    Ok(OfficeContent { text: out.buf, metadata, created })
 }
 
 struct Cell {
@@ -46,13 +34,7 @@ struct Cell {
     repeat: usize,
 }
 
-fn content_text(
-    xml: &[u8],
-    spreadsheet: bool,
-    limits: &Limits,
-    deadline: Deadline,
-    out: &mut TextSink,
-) -> Result<()> {
+fn content_text(xml: &[u8], spreadsheet: bool, limits: &Limits, deadline: Deadline, out: &mut TextSink) -> Result<()> {
     let mut s = XmlStream::new(xml, limits.max_depth).with_deadline(deadline);
     let mut in_body = false;
     let mut paras: Vec<String> = Vec::new();
@@ -76,14 +58,10 @@ fn content_text(
                     continue;
                 }
                 match (ns, local.as_str()) {
-                    (Some(NS_TEXT), "tracked-changes") | (Some(NS_TEXT), "sequence-decls") => {
-                        skip = 1
-                    }
+                    (Some(NS_TEXT), "tracked-changes") | (Some(NS_TEXT), "sequence-decls") => skip = 1,
                     (Some(NS_TEXT), "p") | (Some(NS_TEXT), "h") => paras.push(String::new()),
                     (Some(NS_TEXT), "s") => {
-                        let n: usize = attr(attrs, Some(NS_TEXT), "c")
-                            .and_then(|c| c.parse().ok())
-                            .unwrap_or(1);
+                        let n: usize = attr(attrs, Some(NS_TEXT), "c").and_then(|c| c.parse().ok()).unwrap_or(1);
                         if let Some(p) = paras.last_mut() {
                             p.extend(std::iter::repeat_n(' ', n.min(1000)));
                         }
@@ -108,19 +86,12 @@ fn content_text(
                         }
                     }
                     (Some(NS_TABLE), "table-row") => {
-                        let rep: usize = attr(attrs, Some(NS_TABLE), "number-rows-repeated")
-                            .and_then(|c| c.parse().ok())
-                            .unwrap_or(1);
+                        let rep: usize = attr(attrs, Some(NS_TABLE), "number-rows-repeated").and_then(|c| c.parse().ok()).unwrap_or(1);
                         rows.push((Vec::new(), rep));
                     }
                     (Some(NS_TABLE), "table-cell") | (Some(NS_TABLE), "covered-table-cell") => {
-                        let rep: usize = attr(attrs, Some(NS_TABLE), "number-columns-repeated")
-                            .and_then(|c| c.parse().ok())
-                            .unwrap_or(1);
-                        cells.push(Cell {
-                            text: String::new(),
-                            repeat: rep,
-                        });
+                        let rep: usize = attr(attrs, Some(NS_TABLE), "number-columns-repeated").and_then(|c| c.parse().ok()).unwrap_or(1);
+                        cells.push(Cell { text: String::new(), repeat: rep });
                     }
                     _ => {}
                 }
@@ -212,11 +183,7 @@ fn content_text(
 }
 
 #[allow(clippy::type_complexity)]
-fn meta(
-    xml: &[u8],
-    mime_type: &str,
-    limits: &Limits,
-) -> Result<(Vec<(String, String)>, Option<String>)> {
+fn meta(xml: &[u8], mime_type: &str, limits: &Limits) -> Result<(Vec<(String, String)>, Option<String>)> {
     let mut s = XmlStream::new(xml, limits.max_depth);
     let mut md: Vec<(String, String)> = Vec::new();
     let mut created = None;

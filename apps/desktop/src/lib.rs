@@ -75,12 +75,8 @@ impl DesktopError {
                 "sperrt Dateien, Datenordner liegt in einem Cloud-Ordner (OneDrive/Dropbox). ",
                 "Details im PostgreSQL-Log."
             )),
-            Self::Io { .. } => {
-                Some("Eine Datei oder ein Ordner ist nicht zugänglich (Rechte, Datenträger voll?).")
-            }
-            Self::AlreadyRunning(_) => {
-                Some("PaperRust läuft bereits – das Fenster über das Tray-Symbol öffnen.")
-            }
+            Self::Io { .. } => Some("Eine Datei oder ein Ordner ist nicht zugänglich (Rechte, Datenträger voll?)."),
+            Self::AlreadyRunning(_) => Some("PaperRust läuft bereits – das Fenster über das Tray-Symbol öffnen."),
             Self::Server(m) if m.contains("migrate") => Some(concat!(
                 "Die Datenbank ließ sich nicht aktualisieren oder übernehmen. Details im Log; vor ",
                 "einem neuen Versuch die letzte Sicherung bereithalten."

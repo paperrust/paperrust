@@ -11,7 +11,10 @@ pub enum AErr {
     Forbidden(String),
     NotFound,
     /// 400 with field errors (`fields`, for workflows in the DRF format of `/api/workflows/`).
-    Invalid { message: String, fields: Map<String, Value> },
+    Invalid {
+        message: String,
+        fields: Map<String, Value>,
+    },
     Conflict(String),
     /// 503: function needs something that is off (AI).
     Unavailable(String),

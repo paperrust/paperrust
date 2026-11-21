@@ -57,7 +57,14 @@ impl Shape {
                 t.columns.retain(|c| !schema::TREENODE_DERIVED.contains(&c.name.as_str()));
             }
         }
-        Ok(Shape { version: schema::VERSION, pre: schema::PRE_DATA, post: schema::post_data(), post_raw: schema::POST_DATA, tables, drop_tag_tree })
+        Ok(Shape {
+            version: schema::VERSION,
+            pre: schema::PRE_DATA,
+            post: schema::post_data(),
+            post_raw: schema::POST_DATA,
+            tables,
+            drop_tag_tree,
+        })
     }
 
     pub fn v220() -> Result<Shape> {
@@ -154,17 +161,16 @@ async fn run_inner(opts: &Options, report: &mut Report, src: &mut Source) -> Res
     };
     if let Some(t) = target.as_mut() {
         report.target_version = sqlx::query_scalar::<_, String>("SELECT version()").fetch_one(&mut *t).await.unwrap_or_default();
-        let enc: String = sqlx::query_scalar("SELECT pg_encoding_to_char(encoding)::text FROM pg_database WHERE datname = current_database()")
-            .fetch_one(&mut *t)
-            .await?;
+        let enc: String =
+            sqlx::query_scalar("SELECT pg_encoding_to_char(encoding)::text FROM pg_database WHERE datname = current_database()")
+                .fetch_one(&mut *t)
+                .await?;
         if enc != "UTF8" {
             bail!("Ziel-Datenbank hat Kodierung {enc}, benötigt wird UTF8 (CREATE DATABASE … ENCODING 'UTF8' TEMPLATE template0)");
         }
         let ver: i32 = sqlx::query_scalar("SELECT current_setting('server_version_num')::int").fetch_one(&mut *t).await?;
         if ver < 140000 {
-            report.warnings.push(format!(
-                "Ziel-PostgreSQL {ver} ist älter als 14; getestet ist das Schema nur auf PostgreSQL 18"
-            ));
+            report.warnings.push(format!("Ziel-PostgreSQL {ver} ist älter als 14; getestet ist das Schema nur auf PostgreSQL 18"));
         }
     }
 
@@ -317,12 +323,8 @@ async fn precheck_source(opts: &Options, report: &mut Report, src: &mut Source) 
         let cols = src.columns(&t.name).await?;
         let src_set: BTreeSet<String> = cols.iter().filter(|(_, g)| !g).map(|(n, _)| n.clone()).collect();
         let later = added.get(t.name.as_str());
-        let want_set: BTreeSet<String> = t
-            .copy_columns()
-            .iter()
-            .filter(|c| !later.is_some_and(|a| a.contains_key(c.name.as_str())))
-            .map(|c| c.name.clone())
-            .collect();
+        let want_set: BTreeSet<String> =
+            t.copy_columns().iter().filter(|c| !later.is_some_and(|a| a.contains_key(c.name.as_str()))).map(|c| c.name.clone()).collect();
         let gen_ok = |n: &String| t.columns.iter().any(|c| c.generated && &c.name == n);
         let extra: Vec<&String> = src_set.difference(&want_set).filter(|n| !gen_ok(n)).collect();
         let miss: Vec<&String> = want_set.difference(&src_set).collect();
@@ -350,10 +352,7 @@ async fn precheck_source(opts: &Options, report: &mut Report, src: &mut Source) 
             last_applied = r.get(1).cloned().flatten();
         })
         .await?;
-        let applied = last_applied
-            .as_deref()
-            .and_then(value::parse_ts)
-            .unwrap_or_else(|| chrono::Utc::now().naive_utc());
+        let applied = last_applied.as_deref().and_then(value::parse_ts).unwrap_or_else(|| chrono::Utc::now().naive_utc());
         mig_rows = plan.migration_rows(max_id + 1, &value::fmt_ts(&applied, true));
     }
     Ok(Prep { plan, mig_rows, shape, convert: None })
@@ -463,11 +462,7 @@ async fn check_target_structure(t: &mut PgConnection, tables: &[Table], report: 
     }
     let want: BTreeSet<(String, String, String, Option<i32>, bool)> = tables
         .iter()
-        .flat_map(|t| {
-            t.columns
-                .iter()
-                .map(|c| (t.name.clone(), c.name.clone(), c.udt.clone(), c.max_len.map(|m| m as i32), c.generated))
-        })
+        .flat_map(|t| t.columns.iter().map(|c| (t.name.clone(), c.name.clone(), c.udt.clone(), c.max_len.map(|m| m as i32), c.generated)))
         .collect();
     if have != want {
         let a: Vec<_> = want.difference(&have).take(10).collect();
@@ -523,41 +518,41 @@ async fn scan_table(
         let mut stream = if adapt.skip_source { futures::stream::empty().boxed() } else { src.stream(&sql, &cols) };
         loop {
             let vals: Vec<Option<String>> = if let Some(row) = stream.next().await {
-            let row = row.with_context(|| format!("Lesen aus {} fehlgeschlagen", table.name))?;
-            read.clear();
-            let mut row_issues: Vec<(usize, bool, String)> = Vec::new();
-            for (i, c) in cols.iter().enumerate() {
-                match value::convert(c.kind, &row[i], opts.policy) {
-                    Conv::Ok(None) if !c.nullable => {
-                        read.push(None);
-                        row_issues.push((i, true, "NULL in NOT-NULL-Spalte".into()));
-                    }
-                    Conv::Ok(v) => read.push(v),
-                    Conv::Fixed(v, msg) => {
-                        read.push(v);
-                        row_issues.push((i, false, msg));
-                    }
-                    Conv::Err(msg) => {
-                        read.push(None);
-                        row_issues.push((i, true, msg));
-                    }
-                }
-            }
-            if !row_issues.is_empty() {
-                let pk = pk_idx.and_then(|p| read[p].clone()).unwrap_or_else(|| "?".into());
-                for (i, fatal, msg) in row_issues {
-                    if fatal {
-                        tr.errors += 1;
-                        errors = true;
-                    } else {
-                        tr.fixed += 1;
-                    }
-                    if tr.issues.len() < opts.max_issues {
-                        tr.issues.push(Issue { pk: pk.clone(), column: cols[i].name.clone(), fatal, message: msg });
+                let row = row.with_context(|| format!("Lesen aus {} fehlgeschlagen", table.name))?;
+                read.clear();
+                let mut row_issues: Vec<(usize, bool, String)> = Vec::new();
+                for (i, c) in cols.iter().enumerate() {
+                    match value::convert(c.kind, &row[i], opts.policy) {
+                        Conv::Ok(None) if !c.nullable => {
+                            read.push(None);
+                            row_issues.push((i, true, "NULL in NOT-NULL-Spalte".into()));
+                        }
+                        Conv::Ok(v) => read.push(v),
+                        Conv::Fixed(v, msg) => {
+                            read.push(v);
+                            row_issues.push((i, false, msg));
+                        }
+                        Conv::Err(msg) => {
+                            read.push(None);
+                            row_issues.push((i, true, msg));
+                        }
                     }
                 }
-            }
-            adapt.apply(&read)
+                if !row_issues.is_empty() {
+                    let pk = pk_idx.and_then(|p| read[p].clone()).unwrap_or_else(|| "?".into());
+                    for (i, fatal, msg) in row_issues {
+                        if fatal {
+                            tr.errors += 1;
+                            errors = true;
+                        } else {
+                            tr.fixed += 1;
+                        }
+                        if tr.issues.len() < opts.max_issues {
+                            tr.issues.push(Issue { pk: pk.clone(), column: cols[i].name.clone(), fatal, message: msg });
+                        }
+                    }
+                }
+                adapt.apply(&read)
             } else if let Some(x) = extra.next() {
                 x.clone()
             } else {
@@ -807,9 +802,8 @@ async fn verify_target(
 
     // Sequences: next value > max(id)
     for (table, col, seq) in sequences(t).await? {
-        let max: Option<i64> = sqlx::query_scalar(&format!("SELECT max(\"{col}\")::bigint FROM public.\"{table}\""))
-            .fetch_one(&mut *t)
-            .await?;
+        let max: Option<i64> =
+            sqlx::query_scalar(&format!("SELECT max(\"{col}\")::bigint FROM public.\"{table}\"")).fetch_one(&mut *t).await?;
         let row = sqlx::query(&format!("SELECT last_value, is_called FROM {seq}")).fetch_one(&mut *t).await?;
         let last: i64 = row.try_get(0)?;
         let called: bool = row.try_get(1)?;

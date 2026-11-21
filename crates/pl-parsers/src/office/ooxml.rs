@@ -17,32 +17,18 @@ const NS_CP: &str = "http://schemas.openxmlformats.org/package/2006/metadata/cor
 const NS_DC: &str = "http://purl.org/dc/elements/1.1/";
 const NS_DCTERMS: &str = "http://purl.org/dc/terms/";
 const NS_EP: &str = "http://schemas.openxmlformats.org/officeDocument/2006/extended-properties";
-const REL_NOTES: &str =
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide";
+const REL_NOTES: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide";
 
-pub fn extract(
-    data: &[u8],
-    mime_type: &str,
-    limits: &Limits,
-    deadline: Deadline,
-) -> Result<OfficeContent> {
+pub fn extract(data: &[u8], mime_type: &str, limits: &Limits, deadline: Deadline) -> Result<OfficeContent> {
     let zip = ZipArchive::open(data, limits)?;
     let mut out = TextSink::new(limits.max_text_chars);
     match mime_type {
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => {
-            docx_text(&zip, limits, deadline, &mut out)?
-        }
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => {
-            xlsx_text(&zip, limits, deadline, &mut out)?
-        }
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => docx_text(&zip, limits, deadline, &mut out)?,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => xlsx_text(&zip, limits, deadline, &mut out)?,
         _ => pptx_text(&zip, limits, deadline, &mut out)?,
     }
     let (metadata, created) = core_metadata(&zip, mime_type, limits)?;
-    Ok(OfficeContent {
-        text: out.buf,
-        metadata,
-        created,
-    })
+    Ok(OfficeContent { text: out.buf, metadata, created })
 }
 
 /// Resolve a path relative to a part (`xl/workbook.xml` + `worksheets/s1.xml`).
@@ -72,11 +58,7 @@ fn rels_path(part: &str) -> String {
 }
 
 /// (Id, Type, Target) of a `.rels` file.
-fn read_rels(
-    zip: &ZipArchive,
-    part: &str,
-    limits: &Limits,
-) -> Result<Vec<(String, String, String)>> {
+fn read_rels(zip: &ZipArchive, part: &str, limits: &Limits) -> Result<Vec<(String, String, String)>> {
     let Some(data) = zip.read_opt(&rels_path(part))? else {
         return Ok(Vec::new());
     };
@@ -104,13 +86,7 @@ fn main_part(zip: &ZipArchive, limits: &Limits, default: &str) -> Result<String>
         }
     }
     let _ = limits;
-    if zip.has(default) {
-        Ok(default.to_owned())
-    } else {
-        Err(ParseError::Invalid(format!(
-            "OOXML main part {default} missing"
-        )))
-    }
+    if zip.has(default) { Ok(default.to_owned()) } else { Err(ParseError::Invalid(format!("OOXML main part {default} missing"))) }
 }
 
 // ---------------------------------------------------------------------------
@@ -126,20 +102,9 @@ struct WordState {
     skip: usize,
 }
 
-fn word_part_text(
-    xml: &[u8],
-    limits: &Limits,
-    deadline: Deadline,
-    out: &mut TextSink,
-) -> Result<()> {
+fn word_part_text(xml: &[u8], limits: &Limits, deadline: Deadline, out: &mut TextSink) -> Result<()> {
     let mut s = XmlStream::new(xml, limits.max_depth).with_deadline(deadline);
-    let mut st = WordState {
-        paras: Vec::new(),
-        tables: Vec::new(),
-        cells: Vec::new(),
-        in_t: false,
-        skip: 0,
-    };
+    let mut st = WordState { paras: Vec::new(), tables: Vec::new(), cells: Vec::new(), in_t: false, skip: 0 };
     let emit = |st: &mut WordState, out: &mut TextSink, line: String| -> Result<()> {
         if let Some(cell) = st.cells.last_mut() {
             if !cell.is_empty() {
@@ -212,11 +177,7 @@ fn word_part_text(
                         }
                     }
                     "tr" => {
-                        let row = st
-                            .tables
-                            .last_mut()
-                            .and_then(|t| t.pop())
-                            .unwrap_or_default();
+                        let row = st.tables.last_mut().and_then(|t| t.pop()).unwrap_or_default();
                         let line = row.join("\t");
                         emit(&mut st, out, line)?;
                     }
@@ -240,19 +201,11 @@ fn word_part_text(
     Ok(())
 }
 
-fn docx_text(
-    zip: &ZipArchive,
-    limits: &Limits,
-    deadline: Deadline,
-    out: &mut TextSink,
-) -> Result<()> {
+fn docx_text(zip: &ZipArchive, limits: &Limits, deadline: Deadline, out: &mut TextSink) -> Result<()> {
     let main = main_part(zip, limits, "word/document.xml")?;
     let rels = read_rels(zip, &main, limits)?;
     let by_type = |suffix: &str| -> Vec<String> {
-        rels.iter()
-            .filter(|(_, t, _)| t.ends_with(suffix))
-            .map(|(_, _, target)| resolve(&main, target))
-            .collect()
+        rels.iter().filter(|(_, t, _)| t.ends_with(suffix)).map(|(_, _, target)| resolve(&main, target)).collect()
     };
     for h in by_type("/header") {
         if let Some(x) = zip.read_opt(&h)? {
@@ -284,14 +237,12 @@ fn shared_strings(xml: &[u8], limits: &Limits, deadline: Deadline) -> Result<Vec
     let mut total = 0usize;
     while let Some(ev) = s.next()? {
         match &ev {
-            XEvent::Start { ns, local, .. } if ns.as_deref() == Some(NS_S) => {
-                match local.as_str() {
-                    "si" => cur = Some(String::new()),
-                    "t" => in_t = true,
-                    "rPh" => in_rph += 1,
-                    _ => {}
-                }
-            }
+            XEvent::Start { ns, local, .. } if ns.as_deref() == Some(NS_S) => match local.as_str() {
+                "si" => cur = Some(String::new()),
+                "t" => in_t = true,
+                "rPh" => in_rph += 1,
+                _ => {}
+            },
             XEvent::End { ns, local } if ns.as_deref() == Some(NS_S) => match local.as_str() {
                 "si" => out.push(cur.take().unwrap_or_default()),
                 "t" => in_t = false,
@@ -337,7 +288,9 @@ fn cell_styles(xml: &[u8], limits: &Limits, deadline: Deadline) -> Result<CellSt
         match &ev {
             XEvent::Start { ns, local, attrs } if ns.as_deref() == Some(NS_S) => match local.as_str() {
                 "numFmt" => {
-                    if let (Some(id), Some(code)) = (attr(attrs, None, "numFmtId").and_then(|v| v.trim().parse().ok()), attr(attrs, None, "formatCode")) {
+                    if let (Some(id), Some(code)) =
+                        (attr(attrs, None, "numFmtId").and_then(|v| v.trim().parse().ok()), attr(attrs, None, "formatCode"))
+                    {
                         st.custom.push((id, code.to_owned()));
                     }
                 }
@@ -354,14 +307,7 @@ fn cell_styles(xml: &[u8], limits: &Limits, deadline: Deadline) -> Result<CellSt
     Ok(st)
 }
 
-fn sheet_text(
-    xml: &[u8],
-    sst: &[String],
-    styles: &CellStyles,
-    limits: &Limits,
-    deadline: Deadline,
-    out: &mut TextSink,
-) -> Result<()> {
+fn sheet_text(xml: &[u8], sst: &[String], styles: &CellStyles, limits: &Limits, deadline: Deadline, out: &mut TextSink) -> Result<()> {
     let mut s = XmlStream::new(xml, limits.max_depth).with_deadline(deadline);
     let mut row: Vec<String> = Vec::new();
     let mut in_row = false;
@@ -373,43 +319,32 @@ fn sheet_text(
     let mut inline = String::new();
     while let Some(ev) = s.next()? {
         match &ev {
-            XEvent::Start { ns, local, attrs } if ns.as_deref() == Some(NS_S) => {
-                match local.as_str() {
-                    "row" => {
-                        in_row = true;
-                        row.clear();
-                    }
-                    "c" => {
-                        cell_type = attr(attrs, None, "t").unwrap_or("n").to_owned();
-                        cell_style = attr(attrs, None, "s").and_then(|v| v.trim().parse().ok());
-                        val = None;
-                        inline.clear();
-                    }
-                    "v" => {
-                        in_v = true;
-                        val = Some(String::new());
-                    }
-                    "t" => in_is_t = true,
-                    _ => {}
+            XEvent::Start { ns, local, attrs } if ns.as_deref() == Some(NS_S) => match local.as_str() {
+                "row" => {
+                    in_row = true;
+                    row.clear();
                 }
-            }
+                "c" => {
+                    cell_type = attr(attrs, None, "t").unwrap_or("n").to_owned();
+                    cell_style = attr(attrs, None, "s").and_then(|v| v.trim().parse().ok());
+                    val = None;
+                    inline.clear();
+                }
+                "v" => {
+                    in_v = true;
+                    val = Some(String::new());
+                }
+                "t" => in_is_t = true,
+                _ => {}
+            },
             XEvent::End { ns, local } if ns.as_deref() == Some(NS_S) => match local.as_str() {
                 "v" => in_v = false,
                 "t" => in_is_t = false,
                 "c" => {
                     let text = match cell_type.as_str() {
-                        "s" => val
-                            .as_deref()
-                            .and_then(|v| v.trim().parse::<usize>().ok())
-                            .and_then(|i| sst.get(i).cloned()),
+                        "s" => val.as_deref().and_then(|v| v.trim().parse::<usize>().ok()).and_then(|i| sst.get(i).cloned()),
                         "inlineStr" => Some(inline.clone()),
-                        "b" => val.as_deref().map(|v| {
-                            if v.trim() == "1" {
-                                "TRUE".into()
-                            } else {
-                                "FALSE".into()
-                            }
-                        }),
+                        "b" => val.as_deref().map(|v| if v.trim() == "1" { "TRUE".into() } else { "FALSE".into() }),
                         // Number: displayed text according to cell format (date, percent, …) like Tika/POI
                         "n" => val.as_deref().map(|v| match v.trim().parse::<f64>() {
                             Ok(x) => styles.display(x, cell_style),
@@ -447,12 +382,7 @@ fn sheet_text(
     Ok(())
 }
 
-fn xlsx_text(
-    zip: &ZipArchive,
-    limits: &Limits,
-    deadline: Deadline,
-    out: &mut TextSink,
-) -> Result<()> {
+fn xlsx_text(zip: &ZipArchive, limits: &Limits, deadline: Deadline, out: &mut TextSink) -> Result<()> {
     let wb = main_part(zip, limits, "xl/workbook.xml")?;
     let rels = read_rels(zip, &wb, limits)?;
     let sst = match rels.iter().find(|(_, t, _)| t.ends_with("/sharedStrings")) {
@@ -477,10 +407,7 @@ fn xlsx_text(
             && ns.as_deref() == Some(NS_S)
         {
             if local == "sheet" {
-                sheets.push((
-                    attr(attrs, None, "name").unwrap_or("").to_owned(),
-                    attr(attrs, Some(NS_R), "id").unwrap_or("").to_owned(),
-                ));
+                sheets.push((attr(attrs, None, "name").unwrap_or("").to_owned(), attr(attrs, Some(NS_R), "id").unwrap_or("").to_owned()));
             } else if local == "workbookPr" {
                 styles.date1904 = matches!(attr(attrs, None, "date1904"), Some("1" | "true"));
             }
@@ -511,18 +438,16 @@ fn drawing_text(xml: &[u8], limits: &Limits, deadline: Deadline, out: &mut TextS
     let mut in_t = false;
     while let Some(ev) = s.next()? {
         match &ev {
-            XEvent::Start { ns, local, .. } if ns.as_deref() == Some(NS_A) => {
-                match local.as_str() {
-                    "p" => para = Some(String::new()),
-                    "t" => in_t = true,
-                    "br" => {
-                        if let Some(p) = para.as_mut() {
-                            p.push('\n');
-                        }
+            XEvent::Start { ns, local, .. } if ns.as_deref() == Some(NS_A) => match local.as_str() {
+                "p" => para = Some(String::new()),
+                "t" => in_t = true,
+                "br" => {
+                    if let Some(p) = para.as_mut() {
+                        p.push('\n');
                     }
-                    _ => {}
                 }
-            }
+                _ => {}
+            },
             XEvent::End { ns, local } if ns.as_deref() == Some(NS_A) => match local.as_str() {
                 "t" => in_t = false,
                 "p" => {
@@ -547,12 +472,7 @@ fn drawing_text(xml: &[u8], limits: &Limits, deadline: Deadline, out: &mut TextS
     Ok(())
 }
 
-fn pptx_text(
-    zip: &ZipArchive,
-    limits: &Limits,
-    deadline: Deadline,
-    out: &mut TextSink,
-) -> Result<()> {
+fn pptx_text(zip: &ZipArchive, limits: &Limits, deadline: Deadline, out: &mut TextSink) -> Result<()> {
     let pres = main_part(zip, limits, "ppt/presentation.xml")?;
     let rels = read_rels(zip, &pres, limits)?;
     let px = zip.read(&pres)?;
@@ -698,11 +618,7 @@ pub(crate) fn pptx_slides(data: &[u8], limits: &Limits, deadline: Deadline) -> R
 // ---------------------------------------------------------------------------
 
 #[allow(clippy::type_complexity)]
-fn core_metadata(
-    zip: &ZipArchive,
-    mime_type: &str,
-    limits: &Limits,
-) -> Result<(Vec<(String, String)>, Option<String>)> {
+fn core_metadata(zip: &ZipArchive, mime_type: &str, limits: &Limits) -> Result<(Vec<(String, String)>, Option<String>)> {
     let mut md: Vec<(String, String)> = Vec::new();
     let mut created = None;
     let core_map: &[(&str, &str, &str)] = &[
@@ -765,7 +681,10 @@ fn core_metadata(
         for (local, key) in app_map {
             if let Some((_, _, v)) = vals.iter().find(|(n, l, _)| n == NS_EP && l == local) {
                 // Tika `addProperty(int)`: counter only if > 0
-                let counter = matches!(*local, "Pages" | "Slides" | "Words" | "Characters" | "CharactersWithSpaces" | "Lines" | "Paragraphs" | "HiddenSlides");
+                let counter = matches!(
+                    *local,
+                    "Pages" | "Slides" | "Words" | "Characters" | "CharactersWithSpaces" | "Lines" | "Paragraphs" | "HiddenSlides"
+                );
                 if counter && !v.trim().parse::<i64>().is_ok_and(|n| n > 0) {
                     continue;
                 }
@@ -890,20 +809,11 @@ mod tests {
 
     #[test]
     fn paths() {
-        assert_eq!(
-            resolve("xl/workbook.xml", "worksheets/sheet1.xml"),
-            "xl/worksheets/sheet1.xml"
-        );
-        assert_eq!(
-            resolve("ppt/slides/slide1.xml", "../notesSlides/n1.xml"),
-            "ppt/notesSlides/n1.xml"
-        );
+        assert_eq!(resolve("xl/workbook.xml", "worksheets/sheet1.xml"), "xl/worksheets/sheet1.xml");
+        assert_eq!(resolve("ppt/slides/slide1.xml", "../notesSlides/n1.xml"), "ppt/notesSlides/n1.xml");
         assert_eq!(resolve("", "word/document.xml"), "word/document.xml");
         assert_eq!(resolve("x/y.xml", "/abs/z.xml"), "abs/z.xml");
-        assert_eq!(
-            rels_path("word/document.xml"),
-            "word/_rels/document.xml.rels"
-        );
+        assert_eq!(rels_path("word/document.xml"), "word/_rels/document.xml.rels");
         assert_eq!(rels_path(""), "_rels/.rels");
     }
 }

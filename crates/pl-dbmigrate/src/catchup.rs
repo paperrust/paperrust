@@ -367,7 +367,9 @@ pub fn plan(mc: &MigrationCheck) -> Result<Plan, String> {
     let p = Plan { steps, marks };
     // 1075 without the conversion to v3 exists in no paperless-ngx version
     if p.needs_1075() && !p.is_v2() {
-        return Err("Migrationsstand passt zu keiner paperless-ngx-Version (documents.1075 fehlt, aber v3-Migrationen sind angewandt)".into());
+        return Err(
+            "Migrationsstand passt zu keiner paperless-ngx-Version (documents.1075 fehlt, aber v3-Migrationen sind angewandt)".into()
+        );
     }
     Ok(p)
 }
@@ -439,10 +441,15 @@ pub async fn apply_in_place(conn: &mut sqlx::PgConnection, plan: &Plan, media: O
         for part in &step.parts {
             match part {
                 Part::Sql(sql) => {
-                    sqlx::raw_sql(sql.as_str()).execute(&mut *tx).await.with_context(|| format!("Nachholen {app}.{name} fehlgeschlagen"))?;
+                    sqlx::raw_sql(sql.as_str())
+                        .execute(&mut *tx)
+                        .await
+                        .with_context(|| format!("Nachholen {app}.{name} fehlgeschlagen"))?;
                 }
                 Part::Rust(hook) => {
-                    run_hook(&mut tx, hook, media, &mut out.notes).await.with_context(|| format!("Nachholen {app}.{name} ({hook}) fehlgeschlagen"))?;
+                    run_hook(&mut tx, hook, media, &mut out.notes)
+                        .await
+                        .with_context(|| format!("Nachholen {app}.{name} ({hook}) fehlgeschlagen"))?;
                 }
             }
         }

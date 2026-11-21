@@ -14,9 +14,7 @@ use crate::error::ApiResult;
 pub const TASK_PROCESS_MAIL_ACCOUNTS: &str = "paperless_mail.tasks.process_mail_accounts";
 
 pub fn process_request(account_ids: &[i32]) -> TaskRequest {
-    TaskRequest::new(TASK_PROCESS_MAIL_ACCOUNTS)
-        .kwarg("account_ids", json!(account_ids))
-        .trigger_source("manual")
+    TaskRequest::new(TASK_PROCESS_MAIL_ACCOUNTS).kwarg("account_ids", json!(account_ids)).trigger_source("manual")
 }
 
 pub async fn send_process_mail_accounts(state: &AppState, account_ids: &[i32]) -> ApiResult<String> {

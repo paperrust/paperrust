@@ -61,20 +61,17 @@ pub async fn accounts(pool: &PgPool, ids: Option<&[i32]>) -> Result<Vec<Account>
 }
 
 pub async fn account(pool: &PgPool, id: i32) -> Result<Option<Account>, sqlx::Error> {
-    let r = sqlx::query(&format!("SELECT {ACCOUNT_COLS} FROM paperless_mail_mailaccount WHERE id = $1"))
-        .bind(id)
-        .fetch_optional(pool)
-        .await?;
+    let r =
+        sqlx::query(&format!("SELECT {ACCOUNT_COLS} FROM paperless_mail_mailaccount WHERE id = $1")).bind(id).fetch_optional(pool).await?;
     r.as_ref().map(account_from).transpose()
 }
 
 /// `MailRule.objects.filter(account=account, enabled=True).exists()`.
 pub async fn has_enabled_rules(pool: &PgPool, account_id: i32) -> Result<bool, sqlx::Error> {
-    let (b,): (bool,) =
-        sqlx::query_as("SELECT EXISTS(SELECT 1 FROM paperless_mail_mailrule WHERE account_id = $1 AND enabled)")
-            .bind(account_id)
-            .fetch_one(pool)
-            .await?;
+    let (b,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM paperless_mail_mailrule WHERE account_id = $1 AND enabled)")
+        .bind(account_id)
+        .fetch_one(pool)
+        .await?;
     Ok(b)
 }
 
@@ -187,7 +184,13 @@ pub async fn rule_tag_ids(pool: &PgPool, rule_id: i32) -> Result<Vec<i64>, sqlx:
 }
 
 /// UIDs from `uid_chunk` that are already processed (with UIDVALIDITY filter).
-pub async fn processed_uids(pool: &PgPool, rule_id: i32, folder: &str, uids: &[String], uid_validity: Option<&str>) -> Result<Vec<String>, sqlx::Error> {
+pub async fn processed_uids(
+    pool: &PgPool,
+    rule_id: i32,
+    folder: &str,
+    uids: &[String],
+    uid_validity: Option<&str>,
+) -> Result<Vec<String>, sqlx::Error> {
     let rows: Vec<(String,)> = match uid_validity {
         Some(v) => {
             sqlx::query_as(

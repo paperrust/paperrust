@@ -34,10 +34,10 @@ use pl_authz::User;
 use pl_authz::models::{MAIL_ACCOUNT, MAIL_RULE, SAVED_VIEW};
 use pl_authz::objects::restrict_to_visible;
 use pl_core::RequestContext;
+use pl_core::sqlbind::SqlxBinder;
 use pl_objects::model::{Kind, ObjectRow};
 use pl_objects::serialize::{ChangeSource, SerCtx};
 use sea_query::{Alias, Cond, Expr, Order, PostgresQueryBuilder, Query, SelectStatement};
-use pl_core::sqlbind::SqlxBinder;
 use serde_json::{Map, Value, json};
 use sqlx::{PgPool, Row};
 
@@ -64,10 +64,7 @@ pub fn icontains_pattern(q: &str) -> String {
 
 /// `UPPER("<alias>"."<col>"::text) LIKE UPPER($n)`.
 fn icontains(alias: &str, col: &str, q: &str) -> sea_query::SimpleExpr {
-    Expr::cust_with_values(
-        format!("UPPER(\"{alias}\".\"{col}\"::text) LIKE UPPER($1)"),
-        [icontains_pattern(q)],
-    )
+    Expr::cust_with_values(format!("UPPER(\"{alias}\".\"{col}\"::text) LIKE UPPER($1)"), [icontains_pattern(q)])
 }
 
 /// Per-request data the built-in providers need.
@@ -226,10 +223,7 @@ async fn saved_views(c: &Ctx, query: &str, limit: usize) -> Result<Vec<Value>, V
 /// `SavedViewSerializer.to_representation` (v < 10): `user.ui_settings.settings["saved_views"]`.
 async fn legacy_visibility(db: &PgPool, uid: i64) -> Result<(Vec<Value>, Vec<Value>), ViewError> {
     let s: Option<Option<sqlx::types::Json<Value>>> =
-        sqlx::query_scalar("SELECT settings FROM documents_uisettings WHERE user_id = $1::int8")
-            .bind(uid)
-            .fetch_optional(db)
-            .await?;
+        sqlx::query_scalar("SELECT settings FROM documents_uisettings WHERE user_id = $1::int8").bind(uid).fetch_optional(db).await?;
     let mut out = (Vec::new(), Vec::new());
     let Some(Some(sqlx::types::Json(Value::Object(settings)))) = s else { return Ok(out) };
     // `ui_settings.settings or None`: empty dict → no saved views
@@ -458,10 +452,7 @@ async fn custom_fields(c: &Ctx, query: &str, limit: usize) -> Result<Vec<Value>,
         m.insert("id".into(), json!(r.try_get::<i64, _>("id")?));
         m.insert("name".into(), json!(r.try_get::<String, _>("name")?));
         m.insert("data_type".into(), json!(r.try_get::<String, _>("data_type")?));
-        m.insert(
-            "extra_data".into(),
-            r.try_get::<Option<sqlx::types::Json<Value>>, _>("extra_data")?.map(|j| j.0).unwrap_or(Value::Null),
-        );
+        m.insert("extra_data".into(), r.try_get::<Option<sqlx::types::Json<Value>>, _>("extra_data")?.map(|j| j.0).unwrap_or(Value::Null));
         // document_count: read-only field without annotation → SkipField (omitted)
         out.push(Value::Object(m));
     }

@@ -18,9 +18,7 @@ pub const DRAIN_BATCH: i64 = 1000;
 
 /// Migration applied?
 pub async fn installed(pool: &PgPool) -> Result<bool> {
-    Ok(sqlx::query_scalar::<_, bool>("SELECT to_regclass('public.paperrust_search_dirty') IS NOT NULL")
-        .fetch_one(pool)
-        .await?)
+    Ok(sqlx::query_scalar::<_, bool>("SELECT to_regclass('public.paperrust_search_dirty') IS NOT NULL").fetch_one(pool).await?)
 }
 
 /// Open entries (count).
@@ -37,20 +35,12 @@ pub async fn max_seq(pool: &PgPool) -> Result<Option<i64>> {
     if !installed(pool).await? {
         return Ok(None);
     }
-    Ok(Some(
-        sqlx::query_scalar::<_, i64>("SELECT COALESCE(max(seq), 0) FROM paperrust_search_dirty")
-            .fetch_one(pool)
-            .await?,
-    ))
+    Ok(Some(sqlx::query_scalar::<_, i64>("SELECT COALESCE(max(seq), 0) FROM paperrust_search_dirty").fetch_one(pool).await?))
 }
 
 /// After a rebuild from the DB: everything up to `seq` is done.
 pub async fn clear_upto(pool: &PgPool, seq: i64) -> Result<u64> {
-    Ok(sqlx::query("DELETE FROM paperrust_search_dirty WHERE seq <= $1")
-        .bind(seq)
-        .execute(pool)
-        .await?
-        .rows_affected())
+    Ok(sqlx::query("DELETE FROM paperrust_search_dirty WHERE seq <= $1").bind(seq).execute(pool).await?.rows_affected())
 }
 
 /// Result of a run.
@@ -69,10 +59,7 @@ pub struct Drained {
 /// only then delete the rows that were seen.
 pub async fn drain_once(ix: &Indexer, pool: &PgPool, after_commit: impl FnOnce()) -> Result<Drained> {
     let rows: Vec<(i64, i64)> =
-        sqlx::query_as("SELECT doc_id, seq FROM paperrust_search_dirty ORDER BY seq LIMIT $1")
-            .bind(DRAIN_BATCH)
-            .fetch_all(pool)
-            .await?;
+        sqlx::query_as("SELECT doc_id, seq FROM paperrust_search_dirty ORDER BY seq LIMIT $1").bind(DRAIN_BATCH).fetch_all(pool).await?;
     if rows.is_empty() {
         return Ok(Drained::default());
     }

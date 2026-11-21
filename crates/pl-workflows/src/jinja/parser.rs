@@ -8,9 +8,8 @@ use crate::pyfmt::str_repr;
 
 type R<T> = Result<T, JErr>;
 
-const STATEMENT_KEYWORDS: &[&str] = &[
-    "for", "if", "block", "extends", "print", "macro", "include", "from", "import", "set", "with", "autoescape",
-];
+const STATEMENT_KEYWORDS: &[&str] =
+    &["for", "if", "block", "extends", "print", "macro", "include", "from", "import", "set", "with", "autoescape"];
 const COMPARE_OPS: &[&str] = &["eq", "ne", "lt", "lteq", "gt", "gteq"];
 
 pub struct Parser {
@@ -45,18 +44,14 @@ impl Parser {
                 expected.push(describe_expr(e));
             }
         }
-        let currently_looking = stack.last().map(|last| {
-            last.iter().map(|e| str_repr(&describe_expr(e))).collect::<Vec<_>>().join(" or ")
-        });
+        let currently_looking = stack.last().map(|last| last.iter().map(|e| str_repr(&describe_expr(e))).collect::<Vec<_>>().join(" or "));
         let mut message = vec![match name {
             None => "Unexpected end of template.".to_string(),
             Some(nm) => format!("Encountered unknown tag {}.", str_repr(nm)),
         }];
         if let Some(cl) = currently_looking.filter(|s| !s.is_empty()) {
             if name.is_some_and(|nm| expected.iter().any(|e| e == nm)) {
-                message.push(format!(
-                    "You probably made a nesting mistake. Jinja is expecting this tag, but currently looking for {cl}."
-                ));
+                message.push(format!("You probably made a nesting mistake. Jinja is expecting this tag, but currently looking for {cl}."));
             } else {
                 message.push(format!("Jinja was looking for the following tags: {cl}."));
             }
@@ -166,13 +161,8 @@ impl Parser {
         }
         let recursive = self.stream.skip_if("name:recursive")?;
         let body = self.parse_statements(&["name:endfor", "name:else"], false)?;
-        let else_ = if self.stream.next()?.value == "endfor" {
-            Vec::new()
-        } else {
-            self.parse_statements(&["name:endfor"], true)?
-        };
-        let mut node =
-            Node::new(K::For, lineno, vec![n(target), n(iter), F::L(body), F::L(else_), opt(test)]);
+        let else_ = if self.stream.next()?.value == "endfor" { Vec::new() } else { self.parse_statements(&["name:endfor"], true)? };
+        let mut node = Node::new(K::For, lineno, vec![n(target), n(iter), F::L(body), F::L(else_), opt(test)]);
         node.flag1 = recursive;
         Ok(node)
     }
@@ -198,9 +188,7 @@ impl Parser {
         }
         let mut it = chain.into_iter();
         let (l0, t0, b0) = it.next().ok_or_else(|| JErr::internal("empty if"))?;
-        let elifs: Vec<Node> = it
-            .map(|(l, t, b)| Node::new(K::If, l, vec![n(t), F::L(b), F::L(vec![]), F::L(vec![])]))
-            .collect();
+        let elifs: Vec<Node> = it.map(|(l, t, b)| Node::new(K::If, l, vec![n(t), F::L(b), F::L(vec![]), F::L(vec![])])).collect();
         Ok(Node::new(K::If, l0, vec![n(t0), F::L(b0), F::L(elifs), F::L(else_)]))
     }
 
@@ -246,9 +234,7 @@ impl Parser {
         if required {
             for b in &body {
                 let ok = b.k == K::Output
-                    && b.list(0).iter().all(|o| {
-                        o.k == K::TemplateData && !o.s.is_empty() && o.s.chars().all(super::lexer::is_py_space)
-                    });
+                    && b.list(0).iter().all(|o| o.k == K::TemplateData && !o.s.is_empty() && o.s.chars().all(super::lexer::is_py_space));
                 if !ok {
                     return self.fail("Required blocks can only contain comments or whitespace", None);
                 }
@@ -315,10 +301,7 @@ impl Parser {
                 }
                 let target = self.parse_assign_target(true, true, None, false)?;
                 if target.s.starts_with('_') {
-                    return Err(JErr::parse_assertion(
-                        "names starting with an underline can not be imported",
-                        target.lineno,
-                    ));
+                    return Err(JErr::parse_assertion("names starting with an underline can not be imported", target.lineno));
                 }
                 if self.stream.skip_if("name:as")? {
                     let alias = self.parse_assign_target(true, true, None, false)?;
@@ -374,8 +357,7 @@ impl Parser {
 
     fn parse_call_block(&mut self) -> R<Node> {
         let lineno = self.stream.next()?.lineno;
-        let (args, defaults) =
-            if self.cur_ty() == "lparen" { self.parse_signature()? } else { (Vec::new(), Vec::new()) };
+        let (args, defaults) = if self.cur_ty() == "lparen" { self.parse_signature()? } else { (Vec::new(), Vec::new()) };
         let call_node = self.parse_expression(true)?;
         if call_node.k != K::Call {
             return self.fail("expected call", Some(lineno));
@@ -647,8 +629,7 @@ impl Parser {
             if self.is_tuple_end(extra_end_rules) {
                 break;
             }
-            let a =
-                if simplified { self.parse_primary(with_namespace)? } else { self.parse_expression(with_condexpr)? };
+            let a = if simplified { self.parse_primary(with_namespace)? } else { self.parse_expression(with_condexpr)? };
             args.push(a);
             if self.cur_ty() == "comma" {
                 is_tuple = true;
@@ -662,10 +643,7 @@ impl Parser {
                 return Ok(args.remove(0));
             }
             if !explicit_parentheses {
-                return self.fail(
-                    format!("Expected an expression, got {}", str_repr(&describe_token(&self.stream.current))),
-                    None,
-                );
+                return self.fail(format!("Expected an expression, got {}", str_repr(&describe_token(&self.stream.current))), None);
             }
         }
         Ok(Node::new(K::Tuple, lineno, vec![F::L(args)]).with_ctx("load"))
@@ -759,11 +737,7 @@ impl Parser {
                 args.push(self.parse_subscribed()?);
             }
             self.stream.expect("rbracket")?;
-            let arg = if args.len() == 1 {
-                args.remove(0)
-            } else {
-                Node::new(K::Tuple, token.lineno, vec![F::L(args)]).with_ctx("load")
-            };
+            let arg = if args.len() == 1 { args.remove(0) } else { Node::new(K::Tuple, token.lineno, vec![F::L(args)]).with_ctx("load") };
             return Ok(Node::new(K::Getitem, token.lineno, vec![n(node), n(arg)]).with_ctx("load"));
         }
         self.fail("expected subscript expression", Some(token.lineno))
@@ -865,15 +839,9 @@ impl Parser {
                 name.push('.');
                 name.push_str(&self.stream.expect("name")?.value);
             }
-            let (args, kwargs, da, dk) = if self.cur_ty() == "lparen" {
-                self.parse_call_args()?
-            } else {
-                (Vec::new(), Vec::new(), None, None)
-            };
-            node = Some(
-                Node::new(K::Filter, token.lineno, vec![opt(node), F::L(args), F::L(kwargs), opt(da), opt(dk)])
-                    .with_s(name),
-            );
+            let (args, kwargs, da, dk) =
+                if self.cur_ty() == "lparen" { self.parse_call_args()? } else { (Vec::new(), Vec::new(), None, None) };
+            node = Some(Node::new(K::Filter, token.lineno, vec![opt(node), F::L(args), F::L(kwargs), opt(da), opt(dk)]).with_s(name));
             start_inline = false;
         }
         Ok(node)
@@ -909,8 +877,7 @@ impl Parser {
             let arg = self.parse_postfix(arg)?;
             args = vec![arg];
         }
-        let t = Node::new(K::Test, token.lineno, vec![n(node), F::L(args), F::L(kwargs), opt(da), opt(dk)])
-            .with_s(name);
+        let t = Node::new(K::Test, token.lineno, vec![n(node), F::L(args), F::L(kwargs), opt(da), opt(dk)]).with_s(name);
         if negated {
             return Ok(Node::new(K::Not, token.lineno, vec![n(t)]));
         }
@@ -955,9 +922,10 @@ impl Parser {
                     flush(&mut body, &mut data_buffer);
                     self.stream.next()?;
                     if let Some(e) = end_tokens
-                        && self.stream.current.test_any(e) {
-                            return Ok(body);
-                        }
+                        && self.stream.current.test_any(e)
+                    {
+                        return Ok(body);
+                    }
                     let rv = self.parse_statement()?;
                     body.extend(rv);
                     self.stream.expect("block_end")?;

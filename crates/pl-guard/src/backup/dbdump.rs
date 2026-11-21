@@ -124,7 +124,10 @@ pub async fn restore(pool: &PgPool, dump_file: &Path) -> Result<RestoreStats, St
     // 1. own triggers off while no checks are pending yet
     //    (PostgreSQL forbids ALTER TABLE with deferred trigger events).
     for t in &existing {
-        sqlx::query(&format!("ALTER TABLE public.{} DISABLE TRIGGER USER", qi(t))).execute(&mut *tx).await.map_err(|e| format!("{t}: {e}"))?;
+        sqlx::query(&format!("ALTER TABLE public.{} DISABLE TRIGGER USER", qi(t)))
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| format!("{t}: {e}"))?;
     }
     // 2. check foreign keys only at the end (Django: DEFERRABLE INITIALLY DEFERRED), empty everything
     sqlx::query("SET CONSTRAINTS ALL DEFERRED").execute(&mut *tx).await.map_err(|e| e.to_string())?;
@@ -153,7 +156,11 @@ pub async fn restore(pool: &PgPool, dump_file: &Path) -> Result<RestoreStats, St
         }
         let cols = h.columns.iter().map(|c| qi(c)).collect::<Vec<_>>().join(", ");
         let mut copy = if present {
-            Some(tx.copy_in_raw(&format!("COPY public.{} ({cols}) FROM STDIN", qi(&h.table))).await.map_err(|e| format!("{}: {e}", h.table))?)
+            Some(
+                tx.copy_in_raw(&format!("COPY public.{} ({cols}) FROM STDIN", qi(&h.table)))
+                    .await
+                    .map_err(|e| format!("{}: {e}", h.table))?,
+            )
         } else {
             None
         };
@@ -179,7 +186,10 @@ pub async fn restore(pool: &PgPool, dump_file: &Path) -> Result<RestoreStats, St
     // 4. check foreign keys now (afterwards no events are pending), triggers back on
     sqlx::query("SET CONSTRAINTS ALL IMMEDIATE").execute(&mut *tx).await.map_err(|e| format!("foreign keys: {e}"))?;
     for t in &existing {
-        sqlx::query(&format!("ALTER TABLE public.{} ENABLE TRIGGER USER", qi(t))).execute(&mut *tx).await.map_err(|e| format!("{t}: {e}"))?;
+        sqlx::query(&format!("ALTER TABLE public.{} ENABLE TRIGGER USER", qi(t)))
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| format!("{t}: {e}"))?;
     }
     reset_sequences(&mut tx).await.map_err(|e| format!("sequences: {e}"))?;
     tx.commit().await.map_err(|e| format!("commit (foreign keys checked here): {e}"))?;
@@ -203,7 +213,12 @@ async fn reset_sequences(conn: &mut sqlx::PgConnection) -> Result<(), sqlx::Erro
         let seq: String = r.try_get("seq")?;
         let tbl: String = r.try_get("tbl")?;
         let col: String = r.try_get("col")?;
-        let q = format!("SELECT setval('{}', COALESCE((SELECT max({}) FROM public.{}), 0) + 1, false)", seq.replace('\'', "''"), qi(&col), qi(&tbl));
+        let q = format!(
+            "SELECT setval('{}', COALESCE((SELECT max({}) FROM public.{}), 0) + 1, false)",
+            seq.replace('\'', "''"),
+            qi(&col),
+            qi(&tbl)
+        );
         sqlx::query(&q).execute(&mut *conn).await?;
     }
     Ok(())

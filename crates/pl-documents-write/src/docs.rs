@@ -28,10 +28,7 @@ pub async fn load_live(conn: &mut PgConnection, id: i64) -> Result<Option<DocRow
 
 pub async fn correspondent_name(conn: &mut PgConnection, id: Option<i64>) -> Result<Option<String>, sqlx::Error> {
     let Some(id) = id else { return Ok(None) };
-    sqlx::query_scalar("SELECT name FROM documents_correspondent WHERE id = $1")
-        .bind(id as i32)
-        .fetch_optional(&mut *conn)
-        .await
+    sqlx::query_scalar("SELECT name FROM documents_correspondent WHERE id = $1").bind(id as i32).fetch_optional(&mut *conn).await
 }
 
 /// `str(document)`.
@@ -95,9 +92,25 @@ pub async fn update_columns(conn: &mut PgConnection, d: &DocRow, fields: &[&str]
 
 /// Concrete, storable fields (`Document._meta.concrete_fields` without `id`, `content_length`).
 pub const ALL_FIELDS: &[&str] = &[
-    "deleted_at", "restored_at", "transaction_id", "title", "content", "archive_checksum", "page_count", "created",
-    "modified", "filename", "archive_filename", "archive_serial_number", "correspondent", "document_type",
-    "storage_path", "owner", "root_document", "version_label", "version_index",
+    "deleted_at",
+    "restored_at",
+    "transaction_id",
+    "title",
+    "content",
+    "archive_checksum",
+    "page_count",
+    "created",
+    "modified",
+    "filename",
+    "archive_filename",
+    "archive_serial_number",
+    "correspondent",
+    "document_type",
+    "storage_path",
+    "owner",
+    "root_document",
+    "version_label",
+    "version_index",
 ];
 
 /// `document.save(update_fields=…)`.
@@ -154,11 +167,10 @@ pub async fn touch_modified(conn: &mut PgConnection, ids: &[i64]) -> Result<(), 
 
 /// Tags of a document (ids, ascending).
 pub async fn tag_ids(conn: &mut PgConnection, doc_id: i64) -> Result<Vec<i64>, sqlx::Error> {
-    let v: Vec<i32> =
-        sqlx::query_scalar("SELECT tag_id FROM documents_document_tags WHERE document_id = $1 ORDER BY tag_id")
-            .bind(doc_id as i32)
-            .fetch_all(&mut *conn)
-            .await?;
+    let v: Vec<i32> = sqlx::query_scalar("SELECT tag_id FROM documents_document_tags WHERE document_id = $1 ORDER BY tag_id")
+        .bind(doc_id as i32)
+        .fetch_all(&mut *conn)
+        .await?;
     Ok(v.into_iter().map(i64::from).collect())
 }
 
@@ -168,10 +180,7 @@ pub async fn tag_names(conn: &mut PgConnection, ids: &[i64]) -> Result<Vec<Strin
         return Ok(Vec::new());
     }
     let ids32: Vec<i32> = ids.iter().map(|i| *i as i32).collect();
-    sqlx::query_scalar("SELECT name FROM documents_tag WHERE id = ANY($1) ORDER BY name, id")
-        .bind(&ids32)
-        .fetch_all(&mut *conn)
-        .await
+    sqlx::query_scalar("SELECT name FROM documents_tag WHERE id = ANY($1) ORDER BY name, id").bind(&ids32).fetch_all(&mut *conn).await
 }
 
 /// All tag names (`post_clear` logs `Tag.objects.all()`).
@@ -270,10 +279,7 @@ pub async fn tags_clear(
     if let Some(m) = media {
         files::update_filename_and_move_files(conn, m, doc_id).await?;
     }
-    sqlx::query("DELETE FROM documents_document_tags WHERE document_id = $1")
-        .bind(doc_id as i32)
-        .execute(&mut *conn)
-        .await?;
+    sqlx::query("DELETE FROM documents_document_tags WHERE document_id = $1").bind(doc_id as i32).execute(&mut *conn).await?;
     if ctx.enabled {
         let names = all_tag_names(conn).await?;
         if let Some(d) = load_global(conn, doc_id).await? {

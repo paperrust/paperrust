@@ -51,8 +51,20 @@ pub fn routes() -> Vec<ApiRoute> {
     vec![
         ApiRoute::new("scan.scanners.list", Method::GET, "/api/x-scan/scanners/", SRC, drf_view(get(api::scanners_list), ALLOW_LIST)),
         ApiRoute::new("scan.scanners.create", Method::POST, "/api/x-scan/scanners/", SRC, drf_view(post(api::scanners_create), ALLOW_LIST)),
-        ApiRoute::new("scan.scanners.update", Method::PATCH, "/api/x-scan/scanners/{id}/", SRC, drf_view(patch(api::scanners_update), ALLOW_DETAIL)),
-        ApiRoute::new("scan.scanners.delete", Method::DELETE, "/api/x-scan/scanners/{id}/", SRC, drf_view(delete(api::scanners_delete), ALLOW_DETAIL)),
+        ApiRoute::new(
+            "scan.scanners.update",
+            Method::PATCH,
+            "/api/x-scan/scanners/{id}/",
+            SRC,
+            drf_view(patch(api::scanners_update), ALLOW_DETAIL),
+        ),
+        ApiRoute::new(
+            "scan.scanners.delete",
+            Method::DELETE,
+            "/api/x-scan/scanners/{id}/",
+            SRC,
+            drf_view(delete(api::scanners_delete), ALLOW_DETAIL),
+        ),
         ApiRoute::new(
             "scan.scanners.capabilities",
             Method::GET,
@@ -66,8 +78,20 @@ pub fn routes() -> Vec<ApiRoute> {
         ApiRoute::new("scan.jobs.cancel", Method::POST, "/api/x-scan/jobs/{id}/cancel/", SRC, drf_view(post(api::jobs_cancel), ALLOW_POST)),
         ApiRoute::new("scan.devices.list", Method::GET, "/api/x-scan/devices/", SRC, drf_view(get(api::devices_list), ALLOW_LIST)),
         ApiRoute::new("scan.devices.create", Method::POST, "/api/x-scan/devices/", SRC, drf_view(post(api::devices_create), ALLOW_LIST)),
-        ApiRoute::new("scan.devices.revoke", Method::POST, "/api/x-scan/devices/{id}/revoke/", SRC, drf_view(post(api::devices_revoke), ALLOW_POST)),
-        ApiRoute::new("scan.devices.delete", Method::DELETE, "/api/x-scan/devices/{id}/", SRC, drf_view(delete(api::devices_delete), "DELETE, OPTIONS")),
+        ApiRoute::new(
+            "scan.devices.revoke",
+            Method::POST,
+            "/api/x-scan/devices/{id}/revoke/",
+            SRC,
+            drf_view(post(api::devices_revoke), ALLOW_POST),
+        ),
+        ApiRoute::new(
+            "scan.devices.delete",
+            Method::DELETE,
+            "/api/x-scan/devices/{id}/",
+            SRC,
+            drf_view(delete(api::devices_delete), "DELETE, OPTIONS"),
+        ),
     ]
 }
 

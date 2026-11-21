@@ -234,9 +234,7 @@ impl Env {
     /// `get_list_from_env(key, default=…)` (comma, trim, remove empty ones).
     pub fn list(&self, key: &str, default: &[&str]) -> Vec<String> {
         match self.get(key) {
-            Some(v) if !v.is_empty() => {
-                v.split(',').map(str::trim).filter(|s| !s.is_empty()).map(String::from).collect()
-            }
+            Some(v) if !v.is_empty() => v.split(',').map(str::trim).filter(|s| !s.is_empty()).map(String::from).collect(),
             _ => default.iter().map(|s| s.to_string()).collect(),
         }
     }
@@ -300,18 +298,30 @@ const fn own(name: &'static str, legacy_alias: bool, meaning: &'static str) -> O
 /// `PAPERRUST_X` counts as the primary name of the upstream setting `PAPERLESS_X`.
 pub const OWN_SETTINGS: &[OwnSetting] = &[
     own("PAPERRUST_BIND", true, "Adresse:Port des Servers (Standard 127.0.0.1:8080)"),
-    own("PAPERRUST_DJANGO_URL", true, "entfernt (2026-11-14): Weiterleitung an Django gibt es nicht mehr; gesetzt → Warnung beim Start, sonst wirkungslos"),
+    own(
+        "PAPERRUST_DJANGO_URL",
+        true,
+        "entfernt (2026-11-14): Weiterleitung an Django gibt es nicht mehr; gesetzt → Warnung beim Start, sonst wirkungslos",
+    ),
     own("PAPERRUST_ROUTES", true, "Pfad der routes.toml (Standard ./routes.toml)"),
     own("PAPERRUST_LOG", true, "Log-Filter (tracing EnvFilter, Standard `info`)"),
     own("PAPERRUST_BASE_DIR", true, "Installationswurzel = Django BASE_DIR.parent (Standard: Arbeitsverzeichnis)"),
     own("PAPERRUST_DB_MAX_CONNECTIONS", true, "Poolgröße, wenn PAPERRUST_DB_POOLSIZE fehlt (Standard 10)"),
-    own("PAPERRUST_DB_REQUIRE_AUTH", false, "erlaubte DB-Anmeldeverfahren, z. B. scram-sha-256 (beim Start geprüft; Standard: keine Prüfung)"),
+    own(
+        "PAPERRUST_DB_REQUIRE_AUTH",
+        false,
+        "erlaubte DB-Anmeldeverfahren, z. B. scram-sha-256 (beim Start geprüft; Standard: keine Prüfung)",
+    ),
     own("PAPERRUST_INSTANCE_ID", false, "Kennung der Instanz, erscheint als `instance` in /__rs/health"),
     own("PAPERRUST_STOP_ON_STDIN_EOF", false, "Beenden bei stdin-EOF (Desktop-Supervisor, Standard no)"),
     own("PAPERRUST_BRANDING", false, "Logo/Name/Akzentfarbe von PaperRust (Standard on)"),
     own("PAPERRUST_ACCENT", false, "Akzentfarbe als Hex (Standard #B7410E)"),
     own("PAPERRUST_CACHE", false, "Cache: `local` (Standard, ein Prozess) oder `postgres` (gemeinsam, Mehrprozessbetrieb)"),
-    own("PAPERRUST_QUEUE", false, "wirkungslos seit 2026-11-14: es gibt nur noch die eigene Warteschlange in PostgreSQL (`celery` → Warnung)"),
+    own(
+        "PAPERRUST_QUEUE",
+        false,
+        "wirkungslos seit 2026-11-14: es gibt nur noch die eigene Warteschlange in PostgreSQL (`celery` → Warnung)",
+    ),
     own("PAPERRUST_QUEUE_BACKEND", false, "älterer Name von PAPERRUST_QUEUE (wirkungslos)"),
     own("PAPERRUST_QUEUE_NAMES", false, "abzuarbeitende Warteschlangen (Standard celery = historischer Name der Standard-Warteschlange)"),
     own("PAPERRUST_QUEUE_VISIBILITY_TIMEOUT", false, "Lease-Dauer einer Aufgabe (Standard 60 s)"),
@@ -348,7 +358,11 @@ pub const OWN_SETTINGS: &[OwnSetting] = &[
     own("PAPERRUST_AI_VISION_MAX_PAGES_PER_DAY", false, "KI-Texterkennung: Seiten je Tag und Prozess (Standard 500, 0 = unbegrenzt)"),
     own("PAPERRUST_AI_CUSTOM_FIELDS_ENABLED", false, "Benutzerfelder per KI ausfüllen (Standard no)"),
     own("PAPERRUST_INTEGRITY_INCREMENTAL", false, "Integritätsprüfung: unveränderte Dateien nicht erneut hashen (Standard no)"),
-    own("PAPERRUST_INTEGRITY_FULL_HASH_DAYS", false, "Integritätsprüfung: Höchstalter einer Bestätigung in Tagen (Standard 28, 0 = immer hashen)"),
+    own(
+        "PAPERRUST_INTEGRITY_FULL_HASH_DAYS",
+        false,
+        "Integritätsprüfung: Höchstalter einer Bestätigung in Tagen (Standard 28, 0 = immer hashen)",
+    ),
     own("PAPERRUST_INTEGRITY_THREADS", false, "Integritätsprüfung: parallele Leser (Standard 0 = automatisch, höchstens 4)"),
     own("PAPERRUST_INTEGRITY_REPORT_KEEP", false, "Integritätsprüfung: aufbewahrte JSON-Berichte (Standard 10, 0 = keine)"),
 ];
@@ -661,7 +675,13 @@ pub fn retired_warnings(env: &Env) -> Vec<String> {
     if env.get("PAPERLESS_REDIS").is_some() {
         out.push("PAPERLESS_REDIS is set but PaperRust does not use Redis anymore (task queue and cache live in PostgreSQL or in the process). The variable is ignored; Redis can be shut down.".to_string());
     }
-    for k in ["PAPERRUST_REDIS_CONNECT_TIMEOUT", "PAPERRUST_REDIS_RETRY_AFTER", "PAPERRUST_PROXY_CONNECT_TIMEOUT_SECS", "PAPERRUST_PROXY_RESPONSE_TIMEOUT_SECS", "PAPERRUST_PROXY_X_FORWARDED_FOR"] {
+    for k in [
+        "PAPERRUST_REDIS_CONNECT_TIMEOUT",
+        "PAPERRUST_REDIS_RETRY_AFTER",
+        "PAPERRUST_PROXY_CONNECT_TIMEOUT_SECS",
+        "PAPERRUST_PROXY_RESPONSE_TIMEOUT_SECS",
+        "PAPERRUST_PROXY_X_FORWARDED_FOR",
+    ] {
         if env.get(k).is_some() {
             out.push(format!("{k} has no effect anymore (Redis/Django support was removed) and is ignored."));
         }
@@ -996,9 +1016,42 @@ pub const DEFAULT_BIND: &str = "127.0.0.1:8080";
 
 /// `documents/search/_tokenizer.py::SUPPORTED_LANGUAGES` (Tantivy-Stemmer).
 pub const SEARCH_SUPPORTED_LANGUAGES: &[&str] = &[
-    "ar", "arabic", "da", "danish", "nl", "dutch", "en", "english", "fi", "finnish", "fr", "french", "de",
-    "german", "el", "greek", "hu", "hungarian", "it", "italian", "no", "norwegian", "pt", "portuguese", "ro",
-    "romanian", "ru", "russian", "es", "spanish", "sv", "swedish", "ta", "tamil", "tr", "turkish",
+    "ar",
+    "arabic",
+    "da",
+    "danish",
+    "nl",
+    "dutch",
+    "en",
+    "english",
+    "fi",
+    "finnish",
+    "fr",
+    "french",
+    "de",
+    "german",
+    "el",
+    "greek",
+    "hu",
+    "hungarian",
+    "it",
+    "italian",
+    "no",
+    "norwegian",
+    "pt",
+    "portuguese",
+    "ro",
+    "romanian",
+    "ru",
+    "russian",
+    "es",
+    "spanish",
+    "sv",
+    "swedish",
+    "ta",
+    "tamil",
+    "tr",
+    "turkish",
 ];
 
 /// `_get_search_language_setting(ocr_lang)`.
@@ -1016,9 +1069,24 @@ fn search_language_setting(env: &Env, ocr_lang: &str) -> Result<Option<String>, 
     }
     let primary = ocr_lang.split('+').next().unwrap_or("").to_lowercase();
     let map: &[(&str, &str)] = &[
-        ("ara", "ar"), ("dan", "da"), ("nld", "nl"), ("eng", "en"), ("fin", "fi"), ("fra", "fr"),
-        ("deu", "de"), ("ell", "el"), ("hun", "hu"), ("ita", "it"), ("nor", "no"), ("por", "pt"),
-        ("ron", "ro"), ("rus", "ru"), ("spa", "es"), ("swe", "sv"), ("tam", "ta"), ("tur", "tr"),
+        ("ara", "ar"),
+        ("dan", "da"),
+        ("nld", "nl"),
+        ("eng", "en"),
+        ("fin", "fi"),
+        ("fra", "fr"),
+        ("deu", "de"),
+        ("ell", "el"),
+        ("hun", "hu"),
+        ("ita", "it"),
+        ("nor", "no"),
+        ("por", "pt"),
+        ("ron", "ro"),
+        ("rus", "ru"),
+        ("spa", "es"),
+        ("swe", "sv"),
+        ("tam", "ta"),
+        ("tur", "tr"),
     ];
     Ok(map.iter().find(|(k, _)| *k == primary).map(|(_, v)| v.to_string()))
 }
@@ -1075,9 +1143,7 @@ impl Config {
         if let Some(url) = &paperless_url {
             let host = url::Url::parse(url).ok().and_then(|u| u.host_str().and_then(allowed_host_from_url_hostname));
             let Some(host) = host else {
-                return Err(invalid(format!(
-                    "PAPERRUST_URL '{url}' has no valid hostname, expected a URL like https://example.com"
-                )));
+                return Err(invalid(format!("PAPERRUST_URL '{url}' has no valid hostname, expected a URL like https://example.com")));
             };
             csrf_trusted_origins.push(url.clone());
             cors_allowed_origins.push(url.clone());
@@ -1137,8 +1203,7 @@ impl Config {
         }
         // GMAIL/OUTLOOK_OAUTH_ENABLED = bool((OAUTH_CALLBACK_BASE_URL or PAPERLESS_URL) and ID and SECRET)
         let nonempty = |k: &str| env.get(k).is_some_and(|v| !v.is_empty());
-        let oauth_base =
-            nonempty("PAPERLESS_OAUTH_CALLBACK_BASE_URL") || paperless_url.as_deref().is_some_and(|u| !u.is_empty());
+        let oauth_base = nonempty("PAPERLESS_OAUTH_CALLBACK_BASE_URL") || paperless_url.as_deref().is_some_and(|u| !u.is_empty());
         let gmail_oauth_enabled =
             oauth_base && nonempty("PAPERLESS_GMAIL_OAUTH_CLIENT_ID") && nonempty("PAPERLESS_GMAIL_OAUTH_CLIENT_SECRET");
         let outlook_oauth_enabled =
@@ -1319,9 +1384,7 @@ fn base_dir_join(env: &Env, sub: &str) -> PathBuf {
 /// Django `split_domain_port`: (domain lowercased without trailing dot, port) or `("", "")`.
 pub fn split_domain_port(host: &str) -> (String, String) {
     static RE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
-    let re = RE.get_or_init(|| {
-        regex::Regex::new(r"^([a-z0-9.-]+|\[[a-f0-9]*:[a-f0-9.:]+\])(?::([0-9]+))?$").expect("static regex")
-    });
+    let re = RE.get_or_init(|| regex::Regex::new(r"^([a-z0-9.-]+|\[[a-f0-9]*:[a-f0-9.:]+\])(?::([0-9]+))?$").expect("static regex"));
     let lower = host.to_lowercase();
     match re.captures(&lower) {
         Some(c) => {
@@ -1354,7 +1417,11 @@ fn parse_db_settings(env: &Env, data_dir: &Path) -> Result<DbConfig, ConfigError
             )));
         }
         None => {
-            if env.contains("PAPERLESS_DBHOST") { DbEngine::Postgresql } else { DbEngine::Sqlite }
+            if env.contains("PAPERLESS_DBHOST") {
+                DbEngine::Postgresql
+            } else {
+                DbEngine::Sqlite
+            }
         }
     };
     // PAPERLESS_DB_OPTIONS: "k=v,k2=v2", dot notation allowed.
@@ -1590,12 +1657,9 @@ mod tests {
 
     #[test]
     fn db_settings() {
-        let c = cfg(&[
-            ("PAPERLESS_DBHOST", "db"),
-            ("PAPERLESS_DBPORT", "5433"),
-            ("PAPERLESS_DB_OPTIONS", "sslmode=require,pool.max_size=7"),
-        ])
-        .unwrap();
+        let c =
+            cfg(&[("PAPERLESS_DBHOST", "db"), ("PAPERLESS_DBPORT", "5433"), ("PAPERLESS_DB_OPTIONS", "sslmode=require,pool.max_size=7")])
+                .unwrap();
         assert_eq!(c.db.engine, DbEngine::Postgresql);
         assert_eq!(c.db.port, Some(5433));
         assert_eq!(c.db.sslmode, "require");
@@ -1723,10 +1787,11 @@ mod tests {
             Path::new("p.conf"),
             [("PAPERRUST_ZZ_OV_FILE", "file"), ("PAPERLESS_ZZ_OV_PROC", "f2")],
         );
-        let ov: BTreeMap<String, String> = [("PAPERLESS_ZZ_OV_PROC", "db"), ("PAPERLESS_ZZ_OV_FILE", "db2"), ("PAPERLESS_ZZ_OV_NEW", "db3")]
-            .into_iter()
-            .map(|(k, v)| (k.to_string(), v.to_string()))
-            .collect();
+        let ov: BTreeMap<String, String> =
+            [("PAPERLESS_ZZ_OV_PROC", "db"), ("PAPERLESS_ZZ_OV_FILE", "db2"), ("PAPERLESS_ZZ_OV_NEW", "db3")]
+                .into_iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect();
         env.apply_overlay(&ov);
         assert_eq!(env.get("PAPERLESS_ZZ_OV_PROC"), Some("proc"));
         assert_eq!(env.get("PAPERLESS_ZZ_OV_FILE"), Some("db2"));

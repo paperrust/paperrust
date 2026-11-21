@@ -107,9 +107,7 @@ pub async fn apply_mail_action(worker: &MailWorker, kw: &Map<String, Value>) -> 
 
     let r: Result<(), (String, String)> = async {
         let port = u16::try_from(account.imap_port.unwrap_or(0)).unwrap_or(0);
-        let mut mb = MailBox::connect(&account.imap_server, port, account.imap_security, &worker.config.connect)
-            .await
-            .map_err(err_pair)?;
+        let mut mb = MailBox::connect(&account.imap_server, port, account.imap_security, &worker.config.connect).await.map_err(err_pair)?;
         let inner: Result<(), (String, String)> = async {
             let gmail = mb.capabilities.iter().any(|c| c == "X-GM-EXT-1");
             mb.login(&account.username, &account.password, account.is_token).await.map_err(err_pair)?;

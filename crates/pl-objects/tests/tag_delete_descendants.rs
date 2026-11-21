@@ -97,7 +97,12 @@ async fn user(db: &PgPool, name: &str, superuser: bool) -> (i32, String) {
     .await
     .unwrap();
     let token = format!("{:0>40}", format!("{id:x}ff"));
-    sqlx::query("INSERT INTO authtoken_token (key, created, user_id) VALUES ($1, now(), $2)").bind(&token).bind(id).execute(db).await.unwrap();
+    sqlx::query("INSERT INTO authtoken_token (key, created, user_id) VALUES ($1, now(), $2)")
+        .bind(&token)
+        .bind(id)
+        .execute(db)
+        .await
+        .unwrap();
     (id, token)
 }
 
@@ -198,14 +203,16 @@ async fn delete_checks_descendant_permissions() {
                 (true, _) => 200,
             };
             assert_eq!(status, expected, "mode={mode} ownership={ownership}");
-            let left: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM documents_tag WHERE id = ANY($1)").bind(&ids).fetch_one(&db).await.unwrap();
+            let left: i64 =
+                sqlx::query_scalar("SELECT COUNT(*) FROM documents_tag WHERE id = ANY($1)").bind(&ids).fetch_one(&db).await.unwrap();
             assert_eq!(left, if allowed { 0 } else { 3 }, "mode={mode} ownership={ownership}");
-            let tagged: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM documents_document_tags WHERE document_id = $1 AND tag_id = $2)")
-                .bind(doc)
-                .bind(grandchild)
-                .fetch_one(&db)
-                .await
-                .unwrap();
+            let tagged: bool =
+                sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM documents_document_tags WHERE document_id = $1 AND tag_id = $2)")
+                    .bind(doc)
+                    .bind(grandchild)
+                    .fetch_one(&db)
+                    .await
+                    .unwrap();
             assert_eq!(tagged, !allowed, "mode={mode} ownership={ownership}");
         }
     }

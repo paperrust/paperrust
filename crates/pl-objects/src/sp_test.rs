@@ -14,12 +14,10 @@ use axum::extract::State;
 use chrono::NaiveDate;
 use pl_authz::AuthUser;
 use pl_authz::perms::VIEW_DOCUMENTS_PERMISSIONS;
-use pl_core::{ApiError, AppState, RequestContext};
-use pl_templating::{
-    CustomFieldInstance, CustomFieldValue, DocumentContext, NamedRef, OwnerRef, SelectOption, StoragePathRef, TagRef,
-};
-use sea_query::{Alias, Expr, PostgresQueryBuilder, Query};
 use pl_core::sqlbind::SqlxBinder as _;
+use pl_core::{ApiError, AppState, RequestContext};
+use pl_templating::{CustomFieldInstance, CustomFieldValue, DocumentContext, NamedRef, OwnerRef, SelectOption, StoragePathRef, TagRef};
+use sea_query::{Alias, Expr, PostgresQueryBuilder, Query};
 use serde_json::{Map, Value, json};
 use sqlx::{PgPool, Row};
 
@@ -65,18 +63,15 @@ pub async fn post(State(state): State<AppState>, ctx: RequestContext, auth: Auth
 
     // Serializer.to_internal_value: fields in declaration order (path, document)
     let mut errors = Map::new();
-    let path = match fields::char_field(
-        input(data, "path"),
-        false,
-        &CharOpts { required: true, allow_blank: false, max_length: usize::MAX },
-    ) {
-        Ok(Out::Set(p)) => Some(p),
-        Ok(Out::Skip) => None,
-        Err(e) => {
-            errors.insert("path".into(), e);
-            None
-        }
-    };
+    let path =
+        match fields::char_field(input(data, "path"), false, &CharOpts { required: true, allow_blank: false, max_length: usize::MAX }) {
+            Ok(Out::Set(p)) => Some(p),
+            Ok(Out::Skip) => None,
+            Err(e) => {
+                errors.insert("path".into(), e);
+                None
+            }
+        };
     let doc_id = match document_field(db, &user, input(data, "document")).await? {
         Ok(id) => Some(id),
         Err(e) => {
@@ -140,10 +135,8 @@ struct DocRow {
 }
 
 async fn load_row(db: &PgPool, id: i64) -> Result<Option<DocRow>, sqlx::Error> {
-    let Some(r) = sqlx::query(&format!("SELECT {DOC_COLS} FROM documents_document WHERE id = $1::int8"))
-        .bind(id)
-        .fetch_optional(db)
-        .await?
+    let Some(r) =
+        sqlx::query(&format!("SELECT {DOC_COLS} FROM documents_document WHERE id = $1::int8")).bind(id).fetch_optional(db).await?
     else {
         return Ok(None);
     };
@@ -172,10 +165,8 @@ async fn load_row(db: &PgPool, id: i64) -> Result<Option<DocRow>, sqlx::Error> {
 
 async fn named(db: &PgPool, table: &str, id: Option<i64>) -> Result<Option<NamedRef>, sqlx::Error> {
     let Some(id) = id else { return Ok(None) };
-    let name: Option<String> = sqlx::query_scalar(&format!("SELECT name FROM {table} WHERE id = $1::int8"))
-        .bind(id)
-        .fetch_optional(db)
-        .await?;
+    let name: Option<String> =
+        sqlx::query_scalar(&format!("SELECT name FROM {table} WHERE id = $1::int8")).bind(id).fetch_optional(db).await?;
     Ok(name.map(|name| NamedRef { id: Some(id), name }))
 }
 
@@ -189,8 +180,7 @@ async fn fill(db: &PgPool, r: DocRow) -> Result<DocumentContext, sqlx::Error> {
         c.storage_path = row.map(|(name, path)| StoragePathRef { id: Some(sp), name, path });
     }
     if let Some(o) = r.owner {
-        let u: Option<String> =
-            sqlx::query_scalar("SELECT username FROM auth_user WHERE id = $1::int8").bind(o).fetch_optional(db).await?;
+        let u: Option<String> = sqlx::query_scalar("SELECT username FROM auth_user WHERE id = $1::int8").bind(o).fetch_optional(db).await?;
         c.owner = u.map(|username| OwnerRef { id: o, username });
     }
     let tags: Vec<(i64, String)> = sqlx::query_as(

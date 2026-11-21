@@ -9,8 +9,8 @@ use axum::response::Response;
 use pl_core::{AppState, Config};
 use sqlx::PgPool;
 
-use crate::db::{self, DocRow};
 use crate::compat;
+use crate::db::{self, DocRow};
 use crate::naming;
 use crate::serve::{self, OpenError, OpenedFile};
 
@@ -50,9 +50,7 @@ pub async fn source_path(cx: Ctx<'_>, doc: &DocRow) -> Result<Option<PathBuf>, s
 
 /// `Document.archive_path`.
 pub fn archive_path(cx: Ctx<'_>, doc: &DocRow) -> Option<PathBuf> {
-    doc.archive_filename
-        .as_deref()
-        .and_then(|f| serve::safe_join(&cx.cfg.archive_dir, f))
+    doc.archive_filename.as_deref().and_then(|f| serve::safe_join(&cx.cfg.archive_dir, f))
 }
 
 /// `Document.thumbnail_path`.
@@ -61,13 +59,7 @@ pub fn thumbnail_path(cx: Ctx<'_>, doc: &DocRow) -> PathBuf {
 }
 
 /// `get_public_filename(archive, counter)` – `context` is the root document.
-pub async fn public_filename(
-    cx: Ctx<'_>,
-    doc: &DocRow,
-    context: &DocRow,
-    archive: bool,
-    counter: u32,
-) -> Result<String, sqlx::Error> {
+pub async fn public_filename(cx: Ctx<'_>, doc: &DocRow, context: &DocRow, archive: bool, counter: u32) -> Result<String, sqlx::Error> {
     let ext = if archive { ".pdf" } else { file_type(cx, &doc.mime_type).await? };
     let s = naming::document_str(context.created, context.correspondent.as_deref(), &context.title);
     Ok(naming::public_filename(&s, ext, counter))
@@ -126,11 +118,8 @@ pub async fn serve_file(
         (path, filename, "application/pdf".to_string())
     } else {
         let path = source_path(cx, doc).await?;
-        let filename = if follow_formatting {
-            doc.filename.clone().unwrap_or_default()
-        } else {
-            public_filename(cx, doc, context, false, 0).await?
-        };
+        let filename =
+            if follow_formatting { doc.filename.clone().unwrap_or_default() } else { public_filename(cx, doc, context, false, 0).await? };
         let mut mime = doc.mime_type.clone();
         // Support browser previewing csv files by using text mime type
         if (mime == "application/csv" || mime == "text/csv") && disposition == "inline" {

@@ -49,12 +49,8 @@ fn valid_host(v: &str) -> bool {
     v.is_empty()
         || v.parse::<std::net::Ipv4Addr>().is_ok()
         || (v.len() <= 253
-            && v.split('.').all(|l| {
-                !l.is_empty()
-                    && l.len() <= 63
-                    && l.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
-                    && !l.starts_with('-')
-            }))
+            && v.split('.')
+                .all(|l| !l.is_empty() && l.len() <= 63 && l.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') && !l.starts_with('-')))
 }
 
 /// Applies the changes (all or nothing). Returns: is a server restart needed?
@@ -64,10 +60,7 @@ pub fn apply(cfg: &mut DesktopConfig, changes: &BTreeMap<String, String>) -> Res
     for (k, v) in changes {
         match k.as_str() {
             "desktop.server.port" => {
-                let p: u16 = v
-                    .trim()
-                    .parse()
-                    .map_err(|_| format!("{k}: expected a port number"))?;
+                let p: u16 = v.trim().parse().map_err(|_| format!("{k}: expected a port number"))?;
                 if p < 1024 {
                     return Err(format!("{k}: ports below 1024 are not allowed"));
                 }
@@ -75,8 +68,7 @@ pub fn apply(cfg: &mut DesktopConfig, changes: &BTreeMap<String, String>) -> Res
                 next.server.port = p;
             }
             "desktop.server.open_browser" => {
-                next.server.open_browser =
-                    parse_bool(v).ok_or_else(|| format!("{k}: expected yes/no"))?;
+                next.server.open_browser = parse_bool(v).ok_or_else(|| format!("{k}: expected yes/no"))?;
             }
             "desktop.server.lan_sharing" => {
                 let b = parse_bool(v).ok_or_else(|| format!("{k}: expected yes/no"))?;
@@ -102,41 +94,17 @@ pub fn apply(cfg: &mut DesktopConfig, changes: &BTreeMap<String, String>) -> Res
 pub fn public_values(cfg: &DesktopConfig) -> BTreeMap<String, String> {
     let b = |x: bool| if x { "true" } else { "false" }.to_string();
     let mut m = BTreeMap::new();
-    m.insert(
-        "desktop.database.port".into(),
-        cfg.database.port.to_string(),
-    );
+    m.insert("desktop.database.port".into(), cfg.database.port.to_string());
     m.insert("desktop.database.user".into(), cfg.database.user.clone());
-    m.insert(
-        "desktop.database.app_user".into(),
-        cfg.database.app_user.clone(),
-    );
+    m.insert("desktop.database.app_user".into(), cfg.database.app_user.clone());
     m.insert("desktop.database.name".into(), cfg.database.name.clone());
-    m.insert(
-        "desktop.database.locale_provider".into(),
-        cfg.database.locale_provider.clone(),
-    );
+    m.insert("desktop.database.locale_provider".into(), cfg.database.locale_provider.clone());
     m.insert("desktop.server.port".into(), cfg.server.port.to_string());
-    m.insert(
-        "desktop.server.time_zone".into(),
-        cfg.server.time_zone.clone(),
-    );
-    m.insert(
-        "desktop.server.ocr_language".into(),
-        cfg.server.ocr_language.clone(),
-    );
-    m.insert(
-        "desktop.server.open_browser".into(),
-        b(cfg.server.open_browser),
-    );
-    m.insert(
-        "desktop.server.lan_sharing".into(),
-        b(cfg.server.lan_sharing),
-    );
-    m.insert(
-        "desktop.server.lan_address".into(),
-        cfg.server.lan_address.clone(),
-    );
+    m.insert("desktop.server.time_zone".into(), cfg.server.time_zone.clone());
+    m.insert("desktop.server.ocr_language".into(), cfg.server.ocr_language.clone());
+    m.insert("desktop.server.open_browser".into(), b(cfg.server.open_browser));
+    m.insert("desktop.server.lan_sharing".into(), b(cfg.server.lan_sharing));
+    m.insert("desktop.server.lan_address".into(), cfg.server.lan_address.clone());
     m
 }
 
@@ -162,8 +130,7 @@ pub async fn next_request(file: PathBuf) -> Result<Request, String> {
     loop {
         if let Ok(t) = std::fs::read_to_string(&file) {
             let _ = std::fs::remove_file(&file);
-            return serde_json::from_str::<Request>(&t)
-                .map_err(|e| format!("invalid settings request: {e}"));
+            return serde_json::from_str::<Request>(&t).map_err(|e| format!("invalid settings request: {e}"));
         }
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
     }
@@ -174,43 +141,20 @@ mod tests {
     use super::*;
 
     fn ch(kv: &[(&str, &str)]) -> BTreeMap<String, String> {
-        kv.iter()
-            .map(|(k, v)| (k.to_string(), v.to_string()))
-            .collect()
+        kv.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
     }
 
     #[test]
     fn apply_validates_and_reports_restart() {
         let mut c = DesktopConfig::generate();
         let before = c.clone();
-        assert_eq!(
-            apply(&mut c, &ch(&[("desktop.server.open_browser", "no")])),
-            Ok(false)
-        );
+        assert_eq!(apply(&mut c, &ch(&[("desktop.server.open_browser", "no")])), Ok(false));
         assert!(!c.server.open_browser);
-        assert_eq!(
-            apply(
-                &mut c,
-                &ch(&[
-                    ("desktop.server.lan_sharing", "true"),
-                    ("desktop.server.lan_address", "192.168.1.20")
-                ])
-            ),
-            Ok(true)
-        );
+        assert_eq!(apply(&mut c, &ch(&[("desktop.server.lan_sharing", "true"), ("desktop.server.lan_address", "192.168.1.20")])), Ok(true));
         assert!(c.server.lan_sharing);
         // all or nothing
         let snap = c.clone();
-        assert!(
-            apply(
-                &mut c,
-                &ch(&[
-                    ("desktop.server.port", "60000"),
-                    ("desktop.server.lan_address", "evil host/x")
-                ])
-            )
-            .is_err()
-        );
+        assert!(apply(&mut c, &ch(&[("desktop.server.port", "60000"), ("desktop.server.lan_address", "evil host/x")])).is_err());
         assert_eq!(c, snap);
         assert!(apply(&mut c, &ch(&[("desktop.server.port", "80")])).is_err());
         assert!(apply(&mut c, &ch(&[("desktop.server.secret_key", "x")])).is_err());
@@ -218,9 +162,7 @@ mod tests {
         assert_ne!(c, before);
         // display without secrets
         let v = public_values(&c);
-        assert!(!v.values().any(|x| *x == c.server.secret_key
-            || *x == c.database.password
-            || *x == c.database.app_password));
+        assert!(!v.values().any(|x| *x == c.server.secret_key || *x == c.database.password || *x == c.database.app_password));
         assert_eq!(v["desktop.server.lan_sharing"], "true");
     }
 
@@ -228,27 +170,11 @@ mod tests {
     async fn request_file_is_consumed() {
         let dir = tempfile::tempdir().unwrap();
         let f = dir.path().join(REQUEST_FILE);
-        std::fs::write(
-            &f,
-            r#"{"id":"a1","changes":{"desktop.server.open_browser":"no"}}"#,
-        )
-        .unwrap();
+        std::fs::write(&f, r#"{"id":"a1","changes":{"desktop.server.open_browser":"no"}}"#).unwrap();
         let r = next_request(f.clone()).await.unwrap();
         assert_eq!(r.id, "a1");
         assert!(!f.exists());
-        write_outcome(
-            dir.path(),
-            &Outcome {
-                id: "a1".into(),
-                ok: true,
-                error: None,
-                restart: false,
-            },
-        );
-        assert!(
-            std::fs::read_to_string(dir.path().join(RESULT_FILE))
-                .unwrap()
-                .contains("\"a1\"")
-        );
+        write_outcome(dir.path(), &Outcome { id: "a1".into(), ok: true, error: None, restart: false });
+        assert!(std::fs::read_to_string(dir.path().join(RESULT_FILE)).unwrap().contains("\"a1\""));
     }
 }

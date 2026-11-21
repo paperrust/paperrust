@@ -5,16 +5,16 @@
 
 use std::sync::{Arc, Mutex};
 
+use axum::Json;
 use axum::extract::{Multipart, Path, RawQuery};
 use axum::http::HeaderMap;
 use axum::routing::{get, post};
-use axum::Json;
 use base64::Engine as _;
 use pl_ai::classifier::IdentityTruncator;
 use pl_ai::mcp::api::{ApiBackend, MemorySideStore};
 use pl_ai::mcp::http::{router, testclient::Client};
 use pl_ai::mcp::{McpService, McpSettings};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 const TOKEN: &str = "apitoken000000000000000000000000000000000";
 

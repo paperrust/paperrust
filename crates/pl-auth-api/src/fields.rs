@@ -7,8 +7,8 @@
 use crate::db::a;
 use crate::http::{FieldInput, py_type_name};
 use pl_core::ValidationErrors;
-use sea_query::{Expr, PostgresQueryBuilder, Query};
 use pl_core::sqlbind::SqlxBinder as _;
+use sea_query::{Expr, PostgresQueryBuilder, Query};
 use serde_json::Value;
 use sqlx::{PgPool, Row};
 
@@ -50,7 +50,13 @@ fn py_int(v: &Value) -> Option<i64> {
 
 /// `groups` (`PrimaryKeyRelatedField(many=True, queryset=Group.objects.all())`).
 /// Returns `None` if an error was recorded.
-pub async fn validate_group_pks(db: &PgPool, input: FieldInput, field: &str, required: bool, errs: &mut ValidationErrors) -> Result<Option<Vec<i64>>, sqlx::Error> {
+pub async fn validate_group_pks(
+    db: &PgPool,
+    input: FieldInput,
+    field: &str,
+    required: bool,
+    errs: &mut ValidationErrors,
+) -> Result<Option<Vec<i64>>, sqlx::Error> {
     let v = match input {
         FieldInput::Missing => {
             if required {
@@ -149,10 +155,7 @@ pub async fn validate_permission_codenames(
         let (sql, values) = Query::select()
             .expr_as(Expr::col((a("p"), a("id"))).cast_as(a("int8")), a("id"))
             .from_as(a("auth_permission"), a("p"))
-            .inner_join(
-                a("django_content_type"),
-                Expr::col((a("django_content_type"), a("id"))).equals((a("p"), a("content_type_id"))),
-            )
+            .inner_join(a("django_content_type"), Expr::col((a("django_content_type"), a("id"))).equals((a("p"), a("content_type_id"))))
             .and_where(Expr::col((a("p"), a("codename"))).eq(codename.as_str()))
             .and_where(Expr::col((a("django_content_type"), a("app_label"))).ne("admin"))
             .limit(2)

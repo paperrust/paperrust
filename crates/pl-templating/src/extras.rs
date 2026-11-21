@@ -17,7 +17,7 @@ use rand::Rng;
 use regex::Regex;
 
 use crate::methods::PyArgs;
-use crate::pyvalue::{as_num, check_len, invalid, py_str, Num};
+use crate::pyvalue::{Num, as_num, check_len, invalid, py_str};
 
 /// `markupsafe.escape`.
 pub fn html_escape(s: &str) -> String {
@@ -227,8 +227,7 @@ pub fn f_urlize(value: Value, rest: Rest<Value>) -> Result<Value, Error> {
             // re.fullmatch(r"^[a-zA-Z][a-zA-Z0-9+.-]*:(//)?$", scheme)
             let ok = scheme.chars().next().is_some_and(|c| c.is_ascii_alphabetic()) && {
                 let body = scheme.strip_suffix("//").unwrap_or(&scheme);
-                body.ends_with(':')
-                    && body[..body.len() - 1].chars().all(|c| c.is_ascii_alphanumeric() || "+.-".contains(c))
+                body.ends_with(':') && body[..body.len() - 1].chars().all(|c| c.is_ascii_alphanumeric() || "+.-".contains(c))
             };
             if !ok {
                 return Err(invalid(format!("{scheme} is not a valid URI scheme prefix.")));
@@ -275,10 +274,8 @@ fn split_chunks(text: &str, break_on_hyphens: bool) -> Vec<String> {
         let mut piece = String::new();
         for i in 0..chars.len() {
             piece.push(chars[i]);
-            let hyphen_break = chars[i] == '-'
-                && i > 0
-                && chars[i - 1].is_alphanumeric()
-                && chars.get(i + 1).is_some_and(|c| c.is_alphabetic());
+            let hyphen_break =
+                chars[i] == '-' && i > 0 && chars[i - 1].is_alphanumeric() && chars.get(i + 1).is_some_and(|c| c.is_alphabetic());
             if hyphen_break {
                 out.push(std::mem::take(&mut piece));
             }
@@ -488,11 +485,8 @@ pub fn fn_lipsum(rest: Rest<Value>) -> Result<Value, Error> {
         }
         result.push(p_str);
     }
-    let out = if html {
-        result.iter().map(|x| format!("<p>{}</p>", html_escape(x))).collect::<Vec<_>>().join("\n")
-    } else {
-        result.join("\n\n")
-    };
+    let out =
+        if html { result.iter().map(|x| format!("<p>{}</p>", html_escape(x))).collect::<Vec<_>>().join("\n") } else { result.join("\n\n") };
     check_len(out.len())?;
     Ok(Value::from(out))
 }
@@ -612,14 +606,8 @@ mod tests {
         );
         assert_eq!(urlize("mail a@b.de now", None, None, None, &[]), "mail <a href=\"mailto:a@b.de\">a@b.de</a> now");
         assert_eq!(urlize("x < y", None, None, None, &[]), "x &lt; y");
-        assert_eq!(
-            urlize("(https://x.com/a_(b))", None, None, None, &[]),
-            "(<a href=\"https://x.com/a_(b)\">https://x.com/a_(b)</a>)"
-        );
-        assert_eq!(
-            urlize("https://example.com/long", Some(10), None, None, &[]),
-            "<a href=\"https://example.com/long\">https://ex...</a>"
-        );
+        assert_eq!(urlize("(https://x.com/a_(b))", None, None, None, &[]), "(<a href=\"https://x.com/a_(b)\">https://x.com/a_(b)</a>)");
+        assert_eq!(urlize("https://example.com/long", Some(10), None, None, &[]), "<a href=\"https://example.com/long\">https://ex...</a>");
     }
 
     #[test]

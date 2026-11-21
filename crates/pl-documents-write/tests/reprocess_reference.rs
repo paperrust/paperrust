@@ -14,13 +14,12 @@ async fn single_query_matches_per_root_algorithm() {
     let got = pl_documents_write::bulk_edit::reprocess_sources(&mut conn, &ids).await.unwrap();
 
     // earlier algorithm
-    let rows: Vec<(i32, Option<i32>)> = sqlx::query_as(
-        "SELECT id, root_document_id FROM documents_document WHERE id = ANY($1) AND deleted_at IS NULL ORDER BY id",
-    )
-    .bind(ids.iter().map(|i| *i as i32).collect::<Vec<_>>())
-    .fetch_all(&mut *conn)
-    .await
-    .unwrap();
+    let rows: Vec<(i32, Option<i32>)> =
+        sqlx::query_as("SELECT id, root_document_id FROM documents_document WHERE id = ANY($1) AND deleted_at IS NULL ORDER BY id")
+            .bind(ids.iter().map(|i| *i as i32).collect::<Vec<_>>())
+            .fetch_all(&mut *conn)
+            .await
+            .unwrap();
     let mut expected: Vec<i64> = Vec::new();
     for (id, root) in rows {
         let src = if root.is_some() {

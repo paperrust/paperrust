@@ -8,13 +8,13 @@ use chrono::{DateTime, NaiveDate, Utc};
 use pl_authz::User;
 use pl_authz::models::DOCUMENT;
 use pl_authz::objects::{FilterOpts, permitted_objects_filter};
+use pl_core::sqlbind::SqlxBinder as _;
 use pl_docfilter::{DOC, FilterContext};
 use pl_domain::cursor::KeysetCursor;
 use pl_domain::model::*;
 use pl_domain::query::{AsnCond, Cond, DateRange, DocQuery, RefSet, TextField, parse_sort};
 use pl_domain::{DomainError, DomainResult, Kind, Principal};
 use sea_query::{Expr, Order, PostgresQueryBuilder, Query, SelectStatement};
-use pl_core::sqlbind::SqlxBinder as _;
 use serde_json::{Map, Value, json};
 use sqlx::Row as _;
 use uuid::Uuid;
@@ -124,9 +124,7 @@ pub(crate) async fn to_params(store: &Store, user: &User, leaves: &[&Cond]) -> D
                 e.1.push_str(&v);
                 return Ok(());
             }
-            return Err(DomainError::NotImplemented(format!(
-                "condition \"{k}\" given twice; combine the values into one condition"
-            )));
+            return Err(DomainError::NotImplemented(format!("condition \"{k}\" given twice; combine the values into one condition")));
         }
         params.push((k.to_string(), v));
         Ok(())
@@ -366,13 +364,8 @@ async fn visible_ids(store: &Store, user: &User, ids: &[i64]) -> DomainResult<Ve
     q.and_where(Expr::col((a(DOC), a("id"))).is_in(ids.iter().copied()));
     restrict(&mut q, user);
     let (sql, values) = q.build_sqlx(PostgresQueryBuilder);
-    let found: HashSet<i64> = sqlx::query_scalar_with::<_, i32, _>(&sql, values)
-        .fetch_all(&store.db)
-        .await
-        .map_err(db_err)?
-        .into_iter()
-        .map(i64::from)
-        .collect();
+    let found: HashSet<i64> =
+        sqlx::query_scalar_with::<_, i32, _>(&sql, values).fetch_all(&store.db).await.map_err(db_err)?.into_iter().map(i64::from).collect();
     Ok(ids.iter().copied().filter(|i| found.contains(i)).collect())
 }
 
@@ -532,12 +525,7 @@ async fn stat(p: Option<&PathBuf>) -> Option<std::fs::Metadata> {
 
 /// Weak ETag of the thumbnail.
 pub(crate) fn weak_etag(m: &std::fs::Metadata) -> String {
-    let mtime = m
-        .modified()
-        .ok()
-        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
+    let mtime = m.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_secs()).unwrap_or(0);
     format!("W/\"{mtime}-{}\"", m.len())
 }
 
@@ -630,10 +618,8 @@ pub(crate) async fn load(store: &Store, user: &User, ids: &[i64], include: DocIn
     let users = perm::user_refs(db, &user_ids).await?;
     let grants = perm::grants(db, user, &DOCUMENT, ids, &["change", "delete"]).await?;
     let sharing = if include.sharing {
-        let objs: Vec<(i64, Option<i64>)> = rows
-            .iter()
-            .map(|r| (r.try_get("id").unwrap_or_default(), r.try_get::<Option<i64>, _>("owner_id").ok().flatten()))
-            .collect();
+        let objs: Vec<(i64, Option<i64>)> =
+            rows.iter().map(|r| (r.try_get("id").unwrap_or_default(), r.try_get::<Option<i64>, _>("owner_id").ok().flatten())).collect();
         perm::sharing(db, user, &DOCUMENT, &objs).await?
     } else {
         HashMap::new()
@@ -683,11 +669,7 @@ pub(crate) async fn load(store: &Store, user: &User, ids: &[i64], include: DocIn
             content: if include.content { r.try_get("content").map_err(db_err)? } else { None },
             notes: notes.as_ref().map(|n| {
                 n.get(&id)
-                    .map(|v| {
-                        v.iter()
-                            .map(|(note, uid)| Note { user: uid.and_then(|u| users.get(&u).cloned()), ..note.clone() })
-                            .collect()
-                    })
+                    .map(|v| v.iter().map(|(note, uid)| Note { user: uid.and_then(|u| users.get(&u).cloned()), ..note.clone() }).collect())
                     .unwrap_or_default()
             }),
             sharing: sharing.get(&id).cloned(),
@@ -721,9 +703,9 @@ fn cf_value(r: &sqlx::postgres::PgRow, docs: &HashMap<i64, Ident>) -> DomainResu
         "documentlink" => {
             let v: Option<sqlx::types::Json<Value>> = r.try_get("value_document_ids").map_err(db_err)?;
             Ok(match v.map(|j| j.0) {
-                Some(Value::Array(a)) => Value::Array(
-                    a.iter().filter_map(Value::as_i64).filter_map(|i| docs.get(&i)).map(|i| json!(i.uuid)).collect(),
-                ),
+                Some(Value::Array(a)) => {
+                    Value::Array(a.iter().filter_map(Value::as_i64).filter_map(|i| docs.get(&i)).map(|i| json!(i.uuid)).collect())
+                }
                 _ => Value::Null,
             })
         }
@@ -744,9 +726,7 @@ async fn load_notes(store: &Store, ids: &[i64]) -> DomainResult<HashMap<i64, Vec
     .map_err(db_err)?;
     let mut out: HashMap<i64, Vec<(Note, Option<i64>)>> = HashMap::new();
     for (doc, id, note, created, uid) in rows {
-        out.entry(i64::from(doc))
-            .or_default()
-            .push((Note { legacy_id: i64::from(id), note, created, user: None }, uid.map(i64::from)));
+        out.entry(i64::from(doc)).or_default().push((Note { legacy_id: i64::from(id), note, created, user: None }, uid.map(i64::from)));
     }
     Ok(out)
 }

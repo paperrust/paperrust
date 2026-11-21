@@ -19,9 +19,16 @@ pub enum ColorSpace {
     Rgb,
     Cmyk,
     /// `[/ICCBased s]` with N components.
-    Icc { n: u8, stream: Object },
+    Icc {
+        n: u8,
+        stream: Object,
+    },
     /// `[/Indexed base hival lookup]` (Basis Gray/RGB/CMYK/ICC).
-    Indexed { base: Box<ColorSpace>, hival: u8, lookup: Vec<u8> },
+    Indexed {
+        base: Box<ColorSpace>,
+        hival: u8,
+        lookup: Vec<u8>,
+    },
     /// Everything else (Lab, Cal*, Separation, DeviceN, Pattern, missing …).
     Other,
 }
@@ -309,7 +316,13 @@ pub fn png_predict(data: &[u8], row_bytes: usize, bpp: usize) -> Vec<u8> {
                     _ => {
                         let p = i16::from(a) + i16::from(b) - i16::from(cc);
                         let (pa, pb, pc) = ((p - i16::from(a)).abs(), (p - i16::from(b)).abs(), (p - i16::from(cc)).abs());
-                        if pa <= pb && pa <= pc { a } else if pb <= pc { b } else { cc }
+                        if pa <= pb && pa <= pc {
+                            a
+                        } else if pb <= pc {
+                            b
+                        } else {
+                            cc
+                        }
                     }
                 };
                 c.push(cur[i].wrapping_sub(pred));
@@ -341,11 +354,7 @@ pub struct Encoded {
 
 /// Flate with PNG predictor (8 or 1 bit).
 pub fn encode_flate(p: &Pixels, level: u32) -> Encoded {
-    let (row_bytes, bpp) = if p.bpc == 1 {
-        ((p.width as usize).div_ceil(8), 1)
-    } else {
-        (p.width as usize * p.comps(), p.comps())
-    };
+    let (row_bytes, bpp) = if p.bpc == 1 { ((p.width as usize).div_ceil(8), 1) } else { (p.width as usize * p.comps(), p.comps()) };
     let pred = png_predict(&p.data, row_bytes, bpp);
     let with_pred = zlib(&pred, level);
     // 8 bit: predictor practically always wins for scans/photos – save the second compression.
@@ -357,7 +366,13 @@ pub fn encode_flate(p: &Pixels, level: u32) -> Encoded {
         parms.set("Colors", colors as i64);
         parms.set("BitsPerComponent", i64::from(p.bpc));
         parms.set("Columns", i64::from(p.width));
-        Encoded { content: with_pred, filter: Object::Name(b"FlateDecode".to_vec()), decode_parms: Some(parms), bpc: p.bpc, cs: p.cs.to_object() }
+        Encoded {
+            content: with_pred,
+            filter: Object::Name(b"FlateDecode".to_vec()),
+            decode_parms: Some(parms),
+            bpc: p.bpc,
+            cs: p.cs.to_object(),
+        }
     } else {
         Encoded { content: plain, filter: Object::Name(b"FlateDecode".to_vec()), decode_parms: None, bpc: p.bpc, cs: p.cs.to_object() }
     }

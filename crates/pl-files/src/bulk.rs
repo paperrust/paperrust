@@ -24,7 +24,6 @@ use crate::resolve;
 use crate::serve::{self, TempGuard};
 use crate::zipw::{self, Method, ZipWriter};
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Content {
     Archive,
@@ -102,11 +101,7 @@ fn py_str(v: &Value) -> String {
         Value::String(s) => s.clone(),
         Value::Number(n) => {
             if let Some(f) = n.as_f64().filter(|_| n.is_f64()) {
-                if f.fract() == 0.0 && f.abs() < 1e16 {
-                    format!("{f:.1}")
-                } else {
-                    format!("{f}")
-                }
+                if f.fract() == 0.0 && f.abs() < 1e16 { format!("{f:.1}") } else { format!("{f}") }
             } else {
                 n.to_string()
             }
@@ -143,10 +138,7 @@ pub fn drf_int_list(v: &Value) -> Result<Vec<i64>, Value> {
         return Err(json!(["This field may not be null."]));
     }
     let Value::Array(items) = v else {
-        return Err(json!([format!(
-            "Expected a list of items but got type \"{}\".",
-            py_type(v)
-        )]));
+        return Err(json!([format!("Expected a list of items but got type \"{}\".", py_type(v))]));
     };
     let mut out = Vec::with_capacity(items.len());
     let mut errors = Map::new();
@@ -217,10 +209,7 @@ pub async fn validate(db: &sqlx::PgPool, data: &Value) -> Result<ValidationOutco
                 // validate_documents -> _validate_document_id_list
                 let n = db::count_existing(db, &ids).await?;
                 if n as usize != ids.len() {
-                    errors.insert(
-                        "documents".into(),
-                        json!(["Some documents in documents don't exist or were specified twice."]),
-                    );
+                    errors.insert("documents".into(), json!(["Some documents in documents don't exist or were specified twice."]));
                 } else {
                     documents = Some(ids);
                 }
@@ -247,13 +236,7 @@ pub async fn validate(db: &sqlx::PgPool, data: &Value) -> Result<ValidationOutco
                 errors.insert("filters".into(), json!(["This field may not be null."]));
             }
             other => {
-                errors.insert(
-                    "filters".into(),
-                    json!([format!(
-                        "Expected a dictionary of items but got type \"{}\".",
-                        py_type(other)
-                    )]),
-                );
+                errors.insert("filters".into(), json!([format!("Expected a dictionary of items but got type \"{}\".", py_type(other))]));
             }
         }
     }
@@ -315,15 +298,7 @@ pub async fn validate(db: &sqlx::PgPool, data: &Value) -> Result<ValidationOutco
             })));
         }
     }
-    Ok(ValidationOutcome::Ok(Validated {
-        documents,
-        all,
-        excluded,
-        filters,
-        content,
-        compression,
-        follow_formatting,
-    }))
+    Ok(ValidationOutcome::Ok(Validated { documents, all, excluded, filters, content, compression, follow_formatting }))
 }
 
 /// DRF media type check for `JSONParser` (`media_type_matches("application/json", ct)`).
@@ -340,12 +315,7 @@ struct Planned {
 }
 
 /// `BulkArchiveStrategy.make_unique_filename` + `add_document` for all docs, in order.
-async fn plan(
-    cx: Ctx<'_>,
-    docs: &[DocRow],
-    content: Content,
-    follow_formatting: bool,
-) -> Result<Vec<Planned>, sqlx::Error> {
+async fn plan(cx: Ctx<'_>, docs: &[DocRow], content: Content, follow_formatting: bool) -> Result<Vec<Planned>, sqlx::Error> {
     let mut out: Vec<Planned> = Vec::new();
     let mut names: std::collections::HashSet<String> = std::collections::HashSet::new();
 
@@ -364,11 +334,7 @@ async fn plan(
             }
         }
         for (archive, folder) in parts {
-            let src = if archive {
-                docfile::archive_path(cx, doc)
-            } else {
-                docfile::source_path(cx, doc).await?
-            };
+            let src = if archive { docfile::archive_path(cx, doc) } else { docfile::source_path(cx, doc).await? };
             let name = if follow_formatting {
                 // _formatted_filepath: Path(folder) / (archive_filename | filename)
                 let f = if archive && doc.has_archive_version() {
@@ -381,10 +347,7 @@ async fn plan(
             } else {
                 let mut counter = 0u32;
                 loop {
-                    let candidate = format!(
-                        "{folder}{}",
-                        docfile::public_filename(cx, doc, &context, archive, counter).await?
-                    );
+                    let candidate = format!("{folder}{}", docfile::public_filename(cx, doc, &context, archive, counter).await?);
                     // Review 1 N10: `filename in zipf.namelist()` compares normalized names
                     if name_taken(&names, &candidate) {
                         counter += 1;
@@ -406,12 +369,7 @@ fn name_taken(names: &std::collections::HashSet<String>, candidate: &str) -> boo
 }
 
 /// POST /api/documents/bulk_download/
-pub async fn bulk_download(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-    auth: Result<AuthUser, AuthError>,
-    body: Bytes,
-) -> Response {
+pub async fn bulk_download(State(state): State<AppState>, headers: HeaderMap, auth: Result<AuthUser, AuthError>, body: Bytes) -> Response {
     // initial(): IsAuthenticated + ViewDocumentsPermissions (POST -> documents.view_document)
     let auth = match auth {
         Ok(a) => a,
@@ -431,15 +389,9 @@ async fn handle(state: &AppState, headers: &HeaderMap, user: &User, body: &[u8])
     let data: Value = if body.is_empty() {
         json!({})
     } else {
-        let ct = headers
-            .get(header::CONTENT_TYPE)
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("");
+        let ct = headers.get(header::CONTENT_TYPE).and_then(|v| v.to_str().ok()).unwrap_or("");
         if !is_json_content_type(ct) {
-            return compat::drf_detail(
-                StatusCode::UNSUPPORTED_MEDIA_TYPE,
-                &format!("Unsupported media type \"{ct}\" in request."),
-            );
+            return compat::drf_detail(StatusCode::UNSUPPORTED_MEDIA_TYPE, &format!("Unsupported media type \"{ct}\" in request."));
         }
         match serde_json::from_slice(body) {
             Ok(v) => v,
@@ -508,10 +460,7 @@ async fn handle(state: &AppState, headers: &HeaderMap, user: &User, body: &[u8])
     let h = r.headers_mut();
     h.insert(header::CONTENT_TYPE, HeaderValue::from_static("application/zip"));
     h.insert(header::CONTENT_LENGTH, HeaderValue::from(len));
-    h.insert(
-        header::CONTENT_DISPOSITION,
-        HeaderValue::from_static("attachment; filename=\"documents.zip\""),
-    );
+    h.insert(header::CONTENT_DISPOSITION, HeaderValue::from_static("attachment; filename=\"documents.zip\""));
     r
 }
 
@@ -524,13 +473,8 @@ fn build_zip(
 ) -> std::io::Result<(std::fs::File, PathBuf, u64)> {
     use std::io::{Seek, SeekFrom};
     std::fs::create_dir_all(&scratch_dir)?;
-    let path = scratch_dir
-        .join(format!("tmp{}-compressed-archive", uuid::Uuid::new_v4().simple()));
-    let file = std::fs::OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create_new(true)
-        .open(&path)?;
+    let path = scratch_dir.join(format!("tmp{}-compressed-archive", uuid::Uuid::new_v4().simple()));
+    let file = std::fs::OpenOptions::new().read(true).write(true).create_new(true).open(&path)?;
     let guard = TempGuard(Some(path.clone()));
     let mut z = ZipWriter::new(file, method, tz);
     for p in planned {
@@ -586,23 +530,14 @@ mod tests {
         assert!(drf_int(&json!(5.5)).is_err());
         assert!(drf_int(&json!(true)).is_err());
         assert!(drf_int(&json!("x")).is_err());
-        assert_eq!(
-            drf_int_list(&json!([1, "a"])).unwrap_err(),
-            json!({"1": ["A valid integer is required."]})
-        );
-        assert_eq!(
-            drf_int_list(&json!("1")).unwrap_err(),
-            json!(["Expected a list of items but got type \"str\"."])
-        );
+        assert_eq!(drf_int_list(&json!([1, "a"])).unwrap_err(), json!({"1": ["A valid integer is required."]}));
+        assert_eq!(drf_int_list(&json!("1")).unwrap_err(), json!(["Expected a list of items but got type \"str\"."]));
     }
 
     #[test]
     fn choices_and_bools() {
         assert_eq!(drf_choice(&json!("both"), &["archive", "both"]), Ok("both"));
-        assert_eq!(
-            drf_choice(&json!("x"), &["archive"]).unwrap_err(),
-            json!(["\"x\" is not a valid choice."])
-        );
+        assert_eq!(drf_choice(&json!("x"), &["archive"]).unwrap_err(), json!(["\"x\" is not a valid choice."]));
         assert_eq!(drf_bool(&json!("TRUE")), Ok(true));
         assert_eq!(drf_bool(&json!(0)), Ok(false));
         assert!(drf_bool(&json!("maybe")).is_err());

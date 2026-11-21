@@ -14,8 +14,7 @@
 use crate::models::{DOCUMENT, DOCUMENT_PARENT_FIELD, ObjectModel};
 use crate::user::User;
 use sea_query::{
-    Alias, Cond, Condition, Expr, ExprTrait as _, Func, IntoCondition, JoinType, Query, SelectStatement,
-    SimpleExpr, UnionType,
+    Alias, Cond, Condition, Expr, ExprTrait as _, Func, IntoCondition, JoinType, Query, SelectStatement, SimpleExpr, UnionType,
 };
 
 /// Alias of the base table inside generated subqueries (never clashes with callers' aliases).
@@ -62,11 +61,8 @@ pub fn granted_keys_subquery(user: &User, model: &ObjectModel, perm: &str) -> Se
         .and_where(Expr::col(a("user_id")).eq(user.id))
         .and_where(Expr::col(a("permission_id")).in_subquery(perm_ids.clone()))
         .to_owned();
-    let groups = Query::select()
-        .column(a("group_id"))
-        .from(a("auth_user_groups"))
-        .and_where(Expr::col(a("user_id")).eq(user.id))
-        .to_owned();
+    let groups =
+        Query::select().column(a("group_id")).from(a("auth_user_groups")).and_where(Expr::col(a("user_id")).eq(user.id)).to_owned();
     let group_keys = Query::select()
         .column(a("object_pk"))
         .from(a("guardian_groupobjectpermission"))
@@ -92,9 +88,7 @@ fn owner_and_key(parent: Option<&str>) -> (SimpleExpr, SimpleExpr) {
     match parent {
         None => (col(T, "owner_id"), col(T, "id")),
         Some(pf) => {
-            let owner: SimpleExpr = Expr::case(Expr::col((a(T), a(pf))).is_null(), col(T, "owner_id"))
-                .finally(col(P, "owner_id"))
-                .into();
+            let owner: SimpleExpr = Expr::case(Expr::col((a(T), a(pf))).is_null(), col(T, "owner_id")).finally(col(P, "owner_id")).into();
             let key: SimpleExpr = Func::coalesce([col(T, pf), col(T, "id")]).into();
             (owner, key)
         }
@@ -105,12 +99,7 @@ fn base_select(model: &ObjectModel, opts: &PermOpts, apply_manager: bool) -> Sel
     let mut q = Query::select();
     q.column((a(T), a("id"))).from_as(a(model.table), a(T));
     if let Some(pf) = opts.parent_field {
-        q.join_as(
-            JoinType::LeftJoin,
-            a(model.table),
-            a(P),
-            Expr::col((a(P), a("id"))).equals((a(T), a(pf))),
-        );
+        q.join_as(JoinType::LeftJoin, a(model.table), a(P), Expr::col((a(P), a("id"))).equals((a(T), a(pf))));
     }
     if apply_manager && model.soft_delete && !opts.include_deleted {
         q.and_where(Expr::col((a(T), a("deleted_at"))).is_null());
@@ -125,12 +114,7 @@ fn base_select(model: &ObjectModel, opts: &PermOpts, apply_manager: bool) -> Sel
 /// * inactive user → nothing (even superusers).
 /// * active superuser → every row (of the manager).
 /// * otherwise → owned by user, unowned, or granted to the user or one of their groups.
-pub fn permitted_object_ids(
-    user: Option<&User>,
-    model: &ObjectModel,
-    perm: &str,
-    opts: &PermOpts,
-) -> SelectStatement {
+pub fn permitted_object_ids(user: Option<&User>, model: &ObjectModel, perm: &str, opts: &PermOpts) -> SelectStatement {
     let mut q = base_select(model, opts, true);
     let (owner, key) = owner_and_key(opts.parent_field);
     let Some(user) = user else {
@@ -162,12 +146,7 @@ pub fn granted_key_cond(user: &User, model: &ObjectModel, perm: &str, key: Simpl
 
 /// `permitted_document_ids(user, perm=, include_deleted=)`: documents incl. root-document logic.
 pub fn permitted_document_ids(user: Option<&User>, perm: &str, include_deleted: bool) -> SelectStatement {
-    permitted_object_ids(
-        user,
-        &DOCUMENT,
-        perm,
-        &PermOpts { include_deleted, parent_field: Some(DOCUMENT_PARENT_FIELD) },
-    )
+    permitted_object_ids(user, &DOCUMENT, perm, &PermOpts { include_deleted, parent_field: Some(DOCUMENT_PARENT_FIELD) })
 }
 
 /// `user_is_unrestricted(user)`: `None` or an active superuser.
@@ -190,12 +169,7 @@ fn id_in(table_alias: &str, sub: SelectStatement) -> Condition {
 
 /// `restrict_queryset_to_visible(qs, user, perm)`; `None` = "no user filtering" (unrestricted).
 /// `table_alias` is the alias/table name of the outer query's model table.
-pub fn restrict_to_visible(
-    user: Option<&User>,
-    model: &ObjectModel,
-    perm: &str,
-    table_alias: &str,
-) -> Condition {
+pub fn restrict_to_visible(user: Option<&User>, model: &ObjectModel, perm: &str, table_alias: &str) -> Condition {
     if user_is_unrestricted(user) {
         return Cond::all();
     }
@@ -203,12 +177,7 @@ pub fn restrict_to_visible(
 }
 
 /// `restrict_queryset_to_owner_visible(qs, user, perm)`; `None` sees only unowned rows.
-pub fn restrict_to_owner_visible(
-    user: Option<&User>,
-    model: &ObjectModel,
-    perm: &str,
-    table_alias: &str,
-) -> Condition {
+pub fn restrict_to_owner_visible(user: Option<&User>, model: &ObjectModel, perm: &str, table_alias: &str) -> Condition {
     if user_is_active_superuser(user) {
         return Cond::all();
     }
@@ -235,12 +204,7 @@ impl Default for FilterOpts {
 /// `PermittedObjectsFilter.filter_queryset` as a condition on the outer query.
 ///
 /// `user` is `request.user` (`None` = AnonymousUser). `table_alias` names the outer model table.
-pub fn permitted_objects_filter(
-    user: Option<&User>,
-    model: &ObjectModel,
-    table_alias: &str,
-    opts: &FilterOpts,
-) -> Condition {
+pub fn permitted_objects_filter(user: Option<&User>, model: &ObjectModel, table_alias: &str, opts: &FilterOpts) -> Condition {
     if let Some(u) = user {
         if !u.is_active {
             return SimpleExpr::from(Expr::val(false)).into_condition();
@@ -344,12 +308,7 @@ mod tests {
     #[test]
     fn owner_only_filter() {
         let u = user(5);
-        let c = permitted_objects_filter(
-            Some(&u),
-            &TAG,
-            "t",
-            &FilterOpts { include_granted: false, ..Default::default() },
-        );
+        let c = permitted_objects_filter(Some(&u), &TAG, "t", &FilterOpts { include_granted: false, ..Default::default() });
         let s = Query::select().column(a("id")).from(a("t")).cond_where(c).to_string(PostgresQueryBuilder);
         assert_eq!(s, r#"SELECT "id" FROM "t" WHERE "t"."owner_id" IS NULL OR "t"."owner_id" = 5"#);
     }

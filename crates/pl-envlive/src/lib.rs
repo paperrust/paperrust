@@ -16,11 +16,7 @@ pub fn set(values: BTreeMap<String, String>) {
         Ok(g) => g,
         Err(p) => p.into_inner(),
     };
-    *g = if values.is_empty() {
-        None
-    } else {
-        Some(Arc::new(values))
-    };
+    *g = if values.is_empty() { None } else { Some(Arc::new(values)) };
 }
 
 /// Current overlay.
@@ -33,9 +29,7 @@ pub fn get() -> Option<Arc<BTreeMap<String, String>>> {
 
 /// `std::env::var(name).ok()`, otherwise the value from the overlay (exactly this name).
 pub fn var(name: &str) -> Option<String> {
-    std::env::var(name)
-        .ok()
-        .or_else(|| get().and_then(|o| o.get(name).cloned()))
+    std::env::var(name).ok().or_else(|| get().and_then(|o| o.get(name).cloned()))
 }
 
 /// Like [`var`] for `OsString` readers.
@@ -50,14 +44,9 @@ mod tests {
     #[test]
     fn overlay_after_process() {
         assert_eq!(var("PL_ENVLIVE_TEST_ONLY_X"), None);
-        set([("PL_ENVLIVE_TEST_ONLY_X".to_string(), "1".to_string())]
-            .into_iter()
-            .collect());
+        set([("PL_ENVLIVE_TEST_ONLY_X".to_string(), "1".to_string())].into_iter().collect());
         assert_eq!(var("PL_ENVLIVE_TEST_ONLY_X").as_deref(), Some("1"));
-        assert_eq!(
-            var_os("PL_ENVLIVE_TEST_ONLY_X").as_deref(),
-            Some(std::ffi::OsStr::new("1"))
-        );
+        assert_eq!(var_os("PL_ENVLIVE_TEST_ONLY_X").as_deref(), Some(std::ffi::OsStr::new("1")));
         set(BTreeMap::new());
         assert!(get().is_none());
     }

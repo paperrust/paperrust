@@ -19,13 +19,7 @@ pub struct Nb {
 }
 
 impl Nb {
-    pub fn fit(
-        x: &Csr,
-        class_of_row: &[usize],
-        n_classes: usize,
-        sample_weight: Option<&[f32]>,
-        alpha: f64,
-    ) -> Nb {
+    pub fn fit(x: &Csr, class_of_row: &[usize], n_classes: usize, sample_weight: Option<&[f32]>, alpha: f64) -> Nb {
         let f = x.n_cols;
         let mut fc = vec![0f64; n_classes * f];
         let mut cc = vec![0f64; n_classes];
@@ -38,16 +32,7 @@ impl Nb {
             }
         }
         let total: f64 = cc.iter().sum();
-        let class_log_prior = cc
-            .iter()
-            .map(|&c| {
-                if c > 0.0 {
-                    (c / total).ln() as f32
-                } else {
-                    f32::NEG_INFINITY
-                }
-            })
-            .collect();
+        let class_log_prior = cc.iter().map(|&c| if c > 0.0 { (c / total).ln() as f32 } else { f32::NEG_INFINITY }).collect();
         let mut feature_log_prob = vec![0f32; n_classes * f];
         for c in 0..n_classes {
             let row = &fc[c * f..(c + 1) * f];
@@ -56,12 +41,7 @@ impl Nb {
                 feature_log_prob[c * f + j] = ((row[j] + alpha) / denom).ln() as f32;
             }
         }
-        Nb {
-            n_features: f,
-            n_classes,
-            class_log_prior,
-            feature_log_prob,
-        }
+        Nb { n_features: f, n_classes, class_log_prior, feature_log_prob }
     }
 
     /// Class probabilities for one sparse row (softmax of the joint log likelihood).
@@ -89,15 +69,7 @@ mod tests {
 
     #[test]
     fn separates_two_classes() {
-        let x = Csr::from_rows(
-            3,
-            &[
-                vec![(0, 3.0)],
-                vec![(0, 2.0), (2, 1.0)],
-                vec![(1, 3.0)],
-                vec![(1, 1.0), (2, 1.0)],
-            ],
-        );
+        let x = Csr::from_rows(3, &[vec![(0, 3.0)], vec![(0, 2.0), (2, 1.0)], vec![(1, 3.0)], vec![(1, 1.0), (2, 1.0)]]);
         let nb = Nb::fit(&x, &[0, 0, 1, 1], 2, None, 1.0);
         assert!(nb.predict_proba(&[(0, 1.0)])[0] > 0.5);
         assert!(nb.predict_proba(&[(1, 1.0)])[1] > 0.5);

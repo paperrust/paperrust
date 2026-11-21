@@ -227,14 +227,26 @@ async fn exists_name_owner(db: &PgPool, kind: Kind, name: &str, owner: Option<i6
     Ok(r.try_get::<bool, _>(0)?)
 }
 
-async fn exists_tx(tx: &mut Transaction<'_, Postgres>, kind: Kind, name: &str, owner: Option<i64>, exclude: Option<i64>) -> Result<bool, ApiError> {
+async fn exists_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    kind: Kind,
+    name: &str,
+    owner: Option<i64>,
+    exclude: Option<i64>,
+) -> Result<bool, ApiError> {
     let sql = EXISTS_SQL.replace("{table}", kind.table());
     let r = sqlx::query(&sql).bind(name).bind(owner.map(|o| o as i32)).bind(exclude.map(|o| o as i32)).fetch_one(&mut **tx).await?;
     Ok(r.try_get::<bool, _>(0)?)
 }
 
 /// Serializer-level validators + `validate()`. `v` stays as parsed from the request (DRF validates a copy).
-async fn run_validators_and_validate(db: &PgPool, kind: Kind, user: &User, v: &Validated, instance: Option<&ObjectRow>) -> Result<(), ApiError> {
+async fn run_validators_and_validate(
+    db: &PgPool,
+    kind: Kind,
+    user: &User,
+    v: &Validated,
+    instance: Option<&ObjectRow>,
+) -> Result<(), ApiError> {
     let mut non_field: Vec<Value> = vec![];
     match instance {
         None => {
@@ -242,9 +254,10 @@ async fn run_validators_and_validate(db: &PgPool, kind: Kind, user: &User, v: &V
             let owner = v.owner.unwrap_or(None);
             // UniqueTogetherValidator(name, owner): skipped when owner is None
             if let Some(o) = owner
-                && exists_name_owner(db, kind, &name, Some(o), None).await? {
-                    non_field.push(json!("The fields name, owner must make a unique set."));
-                }
+                && exists_name_owner(db, kind, &name, Some(o), None).await?
+            {
+                non_field.push(json!("The fields name, owner must make a unique set."));
+            }
             // UniqueTogetherValidator(name, condition owner IS NULL) never fires: DRF evaluates the
             // condition with `Q.check({"owner": None})`; `Value(None)` has no output field, the
             // `isnull` lookup raises FieldError and `qs_exists_with_condition` returns False.
@@ -260,10 +273,7 @@ async fn run_validators_and_validate(db: &PgPool, kind: Kind, user: &User, v: &V
             let name = v.name.clone().unwrap_or_else(|| inst.name.clone());
             let owner = v.owner.unwrap_or(inst.owner_id);
             // conditional validator (owner IS NULL): never fires, see create above
-            if (name_changed || owner_changed)
-                && owner.is_some()
-                && exists_name_owner(db, kind, &name, owner, Some(inst.id)).await?
-            {
+            if (name_changed || owner_changed) && owner.is_some() && exists_name_owner(db, kind, &name, owner, Some(inst.id)).await? {
                 non_field.push(json!("The fields name, owner must make a unique set."));
             }
         }
@@ -315,7 +325,14 @@ async fn reload(tx: &mut Transaction<'_, Postgres>, kind: Kind, user: &User, id:
 }
 
 /// POST: `CreateModelMixin.create`.
-pub async fn create(state: &AppState, kind: Kind, user: &User, ctx: &RequestContext, meta: &AuditMeta, body: &Value) -> Result<Response, ApiError> {
+pub async fn create(
+    state: &AppState,
+    kind: Kind,
+    user: &User,
+    ctx: &RequestContext,
+    meta: &AuditMeta,
+    body: &Value,
+) -> Result<Response, ApiError> {
     let db = state.db();
     let Value::Object(data) = body else { return Err(drf::not_a_dict(body)) };
     let mut v = match to_internal_value(db, kind, data, false, state.config().tz).await? {
@@ -334,10 +351,7 @@ pub async fn create(state: &AppState, kind: Kind, user: &User, ctx: &RequestCont
         return Err(unique_error());
     }
     let (cols, extra) = if kind == Kind::Tag {
-        (
-            ", color, is_inbox_tag, tn_parent_id",
-            ", $6, $7, $8::integer",
-        )
+        (", color, is_inbox_tag, tn_parent_id", ", $6, $7, $8::integer")
     } else if kind == Kind::StoragePath {
         (", path", ", $6")
     } else {
@@ -416,11 +430,12 @@ pub async fn update(
     }
     let name = v.name.clone().unwrap_or_else(|| instance.name.clone());
     if let Some(owner) = v.owner
-        && exists_tx(&mut tx, kind, &name, owner, Some(instance.id)).await? {
-            // upstream has already applied set_permissions (no atomic request)
-            tx.commit().await?;
-            return Err(unique_error());
-        }
+        && exists_tx(&mut tx, kind, &name, owner, Some(instance.id)).await?
+    {
+        // upstream has already applied set_permissions (no atomic request)
+        tx.commit().await?;
+        return Err(unique_error());
+    }
     let old = reload(&mut tx, kind, user, instance.id).await?;
     let mut new = instance.clone();
     new.name = name;
@@ -505,9 +520,10 @@ pub async fn update(
         // TagViewSet.perform_update → update_document_parent_tags(tag, new_parent)
         let old_parent = old.tag.as_ref().and_then(|t| t.tn_parent_id);
         if let Some(np) = tag.tn_parent_id
-            && old_parent != Some(np) {
-                parent_docs = update_document_parent_tags(&mut tx, new.id, np).await?;
-            }
+            && old_parent != Some(np)
+        {
+            parent_docs = update_document_parent_tags(&mut tx, new.id, np).await?;
+        }
     }
     tx.commit().await?;
     if !parent_docs.is_empty() {

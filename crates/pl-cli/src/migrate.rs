@@ -117,10 +117,8 @@ pub async fn detect_state(conn: &mut PgConnection) -> CliResult<DbState> {
 /// Migrations from paperless-ngx after v3.4.2 (upstream `dev`) whose effect PaperRust knows (same
 /// list as pl-dbmigrate `schema::KNOWN_NEWER`): documents.0028 removes the treenode columns like
 /// `pl_objects.0001_paperrust_tag_adjacency` (idempotent), 0029 only changes a choice list.
-pub const KNOWN_NEWER: &[(&str, &str)] = &[
-    ("documents", "0028_replace_tag_tree_fields"),
-    ("documents", "0029_alter_workflowrun_type_alter_workflowtrigger_type"),
-];
+pub const KNOWN_NEWER: &[(&str, &str)] =
+    &[("documents", "0028_replace_tag_tree_fields"), ("documents", "0029_alter_workflowrun_type_alter_workflowtrigger_type")];
 
 /// First migration that only needs a paperless-ngx 2.x database.
 const V2_MARKER: (&str, &str) = ("documents", "0003_remove_document_storage_type");
@@ -145,11 +143,7 @@ pub fn classify(present: &BTreeSet<(String, String)>) -> DbState {
             unknown.push(m.clone());
         }
     }
-    if missing.is_empty() && unknown.is_empty() {
-        DbState::Current { extra }
-    } else {
-        DbState::Mismatch { missing, unknown }
-    }
+    if missing.is_empty() && unknown.is_empty() { DbState::Current { extra } } else { DbState::Mismatch { missing, unknown } }
 }
 
 /// Catch-up steps (app, name, sql) from `CATCHUP_SQL` in file order (format like
@@ -289,7 +283,11 @@ pub async fn command(argv: Vec<String>) -> CliResult {
         return match state {
             DbState::Current { .. } => {
                 let pending = pending_paperrust(&mut conn).await?;
-                if pending.is_empty() || a.flag("skip_paperrust") { Ok(()) } else { Err(CliError::Command(format!("unapplied PaperRust migrations: {}", pending.join(", ")))) }
+                if pending.is_empty() || a.flag("skip_paperrust") {
+                    Ok(())
+                } else {
+                    Err(CliError::Command(format!("unapplied PaperRust migrations: {}", pending.join(", "))))
+                }
             }
             DbState::Empty => Err(CliError::Command("database is empty, migrations pending".into())),
             DbState::Mismatch { missing, unknown } => Err(CliError::Command(match catchup_plan(&missing, &unknown) {
@@ -328,8 +326,7 @@ pub async fn command(argv: Vec<String>) -> CliResult {
         DbState::Mismatch { missing, unknown } => {
             // Older paperless-ngx database (from v3.0.0): catch up missing migrations like Django,
             // in one transaction (on error everything stays as it was).
-            let steps = catchup_plan(&missing, &unknown)
-                .ok_or_else(|| CliError::Command(mismatch_message(&missing, &unknown)))?;
+            let steps = catchup_plan(&missing, &unknown).ok_or_else(|| CliError::Command(mismatch_message(&missing, &unknown)))?;
             let mut tx = conn.begin().await?;
             for (app, name, sql) in &steps {
                 if !sql.trim().is_empty() {
@@ -473,7 +470,8 @@ async fn verify_structure(conn: &mut PgConnection) -> CliResult {
         }
         got.push(format!("{t}\t{}\t{}", r.try_get::<String, _>(1)?, r.try_get::<String, _>(2)?));
     }
-    let mut want: Vec<String> = baseline::rows(baseline::COLUMNS_TSV).into_iter().map(|r| format!("{}\t{}\t{}", r[0], r[1], r[3])).collect();
+    let mut want: Vec<String> =
+        baseline::rows(baseline::COLUMNS_TSV).into_iter().map(|r| format!("{}\t{}\t{}", r[0], r[1], r[3])).collect();
     // Order does not matter: when catching up an older DB (e.g. 3.1.3) ALTER TABLE ADD COLUMN appends
     // new columns at the end, so the order then differs from a new installation
     // (real test 2026-11-16: otherwise rollback of the whole catch-up).
@@ -529,7 +527,8 @@ pub async fn post_migrate(conn: &mut PgConnection) -> CliResult {
                 .await?;
         }
     }
-    let anon: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM auth_user WHERE username = 'AnonymousUser')").fetch_one(&mut *conn).await?;
+    let anon: bool =
+        sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM auth_user WHERE username = 'AnonymousUser')").fetch_one(&mut *conn).await?;
     if !anon {
         insert_anonymous_user(conn, None).await?;
     }
@@ -660,7 +659,10 @@ pub async fn apply_paperrust_with(conn: &mut PgConnection, backup: Option<(&pl_c
         let own_tx = sql.lines().any(|l| l.trim().eq_ignore_ascii_case("BEGIN;"));
         if own_tx {
             sqlx::raw_sql(sql).execute(&mut *conn).await?;
-            sqlx::query("INSERT INTO paperrust_migrations (name) VALUES ($1) ON CONFLICT DO NOTHING").bind(name).execute(&mut *conn).await?;
+            sqlx::query("INSERT INTO paperrust_migrations (name) VALUES ($1) ON CONFLICT DO NOTHING")
+                .bind(name)
+                .execute(&mut *conn)
+                .await?;
         } else {
             let mut tx = conn.begin().await?;
             sqlx::raw_sql(sql).execute(&mut *tx).await?;
@@ -672,7 +674,8 @@ pub async fn apply_paperrust_with(conn: &mut PgConnection, backup: Option<(&pl_c
     Ok(applied)
 }
 
-const SHOW_OPTS: &[args::Opt] = &[flag(&["-l", "--list"], "list"), flag(&["-p", "--plan"], "plan"), args::value(&["--database"], "database")];
+const SHOW_OPTS: &[args::Opt] =
+    &[flag(&["-l", "--list"], "list"), flag(&["-p", "--plan"], "plan"), args::value(&["--database"], "database")];
 
 /// `showmigrations`: `[X]` per v3.4.2 migration (Django format "app\n [X] name") + PaperRust.
 pub async fn showmigrations(argv: Vec<String>) -> CliResult {

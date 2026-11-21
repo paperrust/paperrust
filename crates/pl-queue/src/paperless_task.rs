@@ -9,8 +9,8 @@
 //! returned; the caller only logs them (upstream: `logger.exception(...)`, no abort).
 
 use chrono::{DateTime, Utc};
-use sea_query::{Alias, Expr, OnConflict, PostgresQueryBuilder, Query};
 use pl_core::sqlbind::SqlxBinder;
+use sea_query::{Alias, Expr, OnConflict, PostgresQueryBuilder, Query};
 use serde_json::{Map, Value};
 use sqlx::Row;
 
@@ -46,7 +46,8 @@ pub fn extract_input_data(task_type: &str, kwargs: &Map<String, Value>) -> Value
                 m.insert("mailrule_id".into(), r.clone());
             }
             if let Some(Value::Object(ov)) = kwargs.get("overrides") {
-                let od: Map<String, Value> = ov.iter().filter(|(k, v)| !v.is_null() && !k.starts_with('_')).map(|(k, v)| (k.clone(), v.clone())).collect();
+                let od: Map<String, Value> =
+                    ov.iter().filter(|(k, v)| !v.is_null() && !k.starts_with('_')).map(|(k, v)| (k.clone(), v.clone())).collect();
                 if !od.is_empty() {
                     m.insert("overrides".into(), Value::Object(od));
                 }
@@ -159,7 +160,12 @@ pub async fn record_pending<'e, E: sqlx::PgExecutor<'e>>(
 }
 
 /// `task_prerun_handler`: `status=started, date_started=now`.
-pub async fn mark_started<'e, E: sqlx::PgExecutor<'e>>(executor: E, task_name: &str, task_id: &str, now: DateTime<Utc>) -> Result<(), QueueError> {
+pub async fn mark_started<'e, E: sqlx::PgExecutor<'e>>(
+    executor: E,
+    task_name: &str,
+    task_id: &str,
+    now: DateTime<Utc>,
+) -> Result<(), QueueError> {
     if tracked_task_type(task_name).is_none() {
         return Ok(());
     }
@@ -192,7 +198,13 @@ async fn load_dates(conn: &mut sqlx::PgConnection, task_id: &str) -> Result<Opti
 /// `task_postrun_handler` with `state=SUCCESS`: `status=success` (or `failure` if the
 /// result is a dict with `duplicate_of`), `date_done`, `duration_seconds` (if
 /// started), `wait_time_seconds`, `result_data` (only for a dict result).
-pub async fn mark_success(conn: &mut sqlx::PgConnection, task_name: &str, task_id: &str, retval: &Value, now: DateTime<Utc>) -> Result<(), QueueError> {
+pub async fn mark_success(
+    conn: &mut sqlx::PgConnection,
+    task_name: &str,
+    task_id: &str,
+    retval: &Value,
+    now: DateTime<Utc>,
+) -> Result<(), QueueError> {
     if tracked_task_type(task_name).is_none() {
         return Ok(());
     }
@@ -235,7 +247,13 @@ pub fn failure_result_data(error_type: Option<&str>, error_message: Option<&str>
 }
 
 /// `task_failure_handler`: `status=failure`, `result_data`, `date_done`, duration/wait time.
-pub async fn mark_failure(conn: &mut sqlx::PgConnection, task_name: &str, task_id: &str, result_data: &Value, now: DateTime<Utc>) -> Result<(), QueueError> {
+pub async fn mark_failure(
+    conn: &mut sqlx::PgConnection,
+    task_name: &str,
+    task_id: &str,
+    result_data: &Value,
+    now: DateTime<Utc>,
+) -> Result<(), QueueError> {
     if tracked_task_type(task_name).is_none() {
         return Ok(());
     }
@@ -243,10 +261,7 @@ pub async fn mark_failure(conn: &mut sqlx::PgConnection, task_name: &str, task_i
         return Ok(());
     };
     let mut q = Query::update();
-    q.table(t())
-        .value(c("status"), "failure")
-        .value(c("result_data"), result_data.clone())
-        .value(c("date_done"), now);
+    q.table(t()).value(c("status"), "failure").value(c("result_data"), result_data.clone()).value(c("date_done"), now);
     if let Some(s) = started {
         q.value(c("duration_seconds"), secs(now - s));
         q.value(c("wait_time_seconds"), secs(s - created));
@@ -280,7 +295,13 @@ impl RevokeReason {
 }
 
 /// `task_revoked_handler`: `status=revoked, date_done=now, result_data={"reason": …}`.
-pub async fn mark_revoked<'e, E: sqlx::PgExecutor<'e>>(executor: E, task_name: &str, task_id: &str, reason: RevokeReason, now: DateTime<Utc>) -> Result<(), QueueError> {
+pub async fn mark_revoked<'e, E: sqlx::PgExecutor<'e>>(
+    executor: E,
+    task_name: &str,
+    task_id: &str,
+    reason: RevokeReason,
+    now: DateTime<Utc>,
+) -> Result<(), QueueError> {
     if tracked_task_type(task_name).is_none() {
         return Ok(());
     }

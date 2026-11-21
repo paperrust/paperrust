@@ -38,9 +38,7 @@ pub async fn run(State(state): State<AppState>, _ctx: RequestContext, auth: Auth
     let data = body::parse_request(req).await?;
     let task_type = body::run_task_type(&data, TASK_TYPE).map_err(Error::Api)?;
     let Some((name, kwargs)) = runnable(&task_type) else {
-        return Err(Error::Api(ApiError::validation(
-            json!({"error": format!("Task type '{task_type}' cannot be manually triggered")}),
-        )));
+        return Err(Error::Api(ApiError::validation(json!({"error": format!("Task type '{task_type}' cannot be manually triggered")}))));
     };
     let mut treq = TaskRequest::new(name).trigger_source(trigger_source::MANUAL);
     for (k, v) in kwargs {
@@ -50,10 +48,7 @@ pub async fn run(State(state): State<AppState>, _ctx: RequestContext, auth: Auth
         Ok(id) => Ok(Drf::ok(json!({"task_id": id.to_string()})).into_response()),
         Err(e) => {
             tracing::warn!("Error running task: {e}");
-            Err(Error::Api(ApiError::django_text(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Error running task, check logs for more detail.",
-            )))
+            Err(Error::Api(ApiError::django_text(StatusCode::INTERNAL_SERVER_ERROR, "Error running task, check logs for more detail.")))
         }
     }
 }

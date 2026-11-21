@@ -143,7 +143,8 @@ fn run_case(r: &pl_ocr::render::PdfiumRenderer, preset: &str, code: CodeType, st
     let pdf = job.pdf().unwrap();
     let sheet = render_page(r, &pdf, 0);
     let (a, b) = (cut_label(&sheet, &job, slots.0), cut_label(&sheet, &job, slots.1));
-    let stack = vec![scanned_page(Some(&a), 1), scanned_page(None, 2), scanned_page(Some(&b), 3), scanned_page(None, 4), scanned_page(None, 5)];
+    let stack =
+        vec![scanned_page(Some(&a), 1), scanned_page(None, 2), scanned_page(Some(&b), 3), scanned_page(None, 4), scanned_page(None, 5)];
     let path: PathBuf = dir.join(format!("stack-{preset}-{}.pdf", code.as_str()));
     image_pdf(&stack, &path);
     let codes = scan(&path, r);

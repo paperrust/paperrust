@@ -10,10 +10,10 @@ use std::path::{Path, PathBuf};
 
 use sqlx::PgConnection;
 
+use crate::CliResult;
 use crate::args;
 use crate::ctx::Ctx;
 use crate::export::medialock::MediaLock;
-use crate::CliResult;
 
 const MAX_STORED_FILENAME_LENGTH: usize = 1024;
 
@@ -108,7 +108,8 @@ pub async fn update_filename_and_move_files(c: &Ctx, conn: &mut PgConnection, do
                     original_already_moved = true;
                     candidate.clone()
                 } else {
-                    pl_templating::generate_unique_filename(&ctx, false, &opts, |rel| mjoin(originals, rel).exists()).map_err(|e| e.to_string())?
+                    pl_templating::generate_unique_filename(&ctx, false, &opts, |rel| mjoin(originals, rel).exists())
+                        .map_err(|e| e.to_string())?
                 }
             } else {
                 candidate.clone()
@@ -136,7 +137,8 @@ pub async fn update_filename_and_move_files(c: &Ctx, conn: &mut PgConnection, do
                         archive_already_moved = true;
                         acand.clone()
                     } else {
-                        pl_templating::generate_unique_filename(&ctx, true, &opts, |rel| mjoin(archive_dir, rel).exists()).map_err(|e| e.to_string())?
+                        pl_templating::generate_unique_filename(&ctx, true, &opts, |rel| mjoin(archive_dir, rel).exists())
+                            .map_err(|e| e.to_string())?
                     }
                 } else {
                     acand.clone()
@@ -222,10 +224,11 @@ pub async fn update_filename_and_move_files(c: &Ctx, conn: &mut PgConnection, do
     }
     // keep versions in sync with the root
     if first.root_document_id.is_none() {
-        let versions: Vec<i32> = sqlx::query_scalar("SELECT id FROM documents_document WHERE root_document_id = $1 AND deleted_at IS NULL ORDER BY id")
-            .bind(doc_id as i32)
-            .fetch_all(&mut *conn)
-            .await?;
+        let versions: Vec<i32> =
+            sqlx::query_scalar("SELECT id FROM documents_document WHERE root_document_id = $1 AND deleted_at IS NULL ORDER BY id")
+                .bind(doc_id as i32)
+                .fetch_all(&mut *conn)
+                .await?;
         for v in versions {
             Box::pin(update_filename_and_move_files(c, conn, i64::from(v))).await?;
         }
@@ -260,9 +263,8 @@ pub async fn renamer_command(argv: Vec<String>) -> CliResult {
 }
 
 pub async fn rename_all(c: &Ctx) -> CliResult<usize> {
-    let ids: Vec<i32> = sqlx::query_scalar("SELECT id FROM documents_document WHERE deleted_at IS NULL ORDER BY created DESC")
-        .fetch_all(&c.pool)
-        .await?;
+    let ids: Vec<i32> =
+        sqlx::query_scalar("SELECT id FROM documents_document WHERE deleted_at IS NULL ORDER BY created DESC").fetch_all(&c.pool).await?;
     let mut conn = c.pool.acquire().await?;
     let mut moved = 0;
     for id in ids {

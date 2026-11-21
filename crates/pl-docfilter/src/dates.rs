@@ -4,10 +4,7 @@
 //! (parse_date, parse_datetime), django_filters/fields.py (IsoDateTimeField),
 //! rest_framework/fields.py (DateField), src/documents/filters.py@v3.4.2 (DateQueryField).
 
-use chrono::{
-    DateTime, Datelike, Duration, FixedOffset, LocalResult, NaiveDate, NaiveDateTime,
-    NaiveTime, TimeZone, Utc,
-};
+use chrono::{DateTime, Datelike, Duration, FixedOffset, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use chrono_tz::Tz;
 
 use crate::pyval::py_strip;
@@ -18,27 +15,22 @@ use crate::pyval::py_strip;
 
 /// `DATE_INPUT_FORMATS` of `django/conf/locale/en/formats.py` (LANGUAGE_CODE = "en-us").
 pub const EN_DATE_INPUT_FORMATS: &[&str] = &[
-    "%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y", "%b %d %Y", "%b %d, %Y", "%d %b %Y", "%d %b, %Y",
-    "%B %d %Y", "%B %d, %Y", "%d %B %Y", "%d %B, %Y",
+    "%Y-%m-%d",
+    "%m/%d/%Y",
+    "%m/%d/%y",
+    "%b %d %Y",
+    "%b %d, %Y",
+    "%d %b %Y",
+    "%d %b, %Y",
+    "%B %d %Y",
+    "%B %d, %Y",
+    "%d %B %Y",
+    "%d %B, %Y",
 ];
 
-const MONTH_ABBR: [&str; 12] = [
-    "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec",
-];
-const MONTH_FULL: [&str; 12] = [
-    "january",
-    "february",
-    "march",
-    "april",
-    "may",
-    "june",
-    "july",
-    "august",
-    "september",
-    "october",
-    "november",
-    "december",
-];
+const MONTH_ABBR: [&str; 12] = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+const MONTH_FULL: [&str; 12] =
+    ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
 
 #[derive(Default, Clone, Copy)]
 struct StrpState {
@@ -96,8 +88,7 @@ fn day_alternatives(s: &str) -> Vec<(u32, &str)> {
 fn name_alternatives<'a>(s: &'a str, names: &[&str; 12]) -> Vec<(u32, &'a str)> {
     let mut out = Vec::new();
     for (i, n) in names.iter().enumerate() {
-        if s.len() >= n.len() && s.is_char_boundary(n.len()) && s[..n.len()].eq_ignore_ascii_case(n)
-        {
+        if s.len() >= n.len() && s.is_char_boundary(n.len()) && s[..n.len()].eq_ignore_ascii_case(n) {
             out.push((i as u32 + 1, &s[n.len()..]));
         }
     }
@@ -113,10 +104,7 @@ fn strp_match(fmt: &str, s: &str, st: StrpState) -> Option<StrpState> {
         let rest_fmt = &fmt[2..];
         let alts: Vec<(u32, &str)> = match fb[1] {
             b'Y' => take_digits(s, 4).into_iter().collect(),
-            b'y' => take_digits(s, 2)
-                .map(|(y, r)| (if y <= 68 { y + 2000 } else { y + 1900 }, r))
-                .into_iter()
-                .collect(),
+            b'y' => take_digits(s, 2).map(|(y, r)| (if y <= 68 { y + 2000 } else { y + 1900 }, r)).into_iter().collect(),
             b'm' => month_alternatives(s),
             b'd' => day_alternatives(s),
             b'b' => name_alternatives(s, &MONTH_ABBR),
@@ -237,9 +225,7 @@ fn django_date_re(s: &str) -> Option<Option<NaiveDate>> {
         return None;
     }
     let (y, m, d) = (parts[0], parts[1], parts[2]);
-    if y.len() != 4 || !all_digits(y) || !(1..=2).contains(&m.len()) || !all_digits(m)
-        || !(1..=2).contains(&d.len()) || !all_digits(d)
-    {
+    if y.len() != 4 || !all_digits(y) || !(1..=2).contains(&m.len()) || !all_digits(m) || !(1..=2).contains(&d.len()) || !all_digits(d) {
         return None;
     }
     let (y, m, d): (i32, u32, u32) = (y.parse().ok()?, m.parse().ok()?, d.parse().ok()?);
@@ -285,11 +271,7 @@ fn py_iso_time(s: &str) -> Option<NaiveTime> {
         if p.iter().any(|x| x.len() != 2 || !all_digits(x)) || p.len() > 3 {
             return None;
         }
-        (
-            p[0].parse().ok()?,
-            p.get(1).map(|x| x.parse().unwrap_or(99)).unwrap_or(0),
-            p.get(2).map(|x| x.parse().unwrap_or(99)).unwrap_or(0),
-        )
+        (p[0].parse().ok()?, p.get(1).map(|x| x.parse().unwrap_or(99)).unwrap_or(0), p.get(2).map(|x| x.parse().unwrap_or(99)).unwrap_or(0))
     } else {
         if !all_digits(main) || ![2, 4, 6].contains(&main.len()) {
             return None;
@@ -332,10 +314,7 @@ fn py_iso_tz(s: &str) -> Option<FixedOffset> {
 pub fn py_datetime_fromisoformat(s: &str) -> Option<ParsedDateTime> {
     let (date, len) = py_iso_date_prefix(s)?;
     if len == s.len() {
-        return Some(ParsedDateTime {
-            naive: date.and_time(NaiveTime::MIN),
-            offset: None,
-        });
+        return Some(ParsedDateTime { naive: date.and_time(NaiveTime::MIN), offset: None });
     }
     // any single separator character
     let rest = &s[len..];
@@ -351,10 +330,7 @@ pub fn py_datetime_fromisoformat(s: &str) -> Option<ParsedDateTime> {
         Some(t) => Some(py_iso_tz(t)?),
         None => None,
     };
-    Some(ParsedDateTime {
-        naive: date.and_time(time),
-        offset,
-    })
+    Some(ParsedDateTime { naive: date.and_time(time), offset })
 }
 
 /// Django's `datetime_re` fallback in `parse_datetime`. None: no match;
@@ -456,10 +432,7 @@ fn django_datetime_re(s: &str) -> Option<Option<ParsedDateTime>> {
     let date = NaiveDate::from_ymd_opt(year as i32, month, day);
     let time = NaiveTime::from_hms_micro_opt(hour, minute, second, micro);
     Some(match (date, time) {
-        (Some(d), Some(t)) => Some(ParsedDateTime {
-            naive: d.and_time(t),
-            offset,
-        }),
+        (Some(d), Some(t)) => Some(ParsedDateTime { naive: d.and_time(t), offset }),
         _ => None,
     })
 }
@@ -503,9 +476,7 @@ pub fn iso_datetime_field(value: &str, tz: Tz) -> Result<Option<DateTime<Utc>>, 
         },
         None => match tz.from_local_datetime(&parsed.naive) {
             LocalResult::Single(dt) => Ok(Some(dt.with_timezone(&Utc))),
-            _ => Err(DateTimeInputError::Ambiguous {
-                naive: parsed.naive,
-            }),
+            _ => Err(DateTimeInputError::Ambiguous { naive: parsed.naive }),
         },
     }
 }
@@ -514,11 +485,7 @@ pub fn iso_datetime_field(value: &str, tz: Tz) -> Result<Option<DateTime<Utc>>, 
 pub fn py_naive_datetime_str(dt: &NaiveDateTime) -> String {
     let base = dt.format("%Y-%m-%d %H:%M:%S").to_string();
     let micro = dt.and_utc().timestamp_subsec_micros();
-    if micro != 0 {
-        format!("{base}.{micro:06}")
-    } else {
-        base
-    }
+    if micro != 0 { format!("{base}.{micro:06}") } else { base }
 }
 
 /// Local time → instant like `timezone.make_aware` with zoneinfo (fold=0).
@@ -650,16 +617,14 @@ mod tests {
         assert_eq!(v.to_rfc3339(), "2024-01-15T09:00:00.500+00:00");
         assert_eq!(iso_datetime_field("bogus", tz), Err(DateTimeInputError::Invalid));
         assert_eq!(iso_datetime_field("2024-13-01T00:00", tz), Err(DateTimeInputError::Invalid));
-        assert!(matches!(
-            iso_datetime_field("2024-03-31T02:30:00", tz),
-            Err(DateTimeInputError::Ambiguous { .. })
-        ));
+        assert!(matches!(iso_datetime_field("2024-03-31T02:30:00", tz), Err(DateTimeInputError::Ambiguous { .. })));
     }
 
     #[test]
     fn non_ascii_input_never_panics() {
         let tz: Tz = "UTC".parse().unwrap();
-        for v in ["aä€2024-01-01", "2024-01-01T10:00+1é12", "2024-01-01 10:00 +1é12", "€€€€€€€€", "2024-01-01€10:00"] {
+        for v in ["aä€2024-01-01", "2024-01-01T10:00+1é12", "2024-01-01 10:00 +1é12", "€€€€€€€€", "2024-01-01€10:00"]
+        {
             let _ = iso_datetime_field(v, tz);
             let _ = django_form_date(v);
             let _ = drf_parse_date(v);
@@ -748,10 +713,7 @@ mod tests {
     #[test]
     fn day_start_in_tz() {
         let tz: Tz = "America/Los_Angeles".parse().unwrap();
-        assert_eq!(
-            start_of_local_day(d(2024, 1, 1), tz).to_rfc3339(),
-            "2024-01-01T08:00:00+00:00"
-        );
+        assert_eq!(start_of_local_day(d(2024, 1, 1), tz).to_rfc3339(), "2024-01-01T08:00:00+00:00");
         assert_eq!(year_bounds(2024, true), Some((d(2024, 1, 1), d(2024, 12, 29))));
         assert_eq!(year_bounds(0, false), None);
         assert_eq!(year_bounds(10000, false), None);

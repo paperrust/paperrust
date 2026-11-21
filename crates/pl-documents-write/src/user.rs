@@ -2,8 +2,8 @@
 //
 //! The user comes from `pl-authz` (authentication + model permissions).
 
-use sea_query::{Alias, Expr, PostgresQueryBuilder, Query};
 use pl_core::sqlbind::SqlxBinder;
+use sea_query::{Alias, Expr, PostgresQueryBuilder, Query};
 use sqlx::PgConnection;
 
 use crate::error::ApiError;

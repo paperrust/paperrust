@@ -29,12 +29,7 @@ pub fn py_strip(s: &str) -> &str {
 /// llama_index `split_text_keep_separator(text, sep)` (separator at the **start** of the following chunks).
 pub fn split_keep_sep(text: &str, sep: &str) -> Vec<String> {
     let parts: Vec<&str> = text.split(sep).collect();
-    parts
-        .iter()
-        .enumerate()
-        .map(|(i, p)| if i > 0 { format!("{sep}{p}") } else { (*p).to_string() })
-        .filter(|s| !s.is_empty())
-        .collect()
+    parts.iter().enumerate().map(|(i, p)| if i > 0 { format!("{sep}{p}") } else { (*p).to_string() }).filter(|s| !s.is_empty()).collect()
 }
 
 /// `list(text)`.
@@ -281,13 +276,7 @@ impl SentenceSplitter {
             )));
         }
         let chunk_re = regex::Regex::new(CHUNKING_REGEX).map_err(|e| SplitError(e.to_string()))?;
-        Ok(Self {
-            chunk_size,
-            chunk_overlap,
-            separator: " ".into(),
-            paragraph_separator: DEFAULT_PARAGRAPH_SEP.into(),
-            chunk_re,
-        })
+        Ok(Self { chunk_size, chunk_overlap, separator: " ".into(), paragraph_separator: DEFAULT_PARAGRAPH_SEP.into(), chunk_re })
     }
 
     /// upstream `build_document_node`: `SimpleNodeParser(chunk_size, chunk_overlap=min(200, chunk_size-1))`.

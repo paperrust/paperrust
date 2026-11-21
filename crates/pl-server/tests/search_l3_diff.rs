@@ -123,11 +123,15 @@ async fn search(
                 return Outcome::Invalid;
             };
             let stop = (start + size).min(count);
-            let page = p.slice(start, stop).iter().map(|h| {
-                let mut v = h.to_json();
-                v["id"] = Value::from(h.id);
-                v
-            }).collect();
+            let page = p
+                .slice(start, stop)
+                .iter()
+                .map(|h| {
+                    let mut v = h.to_json();
+                    v["id"] = Value::from(h.id);
+                    v
+                })
+                .collect();
             let all = need_all.then(|| p.ordered_ids.clone());
             Outcome::Page { count, page, all }
         }
@@ -192,7 +196,8 @@ fn query_cases(terms: &[String], rng: &mut StdRng) -> Vec<Vec<(String, String)>>
             .map(|s| s.to_string()),
     );
     let mut cases = Vec::new();
-    let orderings = ["", "-score", "score", "created", "-created", "-added", "modified", "archive_serial_number", "-page_count", "-num_notes", "title"];
+    let orderings =
+        ["", "-score", "score", "created", "-created", "-added", "modified", "archive_serial_number", "-page_count", "-num_notes", "title"];
     for q in &qs {
         let o = orderings[rng.gen_range(0..orderings.len())];
         let mut c = vec![("query".to_string(), q.clone())];
@@ -346,7 +351,12 @@ async fn dirty_tracking_and_drain() {
     let tz: chrono_tz::Tz = std::env::var("PL_L3_TZ").ok().and_then(|s| s.parse().ok()).unwrap_or(chrono_tz::UTC);
     let db = sqlx::postgres::PgPoolOptions::new().max_connections(6).connect(&url).await.unwrap();
     let lang = index_language(&index_dir);
-    let backend = Arc::new(SearchBackend::new(SearchSettings { index_dir: index_dir.clone(), language: lang.clone(), fuzzy_threshold: None, time_zone: tz }));
+    let backend = Arc::new(SearchBackend::new(SearchSettings {
+        index_dir: index_dir.clone(),
+        language: lang.clone(),
+        fuzzy_threshold: None,
+        time_zone: tz,
+    }));
     let ix = pl_indexer::Indexer::new(pl_indexer::IndexerConfig { index_dir: index_dir.clone(), language: lang });
     let users = users(&db).await;
     let mut rng = StdRng::seed_from_u64(11);

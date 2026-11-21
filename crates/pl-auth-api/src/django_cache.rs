@@ -113,10 +113,7 @@ mod tests {
     #[test]
     fn pickle_matches_cpython() {
         assert_eq!(pickle_float_list(&[]), b"\x80\x05]\x94.");
-        assert_eq!(
-            pickle_float_list(&[1736150400.5]),
-            b"\x80\x05\x95\r\x00\x00\x00\x00\x00\x00\x00]\x94GA\xd9\xde\xe3` \x00\x00a."
-        );
+        assert_eq!(pickle_float_list(&[1736150400.5]), b"\x80\x05\x95\r\x00\x00\x00\x00\x00\x00\x00]\x94GA\xd9\xde\xe3` \x00\x00a.");
         let two = b"\x80\x05\x95\x17\x00\x00\x00\x00\x00\x00\x00]\x94(GA\xd9\xde\xe3` \x00\x00GA\xd9\xde\xe3_\xd0\x00\x00e.";
         assert_eq!(pickle_float_list(&[1736150400.5, 1736150399.25]), two);
         assert_eq!(unpickle_float_list(two).unwrap(), vec![1736150400.5, 1736150399.25]);

@@ -30,16 +30,7 @@ use pl_domain::filter::{CfColumn, CfCond, CfTest, CfValue, CmpOp, DatePart, NumC
 pub const CUSTOM_FIELD_QUERY_MAX_DEPTH: usize = 10;
 pub const CUSTOM_FIELD_QUERY_MAX_ATOMS: usize = 20;
 
-const DATE_COMPONENTS: &[&str] = &[
-    "year",
-    "iso_year",
-    "month",
-    "day",
-    "week",
-    "week_day",
-    "iso_week_day",
-    "quarter",
-];
+const DATE_COMPONENTS: &[&str] = &["year", "iso_year", "month", "day", "week", "week_day", "iso_week_day", "quarter"];
 
 const INT_MIN: i64 = -2_147_483_648;
 const INT_MAX: i64 = 2_147_483_647;
@@ -181,10 +172,7 @@ pub(crate) fn json_to_py(v: &Json) -> PyJson {
             if let Some(i) = n.as_i64() {
                 PyJson::int(i)
             } else if let Some(u) = n.as_u64() {
-                PyJson::Int {
-                    negative: false,
-                    digits: u.to_string(),
-                }
+                PyJson::Int { negative: false, digits: u.to_string() }
             } else {
                 PyJson::Float(n.as_f64().unwrap_or(f64::NAN))
             }
@@ -230,10 +218,8 @@ fn validate(spec: &FieldSpec, data: &PyJson, rel: &dyn Fn(&str) -> Option<NaiveD
                 PyJson::Bool(b) => Some(*b),
                 // DRF 3.18.3 `BooleanField._lower_if_str`: lowercased before the set lookup
                 PyJson::Str(s) => match s.to_lowercase().as_str() {
-                    "t" | "T" | "y" | "Y" | "yes" | "Yes" | "YES" | "true" | "True" | "TRUE"
-                    | "on" | "On" | "ON" | "1" => Some(true),
-                    "f" | "F" | "n" | "N" | "no" | "No" | "NO" | "false" | "False" | "FALSE"
-                    | "off" | "Off" | "OFF" | "0" => Some(false),
+                    "t" | "T" | "y" | "Y" | "yes" | "Yes" | "YES" | "true" | "True" | "TRUE" | "on" | "On" | "ON" | "1" => Some(true),
+                    "f" | "F" | "n" | "N" | "no" | "No" | "NO" | "false" | "False" | "FALSE" | "off" | "Off" | "OFF" | "0" => Some(false),
                     _ => None,
                 },
                 PyJson::Int { .. } | PyJson::Float(_) => data.as_f64().and_then(|f| {
@@ -247,8 +233,7 @@ fn validate(spec: &FieldSpec, data: &PyJson, rel: &dyn Fn(&str) -> Option<NaiveD
                 }),
                 _ => None,
             };
-            r.map(Validated::Bool)
-                .ok_or_else(|| fail("Must be a valid boolean."))
+            r.map(Validated::Bool).ok_or_else(|| fail("Must be a valid boolean."))
         }
         FieldSpec::Int { min, max } => {
             let s = data.py_str();
@@ -264,15 +249,15 @@ fn validate(spec: &FieldSpec, data: &PyJson, rel: &dyn Fn(&str) -> Option<NaiveD
                 return Err(fail("A valid integer is required."));
             };
             if let Some(mx) = max
-                && matches!(v.range_check(i64::MIN, *mx), RangeCheck::Overflow) {
-                    return Err(fail(format!("Ensure this value is less than or equal to {mx}.")));
-                }
+                && matches!(v.range_check(i64::MIN, *mx), RangeCheck::Overflow)
+            {
+                return Err(fail(format!("Ensure this value is less than or equal to {mx}.")));
+            }
             if let Some(mn) = min
-                && matches!(v.range_check(*mn, i64::MAX), RangeCheck::Underflow) {
-                    return Err(fail(format!(
-                        "Ensure this value is greater than or equal to {mn}."
-                    )));
-                }
+                && matches!(v.range_check(*mn, i64::MAX), RangeCheck::Underflow)
+            {
+                return Err(fail(format!("Ensure this value is greater than or equal to {mn}.")));
+            }
             Ok(Validated::Int(v))
         }
         FieldSpec::Float => match data {
@@ -280,9 +265,7 @@ fn validate(spec: &FieldSpec, data: &PyJson, rel: &dyn Fn(&str) -> Option<NaiveD
                 if s.chars().count() > 1000 {
                     return Err(fail("String value too large."));
                 }
-                py_float(s)
-                    .map(Validated::Float)
-                    .ok_or_else(|| fail("A valid number is required."))
+                py_float(s).map(Validated::Float).ok_or_else(|| fail("A valid number is required."))
             }
             PyJson::Float(f) => Ok(Validated::Float(*f)),
             PyJson::Bool(b) => Ok(Validated::Float(*b as i64 as f64)),
@@ -325,9 +308,9 @@ fn validate(spec: &FieldSpec, data: &PyJson, rel: &dyn Fn(&str) -> Option<NaiveD
                     return Ok(Validated::Date(d));
                 }
                 // DateQueryField: fallback to relative expressions (dateparser)
-                return rel(s).map(Validated::Date).ok_or_else(|| {
-                    fail("Expected a date or a relative date such as \"today\" or \"in 30 days\".")
-                });
+                return rel(s)
+                    .map(Validated::Date)
+                    .ok_or_else(|| fail("Expected a date or a relative date such as \"today\" or \"in 30 days\"."));
             }
             Err(fail("Date has wrong format. Use one of these formats instead: YYYY-MM-DD."))
         }
@@ -339,29 +322,21 @@ fn validate(spec: &FieldSpec, data: &PyJson, rel: &dyn Fn(&str) -> Option<NaiveD
             };
             let mut value: &str = py_strip(&s);
             if let Some(first) = value.chars().next()
-                && !first.is_ascii_digit() && first != '-' {
-                    value = match value.char_indices().nth(3) {
-                        Some((i, _)) => &value[i..],
-                        None => "",
-                    };
-                }
-            PyDecimal::parse(value)
-                .map(Validated::Decimal)
-                .ok_or_else(|| fail("A valid number is required."))
+                && !first.is_ascii_digit()
+                && first != '-'
+            {
+                value = match value.char_indices().nth(3) {
+                    Some((i, _)) => &value[i..],
+                    None => "",
+                };
+            }
+            PyDecimal::parse(value).map(Validated::Decimal).ok_or_else(|| fail("A valid number is required."))
         }
-        FieldSpec::List {
-            child,
-            allow_empty,
-            min_length,
-            max_length,
-        } => {
+        FieldSpec::List { child, allow_empty, min_length, max_length } => {
             let items = match data {
                 PyJson::List(items) => items,
                 other => {
-                    return Err(fail(format!(
-                        "Expected a list of items but got type \"{}\".",
-                        other.type_name()
-                    )));
+                    return Err(fail(format!("Expected a list of items but got type \"{}\".", other.type_name())));
                 }
             };
             if !allow_empty && items.is_empty() {
@@ -382,15 +357,15 @@ fn validate(spec: &FieldSpec, data: &PyJson, rel: &dyn Fn(&str) -> Option<NaiveD
                 return Err(Ok(Json::Object(errors)));
             }
             if let Some(mx) = max_length
-                && out.len() > *mx {
-                    return Err(fail(format!(
-                        "Ensure this field has no more than {mx} elements."
-                    )));
-                }
+                && out.len() > *mx
+            {
+                return Err(fail(format!("Ensure this field has no more than {mx} elements.")));
+            }
             if let Some(mn) = min_length
-                && out.len() < *mn {
-                    return Err(fail(format!("Ensure this field has at least {mn} elements.")));
-                }
+                && out.len() < *mn
+            {
+                return Err(fail(format!("Ensure this field has at least {mn} elements.")));
+            }
             Ok(Validated::List(out))
         }
     }
@@ -405,9 +380,10 @@ fn validate_char(data: &PyJson, max_length: Option<usize>) -> VResult {
     let value = py_strip(&s).to_string();
     let mut errs = Vec::new();
     if let Some(mx) = max_length
-        && value.chars().count() > mx {
-            errs.push(format!("Ensure this field has no more than {mx} characters."));
-        }
+        && value.chars().count() > mx
+    {
+        errs.push(format!("Ensure this field has no more than {mx} characters."));
+    }
     if value.contains('\0') {
         errs.push("Null characters are not allowed.".to_string());
     }
@@ -430,7 +406,10 @@ enum Node {
     Or(Vec<Node>),
     Not(Box<Node>),
     /// Document link `contains` with a non-empty ID list (needs DB back references)
-    DocLinkContains { field_id: i64, ids: Vec<PyInt> },
+    DocLinkContains {
+        field_id: i64,
+        ids: Vec<PyInt>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -518,32 +497,24 @@ impl Parser<'_> {
         // Cache hit like Python's dict (1 == 1.0 == True)
         let probe: Option<CacheKey> = match key {
             PyJson::Bool(_) | PyJson::Int { .. } => key.as_pyint().map(CacheKey::Int),
-            PyJson::Float(f) if f.fract() == 0.0 && f.abs() < 1e18 => {
-                Some(CacheKey::Int(PyInt::Small(*f as i128)))
-            }
+            PyJson::Float(f) if f.fract() == 0.0 && f.abs() < 1e18 => Some(CacheKey::Int(PyInt::Small(*f as i128))),
             PyJson::Str(s) => Some(CacheKey::Str(s.clone())),
             _ => None,
         };
         if let Some(p) = &probe
-            && let Some((_, f)) = self.cache.iter().find(|(k, _)| k == p) {
-                return Ok(f.clone());
-            }
+            && let Some((_, f)) = self.cache.iter().find(|(k, _)| k == p)
+        {
+            return Ok(f.clone());
+        }
         let found = match key {
-            PyJson::Bool(_) | PyJson::Int { .. } => key
-                .as_pyint()
-                .and_then(|i| i.as_i64())
-                .and_then(|i| self.by_id.get(&i).cloned()),
+            PyJson::Bool(_) | PyJson::Int { .. } => key.as_pyint().and_then(|i| i.as_i64()).and_then(|i| self.by_id.get(&i).cloned()),
             PyJson::Null => None,
             other => self.by_name.get(&other.py_str()).cloned(),
         };
         let Some(field) = found else {
-            return Err(validation_list(format!(
-                "{} is not a valid custom field.",
-                key.py_repr()
-            )));
+            return Err(validation_list(format!("{} is not a valid custom field.", key.py_repr())));
         };
-        self.cache
-            .push((CacheKey::Int(PyInt::Small(field.id as i128)), field.clone()));
+        self.cache.push((CacheKey::Int(PyInt::Small(field.id as i128)), field.clone()));
         self.cache.push((CacheKey::Str(field.name.clone()), field.clone()));
         Ok(field)
     }
@@ -552,22 +523,16 @@ impl Parser<'_> {
         let full = raw_op.py_str();
         let (prefix, op) = split_op(&full);
         let Some(cats) = supported_categories(&field.data_type) else {
-            return Err(FilterError::internal(format!(
-                "KeyError: unsupported data type {}",
-                field.data_type
-            )));
+            return Err(FilterError::internal(format!("KeyError: unsupported data type {}", field.data_type)));
         };
         let mut supported = cats.iter().any(|c| category_ops(c).contains(&op));
         if let Some(p) = prefix
-            && !(DATE_COMPONENTS.contains(&p) && field.data_type == "date") {
-                supported = false;
-            }
+            && !(DATE_COMPONENTS.contains(&p) && field.data_type == "date")
+        {
+            supported = false;
+        }
         if !supported {
-            return Err(validation_list(format!(
-                "{} does not support query expr {}.",
-                field.data_type,
-                raw_op.py_repr()
-            )));
+            return Err(validation_list(format!("{} does not support query expr {}.", field.data_type, raw_op.py_repr())));
         }
         Ok(full)
     }
@@ -598,26 +563,14 @@ impl Parser<'_> {
                 _ => return Err(FilterError::internal("TypeError: extra_data is not subscriptable")),
             }
         } else if dt == "url" {
-            FieldSpec::Char {
-                max_length: None,
-                allow_blank: false,
-            }
+            FieldSpec::Char { max_length: None, allow_blank: false }
         } else if dt == "monetary" && (ARITHMETIC.contains(&op) || op == "exact" || op == "in") {
             FieldSpec::Monetary
         } else {
             match dt {
-                "string" | "monetary" => FieldSpec::Char {
-                    max_length: Some(128),
-                    allow_blank: true,
-                },
-                "longtext" => FieldSpec::Char {
-                    max_length: None,
-                    allow_blank: true,
-                },
-                "integer" => FieldSpec::Int {
-                    min: Some(INT_MIN),
-                    max: Some(INT_MAX),
-                },
+                "string" | "monetary" => FieldSpec::Char { max_length: Some(128), allow_blank: true },
+                "longtext" => FieldSpec::Char { max_length: None, allow_blank: true },
+                "integer" => FieldSpec::Int { min: Some(INT_MIN), max: Some(INT_MAX) },
                 "float" => FieldSpec::Float,
                 "boolean" => FieldSpec::Bool,
                 other => {
@@ -626,18 +579,8 @@ impl Parser<'_> {
             }
         };
         Ok(match op {
-            "in" => FieldSpec::List {
-                child: Box::new(base),
-                allow_empty: false,
-                min_length: None,
-                max_length: None,
-            },
-            "range" => FieldSpec::List {
-                child: Box::new(base),
-                allow_empty: true,
-                min_length: Some(2),
-                max_length: Some(2),
-            },
+            "in" => FieldSpec::List { child: Box::new(base), allow_empty: false, min_length: None, max_length: None },
+            "range" => FieldSpec::List { child: Box::new(base), allow_empty: true, min_length: Some(2), max_length: Some(2) },
             _ => base,
         })
     }
@@ -661,9 +604,7 @@ impl Parser<'_> {
         }
         let field = self.get_custom_field(key).map_err(|e| e.prefixed("0"))?;
         let op = self.validate_atom_op(&field, op).map_err(|e| e.prefixed("1"))?;
-        let value = self
-            .validate_atom_value(&field, &op, value)
-            .map_err(|e| e.prefixed("2"))?;
+        let value = self.validate_atom_value(&field, &op, value).map_err(|e| e.prefixed("2"))?;
         if self.ast {
             return build_atom_pred(&field, &op, value);
         }
@@ -773,9 +714,7 @@ fn value_lookup(column: SimpleExpr, full_op: &str, value: &Validated) -> Result<
         if op == "exists" {
             return Err(FilterError::internal("FieldError: Unsupported lookup 'exists'"));
         }
-        if (component == "year" || component == "iso_year")
-            && matches!(op, "exact" | "gt" | "gte" | "lt" | "lte")
-        {
+        if (component == "year" || component == "iso_year") && matches!(op, "exact" | "gt" | "gte" | "lt" | "lte") {
             let Validated::Int(y) = value else { return Err(FilterError::internal("year value")) };
             let Some(year) = y.as_i64() else {
                 return Err(year_out_of_range());
@@ -802,11 +741,7 @@ fn value_lookup(column: SimpleExpr, full_op: &str, value: &Validated) -> Result<
                         _ => None,
                     })
                     .collect();
-                if vals.is_empty() {
-                    Cond::False
-                } else {
-                    Cond::Expr(e.is_in(vals))
-                }
+                if vals.is_empty() { Cond::False } else { Cond::Expr(e.is_in(vals)) }
             }
             ("range", Validated::List(items)) if items.len() == 2 => {
                 let (Validated::Int(a), Validated::Int(b)) = (&items[0], &items[1]) else {
@@ -852,8 +787,7 @@ fn value_lookup(column: SimpleExpr, full_op: &str, value: &Validated) -> Result<
 ///          AND cq.field_id = <id> [AND cond])`
 fn cfi_exists(field_id: i64, cond: Cond) -> Cond {
     let mut sel = select_one_from(CFI, "cq");
-    sel.and_where(col("cq", "document_id").eq(doc_col("id")))
-        .and_where(col("cq", "field_id").eq(field_id));
+    sel.and_where(col("cq", "document_id").eq(doc_col("id"))).and_where(col("cq", "field_id").eq(field_id));
     match cond {
         Cond::False => return Cond::False,
         Cond::True => {}
@@ -870,10 +804,7 @@ fn build_atom(field: &CustomFieldDef, op: &str, value: Validated) -> Result<Node
             return Err(FilterError::internal("contains value"));
         };
         if items.is_empty() {
-            return Ok(Node::Leaf(cfi_exists(
-                field.id,
-                Cond::Expr(col("cq", "value_document_ids").is_not_null()),
-            )));
+            return Ok(Node::Leaf(cfi_exists(field.id, Cond::Expr(col("cq", "value_document_ids").is_not_null()))));
         }
         let ids = items
             .into_iter()
@@ -882,17 +813,11 @@ fn build_atom(field: &CustomFieldDef, op: &str, value: Validated) -> Result<Node
                 _ => Err(FilterError::internal("contains item")),
             })
             .collect::<Result<Vec<_>, _>>()?;
-        return Ok(Node::DocLinkContains {
-            field_id: field.id,
-            ids,
-        });
+        return Ok(Node::DocLinkContains { field_id: field.id, ids });
     }
-    let mut value_field = value_field_name(&field.data_type)
-        .ok_or_else(|| FilterError::internal("NotImplementedError: data type"))?;
+    let mut value_field = value_field_name(&field.data_type).ok_or_else(|| FilterError::internal("NotImplementedError: data type"))?;
     let (_, base_op) = split_op(op);
-    if field.data_type == "monetary"
-        && (ARITHMETIC.contains(&op) || op == "exact" || op == "in")
-    {
+    if field.data_type == "monetary" && (ARITHMETIC.contains(&op) || op == "exact" || op == "in") {
         value_field = "value_monetary_amount";
     }
     if op == "exists" {
@@ -1021,9 +946,10 @@ async fn resolve<D: FilterDb>(node: Node, db: &D) -> Result<Cond, FilterError> {
                                 let mut s = Vec::new();
                                 for v in a {
                                     if let Some(id) = link_id(v)?
-                                        && !s.contains(&id) {
-                                            s.push(id);
-                                        }
+                                        && !s.contains(&id)
+                                    {
+                                        s.push(id);
+                                    }
                                 }
                                 s
                             }
@@ -1175,9 +1101,7 @@ fn value_lookup_ast(full_op: &str, value: &Validated) -> Result<Lookup, FilterEr
         if op == "exists" {
             return Err(FilterError::internal("FieldError: Unsupported lookup 'exists'"));
         }
-        if (component == "year" || component == "iso_year")
-            && matches!(op, "exact" | "gt" | "gte" | "lt" | "lte")
-        {
+        if (component == "year" || component == "iso_year") && matches!(op, "exact" | "gt" | "gte" | "lt" | "lte") {
             let Validated::Int(y) = value else { return Err(FilterError::internal("year value")) };
             let Some(year) = y.as_i64() else {
                 return Err(year_out_of_range());
@@ -1188,18 +1112,14 @@ fn value_lookup_ast(full_op: &str, value: &Validated) -> Result<Lookup, FilterEr
             return Ok(Lookup::Test(CfTest::YearBounds(cmp_op(op), start, end)));
         }
         return Ok(match (op, value) {
-            ("exact" | "gt" | "gte" | "lt" | "lte", Validated::Int(v)) => {
-                match (op, v.range_check(INT_MIN, INT_MAX)) {
-                    (_, RangeCheck::InRange(x)) => {
-                        Lookup::Test(CfTest::Part(part, PartTest::Cmp(cmp_op(op), x)))
-                    }
-                    ("exact", _) => Lookup::Const(false),
-                    ("gt" | "gte", RangeCheck::Underflow) => Lookup::Const(true),
-                    ("gt" | "gte", _) => Lookup::Const(false),
-                    ("lt" | "lte", RangeCheck::Overflow) => Lookup::Const(true),
-                    _ => Lookup::Const(false),
-                }
-            }
+            ("exact" | "gt" | "gte" | "lt" | "lte", Validated::Int(v)) => match (op, v.range_check(INT_MIN, INT_MAX)) {
+                (_, RangeCheck::InRange(x)) => Lookup::Test(CfTest::Part(part, PartTest::Cmp(cmp_op(op), x))),
+                ("exact", _) => Lookup::Const(false),
+                ("gt" | "gte", RangeCheck::Underflow) => Lookup::Const(true),
+                ("gt" | "gte", _) => Lookup::Const(false),
+                ("lt" | "lte", RangeCheck::Overflow) => Lookup::Const(true),
+                _ => Lookup::Const(false),
+            },
             ("in", Validated::List(items)) => {
                 let vals: Vec<i64> = items
                     .iter()
@@ -1208,11 +1128,7 @@ fn value_lookup_ast(full_op: &str, value: &Validated) -> Result<Lookup, FilterEr
                         _ => None,
                     })
                     .collect();
-                if vals.is_empty() {
-                    Lookup::Const(false)
-                } else {
-                    Lookup::Test(CfTest::Part(part, PartTest::In(vals)))
-                }
+                if vals.is_empty() { Lookup::Const(false) } else { Lookup::Test(CfTest::Part(part, PartTest::In(vals))) }
             }
             ("range", Validated::List(items)) if items.len() == 2 => {
                 let (Validated::Int(a), Validated::Int(b)) = (&items[0], &items[1]) else {
@@ -1269,8 +1185,7 @@ fn build_atom_pred(field: &CustomFieldDef, op: &str, value: Validated) -> Result
             .collect::<Result<Vec<_>, _>>()?;
         return Ok(Node::DocLinkContains { field_id: field.id, ids });
     }
-    let mut value_field = value_field_name(&field.data_type)
-        .ok_or_else(|| FilterError::internal("NotImplementedError: data type"))?;
+    let mut value_field = value_field_name(&field.data_type).ok_or_else(|| FilterError::internal("NotImplementedError: data type"))?;
     if field.data_type == "monetary" && (ARITHMETIC.contains(&op) || op == "exact" || op == "in") {
         value_field = "value_monetary_amount";
     }

@@ -30,8 +30,8 @@ use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{FromRequestParts, Request};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
-use pl_queue::{EventBus, WsPayload};
 use futures::SinkExt;
+use pl_queue::{EventBus, WsPayload};
 use tokio::sync::broadcast::error::RecvError;
 
 /// Path of the status socket (`BASE_URL` = `/`).

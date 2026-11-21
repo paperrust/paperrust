@@ -102,9 +102,7 @@ async fn aborted_and_completed_requests_are_logged() {
 
     // 2. Client aborts while the handler is still working → line with 499 / client closed
     let mut s = TcpStream::connect(app).await.unwrap();
-    s.write_all(b"POST /slow/ HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{}")
-        .await
-        .unwrap();
+    s.write_all(b"POST /slow/ HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{}").await.unwrap();
     tokio::time::sleep(Duration::from_millis(400)).await;
     drop(s);
     let line = wait_line(&log, "path=/slow/").await;

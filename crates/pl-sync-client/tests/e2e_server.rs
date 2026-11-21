@@ -125,7 +125,8 @@ async fn e2e_1_online() {
 
     // --- Selection with files: tag "Invoices" (seed documents with real files) preferred
     let tags = c.replica().pool();
-    let invoices: String = sqlx::query_scalar("SELECT key FROM object WHERE kind = 'tag' AND name = 'Invoices'").fetch_one(tags).await.unwrap();
+    let invoices: String =
+        sqlx::query_scalar("SELECT key FROM object WHERE kind = 'tag' AND name = 'Invoices'").fetch_one(tags).await.unwrap();
     let mut sel2 = sel.clone();
     sel2.push(SelectionItem { kind: "tag".into(), key: invoices.clone(), files: "preferred".into() });
     c.apply_selection(&sel2).await.unwrap();
@@ -145,14 +146,20 @@ async fn e2e_1_online() {
     .fetch_one(&pg)
     .await
     .unwrap();
-    sqlx::query("UPDATE documents_document SET title = 'P5 E2E geändert', modified = now() WHERE id = $1").bind(doc_a).execute(&pg).await.unwrap();
+    sqlx::query("UPDATE documents_document SET title = 'P5 E2E geändert', modified = now() WHERE id = $1")
+        .bind(doc_a)
+        .execute(&pg)
+        .await
+        .unwrap();
     sqlx::query("UPDATE documents_document SET deleted_at = now() WHERE id = $1").bind(doc_b).execute(&pg).await.unwrap();
     let r = c.replica().clone();
     sync_until(&c, || {
         let r = r.clone();
         async move {
-            let t: Option<String> = sqlx::query_scalar("SELECT title FROM document WHERE legacy_id = ?").bind(doc_a).fetch_optional(r.pool()).await.unwrap();
-            let gone: i64 = sqlx::query_scalar("SELECT count(*) FROM document WHERE legacy_id = ?").bind(doc_b).fetch_one(r.pool()).await.unwrap();
+            let t: Option<String> =
+                sqlx::query_scalar("SELECT title FROM document WHERE legacy_id = ?").bind(doc_a).fetch_optional(r.pool()).await.unwrap();
+            let gone: i64 =
+                sqlx::query_scalar("SELECT count(*) FROM document WHERE legacy_id = ?").bind(doc_b).fetch_one(r.pool()).await.unwrap();
             t.as_deref() == Some("P5 E2E geändert") && gone == 0
         }
     })
@@ -190,7 +197,8 @@ async fn e2e_1_online() {
     .await
     .unwrap();
     let cand = cand.expect("seed has documents shared with alice by user permission");
-    let before: i64 = sqlx::query_scalar("SELECT count(*) FROM document WHERE legacy_id = ?").bind(cand).fetch_one(ca.replica().pool()).await.unwrap();
+    let before: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM document WHERE legacy_id = ?").bind(cand).fetch_one(ca.replica().pool()).await.unwrap();
     assert_eq!(before, 1);
     let removed: Vec<(i64, i32, i32, i32)> = sqlx::query_as(
         "DELETE FROM guardian_userobjectpermission WHERE object_pk = $1 AND user_id = 3 RETURNING id::int8, content_type_id, permission_id, user_id",
@@ -202,19 +210,24 @@ async fn e2e_1_online() {
     let ra = ca.replica().clone();
     sync_until(&ca, || {
         let r = ra.clone();
-        async move { sqlx::query_scalar::<_, i64>("SELECT count(*) FROM document WHERE legacy_id = ?").bind(cand).fetch_one(r.pool()).await.unwrap() == 0 }
+        async move {
+            sqlx::query_scalar::<_, i64>("SELECT count(*) FROM document WHERE legacy_id = ?").bind(cand).fetch_one(r.pool()).await.unwrap()
+                == 0
+        }
     })
     .await;
     // Recht wiederherstellen
     for (_, ct, perm, user) in &removed {
-        sqlx::query("INSERT INTO guardian_userobjectpermission (object_pk, content_type_id, permission_id, user_id) VALUES ($1, $2, $3, $4)")
-            .bind(cand.to_string())
-            .bind(ct)
-            .bind(perm)
-            .bind(user)
-            .execute(&pg)
-            .await
-            .unwrap();
+        sqlx::query(
+            "INSERT INTO guardian_userobjectpermission (object_pk, content_type_id, permission_id, user_id) VALUES ($1, $2, $3, $4)",
+        )
+        .bind(cand.to_string())
+        .bind(ct)
+        .bind(perm)
+        .bind(user)
+        .execute(&pg)
+        .await
+        .unwrap();
     }
     report(&e, "changes", json!({"title_changed": doc_a, "trashed": doc_b, "revoked_for_alice": cand}));
 }
@@ -237,7 +250,8 @@ async fn e2e_2_offline() {
     assert!(list["next_cursor"].is_string());
     // Suche
     let t = Instant::now();
-    let r = gw.handle(post("/rs/api/v2/documents/query", json!({"filter": {"text": {"query": "invoice"}}, "count": true, "limit": 10}))).await;
+    let r =
+        gw.handle(post("/rs/api/v2/documents/query", json!({"filter": {"text": {"query": "invoice"}}, "count": true, "limit": 10}))).await;
     let search_ms = t.elapsed().as_millis();
     let hits = body(&r)["count"].as_i64().unwrap();
     assert!(hits > 0);
@@ -255,8 +269,12 @@ async fn e2e_2_offline() {
     let mut req = post(&format!("/rs/api/v2/documents/{doc}"), json!({"title": "x"}));
     req.method = "PATCH".into();
     assert_eq!(gw.handle(req).await.status, 503);
-    report(&e, "offline", json!({"list_count": list["count"], "search_hits": hits, "search_ms": search_ms, "pdf_bytes": r.body.len(),
-                                 "pdf_doc": doc, "status": c.status()}));
+    report(
+        &e,
+        "offline",
+        json!({"list_count": list["count"], "search_hits": hits, "search_ms": search_ms, "pdf_bytes": r.body.len(),
+                                 "pdf_doc": doc, "status": c.status()}),
+    );
 }
 
 #[tokio::test]

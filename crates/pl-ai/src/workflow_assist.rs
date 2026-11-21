@@ -10,7 +10,7 @@
 //!    calls the model.
 
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 
 use crate::auto::{Field, Plan};
 
@@ -46,7 +46,12 @@ impl AiVerdict {
     pub fn from_plan(document: i64, plan: &Plan) -> Self {
         let mut v = AiVerdict { document, ..Default::default() };
         for c in &plan.changes {
-            let o = Opinion { id: c.existing_id, value: c.value.clone().or_else(|| c.new_name.clone()), confidence: c.confidence, sure: c.confidence >= SURE };
+            let o = Opinion {
+                id: c.existing_id,
+                value: c.value.clone().or_else(|| c.new_name.clone()),
+                confidence: c.confidence,
+                sure: c.confidence >= SURE,
+            };
             match c.field {
                 Field::Title => v.title = v.title.take().or(Some(o)),
                 Field::Created => v.created = v.created.take().or(Some(o)),
@@ -196,7 +201,11 @@ pub fn sanitize_draft(raw: &Value, t: &DraftTaxonomy) -> WorkflowDraft {
         }
         let mut m = Map::new();
         m.insert("type".into(), json!(ty));
-        let sources: Vec<i64> = tr.get("sources").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_i64).filter(|s| (1..=4).contains(s)).collect()).unwrap_or_default();
+        let sources: Vec<i64> = tr
+            .get("sources")
+            .and_then(Value::as_array)
+            .map(|a| a.iter().filter_map(Value::as_i64).filter(|s| (1..=4).contains(s)).collect())
+            .unwrap_or_default();
         m.insert("sources".into(), json!(if sources.is_empty() { vec![1, 2, 3, 4] } else { sources }));
         let ff = text(tr.get("filter_filename"), 256);
         m.insert("filter_filename".into(), if ff.is_empty() { Value::Null } else { json!(ff) });
@@ -230,7 +239,10 @@ pub fn sanitize_draft(raw: &Value, t: &DraftTaxonomy) -> WorkflowDraft {
                 m.insert("remove_tags".into(), json!(known_list(&t.tags, a.get("remove_tags"), &mut dropped, "tag")));
             }
             8 => {
-                m.insert("ai_suggestion_fields".into(), json!(["title", "tags", "correspondent", "document_type", "storage_path", "created"]));
+                m.insert(
+                    "ai_suggestion_fields".into(),
+                    json!(["title", "tags", "correspondent", "document_type", "storage_path", "created"]),
+                );
                 m.insert("ai_create_missing".into(), json!(false));
                 m.insert("ai_overwrite_existing".into(), json!(false));
             }
@@ -245,7 +257,18 @@ pub fn sanitize_draft(raw: &Value, t: &DraftTaxonomy) -> WorkflowDraft {
     if name.is_empty() {
         name = "AI draft".into();
     }
-    let missing: Vec<String> = raw.get("missing").and_then(Value::as_array).map(|a| a.iter().filter_map(|x| x.as_str()).map(|s| s.chars().take(128).collect::<String>()).filter(|s| !s.trim().is_empty()).take(20).collect()).unwrap_or_default();
+    let missing: Vec<String> = raw
+        .get("missing")
+        .and_then(Value::as_array)
+        .map(|a| {
+            a.iter()
+                .filter_map(|x| x.as_str())
+                .map(|s| s.chars().take(128).collect::<String>())
+                .filter(|s| !s.trim().is_empty())
+                .take(20)
+                .collect()
+        })
+        .unwrap_or_default();
     dropped.sort();
     dropped.dedup();
     WorkflowDraft {
@@ -267,7 +290,10 @@ mod tests {
 
     #[test]
     fn condition() {
-        let plan = Plan { changes: vec![ch(Field::DocumentType, Some(4), 0.95), ch(Field::Tags, Some(7), 0.82), ch(Field::Tags, Some(8), 0.95)], new_objects: 0 };
+        let plan = Plan {
+            changes: vec![ch(Field::DocumentType, Some(4), 0.95), ch(Field::Tags, Some(7), 0.82), ch(Field::Tags, Some(8), 0.95)],
+            new_objects: 0,
+        };
         let v = AiVerdict::from_plan(1, &plan);
         assert!(v.document_type.as_ref().unwrap().sure);
         assert!(AiCondition { field: Field::DocumentType, object_id: 4, min_confidence: SURE }.matches(&v));
@@ -281,7 +307,12 @@ mod tests {
 
     #[test]
     fn draft_is_sanitized() {
-        let t = DraftTaxonomy { tags: vec![(1, "Rechnung".into()), (2, "Inbox".into())], correspondents: vec![(3, "Swisscom".into())], document_types: vec![(4, "Invoice".into())], storage_paths: vec![] };
+        let t = DraftTaxonomy {
+            tags: vec![(1, "Rechnung".into()), (2, "Inbox".into())],
+            correspondents: vec![(3, "Swisscom".into())],
+            document_types: vec![(4, "Invoice".into())],
+            storage_paths: vec![],
+        };
         let raw = json!({
             "name": "Swisscom-Rechnungen",
             "triggers": [{"type": 2, "match": "Swisscom", "matching_algorithm": 1, "filter_has_tags": [2, 99]}, {"type": 4}],
@@ -307,7 +338,11 @@ mod tests {
         assert_eq!(w["actions"][0]["assign_storage_path"], Value::Null);
         assert_eq!(w["actions"][2]["type"], 8);
         assert_eq!(d.missing, vec!["Telefon".to_string()]);
-        assert!(d.dropped.contains(&"action_type".to_string()) && d.dropped.contains(&"trigger_type".to_string()) && d.dropped.contains(&"unknown_tag".to_string()));
+        assert!(
+            d.dropped.contains(&"action_type".to_string())
+                && d.dropped.contains(&"trigger_type".to_string())
+                && d.dropped.contains(&"unknown_tag".to_string())
+        );
         let p = workflow_prompt("Rechnungen von Swisscom taggen", &t);
         assert!(p.contains("\"Swisscom\"") && p.ends_with("Rechnungen von Swisscom taggen"));
         assert_eq!(sanitize_draft(&json!({}), &t).workflow["name"], "AI draft");

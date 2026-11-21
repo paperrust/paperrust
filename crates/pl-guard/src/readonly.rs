@@ -105,12 +105,8 @@ pub async fn middleware(req: Request, next: Next) -> Response {
 }
 
 /// Tasks that may also run in read-only mode (they only read or protect the archive).
-pub const TASKS_ALLOWED: &[&str] = &[
-    "documents.tasks.sanity_check",
-    crate::TASK_BACKUP,
-    "documents.tasks.index_optimize",
-    "documents.tasks.clear_expired_sessions",
-];
+pub const TASKS_ALLOWED: &[&str] =
+    &["documents.tasks.sanity_check", crate::TASK_BACKUP, "documents.tasks.index_optimize", "documents.tasks.clear_expired_sessions"];
 
 /// Returns `true` if a task is rejected in read-only mode.
 pub fn task_blocked(name: &str) -> bool {

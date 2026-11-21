@@ -425,8 +425,10 @@ pub async fn list_objects(
     };
     let mut out = json!({"items": items, "next_cursor": next_cursor});
     if count {
-        let n: i64 =
-            bind_all(sqlx::query(&format!("SELECT count(*) FROM object o WHERE {base_where}")), &base_args).fetch_one(r.pool()).await?.get(0);
+        let n: i64 = bind_all(sqlx::query(&format!("SELECT count(*) FROM object o WHERE {base_where}")), &base_args)
+            .fetch_one(r.pool())
+            .await?
+            .get(0);
         out["count"] = json!(n);
     }
     Ok(out)

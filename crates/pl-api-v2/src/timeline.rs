@@ -29,10 +29,7 @@ pub const STALE_PER_REQUEST: i64 = 200;
 pub fn routes(r: axum::Router<AppState>) -> axum::Router<AppState> {
     r.route("/timeline", get(timeline))
         .route("/timeline/upcoming", get(upcoming))
-        .route(
-            "/timeline/items/{id}/state",
-            put(set_state).delete(clear_state),
-        )
+        .route("/timeline/items/{id}/state", put(set_state).delete(clear_state))
         .route("/timeline/reminders", get(reminders).post(add_reminder))
         .route("/timeline/reminders/{id}", delete(delete_reminder))
         .route("/timeline/config", get(config))
@@ -52,8 +49,7 @@ async fn ctx(state: &AppState, p: &Principal) -> V2Result<Ctx> {
     d2::ensure(state).await?;
     let vis = d2::visibility(p)?;
     let all = store::custom_fields(state.db()).await.map_err(tl)?;
-    let (fields, warnings) =
-        fields::resolve(&all, d2::setting(pl_timeline::SETTING_FIELDS).as_deref());
+    let (fields, warnings) = fields::resolve(&all, d2::setting(pl_timeline::SETTING_FIELDS).as_deref());
     for w in warnings {
         tracing::warn!(target: "paperrust.timeline", "{}: {w}", pl_timeline::SETTING_FIELDS);
     }
@@ -61,30 +57,19 @@ async fn ctx(state: &AppState, p: &Principal) -> V2Result<Ctx> {
     let extract = refresh::enabled(&d2::setting);
     if extract {
         let dp = DateParse::from_lookup(d2::setting);
-        if let Err(e) =
-            refresh::refresh_stale(state.db(), &dp, Some(&vis.documents), STALE_PER_REQUEST).await
-        {
+        if let Err(e) = refresh::refresh_stale(state.db(), &dp, Some(&vis.documents), STALE_PER_REQUEST).await {
             tracing::warn!(target: "paperrust.timeline", error = %e, "refreshing stale timeline dates failed");
         }
     }
-    Ok(Ctx {
-        vis,
-        fields,
-        names,
-        extract,
-    })
+    Ok(Ctx { vis, fields, names, extract })
 }
 
 /// Effective ranges with resolved rules.
 async fn lane_areas(state: &AppState, p: &Principal) -> V2Result<(Vec<LaneArea>, &'static str)> {
-    let (areas, source) = store::effective_areas(state.db(), p.user_id)
-        .await
-        .map_err(tl)?;
+    let (areas, source) = store::effective_areas(state.db(), p.user_id).await.map_err(tl)?;
     let mut out = Vec::with_capacity(areas.len());
     for a in areas {
-        let rules = store::resolve_rules(state.db(), &a.rules)
-            .await
-            .map_err(tl)?;
+        let rules = store::resolve_rules(state.db(), &a.rules).await.map_err(tl)?;
         out.push(LaneArea { area: a, rules });
     }
     Ok((out, source))
@@ -99,12 +84,8 @@ fn lanes_filter(q: &HashMap<String, String>) -> V2Result<Option<HashSet<String>>
         if part == "other" {
             out.insert(part.to_string());
         } else {
-            let u = uuid::Uuid::parse_str(part).map_err(|_| {
-                V2Error(DomainError::field(
-                    "areas",
-                    "Expected area UUIDs and/or \"other\".",
-                ))
-            })?;
+            let u =
+                uuid::Uuid::parse_str(part).map_err(|_| V2Error(DomainError::field("areas", "Expected area UUIDs and/or \"other\".")))?;
             out.insert(u.to_string());
         }
     }
@@ -118,10 +99,7 @@ fn kinds_filter(q: &HashMap<String, String>) -> V2Result<Option<HashSet<DateKind
     v.split(',')
         .map(str::trim)
         .filter(|s| !s.is_empty())
-        .map(|k| {
-            DateKind::parse(k)
-                .ok_or_else(|| V2Error(DomainError::field("kinds", format!("Unknown kind {k:?}."))))
-        })
+        .map(|k| DateKind::parse(k).ok_or_else(|| V2Error(DomainError::field("kinds", format!("Unknown kind {k:?}.")))))
         .collect::<V2Result<HashSet<_>>>()
         .map(Some)
 }
@@ -132,26 +110,14 @@ async fn load_items(
     c: &Ctx,
     created: Option<(NaiveDate, NaiveDate)>,
 ) -> V2Result<(Vec<build::Item>, HashMap<i64, build::DocRow>)> {
-    let spec = LoadSpec {
-        user_id: p.user_id,
-        created_range: created,
-        fields: &c.fields,
-        field_names: &c.names,
-        content_dates: c.extract,
-    };
+    let spec = LoadSpec { user_id: p.user_id, created_range: created, fields: &c.fields, field_names: &c.names, content_dates: c.extract };
     let (docs, rows) = store::load(state.db(), &c.vis, &spec).await.map_err(tl)?;
     let ids: Vec<i64> = docs.keys().copied().collect();
-    let states = store::states(state.db(), p.user_id, &ids)
-        .await
-        .map_err(tl)?;
+    let states = store::states(state.db(), p.user_id, &ids).await.map_err(tl)?;
     Ok((build::items(&docs, &rows, &states), docs))
 }
 
-pub async fn timeline(
-    State(state): State<AppState>,
-    Caller(p): Caller,
-    Query(q): Query<HashMap<String, String>>,
-) -> V2Result<Response> {
+pub async fn timeline(State(state): State<AppState>, Caller(p): Caller, Query(q): Query<HashMap<String, String>>) -> V2Result<Response> {
     let today = d2::today(&state);
     let from = match q.get("from") {
         Some(v) => d2::parse_date("from", v)?,
@@ -162,34 +128,19 @@ pub async fn timeline(
         None => today + chrono::Duration::days(365),
     };
     if to < from {
-        return Err(V2Error(DomainError::field(
-            "to",
-            "Must not be before from.",
-        )));
+        return Err(V2Error(DomainError::field("to", "Must not be before from.")));
     }
     if (to - from).num_days() > 3660 {
-        return Err(V2Error(DomainError::field(
-            "to",
-            "The range may span at most 3660 days.",
-        )));
+        return Err(V2Error(DomainError::field("to", "The range may span at most 3660 days.")));
     }
     let kinds = kinds_filter(&q)?;
     let lanes = lanes_filter(&q)?;
     let limit = d2::parse_int("limit", q.get("limit"), 2000, 1, 10000)? as usize;
     let c = ctx(&state, &p).await?;
     let (areas, source) = lane_areas(&state, &p).await?;
-    let created = kinds
-        .as_ref()
-        .is_none_or(|k| k.contains(&DateKind::Created))
-        .then_some((from, to));
+    let created = kinds.as_ref().is_none_or(|k| k.contains(&DateKind::Created)).then_some((from, to));
     let (items, docs) = load_items(&state, &p, &c, created).await?;
-    let tq = TimelineQuery {
-        from,
-        to,
-        kinds,
-        lanes,
-        limit,
-    };
+    let tq = TimelineQuery { from, to, kinds, lanes, limit };
     let (lanes, truncated) = build::lanes(items, &docs, &areas, &tq);
     Ok(json(&json!({
         "from": from,
@@ -202,11 +153,7 @@ pub async fn timeline(
     })))
 }
 
-pub async fn upcoming(
-    State(state): State<AppState>,
-    Caller(p): Caller,
-    Query(q): Query<HashMap<String, String>>,
-) -> V2Result<Response> {
+pub async fn upcoming(State(state): State<AppState>, Caller(p): Caller, Query(q): Query<HashMap<String, String>>) -> V2Result<Response> {
     let today = d2::today(&state);
     let days = d2::parse_int("days", q.get("days"), 60, 1, 366)?;
     let overdue = d2::parse_int("overdue_days", q.get("overdue_days"), 30, 0, 366)?;
@@ -215,19 +162,8 @@ pub async fn upcoming(
     let c = ctx(&state, &p).await?;
     let (areas, _) = lane_areas(&state, &p).await?;
     let (items, docs) = load_items(&state, &p, &c, None).await?;
-    let up = build::upcoming(
-        items,
-        &docs,
-        &areas,
-        today,
-        days,
-        overdue,
-        lanes.as_ref(),
-        include_done,
-    );
-    Ok(json(
-        &json!({ "today": today, "days": days, "overdue_days": overdue, "items": up }),
-    ))
+    let up = build::upcoming(items, &docs, &areas, today, days, overdue, lanes.as_ref(), include_done);
+    Ok(json(&json!({ "today": today, "days": days, "overdue_days": overdue, "items": up })))
 }
 
 /// Entry id → (document id) if visible, otherwise 404.
@@ -235,9 +171,7 @@ async fn item_doc(state: &AppState, p: &Principal, id: &str) -> V2Result<i64> {
     d2::require_view_documents(p)?;
     d2::ensure(state).await?;
     let (u, _, _) = parse_item_id(id).ok_or(V2Error(DomainError::NotFound))?;
-    store::visible_document(state.db(), &d2::visibility(p)?, u)
-        .await
-        .map_err(tl)
+    store::visible_document(state.db(), &d2::visibility(p)?, u).await.map_err(tl)
 }
 
 #[derive(Deserialize)]
@@ -264,46 +198,26 @@ pub async fn set_state(
     let doc = item_doc(&state, &p, &id).await?;
     let snoozed: Option<Option<NaiveDate>> = match (b.snoozed_until, b.snooze_days) {
         (Some(_), Some(_)) => {
-            return Err(V2Error(DomainError::field(
-                "snooze_days",
-                "Use either snoozed_until or snooze_days.",
-            )));
+            return Err(V2Error(DomainError::field("snooze_days", "Use either snoozed_until or snooze_days.")));
         }
         (Some(None), None) => Some(None),
         (Some(Some(s)), None) => Some(Some(d2::parse_date("snoozed_until", &s)?)),
-        (None, Some(n)) if (1..=366).contains(&n) => {
-            Some(Some(d2::today(&state) + chrono::Duration::days(n)))
-        }
+        (None, Some(n)) if (1..=366).contains(&n) => Some(Some(d2::today(&state) + chrono::Duration::days(n))),
         (None, Some(_)) => {
-            return Err(V2Error(DomainError::field(
-                "snooze_days",
-                "Expected 1–366.",
-            )));
+            return Err(V2Error(DomainError::field("snooze_days", "Expected 1–366.")));
         }
         (None, None) => None,
     };
     if b.done.is_none() && snoozed.is_none() {
-        return Err(V2Error(DomainError::invalid(
-            "Nothing to change: send done, snoozed_until or snooze_days.",
-        )));
+        return Err(V2Error(DomainError::invalid("Nothing to change: send done, snoozed_until or snooze_days.")));
     }
-    let st = store::set_state(state.db(), p.user_id, &id, doc, b.done, snoozed)
-        .await
-        .map_err(tl)?;
-    Ok(json(
-        &json!({ "id": id, "done": st.done_at.is_some(), "done_at": st.done_at, "snoozed_until": st.snoozed_until }),
-    ))
+    let st = store::set_state(state.db(), p.user_id, &id, doc, b.done, snoozed).await.map_err(tl)?;
+    Ok(json(&json!({ "id": id, "done": st.done_at.is_some(), "done_at": st.done_at, "snoozed_until": st.snoozed_until })))
 }
 
-pub async fn clear_state(
-    State(state): State<AppState>,
-    Caller(p): Caller,
-    Path(id): Path<String>,
-) -> V2Result<Response> {
+pub async fn clear_state(State(state): State<AppState>, Caller(p): Caller, Path(id): Path<String>) -> V2Result<Response> {
     item_doc(&state, &p, &id).await?;
-    store::clear_state(state.db(), p.user_id, &id)
-        .await
-        .map_err(tl)?;
+    store::clear_state(state.db(), p.user_id, &id).await.map_err(tl)?;
     Ok(StatusCode::NO_CONTENT.into_response())
 }
 
@@ -324,18 +238,10 @@ fn reminder_json(r: &store::Reminder, uuid: uuid::Uuid, title: &str) -> Value {
 pub async fn reminders(State(state): State<AppState>, Caller(p): Caller) -> V2Result<Response> {
     d2::require_view_documents(&p)?;
     d2::ensure(&state).await?;
-    let list = store::list_reminders(state.db(), p.user_id, &d2::visibility(&p)?)
-        .await
-        .map_err(tl)?;
+    let list = store::list_reminders(state.db(), p.user_id, &d2::visibility(&p)?).await.map_err(tl)?;
     let ids: Vec<i64> = list.iter().map(|r| r.document_id).collect();
     let t = store::titles(state.db(), &ids).await.map_err(tl)?;
-    let items: Vec<Value> = list
-        .iter()
-        .filter_map(|r| {
-            t.get(&r.document_id)
-                .map(|(u, title)| reminder_json(r, *u, title))
-        })
-        .collect();
+    let items: Vec<Value> = list.iter().filter_map(|r| t.get(&r.document_id).map(|(u, title)| reminder_json(r, *u, title))).collect();
     Ok(json(&json!({ "items": items })))
 }
 
@@ -350,65 +256,34 @@ pub struct ReminderBody {
     pub note: Option<String>,
 }
 
-pub async fn add_reminder(
-    State(state): State<AppState>,
-    Caller(p): Caller,
-    V2Json(b): V2Json<ReminderBody>,
-) -> V2Result<Response> {
+pub async fn add_reminder(State(state): State<AppState>, Caller(p): Caller, V2Json(b): V2Json<ReminderBody>) -> V2Result<Response> {
     d2::require_view_documents(&p)?;
     d2::ensure(&state).await?;
     let kind = match b.kind.as_deref() {
         None => DateKind::Due,
         Some(k) => DateKind::parse(k)
             .filter(|k| *k != DateKind::Created)
-            .ok_or_else(|| {
-                V2Error(DomainError::field(
-                    "kind",
-                    "Expected due, cancel_by, valid_from, valid_until or warranty_until.",
-                ))
-            })?,
+            .ok_or_else(|| V2Error(DomainError::field("kind", "Expected due, cancel_by, valid_from, valid_until or warranty_until.")))?,
     };
     let date = d2::parse_date("date", &b.date)?;
-    let note = b
-        .note
-        .map(|n| n.trim().to_string())
-        .filter(|n| !n.is_empty());
+    let note = b.note.map(|n| n.trim().to_string()).filter(|n| !n.is_empty());
     if note.as_ref().is_some_and(|n| n.chars().count() > 500) {
-        return Err(V2Error(DomainError::field(
-            "note",
-            "At most 500 characters.",
-        )));
+        return Err(V2Error(DomainError::field("note", "At most 500 characters.")));
     }
-    let u = uuid::Uuid::parse_str(b.document.trim())
-        .map_err(|_| V2Error(DomainError::field("document", "Expected a document UUID.")))?;
-    let doc = store::visible_document(state.db(), &d2::visibility(&p)?, u)
-        .await
-        .map_err(tl)?;
-    let (r, created) = store::add_reminder(state.db(), p.user_id, doc, kind, date, note.as_deref())
-        .await
-        .map_err(tl)?;
+    let u = uuid::Uuid::parse_str(b.document.trim()).map_err(|_| V2Error(DomainError::field("document", "Expected a document UUID.")))?;
+    let doc = store::visible_document(state.db(), &d2::visibility(&p)?, u).await.map_err(tl)?;
+    let (r, created) = store::add_reminder(state.db(), p.user_id, doc, kind, date, note.as_deref()).await.map_err(tl)?;
     let t = store::titles(state.db(), &[doc]).await.map_err(tl)?;
     let title = t.get(&doc).map(|x| x.1.clone()).unwrap_or_default();
-    let status = if created {
-        StatusCode::CREATED
-    } else {
-        StatusCode::OK
-    };
+    let status = if created { StatusCode::CREATED } else { StatusCode::OK };
     Ok(json_with_rev(status, &reminder_json(&r, u, &title), None))
 }
 
-pub async fn delete_reminder(
-    State(state): State<AppState>,
-    Caller(p): Caller,
-    Path(id): Path<String>,
-) -> V2Result<Response> {
+pub async fn delete_reminder(State(state): State<AppState>, Caller(p): Caller, Path(id): Path<String>) -> V2Result<Response> {
     d2::require_view_documents(&p)?;
     d2::ensure(&state).await?;
     let id: i64 = id.parse().map_err(|_| V2Error(DomainError::NotFound))?;
-    if !store::delete_reminder(state.db(), p.user_id, id)
-        .await
-        .map_err(tl)?
-    {
+    if !store::delete_reminder(state.db(), p.user_id, id).await.map_err(tl)? {
         return Err(V2Error(DomainError::NotFound));
     }
     Ok(StatusCode::NO_CONTENT.into_response())
@@ -418,12 +293,9 @@ pub async fn config(State(state): State<AppState>, Caller(p): Caller) -> V2Resul
     d2::require_view_documents(&p)?;
     d2::ensure(&state).await?;
     let all = store::custom_fields(state.db()).await.map_err(tl)?;
-    let (kinds, warnings) =
-        fields::resolve(&all, d2::setting(pl_timeline::SETTING_FIELDS).as_deref());
+    let (kinds, warnings) = fields::resolve(&all, d2::setting(pl_timeline::SETTING_FIELDS).as_deref());
     let ids: Vec<i64> = all.iter().map(|f| f.id).collect();
-    let u = store::uuids(state.db(), store::KIND_CUSTOM_FIELD, &ids)
-        .await
-        .map_err(tl)?;
+    let u = store::uuids(state.db(), store::KIND_CUSTOM_FIELD, &ids).await.map_err(tl)?;
     let show = d2::visibility(&p)?.custom_field_names;
     let fields: Vec<Value> = all
         .iter()
@@ -460,35 +332,22 @@ pub struct BackfillBody {
     force: bool,
 }
 
-pub async fn backfill(
-    State(state): State<AppState>,
-    Caller(p): Caller,
-    body: axum::body::Bytes,
-) -> V2Result<Response> {
+pub async fn backfill(State(state): State<AppState>, Caller(p): Caller, body: axum::body::Bytes) -> V2Result<Response> {
     let u = d2::user(&p)?;
     if !(u.is_active && u.is_superuser) {
-        return Err(V2Error(DomainError::Forbidden(
-            "Only superusers can start the backfill.".into(),
-        )));
+        return Err(V2Error(DomainError::Forbidden("Only superusers can start the backfill.".into())));
     }
     if !refresh::enabled(&d2::setting) {
-        return Err(V2Error(DomainError::invalid(format!(
-            "Date extraction is disabled ({}).",
-            pl_timeline::SETTING_EXTRACT
-        ))));
+        return Err(V2Error(DomainError::invalid(format!("Date extraction is disabled ({}).", pl_timeline::SETTING_EXTRACT))));
     }
     if refresh::backfill_running() {
-        return Err(V2Error(DomainError::Conflict(
-            "A backfill is already running.".into(),
-        )));
+        return Err(V2Error(DomainError::Conflict("A backfill is already running.".into())));
     }
     d2::ensure(&state).await?;
     let force = if body.iter().all(u8::is_ascii_whitespace) {
         false
     } else {
-        serde_json::from_slice::<BackfillBody>(&body)
-            .map_err(|e| V2Error(DomainError::invalid(format!("Invalid JSON: {e}"))))?
-            .force
+        serde_json::from_slice::<BackfillBody>(&body).map_err(|e| V2Error(DomainError::invalid(format!("Invalid JSON: {e}"))))?.force
     };
     let pool = state.db().clone();
     tokio::spawn(async move {
@@ -497,9 +356,5 @@ pub async fn backfill(
             tracing::error!(target: "paperrust.timeline", error = %e, "timeline backfill failed");
         }
     });
-    Ok(json_with_rev(
-        StatusCode::ACCEPTED,
-        &json!({ "started": true }),
-        None,
-    ))
+    Ok(json_with_rev(StatusCode::ACCEPTED, &json!({ "started": true }), None))
 }

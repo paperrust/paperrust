@@ -98,8 +98,10 @@ pub fn path_check(var: &str, directory: &Path) -> Vec<Issue> {
         return Vec::new();
     }
     if !directory.is_dir() {
-        return vec![Issue::new(Level::Error, format!("{var} is set but doesn't exist."))
-            .hint(format!("Create a directory at {}", directory.display()))];
+        return vec![
+            Issue::new(Level::Error, format!("{var} is set but doesn't exist."))
+                .hint(format!("Create a directory at {}", directory.display())),
+        ];
     }
     let test_file = directory.join(format!("__paperless_write_test_{}__", std::process::id()));
     let mut out = Vec::new();
@@ -244,9 +246,7 @@ pub fn audit_log_check(table_exists: bool, audit_enabled: bool) -> Vec<Issue> {
 /// (`None`: no table `django_migrations`).
 pub fn v3_minimum_upgrade_check(applied: Option<&[String]>) -> Vec<Issue> {
     let Some(applied) = applied else { return Vec::new() };
-    if applied.is_empty()
-        || applied.iter().any(|m| m == "0001_squashed" || m == "0002_squashed" || m == "1075_workflowaction_order")
-    {
+    if applied.is_empty() || applied.iter().any(|m| m == "0001_squashed" || m == "0002_squashed" || m == "1075_workflowaction_order") {
         return Vec::new();
     }
     let mut sorted = applied.to_vec();
@@ -342,11 +342,10 @@ pub fn filename_format_check(filename_format: Option<&str>) -> Vec<Issue> {
     let Some(f) = filename_format.filter(|f| !f.is_empty()) else { return Vec::new() };
     let converted = pl_templating::convert_format_str_to_template_format(f);
     if converted != f {
-        return vec![Issue::new(
-            Level::Warning,
-            format!("Filename format {f} is using the old style, please update to use double curly brackets"),
-        )
-        .hint(converted)];
+        return vec![
+            Issue::new(Level::Warning, format!("Filename format {f} is using the old style, please update to use double curly brackets"))
+                .hint(converted),
+        ];
     }
     Vec::new()
 }
@@ -379,11 +378,7 @@ pub fn render(issues: &[Issue], fail_level: Level) -> (String, bool) {
     }
     footer.push_str(&format!("System check identified {count} (0 silenced)."));
     let serious = issues.iter().any(|i| i.level >= fail_level);
-    if serious {
-        (format!("SystemCheckError: {header}{body}{footer}"), true)
-    } else {
-        (format!("{header}{body}{footer}"), false)
-    }
+    if serious { (format!("SystemCheckError: {header}{body}{footer}"), true) } else { (format!("{header}{body}{footer}"), false) }
 }
 
 const OPTS: &[args::Opt] = &[
@@ -401,10 +396,7 @@ pub async fn collect() -> Vec<Issue> {
         Err(e) => return vec![Issue::new(Level::Critical, format!("Configuration error: {e}"))],
     };
     v.extend(paths_check(&cfg));
-    let tess = std::env::var_os("PAPERRUST_TESSERACT_PATH")
-        .map(PathBuf::from)
-        .filter(|p| p.is_file())
-        .or_else(|| which("tesseract"));
+    let tess = std::env::var_os("PAPERRUST_TESSERACT_PATH").map(PathBuf::from).filter(|p| p.is_file()).or_else(|| which("tesseract"));
     v.extend(binaries_check(tess.clone(), pl_ocr::render::PdfiumRenderer::from_env().is_ok()));
     v.extend(debug_mode_check(cfg.debug));
     let get = |k: &str| pl_core::config::Env::from_process().get(k).map(str::to_string);
@@ -414,12 +406,16 @@ pub async fn collect() -> Vec<Issue> {
         Ok(c) => match crate::ctx::connect_pool(&c).await {
             Err(e) => v.push(Issue::new(Level::Error, e.to_string())),
             Ok(pool) => {
-                let audit: Option<bool> = sqlx::query_scalar("SELECT to_regclass('auditlog_logentry') IS NOT NULL").fetch_one(&pool).await.ok();
+                let audit: Option<bool> =
+                    sqlx::query_scalar("SELECT to_regclass('auditlog_logentry') IS NOT NULL").fetch_one(&pool).await.ok();
                 v.extend(audit_log_check(audit.unwrap_or(false), cfg.audit_log_enabled));
-                let has_mig: bool = sqlx::query_scalar("SELECT to_regclass('django_migrations') IS NOT NULL").fetch_one(&pool).await.unwrap_or(false);
+                let has_mig: bool =
+                    sqlx::query_scalar("SELECT to_regclass('django_migrations') IS NOT NULL").fetch_one(&pool).await.unwrap_or(false);
                 if has_mig {
                     // DatabaseError → [] like upstream
-                    if let Ok(applied) = sqlx::query_scalar::<_, String>("SELECT name FROM django_migrations WHERE app = 'documents'").fetch_all(&pool).await {
+                    if let Ok(applied) =
+                        sqlx::query_scalar::<_, String>("SELECT name FROM django_migrations WHERE app = 'documents'").fetch_all(&pool).await
+                    {
                         v.extend(v3_minimum_upgrade_check(Some(&applied)));
                     }
                 }
@@ -441,7 +437,9 @@ pub async fn command(argv: Vec<String>) -> CliResult {
     let fail_level = match a.value("fail_level") {
         None => Level::Error,
         Some(s) => Level::parse(s).ok_or_else(|| {
-            CliError::Usage(format!("argument --fail-level: invalid choice: '{s}' (choose from 'CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG')"))
+            CliError::Usage(format!(
+                "argument --fail-level: invalid choice: '{s}' (choose from 'CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG')"
+            ))
         })?,
     };
     let issues = collect().await;
@@ -495,10 +493,16 @@ mod tests {
 
     #[test]
     fn settings_values() {
-        let env = |pairs: &'static [(&'static str, &'static str)]| move |k: &str| pairs.iter().find(|(n, _)| *n == k).map(|(_, v)| v.to_string());
+        let env =
+            |pairs: &'static [(&'static str, &'static str)]| move |k: &str| pairs.iter().find(|(n, _)| *n == k).map(|(_, v)| v.to_string());
         assert!(settings_values_check(&env(&[]), "UTC", None).is_empty());
         let v = settings_values_check(
-            &env(&[("PAPERLESS_OCR_OUTPUT_TYPE", "tiff"), ("PAPERLESS_OCR_MODE", "skip"), ("PAPERLESS_OCR_CLEAN", "x"), ("PAPERLESS_ARCHIVE_FILE_GENERATION", "sometimes")]),
+            &env(&[
+                ("PAPERLESS_OCR_OUTPUT_TYPE", "tiff"),
+                ("PAPERLESS_OCR_MODE", "skip"),
+                ("PAPERLESS_OCR_CLEAN", "x"),
+                ("PAPERLESS_ARCHIVE_FILE_GENERATION", "sometimes"),
+            ]),
             "Mars/Base",
             Some(Path::new("/definitely/not/here.pem")),
         );

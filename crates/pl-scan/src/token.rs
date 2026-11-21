@@ -40,8 +40,7 @@ pub fn normalize(candidate: &str) -> String {
 /// Formally valid? Invalid forms are rejected without DB access.
 pub fn is_well_formed(candidate: &str) -> bool {
     let c = normalize(candidate);
-    c.strip_prefix(PREFIX)
-        .is_some_and(|b| b.len() == BODY_LEN && b.bytes().all(|x| x.is_ascii_lowercase() || x.is_ascii_digit()))
+    c.strip_prefix(PREFIX).is_some_and(|b| b.len() == BODY_LEN && b.bytes().all(|x| x.is_ascii_lowercase() || x.is_ascii_digit()))
 }
 
 /// `sha256(normalize(token))` as 64 hex characters.

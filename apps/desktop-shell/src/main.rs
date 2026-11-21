@@ -50,16 +50,13 @@ use paperrust_desktop::layout::InstallLayout;
 use paperrust_desktop::lock::{Acquire, InstanceLock};
 use paperrust_desktop::paths::AppPaths;
 use paperrust_desktop::supervisor::{
-    AdminPrompt, BackupReply, Event, Opened, SetupChoice, SetupOptions, Supervisor,
-    control_channel, setup_from_env, validate_setup,
+    AdminPrompt, BackupReply, Event, Opened, SetupChoice, SetupOptions, Supervisor, control_channel, setup_from_env, validate_setup,
 };
 use serde::Serialize;
 use tauri::menu::MenuItem;
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::webview::{DownloadEvent, PageLoadEvent};
-use tauri::{
-    AppHandle, Manager, RunEvent, Url, WebviewUrl, WebviewWindowBuilder, WindowEvent, Wry,
-};
+use tauri::{AppHandle, Manager, RunEvent, Url, WebviewUrl, WebviewWindowBuilder, WindowEvent, Wry};
 
 use mode::{AppConfig, Mode, Profile, Start};
 use nav::{NavDecision, NavPolicy, is_local_page};
@@ -205,21 +202,13 @@ struct Failure {
 
 impl From<paperrust_desktop::DesktopError> for Failure {
     fn from(e: paperrust_desktop::DesktopError) -> Self {
-        Self {
-            message: e.to_string(),
-            advice: e.advice().map(str::to_string),
-            log: e.log_file(),
-        }
+        Self { message: e.to_string(), advice: e.advice().map(str::to_string), log: e.log_file() }
     }
 }
 
 impl Failure {
     fn other(message: String) -> Self {
-        Self {
-            message,
-            advice: None,
-            log: "desktop.log",
-        }
+        Self { message, advice: None, log: "desktop.log" }
     }
 }
 
@@ -229,11 +218,8 @@ impl Shared {
     }
 
     fn set_switch(&self, c: &paperrust_desktop::supervisor::SwitchCheck) {
-        lock(&self.view).switch = Some(SwitchView {
-            verdict: c.verdict.clone(),
-            summary: c.summary.clone(),
-            has_report: c.report.is_some(),
-        });
+        lock(&self.view).switch =
+            Some(SwitchView { verdict: c.verdict.clone(), summary: c.summary.clone(), has_report: c.report.is_some() });
     }
 
     /// Mode 1: UI ready on `http://127.0.0.1:<port>/`.
@@ -258,11 +244,7 @@ impl Shared {
     /// For "retry": state of a new run.
     fn reset(&self) {
         let mode = lock(&self.view).mode.clone();
-        *lock(&self.view) = View {
-            stage: "Wird gestartet".into(),
-            mode,
-            ..View::default()
-        };
+        *lock(&self.view) = View { stage: "Wird gestartet".into(), mode, ..View::default() };
         *lock(&self.nav) = NavPolicy::none();
         *lock(&self.local_login) = None;
         self.quitting.store(false, Ordering::SeqCst);
@@ -333,11 +315,8 @@ fn shell_state(shared: tauri::State<'_, Arc<Shared>>) -> View {
 }
 
 fn send_answer(shared: &Shared, a: FormAnswer) -> Result<(), String> {
-    let tx = lock(&shared.form_tx)
-        .take()
-        .ok_or_else(|| "Es wird gerade nichts abgefragt.".to_string())?;
-    tx.send(Some(a))
-        .map_err(|_| "Einrichtung läuft nicht mehr.".to_string())
+    let tx = lock(&shared.form_tx).take().ok_or_else(|| "Es wird gerade nichts abgefragt.".to_string())?;
+    tx.send(Some(a)).map_err(|_| "Einrichtung läuft nicht mehr.".to_string())
 }
 
 /// Fields of the first-start form. `mode`: `fresh` | `import` | `migrate-db`. "Start fresh"
@@ -364,9 +343,7 @@ fn stage_for(choice: &SetupChoice) -> &'static str {
 #[tauri::command]
 fn submit_setup(form: SetupForm, shared: tauri::State<'_, Arc<Shared>>) -> Result<(), String> {
     let choice = setup_choice(form)?;
-    let opts = SetupOptions {
-        can_migrate_db: lock(&shared.view).can_migrate_db,
-    };
+    let opts = SetupOptions { can_migrate_db: lock(&shared.view).can_migrate_db };
     validate_setup(&choice, &opts)?;
     let stage = stage_for(&choice);
     send_answer(&shared, FormAnswer::Setup(choice))?;
@@ -377,18 +354,12 @@ fn submit_setup(form: SetupForm, shared: tauri::State<'_, Arc<Shared>>) -> Resul
 /// First start, choice "Auf diesem Computer": save the mode, start the supervisor with the preselection
 /// (it then does not ask again).
 #[tauri::command]
-fn first_start_local(
-    form: SetupForm,
-    app: AppHandle,
-    shared: tauri::State<'_, Arc<Shared>>,
-) -> Result<(), String> {
+fn first_start_local(form: SetupForm, app: AppHandle, shared: tauri::State<'_, Arc<Shared>>) -> Result<(), String> {
     if shared.start() != Some(Start::FirstRun) {
         return Err("Die Einrichtung läuft bereits.".into());
     }
     let choice = setup_choice(form)?;
-    let opts = SetupOptions {
-        can_migrate_db: lock(&shared.view).can_migrate_db,
-    };
+    let opts = SetupOptions { can_migrate_db: lock(&shared.view).can_migrate_db };
     validate_setup(&choice, &opts)?;
     let paths = AppPaths::from_env().map_err(|e| e.to_string())?;
     let mut cfg = load_config(&paths);
@@ -419,9 +390,7 @@ fn setup_choice(f: SetupForm) -> Result<SetupChoice, String> {
             if s.is_empty() {
                 return Err("Bitte den Export-Ordner oder die ZIP-Datei angeben.".into());
             }
-            Ok(SetupChoice::ImportExport {
-                source: PathBuf::from(s),
-            })
+            Ok(SetupChoice::ImportExport { source: PathBuf::from(s) })
         }
         "migrate-db" => {
             let s = clean(&f.source);
@@ -429,10 +398,7 @@ fn setup_choice(f: SetupForm) -> Result<SetupChoice, String> {
                 return Err("Bitte die Quell-Datenbank angeben.".into());
             }
             let m = clean(&f.media);
-            Ok(SetupChoice::MigrateDb {
-                source_url: s,
-                media_dir: (!m.is_empty()).then(|| PathBuf::from(m)),
-            })
+            Ok(SetupChoice::MigrateDb { source_url: s, media_dir: (!m.is_empty()).then(|| PathBuf::from(m)) })
         }
         _ => Err("Unbekannte Auswahl.".into()),
     }
@@ -574,8 +540,7 @@ fn relaunch(app: &AppHandle) {
     match std::env::current_exe() {
         Ok(exe) => {
             let mut c = std::process::Command::new(exe);
-            c.args(std::env::args_os().skip(1))
-                .env(ENV_RESTART_AFTER, std::process::id().to_string());
+            c.args(std::env::args_os().skip(1)).env(ENV_RESTART_AFTER, std::process::id().to_string());
             #[cfg(windows)]
             {
                 use std::os::windows::process::CommandExt;
@@ -594,10 +559,7 @@ fn relaunch(app: &AppHandle) {
 
 /// Restart: wait up to 20 s until the predecessor has ended.
 fn wait_for_predecessor() {
-    let Some(pid) = std::env::var(ENV_RESTART_AFTER)
-        .ok()
-        .and_then(|p| p.trim().parse::<u32>().ok())
-    else {
+    let Some(pid) = std::env::var(ENV_RESTART_AFTER).ok().and_then(|p| p.trim().parse::<u32>().ok()) else {
         return;
     };
     // SAFETY: variable is removed before any threads (start of `main`).
@@ -605,9 +567,7 @@ fn wait_for_predecessor() {
     #[cfg(windows)]
     unsafe {
         use windows::Win32::Foundation::CloseHandle;
-        use windows::Win32::System::Threading::{
-            OpenProcess, PROCESS_SYNCHRONIZE, WaitForSingleObject,
-        };
+        use windows::Win32::System::Threading::{OpenProcess, PROCESS_SYNCHRONIZE, WaitForSingleObject};
         if let Ok(h) = OpenProcess(PROCESS_SYNCHRONIZE, false, pid) {
             let _ = WaitForSingleObject(h, 20_000);
             let _ = CloseHandle(h);
@@ -640,8 +600,7 @@ fn load_config(paths: &AppPaths) -> AppConfig {
 }
 
 fn save_config(paths: &AppPaths, cfg: &AppConfig) -> Result<(), String> {
-    paperrust_desktop::perms::create_private_dir(&paths.home)
-        .map_err(|e| format!("{}: {e}", paths.home.display()))?;
+    paperrust_desktop::perms::create_private_dir(&paths.home).map_err(|e| format!("{}: {e}", paths.home.display()))?;
     cfg.save(&paths.app_config_file())
 }
 
@@ -716,11 +675,7 @@ struct ConnectResult {
 
 impl ConnectResult {
     fn error(message: impl Into<String>) -> Self {
-        Self {
-            status: "error",
-            message: message.into(),
-            ..Self::default()
-        }
+        Self { status: "error", message: message.into(), ..Self::default() }
     }
 }
 
@@ -728,28 +683,16 @@ impl ConnectResult {
 /// Multi-step: http → confirmation; untrusted certificate → show fingerprint;
 /// only with all confirmations is it saved.
 #[tauri::command]
-async fn server_connect(
-    form: ConnectForm,
-    app: AppHandle,
-    shared: tauri::State<'_, Arc<Shared>>,
-) -> Result<ConnectResult, String> {
+async fn server_connect(form: ConnectForm, app: AppHandle, shared: tauri::State<'_, Arc<Shared>>) -> Result<ConnectResult, String> {
     let shared = shared.inner().clone();
     let su = match remote::parse_server_url(&form.url) {
         Ok(u) => u,
         Err(e) => return Ok(ConnectResult::error(e)),
     };
-    let mut res = ConnectResult {
-        base: Some(su.base.clone()),
-        idn_host: su.idn.then(|| su.host.clone()),
-        ..ConnectResult::default()
-    };
+    let mut res = ConnectResult { base: Some(su.base.clone()), idn_host: su.idn.then(|| su.host.clone()), ..ConnectResult::default() };
     match remote::http_policy(&su) {
         Err(e) => {
-            return Ok(ConnectResult {
-                status: "error",
-                message: e,
-                ..res
-            });
+            return Ok(ConnectResult { status: "error", message: e, ..res });
         }
         Ok(true) if !form.allow_http => {
             res.status = "confirm_http";
@@ -770,16 +713,16 @@ async fn server_connect(
     let detected = remote::detect(&fetcher).await;
     let det = match detected {
         Ok(d) => d,
-        Err(DetectError::Fetch(FetchError::Tls(kind, msg)))
-            if su.https && kind != TlsKind::Expired =>
-        {
+        Err(DetectError::Fetch(FetchError::Tls(kind, msg))) if su.https && kind != TlsKind::Expired => {
             tracing::info!(url = %su.base, ?kind, "Zertifikat nicht vertrauenswürdig: {msg}");
             return Ok(match Fetcher::peer_certificate(&su.base).await {
                 Ok(cert) => ConnectResult {
                     status: "confirm_tls",
                     message: match kind {
                         TlsKind::Name => "Das Zertifikat des Servers ist nicht für diesen Namen ausgestellt.".into(),
-                        _ => "Das Zertifikat des Servers ist nicht von einer bekannten Stelle unterschrieben (z. B. selbst signiert).".into(),
+                        _ => {
+                            "Das Zertifikat des Servers ist nicht von einer bekannten Stelle unterschrieben (z. B. selbst signiert).".into()
+                        }
                     },
                     cert: Some(cert),
                     tls_kind: Some(kind),
@@ -820,14 +763,7 @@ async fn server_connect(
     cfg.mode = Mode::Remote;
     save_config(&paths, &cfg)?;
     res.status = "ok";
-    res.message = format!(
-        "Verbunden: {}{}",
-        det.flavor.label(),
-        det.version
-            .as_deref()
-            .map(|v| format!(" {v}"))
-            .unwrap_or_default()
-    );
+    res.message = format!("Verbunden: {}{}", det.flavor.label(), det.version.as_deref().map(|v| format!(" {v}")).unwrap_or_default());
     res.flavor = Some(det.flavor.label());
     res.version = det.version;
     res.note = det.note;
@@ -902,11 +838,7 @@ fn settings_state(shared: tauri::State<'_, Arc<Shared>>) -> Result<SettingsView,
 
 /// Switch mode (restarts). Local data stays untouched.
 #[tauri::command]
-fn settings_set_mode(
-    mode: String,
-    app: AppHandle,
-    shared: tauri::State<'_, Arc<Shared>>,
-) -> Result<(), String> {
+fn settings_set_mode(mode: String, app: AppHandle, shared: tauri::State<'_, Arc<Shared>>) -> Result<(), String> {
     let m = Mode::parse(&mode).ok_or("Unbekannte Betriebsart.")?;
     let paths = AppPaths::from_env().map_err(|e| e.to_string())?;
     let mut cfg = load_config(&paths);
@@ -917,10 +849,7 @@ fn settings_set_mode(
     Ok(())
 }
 
-fn with_profile<T>(
-    id: &str,
-    f: impl FnOnce(&mut AppConfig, &AppPaths) -> Result<T, String>,
-) -> Result<T, String> {
+fn with_profile<T>(id: &str, f: impl FnOnce(&mut AppConfig, &AppPaths) -> Result<T, String>) -> Result<T, String> {
     if !mode::valid_profile_id(id) {
         return Err("Unbekanntes Profil.".into());
     }
@@ -936,11 +865,7 @@ fn with_profile<T>(
 
 /// Activate profile (and switch to remote mode) – restarts.
 #[tauri::command]
-fn profile_activate(
-    id: String,
-    app: AppHandle,
-    shared: tauri::State<'_, Arc<Shared>>,
-) -> Result<(), String> {
+fn profile_activate(id: String, app: AppHandle, shared: tauri::State<'_, Arc<Shared>>) -> Result<(), String> {
     with_profile(&id, |cfg, _| {
         cfg.active_profile = id.clone();
         cfg.mode = Mode::Remote;
@@ -971,20 +896,13 @@ fn profile_rename(id: String, name: String, app: AppHandle) -> Result<(), String
 }
 
 fn is_active_running(shared: &Shared, id: &str) -> bool {
-    shared.start() == Some(Start::Remote)
-        && lock(&shared.remote)
-            .as_ref()
-            .is_some_and(|r| r.profile.id == id)
+    shared.start() == Some(Start::Remote) && lock(&shared.remote).as_ref().is_some_and(|r| r.profile.id == id)
 }
 
 /// Log out: server logout (if connected) and delete the profile's WebView data. For the active
 /// profile the files are in use → delete on restart (marker), otherwise immediately.
 #[tauri::command]
-fn profile_logout(
-    id: String,
-    app: AppHandle,
-    shared: tauri::State<'_, Arc<Shared>>,
-) -> Result<(), String> {
+fn profile_logout(id: String, app: AppHandle, shared: tauri::State<'_, Arc<Shared>>) -> Result<(), String> {
     let dir = with_profile(&id, |_, paths| Ok(paths.profile_dir(&id)))?;
     // P5: device token from the keychain (revocation on the server: UI via prapi /local/logout)
     sync::forget(&app, &id);
@@ -995,10 +913,7 @@ fn profile_logout(
     }
     paperrust_desktop::perms::create_private_dir(&dir).map_err(|e| e.to_string())?;
     std::fs::write(dir.join(LOGOUT_MARKER), b"logout").map_err(|e| e.to_string())?;
-    let (online, base) = lock(&shared.remote)
-        .as_ref()
-        .map(|r| (r.online, r.server.base.clone()))
-        .unwrap_or_default();
+    let (online, base) = lock(&shared.remote).as_ref().map(|r| (r.online, r.server.base.clone())).unwrap_or_default();
     tracing::info!(profile = %id, online, "Abmelden: Server-Logout, WebView-Daten beim Neustart löschen");
     if online && let Ok(u) = Url::parse(&format!("{base}accounts/logout/")) {
         // End the session on the server (paperless-ngx/PaperRust: GET → logout + redirect).
@@ -1019,11 +934,7 @@ fn profile_logout(
 
 /// Remove profile (folder including WebView data). The active profile → restart.
 #[tauri::command]
-fn profile_remove(
-    id: String,
-    app: AppHandle,
-    shared: tauri::State<'_, Arc<Shared>>,
-) -> Result<(), String> {
+fn profile_remove(id: String, app: AppHandle, shared: tauri::State<'_, Arc<Shared>>) -> Result<(), String> {
     let dir = with_profile(&id, |cfg, paths| {
         cfg.remove(&id);
         Ok(paths.profile_dir(&id))
@@ -1040,11 +951,7 @@ fn profile_remove(
 }
 
 fn local_url(page: &str) -> Option<Url> {
-    let base = if cfg!(windows) {
-        "http://tauri.localhost/"
-    } else {
-        "tauri://localhost/"
-    };
+    let base = if cfg!(windows) { "http://tauri.localhost/" } else { "tauri://localhost/" };
     Url::parse(base).ok()?.join(page).ok()
 }
 
@@ -1068,11 +975,7 @@ fn open_settings(app: AppHandle) {
 /// Close settings: back to the UI or to the start page.
 #[tauri::command]
 fn close_settings(app: AppHandle, shared: tauri::State<'_, Arc<Shared>>) {
-    let target = lock(&shared.view)
-        .ready_url
-        .as_deref()
-        .and_then(|u| Url::parse(u).ok())
-        .or_else(|| local_url("index.html"));
+    let target = lock(&shared.view).ready_url.as_deref().and_then(|u| Url::parse(u).ok()).or_else(|| local_url("index.html"));
     if let Some(u) = target {
         navigate_main(&app, u);
     }
@@ -1114,19 +1017,11 @@ fn cancel_connect(app: AppHandle, shared: tauri::State<'_, Arc<Shared>>) {
 /// SSO redirect: `allow` (allow origin permanently), `browser` (in the system browser), otherwise
 /// cancel.
 #[tauri::command]
-fn sso_decide(
-    choice: String,
-    app: AppHandle,
-    shared: tauri::State<'_, Arc<Shared>>,
-) -> Result<(), String> {
+fn sso_decide(choice: String, app: AppHandle, shared: tauri::State<'_, Arc<Shared>>) -> Result<(), String> {
     let (target, profile_id, base) = {
         let mut r = lock(&shared.remote);
         let r = r.as_mut().ok_or("Kein Server aktiv.")?;
-        (
-            r.pending_sso.take(),
-            r.profile.id.clone(),
-            r.server.base.clone(),
-        )
+        (r.pending_sso.take(), r.profile.id.clone(), r.server.base.clone())
     };
     lock(&shared.view).sso = None;
     let target = target.ok_or("Keine Weiterleitung offen.")?;
@@ -1282,10 +1177,7 @@ fn refresh_title(app: &AppHandle, w: &tauri::WebviewWindow) {
     let shared = app.state::<Arc<Shared>>().inner().clone();
     if let Some(r) = lock(&shared.remote).as_mut()
         && let Ok(paths) = AppPaths::from_env()
-        && let Some(p) = load_config(&paths)
-            .profiles
-            .into_iter()
-            .find(|p| p.id == r.profile.id)
+        && let Some(p) = load_config(&paths).profiles.into_iter().find(|p| p.id == r.profile.id)
     {
         r.profile.name = p.name;
     }
@@ -1347,8 +1239,7 @@ fn create_main(app: &AppHandle, data_dir: Option<PathBuf>) -> tauri::Result<()> 
                 !hard
                     && !r.profile.tls_pin.is_empty()
                     && r.profile.tls_pin == pin
-                    && Url::parse(uri)
-                        .is_ok_and(|u| u.origin().ascii_serialization() == r.server.origin)
+                    && Url::parse(uri).is_ok_and(|u| u.origin().ascii_serialization() == r.server.origin)
             }),
             Arc::new(move || fail_shared.probe_now.notify_one()),
         );
@@ -1468,13 +1359,7 @@ fn install_tray_menu(app: &AppHandle, mode: TrayMode) {
         AppPaths::from_env()
             .map(|p| {
                 let c = load_config(&p);
-                (
-                    c.profiles
-                        .iter()
-                        .map(|p| (p.id.clone(), p.name.clone()))
-                        .collect::<Vec<_>>(),
-                    c.active_profile.clone(),
-                )
+                (c.profiles.iter().map(|p| (p.id.clone(), p.name.clone())).collect::<Vec<_>>(), c.active_profile.clone())
             })
             .unwrap_or_default()
     } else {
@@ -1502,10 +1387,9 @@ fn install_tray_menu(app: &AppHandle, mode: TrayMode) {
 fn on_tray_menu(app: &AppHandle, id: &str) {
     match id {
         "open" => show_main(app),
-        design::MODERN_ID | design::CLASSIC_ID => switch_design(
-            app,
-            if id == design::MODERN_ID { design::Design::Modern } else { design::Design::Classic },
-        ),
+        design::MODERN_ID | design::CLASSIC_ID => {
+            switch_design(app, if id == design::MODERN_ID { design::Design::Modern } else { design::Design::Classic })
+        }
         "backup" => start_backup(app),
         "consume" => open_dir(|p| p.consume.clone()),
         "backups" => open_dir(|p| p.backups.clone()),
@@ -1579,12 +1463,7 @@ fn build_tray(app: &AppHandle, mode: TrayMode) -> tauri::Result<()> {
         .show_menu_on_left_click(false)
         .on_menu_event(|app, ev| on_tray_menu(app, ev.id().as_ref()))
         .on_tray_icon_event(|tray, ev| {
-            if let TrayIconEvent::Click {
-                button: MouseButton::Left,
-                button_state: MouseButtonState::Up,
-                ..
-            } = ev
-            {
+            if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = ev {
                 show_main(tray.app_handle());
             }
         });
@@ -1603,33 +1482,27 @@ fn build_tray(app: &AppHandle, mode: TrayMode) -> tauri::Result<()> {
 
 fn spawn_supervisor(app: AppHandle, shared: Arc<Shared>) {
     let for_thread = shared.clone();
-    let spawned = std::thread::Builder::new()
-        .name("paperrust-supervisor".into())
-        .spawn(move || {
-            let shared = for_thread;
-            let result = match tokio::runtime::Builder::new_multi_thread()
-                .worker_threads(2)
-                .enable_all()
-                .build()
-            {
-                Ok(rt) => rt.block_on(supervise(&app, &shared)),
-                Err(e) => Err(Failure::other(format!("Laufzeit: {e}"))),
-            };
-            *lock(&shared.backup_tx) = None;
-            set_backup_item(&app, BACKUP_LABEL, false);
-            shared.finished.store(true, Ordering::SeqCst);
-            let ended = |app: &AppHandle| finish(app, &shared);
-            match result {
-                Ok(()) => ended(&app),
-                Err(_) if shared.quitting.load(Ordering::SeqCst) => ended(&app),
-                Err(f) => {
-                    tracing::error!("{}", f.message);
-                    shared.set_error(&f);
-                    set_tooltip(&app, "PaperRust – Fehler");
-                    show_error_page(&app);
-                }
+    let spawned = std::thread::Builder::new().name("paperrust-supervisor".into()).spawn(move || {
+        let shared = for_thread;
+        let result = match tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build() {
+            Ok(rt) => rt.block_on(supervise(&app, &shared)),
+            Err(e) => Err(Failure::other(format!("Laufzeit: {e}"))),
+        };
+        *lock(&shared.backup_tx) = None;
+        set_backup_item(&app, BACKUP_LABEL, false);
+        shared.finished.store(true, Ordering::SeqCst);
+        let ended = |app: &AppHandle| finish(app, &shared);
+        match result {
+            Ok(()) => ended(&app),
+            Err(_) if shared.quitting.load(Ordering::SeqCst) => ended(&app),
+            Err(f) => {
+                tracing::error!("{}", f.message);
+                shared.set_error(&f);
+                set_tooltip(&app, "PaperRust – Fehler");
+                show_error_page(&app);
             }
-        });
+        }
+    });
     if let Err(e) = spawned {
         shared.set_error(&Failure::other(format!("Supervisor-Thread: {e}")));
         shared.finished.store(true, Ordering::SeqCst);
@@ -1640,8 +1513,7 @@ async fn supervise(app: &AppHandle, shared: &Arc<Shared>) -> Result<(), Failure>
     let paths = AppPaths::from_env()?;
     paths.ensure_dirs()?;
     let stop_file = paths.stop_request_file();
-    let layout = InstallLayout::from_current_exe()
-        .map_err(|e| Failure::other(format!("Programmpfad: {e}")))?;
+    let layout = InstallLayout::from_current_exe().map_err(|e| Failure::other(format!("Programmpfad: {e}")))?;
     let shutdown = shared.shutdown.notified();
     // After a restart (mode switch) the old process may still hold the lock for a moment.
     for _ in 0..40 {
@@ -1679,22 +1551,17 @@ async fn supervise(app: &AppHandle, shared: &Arc<Shared>) -> Result<(), Failure>
         }
         Opened::AlreadyRunning(None) => {
             return Err(Failure::other(
-                "PaperRust wird gerade von einem anderen Prozess gestartet. Bitte kurz warten und erneut versuchen."
-                    .into(),
+                "PaperRust wird gerade von einem anderen Prozess gestartet. Bitte kurz warten und erneut versuchen.".into(),
             ));
         }
     };
-    let log = paperrust_desktop::logs::init(&sup.paths.logs)
-        .map_err(|e| Failure::other(format!("Log öffnen: {e}")))?;
+    let log = paperrust_desktop::logs::init(&sup.paths.logs).map_err(|e| Failure::other(format!("Log öffnen: {e}")))?;
     tracing::info!(log = %log.display(), "PaperRust Desktop (Tauri) {}", env!("CARGO_PKG_VERSION"));
     for n in &sup.notices {
         tracing::warn!("{n}");
     }
 
-    let prompt = FormPrompt {
-        app: app.clone(),
-        shared: shared.clone(),
-    };
+    let prompt = FormPrompt { app: app.clone(), shared: shared.clone() };
     let (backup_tx, control) = control_channel();
     let on_event = |e: Event| match e {
         Event::Stage(s) => {
@@ -1728,19 +1595,14 @@ async fn supervise(app: &AppHandle, shared: &Arc<Shared>) -> Result<(), Failure>
             set_tooltip(app, "PaperRust – wird beendet …");
         }
     };
-    sup.run_with_control(&prompt, &on_event, shutdown, control)
-        .await
-        .map_err(Failure::from)
+    sup.run_with_control(&prompt, &on_event, shutdown, control).await.map_err(Failure::from)
 }
 
 // ---------------------------------------------------------------------------------------------
 // Remote mode (2a): start and connection monitoring
 
 fn now_ms() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_millis() as u64)
-        .unwrap_or(0)
+    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
 }
 
 /// Local time without a time zone library: the page formats itself (Unix ms as text).
@@ -1772,14 +1634,9 @@ fn cleanup_profiles(paths: &AppPaths, cfg: &AppConfig) {
 
 /// Prepare remote mode (before the window): folder, lock, log, profile. Returns the
 /// WebView data directory of the active profile.
-fn prepare_remote(
-    shared: &Arc<Shared>,
-    paths: &AppPaths,
-    cfg: &AppConfig,
-) -> Result<Option<PathBuf>, Failure> {
+fn prepare_remote(shared: &Arc<Shared>, paths: &AppPaths, cfg: &AppConfig) -> Result<Option<PathBuf>, Failure> {
     for d in [&paths.home, &paths.logs, &paths.run, &paths.profiles_dir()] {
-        paperrust_desktop::perms::create_private_dir(d)
-            .map_err(|e| Failure::other(format!("Verzeichnis {} anlegen: {e}", d.display())))?;
+        paperrust_desktop::perms::create_private_dir(d).map_err(|e| Failure::other(format!("Verzeichnis {} anlegen: {e}", d.display())))?;
     }
     // Single instance (also against a locally running console shell). After a restart the
     // old process may still hold the lock briefly.
@@ -1795,7 +1652,9 @@ fn prepare_remote(
         }
     }
     let l = acquired.ok_or_else(|| {
-        Failure::other("PaperRust läuft bereits in einem anderen Programm (z. B. lokal über die Konsole). Bitte dieses zuerst beenden.".into())
+        Failure::other(
+            "PaperRust läuft bereits in einem anderen Programm (z. B. lokal über die Konsole). Bitte dieses zuerst beenden.".into(),
+        )
     })?;
     *lock(&shared.instance_lock) = Some(l);
     if let Ok(log) = paperrust_desktop::logs::init(&paths.logs) {
@@ -1815,25 +1674,13 @@ fn prepare_remote(
         v.insecure = !server.https;
         v.stage = format!("Verbindung zu {} …", p.name);
     }
-    *lock(&shared.remote) = Some(RemoteCtx {
-        profile: p.clone(),
-        server,
-        online: false,
-        pending_sso: None,
-    });
+    *lock(&shared.remote) = Some(RemoteCtx { profile: p.clone(), server, online: false, pending_sso: None });
     let dir = paths.profile_dir(&p.id);
-    paperrust_desktop::perms::create_private_dir(&dir)
-        .map_err(|e| Failure::other(format!("Profilordner: {e}")))?;
+    paperrust_desktop::perms::create_private_dir(&dir).map_err(|e| Failure::other(format!("Profilordner: {e}")))?;
     Ok(Some(dir.join("webview")))
 }
 
-fn set_offline(
-    app: &AppHandle,
-    shared: &Shared,
-    error: String,
-    last_ok: &Option<String>,
-    wait: Duration,
-) {
+fn set_offline(app: &AppHandle, shared: &Shared, error: String, last_ok: &Option<String>, wait: Duration) {
     let (name, url) = lock(&shared.remote)
         .as_mut()
         .map(|r| {
@@ -1908,10 +1755,7 @@ async fn remote_loop(app: AppHandle, shared: Arc<Shared>) {
                             ctx.server.base.clone()
                         });
                     }
-                    set_tooltip(
-                        &app,
-                        &format!("PaperRust – {} · Rechtsklick für Menü", ctx.profile.name),
-                    );
+                    set_tooltip(&app, &format!("PaperRust – {} · Rechtsklick für Menü", ctx.profile.name));
                 }
                 Duration::from_secs(15)
             }
@@ -1991,15 +1835,11 @@ struct UpdateView {
 }
 
 fn update_store() -> Option<update::Store> {
-    AppPaths::from_env()
-        .ok()
-        .map(|p| update::Store::new(&p.home))
+    AppPaths::from_env().ok().map(|p| update::Store::new(&p.home))
 }
 
 fn update_effective(app: &AppHandle) -> (update::Effective, update::UpdateSettings) {
-    let settings = AppPaths::from_env()
-        .map(|p| load_config(&p).updates)
-        .unwrap_or_default();
+    let settings = AppPaths::from_env().map(|p| load_config(&p).updates).unwrap_or_default();
     let eff = update::effective(&settings, |k| std::env::var(k).ok(), &update::pubkey(app));
     (eff, settings)
 }
@@ -2072,23 +1912,22 @@ fn open_update_window(app: &AppHandle, focus: bool) {
             }
             return;
         }
-        let built =
-            WebviewWindowBuilder::new(&handle, UPDATE_WIN, WebviewUrl::App("update.html".into()))
-                .title("PaperRust – Update")
-                .inner_size(580.0, 600.0)
-                .min_inner_size(420.0, 380.0)
-                .center()
-                .focused(focus)
-                .on_navigation(|u| {
-                    if is_local_page(u) {
-                        return true;
-                    }
-                    if matches!(u.scheme(), "http" | "https") {
-                        open_external(u.as_str());
-                    }
-                    false
-                })
-                .build();
+        let built = WebviewWindowBuilder::new(&handle, UPDATE_WIN, WebviewUrl::App("update.html".into()))
+            .title("PaperRust – Update")
+            .inner_size(580.0, 600.0)
+            .min_inner_size(420.0, 380.0)
+            .center()
+            .focused(focus)
+            .on_navigation(|u| {
+                if is_local_page(u) {
+                    return true;
+                }
+                if matches!(u.scheme(), "http" | "https") {
+                    open_external(u.as_str());
+                }
+                false
+            })
+            .build();
         match built {
             Ok(_) => tracing::info!("Update-Fenster geöffnet"),
             Err(e) => tracing::error!(error = %e, "Update-Fenster lässt sich nicht öffnen"),
@@ -2117,9 +1956,9 @@ async fn update_loop(app: AppHandle, shared: Arc<Shared>) {
     let start_note = store.reconcile(&current);
     lock(&shared.update).note = match &start_note {
         update::StartNote::Installed(v) => Some(format!("PaperRust wurde auf {v} aktualisiert.")),
-        update::StartNote::InstallFailed(v) => Some(format!(
-            "Das Update auf {v} wurde nicht eingespielt (installiert ist weiterhin {current})."
-        )),
+        update::StartNote::InstallFailed(v) => {
+            Some(format!("Das Update auf {v} wurde nicht eingespielt (installiert ist weiterhin {current})."))
+        }
         update::StartNote::None => None,
     };
     refresh_update_view(&app, &shared);
@@ -2154,8 +1993,7 @@ async fn update_loop(app: AppHandle, shared: Arc<Shared>) {
         if eff.enabled && (forced || update::due(first, last, now_ms(), eff.interval)) {
             first = false;
             lock(&shared.update).checking = true;
-            let o =
-                update::check(&app, &store, &eff, &current, update_installable(), now_ms()).await;
+            let o = update::check(&app, &store, &eff, &current, update_installable(), now_ms()).await;
             store.update_state(|s| {
                 s.last_check_ms = now_ms();
                 s.last_error = match &o {
@@ -2265,11 +2103,7 @@ fn update_install(app: AppHandle, shared: tauri::State<'_, Arc<Shared>>) -> Resu
     };
     let current = app.package_info().version.to_string();
     store.update_state(|s| {
-        s.installing = Some(update::Installing {
-            version: p.version.clone(),
-            from: current.clone(),
-            started_ms: now_ms(),
-        });
+        s.installing = Some(update::Installing { version: p.version.clone(), from: current.clone(), started_ms: now_ms() });
         s.last_error = None;
     });
     tracing::info!(version = %p.version, from = %current, "Update wird eingespielt – PaperRust wird beendet");
@@ -2315,12 +2149,7 @@ fn update_settings_save(
     cfg.updates.channel = ch;
     cfg.updates.interval_hours = interval_hours.clamp(1, 720);
     save_config(&paths, &cfg)?;
-    tracing::info!(
-        enabled,
-        channel = ch.as_str(),
-        interval_hours,
-        "Update-Einstellungen gespeichert"
-    );
+    tracing::info!(enabled, channel = ch.as_str(), interval_hours, "Update-Einstellungen gespeichert");
     refresh_update_view(&app, &shared);
     if update_effective(&app).0.enabled {
         lock(&shared.update).checking = true;
@@ -2348,9 +2177,7 @@ fn begin(app: &AppHandle, shared: &Arc<Shared>) -> tauri::Result<()> {
     });
     // Without a form: server address from the environment → create/activate profile.
     let env_url = get(ENV_SERVER_URL);
-    let env_mode = get(ENV_MODE)
-        .and_then(|m| Mode::parse(&m))
-        .or(env_url.as_ref().map(|_| Mode::Remote));
+    let env_mode = get(ENV_MODE).and_then(|m| Mode::parse(&m)).or(env_url.as_ref().map(|_| Mode::Remote));
     if let (Some(url), Ok(p)) = (&env_url, &paths)
         && env_mode == Some(Mode::Remote)
     {
@@ -2366,13 +2193,10 @@ fn begin(app: &AppHandle, shared: &Arc<Shared>) -> tauri::Result<()> {
     }
     // `setup_from_env` also covers `PAPERRUST_DESKTOP_ADMIN_*`.
     let managed_local = setup_from_env(|k| std::env::var(k).ok()).is_some();
-    let local_data = paths
-        .as_ref()
-        .is_ok_and(|p| p.config_file.exists() || p.pgdata.exists());
+    let local_data = paths.as_ref().is_ok_and(|p| p.config_file.exists() || p.pgdata.exists());
     let start = mode::decide(cfg_opt.as_ref(), env_mode, managed_local, local_data);
     *lock(&shared.start) = Some(start);
-    let can_migrate_db =
-        InstallLayout::from_current_exe().is_ok_and(|l| l.migrate_db_bin.is_some());
+    let can_migrate_db = InstallLayout::from_current_exe().is_ok_and(|l| l.migrate_db_bin.is_some());
     match start {
         Start::Local => {
             lock(&shared.view).mode = "local".into();
@@ -2397,9 +2221,10 @@ fn begin(app: &AppHandle, shared: &Arc<Shared>) -> tauri::Result<()> {
             lock(&shared.view).mode = "remote".into();
             shared.finished.store(true, Ordering::SeqCst);
             build_tray(app, TrayMode::Remote)?;
-            let data_dir = match paths.map_err(Failure::from).and_then(|p| {
-                prepare_remote(shared, &p, &cfg_opt.clone().unwrap_or_default()).map(|d| (d, p))
-            }) {
+            let data_dir = match paths
+                .map_err(Failure::from)
+                .and_then(|p| prepare_remote(shared, &p, &cfg_opt.clone().unwrap_or_default()).map(|d| (d, p)))
+            {
                 Ok((d, p)) => {
                     let stop_file = p.stop_request_file();
                     let watcher = shared.clone();
@@ -2554,11 +2379,7 @@ fn main() {
         })
         .build({
             let mut ctx = tauri::generate_context!();
-            if let Some(sfx) = identifier_suffix(
-                std::env::var(paperrust_desktop::paths::HOME_ENV)
-                    .ok()
-                    .as_deref(),
-            ) {
+            if let Some(sfx) = identifier_suffix(std::env::var(paperrust_desktop::paths::HOME_ENV).ok().as_deref()) {
                 ctx.config_mut().identifier.push_str(&sfx);
             }
             ctx
@@ -2594,11 +2415,7 @@ mod tests {
 
     #[test]
     fn identifier_per_home_override() {
-        assert_eq!(
-            identifier_suffix(None),
-            None,
-            "installierte App: Kennung unverändert"
-        );
+        assert_eq!(identifier_suffix(None), None, "installierte App: Kennung unverändert");
         assert_eq!(identifier_suffix(Some(" ")), None);
         let a = identifier_suffix(Some(r"C:\PaperRust\data")).unwrap();
         assert_eq!(a, identifier_suffix(Some("c:/paperrust/data/")).unwrap());
@@ -2623,10 +2440,7 @@ mod tests {
         s.set_ready("http://127.0.0.1:58080/");
         assert!(lock(&s.nav).allows(&u("http://127.0.0.1:58080/dashboard")));
         assert!(!lock(&s.nav).allows(&u("http://127.0.0.1:58081/")));
-        assert_eq!(
-            lock(&s.view).ready_url.as_deref(),
-            Some("http://127.0.0.1:58080/")
-        );
+        assert_eq!(lock(&s.view).ready_url.as_deref(), Some("http://127.0.0.1:58080/"));
         s.set_error(&Failure::other("kaputt".into()));
         assert_eq!(lock(&s.view).error_log.as_deref(), Some("desktop.log"));
         s.finished.store(true, Ordering::SeqCst);
@@ -2641,23 +2455,11 @@ mod tests {
 
     #[test]
     fn form_fields_to_choice() {
-        let f = |mode: &str, source: &str, media: &str| SetupForm {
-            mode: mode.into(),
-            source: source.into(),
-            media: media.into(),
-        };
+        let f = |mode: &str, source: &str, media: &str| SetupForm { mode: mode.into(), source: source.into(), media: media.into() };
         let c = setup_choice(f("import", " \"C:\\Export\\paperless.zip\" ", "")).unwrap();
-        assert!(
-            matches!(c, SetupChoice::ImportExport { ref source } if source == &PathBuf::from("C:\\Export\\paperless.zip"))
-        );
+        assert!(matches!(c, SetupChoice::ImportExport { ref source } if source == &PathBuf::from("C:\\Export\\paperless.zip")));
         let c = setup_choice(f("migrate-db", "sqlite:///C:/p/db.sqlite3", " ")).unwrap();
-        assert!(matches!(
-            c,
-            SetupChoice::MigrateDb {
-                media_dir: None,
-                ..
-            }
-        ));
+        assert!(matches!(c, SetupChoice::MigrateDb { media_dir: None, .. }));
         assert!(setup_choice(f("import", "", "")).is_err());
         assert!(setup_choice(f("x", "", "")).is_err());
         // "Start fresh" without user name/password: owner automatic
@@ -2705,9 +2507,7 @@ mod tests {
         let f = Failure::from(paperrust_desktop::DesktopError::Postgres("kaputt".into()));
         assert_eq!(f.log, "postgresql.log");
         assert!(f.advice.is_some());
-        let f = Failure::from(paperrust_desktop::DesktopError::Server(
-            "manage migrate fehlgeschlagen; Details in logs/manage.log".into(),
-        ));
+        let f = Failure::from(paperrust_desktop::DesktopError::Server("manage migrate fehlgeschlagen; Details in logs/manage.log".into()));
         assert_eq!(f.log, "manage.log");
     }
 
@@ -2715,9 +2515,7 @@ mod tests {
     fn pending_setup_answers_supervisor_once() {
         // First-start form before the supervisor: its question is answered without a second form.
         let s = Arc::new(Shared::default());
-        *lock(&s.pending_setup) = Some(SetupChoice::ImportExport {
-            source: PathBuf::from("C:\\x.zip"),
-        });
+        *lock(&s.pending_setup) = Some(SetupChoice::ImportExport { source: PathBuf::from("C:\\x.zip") });
         let taken = lock(&s.pending_setup).take();
         assert!(matches!(taken, Some(SetupChoice::ImportExport { .. })));
         assert!(lock(&s.pending_setup).is_none());
@@ -2731,10 +2529,7 @@ mod tests {
         // same address → no second profile
         let c2 = env_profile("https://docs.example.ch/", c.clone()).unwrap();
         assert_eq!(c2.profiles.len(), 1);
-        assert!(
-            env_profile("http://example.ch", AppConfig::default()).is_err(),
-            "öffentlich nie"
-        );
+        assert!(env_profile("http://example.ch", AppConfig::default()).is_err(), "öffentlich nie");
         // private without ALLOW_HTTP → rejected (variable is not set in the test run)
         if std::env::var(ENV_ALLOW_HTTP).is_err() {
             assert!(env_profile("http://192.168.1.2:8000", AppConfig::default()).is_err());

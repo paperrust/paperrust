@@ -13,9 +13,9 @@ use std::sync::Arc;
 
 use sqlx::Row;
 
+use crate::CliResult;
 use crate::args::{self, value};
 use crate::ctx::Ctx;
-use crate::CliResult;
 use pl_consumer::stages::{DocumentParsing, ParseRequest};
 
 const OPTS: &[args::Opt] = &[args::PROGRESS, args::PROCESSES, value(&["-d", "--document"], "document")];
@@ -98,7 +98,9 @@ pub async fn regenerate_parallel(
     processes: usize,
     print_failures: bool,
 ) -> CliResult<(usize, Vec<(i64, String)>)> {
-    let mut q = sqlx::QueryBuilder::<sqlx::Postgres>::new("SELECT id, mime_type, original_filename, filename FROM documents_document WHERE deleted_at IS NULL");
+    let mut q = sqlx::QueryBuilder::<sqlx::Postgres>::new(
+        "SELECT id, mime_type, original_filename, filename FROM documents_document WHERE deleted_at IS NULL",
+    );
     if let Some(d) = only {
         q.push(" AND id = ").push_bind(i32::try_from(d).unwrap_or(-1));
     }
@@ -106,12 +108,7 @@ pub async fn regenerate_parallel(
     let rows = q.build().fetch_all(&c.pool).await?;
     let mut items = Vec::with_capacity(rows.len());
     for r in rows {
-        items.push(Item {
-            id: i64::from(r.try_get::<i32, _>(0)?),
-            mime: r.try_get(1)?,
-            original: r.try_get(2)?,
-            filename: r.try_get(3)?,
-        });
+        items.push(Item { id: i64::from(r.try_get::<i32, _>(0)?), mime: r.try_get(1)?, original: r.try_get(2)?, filename: r.try_get(3)? });
     }
     let ocr_settings = pl_ocr::OcrSettings::from_process_env().map_err(|e| crate::CliError::Other(e.to_string()))?;
     let app = pl_consumer::consumer::load_app_config(&c.pool).await?;

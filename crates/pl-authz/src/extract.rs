@@ -23,16 +23,10 @@ async fn context(parts: &mut Parts) -> Result<Arc<AuthContext>, AuthError> {
     if let Some(ctx) = parts.extensions.get::<Arc<AuthContext>>() {
         return Ok(ctx.clone());
     }
-    let authz = parts
-        .extensions
-        .get::<Authz>()
-        .cloned()
-        .ok_or_else(|| AuthError::internal("pl_authz::Authz missing in request extensions"))?;
+    let authz =
+        parts.extensions.get::<Authz>().cloned().ok_or_else(|| AuthError::internal("pl_authz::Authz missing in request extensions"))?;
     let meta = crate::authn::RequestMeta {
-        remote_addr: parts
-            .extensions
-            .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
-            .map(|c| c.0.ip()),
+        remote_addr: parts.extensions.get::<axum::extract::ConnectInfo<std::net::SocketAddr>>().map(|c| c.0.ip()),
         csrf_form_token: parts.extensions.get::<crate::csrf::FormCsrfToken>().map(|t| t.0.clone()),
     };
     let ctx = Arc::new(authz.authenticate_with(&parts.method, parts.uri.path(), &parts.headers, &meta).await?);
@@ -151,9 +145,7 @@ mod tests {
 
     #[tokio::test]
     async fn extractor_rejects_anonymous() {
-        let pool = sqlx::postgres::PgPoolOptions::new()
-            .connect_lazy("postgres://invalid:invalid@127.0.0.1:1/invalid")
-            .unwrap();
+        let pool = sqlx::postgres::PgPoolOptions::new().connect_lazy("postgres://invalid:invalid@127.0.0.1:1/invalid").unwrap();
         let authz = Authz::new(pool, AuthConfig::for_tests("s"));
         let app = axum::Router::new()
             .route("/needs", get(|u: AuthUser| async move { u.user().username.clone() }))

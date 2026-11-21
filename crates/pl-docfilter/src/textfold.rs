@@ -92,9 +92,7 @@ impl UpperFold {
             ('\u{FB05}', "ST"),
             ('\u{FB06}', "ST"),
         ];
-        UpperFold {
-            specials: specials.iter().map(|(c, u)| (*c, (*u).to_string())).collect(),
-        }
+        UpperFold { specials: specials.iter().map(|(c, u)| (*c, (*u).to_string())).collect() }
     }
 
     pub fn specials(&self) -> &[(char, String)] {
@@ -107,13 +105,7 @@ impl UpperFold {
     }
 
     /// Like [`Self::lookup`] with its own maximum number of replacements (tests: `usize::MAX`).
-    pub fn lookup_limited(
-        &self,
-        lhs: SimpleExpr,
-        lookup: TextLookup,
-        value: &str,
-        max_replaces: usize,
-    ) -> SimpleExpr {
+    pub fn lookup_limited(&self, lhs: SimpleExpr, lookup: TextLookup, value: &str, max_replaces: usize) -> SimpleExpr {
         if !value.is_ascii() {
             return text_lookup(lhs, lookup, value);
         }
@@ -124,11 +116,8 @@ impl UpperFold {
             TextLookup::IExact => ("=", value.to_string()),
         };
         let upper = pattern.to_ascii_uppercase();
-        let relevant: Vec<&(char, String)> = self
-            .specials
-            .iter()
-            .filter(|(_, up)| up.chars().any(|u| u.is_ascii() && upper.contains(u)))
-            .collect();
+        let relevant: Vec<&(char, String)> =
+            self.specials.iter().filter(|(_, up)| up.chars().any(|u| u.is_ascii() && upper.contains(u))).collect();
         // Each replace() is another pass over the text; from MAX_REPLACES on, the
         // collation UPPER() form is equally fast or faster (measured, pgvalidate.md 9).
         if relevant.len() > max_replaces {
@@ -136,22 +125,14 @@ impl UpperFold {
         }
         let mut folded = Expr::cust_with_exprs(r#"UPPER(($1)::text COLLATE "C")"#, [lhs]);
         for (c, up) in relevant {
-            folded = Expr::cust_with_exprs(
-                "replace($1, $2, $3)",
-                [folded, Expr::val(c.to_string()).into(), Expr::val(up.clone()).into()],
-            );
+            folded = Expr::cust_with_exprs("replace($1, $2, $3)", [folded, Expr::val(c.to_string()).into(), Expr::val(up.clone()).into()]);
         }
         Expr::cust_with_exprs(format!("$1 {op} $2"), [folded, Expr::val(upper).into()])
     }
 }
 
 /// Text lookup with optional folding (`None` = Django form).
-pub fn folded_lookup(
-    fold: Option<&UpperFold>,
-    lhs: SimpleExpr,
-    lookup: TextLookup,
-    value: &str,
-) -> SimpleExpr {
+pub fn folded_lookup(fold: Option<&UpperFold>, lhs: SimpleExpr, lookup: TextLookup, value: &str) -> SimpleExpr {
     match fold {
         Some(f) => f.lookup(lhs, lookup, value),
         None => text_lookup(lhs, lookup, value),
@@ -199,9 +180,7 @@ mod tests {
 
     #[test]
     fn rows_validate_ascii() {
-        let mut rows: Vec<(i32, String)> = (1..128u8)
-            .map(|b| (b as i32, (b as char).to_ascii_uppercase().to_string()))
-            .collect();
+        let mut rows: Vec<(i32, String)> = (1..128u8).map(|b| (b as i32, (b as char).to_ascii_uppercase().to_string())).collect();
         rows.push((0xDF, "SS".into()));
         let f = UpperFold::from_db_rows(&rows).unwrap();
         assert_eq!(f.specials, vec![('\u{DF}', "SS".to_string())]);
@@ -221,25 +200,13 @@ mod tests {
             r#"SELECT replace(replace(UPPER(("t")::text COLLATE "C"), 'ŉ', 'ʼN'), 'ẖ', 'H̱') LIKE '%RECHNUNG%'"#
         );
         // without relevant special characters
-        assert_eq!(
-            sql(f.lookup(col(), TextLookup::IExact, "42 x")),
-            r#"SELECT UPPER(("t")::text COLLATE "C") = '42 X'"#
-        );
+        assert_eq!(sql(f.lookup(col(), TextLookup::IExact, "42 x")), r#"SELECT UPPER(("t")::text COLLATE "C") = '42 X'"#);
         // Escape like Django
-        assert_eq!(
-            sql(f.lookup(col(), TextLookup::IStartsWith, "5%_")),
-            r#"SELECT UPPER(("t")::text COLLATE "C") LIKE E'5\\%\\_%'"#
-        );
+        assert_eq!(sql(f.lookup(col(), TextLookup::IStartsWith, "5%_")), r#"SELECT UPPER(("t")::text COLLATE "C") LIKE E'5\\%\\_%'"#);
         // too many relevant special characters (S, T, F, I …: ß ſ ﬅ ﬆ ẗ …) → Django form
-        assert_eq!(
-            sql(f.lookup(col(), TextLookup::IContains, "strasse")),
-            sql(text_lookup(col(), TextLookup::IContains, "strasse"))
-        );
+        assert_eq!(sql(f.lookup(col(), TextLookup::IContains, "strasse")), sql(text_lookup(col(), TextLookup::IContains, "strasse")));
         // non-ASCII → Django form
-        assert_eq!(
-            sql(f.lookup(col(), TextLookup::IContains, "für")),
-            sql(text_lookup(col(), TextLookup::IContains, "für"))
-        );
+        assert_eq!(sql(f.lookup(col(), TextLookup::IContains, "für")), sql(text_lookup(col(), TextLookup::IContains, "für")));
     }
 
     /// Model of equality: ICU uppercase image (Rust `to_uppercase`, full mapping) against the
@@ -257,13 +224,28 @@ mod tests {
             s
         };
         let texts = [
-            "Straße", "STRASSE", "straſse", "ﬁle", "Rechnung", "rechnungß", "aı", "ǰo", "ẖa",
-            "Ärger", "ärger", "xﬀy", "ﬅop", "ŉo", "ʼn", "a\u{0307}b", "ΐ", "ﬃx", "Fİle",
+            "Straße",
+            "STRASSE",
+            "straſse",
+            "ﬁle",
+            "Rechnung",
+            "rechnungß",
+            "aı",
+            "ǰo",
+            "ẖa",
+            "Ärger",
+            "ärger",
+            "xﬀy",
+            "ﬅop",
+            "ŉo",
+            "ʼn",
+            "a\u{0307}b",
+            "ΐ",
+            "ﬃx",
+            "Fİle",
         ];
-        let pats = [
-            "STRASSE", "SS", "FILE", "FI", "RECHNUNG", "AI", "JO", "HA", "RGER", "FFY", "FY",
-            "STOP", "ʼN", "N", "IX", "FFI", "B", "I",
-        ];
+        let pats =
+            ["STRASSE", "SS", "FILE", "FI", "RECHNUNG", "AI", "JO", "HA", "RGER", "FFY", "FY", "STOP", "ʼN", "N", "IX", "FFI", "B", "I"];
         for t in texts {
             let icu: String = t.chars().flat_map(char::to_uppercase).collect();
             for p in pats {

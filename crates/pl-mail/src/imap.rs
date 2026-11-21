@@ -151,9 +151,7 @@ pub fn is_public_ip(ip: IpAddr) -> bool {
 
 /// `resolve_hostname_ips` (getaddrinfo, all families).
 pub async fn resolve_hostname_ips(host: &str) -> Result<Vec<IpAddr>, String> {
-    let addrs = tokio::net::lookup_host((host, 0))
-        .await
-        .map_err(|_| format!("Could not resolve hostname: {host}"))?;
+    let addrs = tokio::net::lookup_host((host, 0)).await.map_err(|_| format!("Could not resolve hostname: {host}"))?;
     let ips: Vec<IpAddr> = addrs.map(|a| a.ip()).collect();
     if ips.is_empty() {
         return Err(format!("Could not resolve hostname: {host}"));
@@ -214,27 +212,17 @@ enum Item {
 fn to_item(r: Response<'_>) -> Item {
     match r {
         Response::Continue { .. } => Item::Continue,
-        Response::Done { tag, status, code, .. } => Item::Tagged {
-            tag: tag.0,
-            status: st(&status),
-            read_only: matches!(code, Some(ResponseCode::ReadOnly)),
-        },
+        Response::Done { tag, status, code, .. } => {
+            Item::Tagged { tag: tag.0, status: st(&status), read_only: matches!(code, Some(ResponseCode::ReadOnly)) }
+        }
         Response::Data { status, code, .. } => {
             let caps = match &code {
                 Some(ResponseCode::Capabilities(c)) => Some(cap_strings(c)),
                 _ => None,
             };
-            Item::Untagged {
-                status: Some(st(&status)),
-                read_only: matches!(code, Some(ResponseCode::ReadOnly)),
-                caps,
-            }
+            Item::Untagged { status: Some(st(&status)), read_only: matches!(code, Some(ResponseCode::ReadOnly)), caps }
         }
-        Response::Capabilities(c) => Item::Untagged {
-            status: None,
-            read_only: false,
-            caps: Some(cap_strings(&c)),
-        },
+        Response::Capabilities(c) => Item::Untagged { status: None, read_only: false, caps: Some(cap_strings(&c)) },
         _ => Item::Untagged { status: None, read_only: false, caps: None },
     }
 }
@@ -448,15 +436,11 @@ fn root_store(opts: &ConnectOptions) -> Result<rustls::RootCertStore, String> {
     if let Some(path) = &opts.certificate_file {
         let data = std::fs::read(path).map_err(|e| format!("cafile: {e}"))?;
         for der in pem_certs(&data) {
-            roots
-                .add(rustls::pki_types::CertificateDer::from(der))
-                .map_err(|e| format!("cafile: {e}"))?;
+            roots.add(rustls::pki_types::CertificateDer::from(der)).map_err(|e| format!("cafile: {e}"))?;
         }
     }
     for der in &opts.extra_roots {
-        roots
-            .add(rustls::pki_types::CertificateDer::from(der.clone()))
-            .map_err(|e| format!("extra root: {e}"))?;
+        roots.add(rustls::pki_types::CertificateDer::from(der.clone())).map_err(|e| format!("extra root: {e}"))?;
     }
     Ok(roots)
 }
@@ -529,20 +513,14 @@ async fn get_mailbox(acc: &TestAccount, opts: &ConnectOptions) -> Result<Conn, T
     if !opts.allow_internal_hosts {
         let ips = resolve_hostname_ips(host).await.map_err(TestError::Mail)?;
         if ips.iter().any(|ip| !is_public_ip(*ip)) {
-            return Err(TestError::Mail(format!(
-                "Connection blocked: {host} resolves to a non-public address"
-            )));
+            return Err(TestError::Mail(format!("Connection blocked: {host} resolves to a non-public address")));
         }
         pinned = Some(ips);
     }
     if acc.imap_security == SECURITY_STARTTLS && acc.imap_port == 993 {
-        return Err(TestError::Other(
-            "Port 993 requires IMAP4_SSL. Use MailBox class for SSL/TLS connection.".into(),
-        ));
+        return Err(TestError::Other("Port 993 requires IMAP4_SSL. Use MailBox class for SSL/TLS connection.".into()));
     }
-    let tcp = tcp_connect(host, acc.imap_port, &pinned, opts.timeout)
-        .await
-        .map_err(TestError::Other)?;
+    let tcp = tcp_connect(host, acc.imap_port, &pinned, opts.timeout).await.map_err(TestError::Other)?;
     let mut stream: Box<dyn Stream> = Box::new(tcp);
     if acc.imap_security == SECURITY_SSL {
         stream = tls_wrap(stream, host, opts).await.map_err(TestError::Other)?;

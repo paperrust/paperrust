@@ -7,11 +7,11 @@
 use chrono::{DateTime, FixedOffset, NaiveDate, NaiveTime};
 use minijinja::value::Value;
 
-use crate::context::{custom_fields_context, CustomFieldInstance};
+use crate::context::{CustomFieldInstance, custom_fields_context};
 use crate::error::{TemplateError, WorkflowTemplateError};
 use crate::pystr::path_stem;
-use crate::pyvalue::{date_iso, PyDateTime};
-use crate::strftime::{strftime, TzInfo};
+use crate::pyvalue::{PyDateTime, date_iso};
+use crate::strftime::{TzInfo, strftime};
 
 /// `_known_placeholder_names`.
 pub const KNOWN_PLACEHOLDER_NAMES: &[&str] = &[
@@ -54,15 +54,11 @@ pub fn validate_workflow_template(text: &str) -> Result<(), WorkflowTemplateErro
     if let Some(msg) = crate::env::check_filter_and_test_names(text) {
         return Err(WorkflowTemplateError::ValueError(format!("Template assertion error: {msg}")));
     }
-    let undeclared = crate::env::undeclared_variables(text)
-        .map_err(|e| WorkflowTemplateError::ValueError(format!("Template syntax error: {e}")))?;
-    let unknown: Vec<String> =
-        undeclared.into_iter().filter(|v| !KNOWN_PLACEHOLDER_NAMES.contains(&v.as_str())).collect();
+    let undeclared =
+        crate::env::undeclared_variables(text).map_err(|e| WorkflowTemplateError::ValueError(format!("Template syntax error: {e}")))?;
+    let unknown: Vec<String> = undeclared.into_iter().filter(|v| !KNOWN_PLACEHOLDER_NAMES.contains(&v.as_str())).collect();
     if !unknown.is_empty() {
-        return Err(WorkflowTemplateError::KeyError(format!(
-            "Template references unknown placeholders: {}",
-            unknown.join(", ")
-        )));
+        return Err(WorkflowTemplateError::KeyError(format!("Template references unknown placeholders: {}", unknown.join(", "))));
     }
     Ok(())
 }

@@ -114,6 +114,7 @@ RUN --mount=type=cache,id=paperrust-cargo-registry,target=/usr/local/cargo/regis
     --mount=type=cache,id=paperrust-cargo-git,target=/usr/local/cargo/git \
     --mount=type=cache,id=paperrust-target-${TARGETARCH},target=/build/target \
     set -eux; \
+    if [ -z "${CARGO_BUILD_JOBS}" ]; then unset CARGO_BUILD_JOBS; fi; \
     if [ -n "${CARGO_RELEASE_LTO}" ]; then export CARGO_PROFILE_RELEASE_LTO="${CARGO_RELEASE_LTO}"; fi; \
     if [ -n "${CARGO_RELEASE_CODEGEN_UNITS}" ]; then export CARGO_PROFILE_RELEASE_CODEGEN_UNITS="${CARGO_RELEASE_CODEGEN_UNITS}"; fi; \
     rustc --version; \

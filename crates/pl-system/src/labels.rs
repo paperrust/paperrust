@@ -8,13 +8,8 @@
 mod generated;
 
 /// `PaperlessTask.Status` choices (value, label) in declaration order.
-pub const STATUS: &[(&str, &str)] = &[
-    ("pending", "Pending"),
-    ("started", "Started"),
-    ("success", "Success"),
-    ("failure", "Failure"),
-    ("revoked", "Revoked"),
-];
+pub const STATUS: &[(&str, &str)] =
+    &[("pending", "Pending"), ("started", "Started"), ("success", "Success"), ("failure", "Failure"), ("revoked", "Revoked")];
 
 /// `PaperlessTask.TaskType` choices in declaration order.
 pub const TASK_TYPE: &[(&str, &str)] = &[
@@ -55,11 +50,7 @@ pub fn label_of(choices: &[(&str, &'static str)], value: &str) -> Option<&'stati
 /// `gettext(msgid)` for the active language (`settings.LANGUAGES` code, e.g. `de-de`).
 pub fn translate(language: &str, msgid: &'static str) -> &'static str {
     let lang = language.to_ascii_lowercase();
-    generated::TRANSLATIONS
-        .iter()
-        .find(|(l, m, _)| *l == lang && *m == msgid)
-        .map(|(_, _, t)| *t)
-        .unwrap_or(msgid)
+    generated::TRANSLATIONS.iter().find(|(l, m, _)| *l == lang && *m == msgid).map(|(_, _, t)| *t).unwrap_or(msgid)
 }
 
 /// `get_<field>_display()`: translated label, or the raw value for unknown values.

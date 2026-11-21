@@ -116,7 +116,10 @@ pub enum InstanceCond {
     Field(i64),
     FieldIn(Vec<i64>),
     /// legacy `custom_fields__icontains`: field name, values or matching select options.
-    IContains { value: String, select_option_ids: Vec<String> },
+    IContains {
+        value: String,
+        select_option_ids: Vec<String>,
+    },
 }
 
 /// Value column of a custom field instance.
@@ -143,7 +146,9 @@ pub enum CfValue {
     Bool(bool),
     Int(i64),
     /// Integer outside `i64` (compared as `numeric` ±1e400, like Python `int`).
-    HugeInt { negative: bool },
+    HugeInt {
+        negative: bool,
+    },
     Float(f64),
     Text(String),
     Date(NaiveDate),
@@ -234,29 +239,75 @@ pub enum Pred {
     Not(Box<Pred>),
     /// Set complement: `(p) IS NOT TRUE` – also rows for which `p` is NULL (v2 `not`).
     Complement(Box<Pred>),
-    Num { col: NumCol, op: CmpOp, value: i64 },
-    NumIn { col: NumCol, values: Vec<i64> },
-    IsNull { col: NumCol, is_null: bool },
+    Num {
+        col: NumCol,
+        op: CmpOp,
+        value: i64,
+    },
+    NumIn {
+        col: NumCol,
+        values: Vec<i64>,
+    },
+    IsNull {
+        col: NumCol,
+        is_null: bool,
+    },
     /// `exclude(<fk>__id=x)` on a nullable FK: `NOT (fk = x AND fk IS NOT NULL)` (NULL stays).
-    FkNot { col: NumCol, id: i64 },
-    Text { col: TextCol, lookup: TextLookup, value: String },
+    FkNot {
+        col: NumCol,
+        id: i64,
+    },
+    Text {
+        col: TextCol,
+        lookup: TextLookup,
+        value: String,
+    },
     /// Name of the referenced object (`fk IN (SELECT id FROM <rel> WHERE name …)`).
-    RelName { rel: NamedRel, lookup: TextLookup, value: String },
+    RelName {
+        rel: NamedRel,
+        lookup: TextLookup,
+        value: String,
+    },
     /// `created` (DateField) against a date.
-    Created { op: CmpOp, date: NaiveDate },
+    Created {
+        op: CmpOp,
+        date: NaiveDate,
+    },
     /// `created BETWEEN from AND to` (`created__year`).
-    CreatedBetween { from: NaiveDate, to: NaiveDate },
+    CreatedBetween {
+        from: NaiveDate,
+        to: NaiveDate,
+    },
     /// `EXTRACT(part FROM created) <op> value` (integer overflow is already resolved).
-    CreatedPart { part: DatePart, op: CmpOp, value: i64 },
+    CreatedPart {
+        part: DatePart,
+        op: CmpOp,
+        value: i64,
+    },
     /// Timestamp comparison (UTC).
-    Ts { col: TsCol, op: CmpOp, at: DateTime<Utc> },
-    TsNotNull { col: TsCol },
+    Ts {
+        col: TsCol,
+        op: CmpOp,
+        at: DateTime<Utc>,
+    },
+    TsNotNull {
+        col: TsCol,
+    },
     /// `EXTRACT(part FROM col AT TIME ZONE tz) <op> value` (Django `USE_TZ`: local time).
-    TsPart { col: TsCol, part: DatePart, tz: String, op: CmpOp, value: i64 },
+    TsPart {
+        col: TsCol,
+        part: DatePart,
+        tz: String,
+        op: CmpOp,
+        value: i64,
+    },
     Tag(TagCond),
     Instance(InstanceCond),
     /// `EXISTS (instance of field field_id [with test])`; `None` = field present.
-    CustomField { field_id: i64, test: Option<CfCond> },
+    CustomField {
+        field_id: i64,
+        test: Option<CfCond>,
+    },
     /// There is a duplicate visible to the user (same checksum) – visibility is applied by
     /// the SQL builder.
     HasDuplicates(bool),

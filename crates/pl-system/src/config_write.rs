@@ -156,11 +156,7 @@ async fn parse_request(req: Request) -> Result<(Data, bool)> {
     let ct = req.headers().get(CONTENT_TYPE).and_then(|v| v.to_str().ok()).map(str::to_string);
     let main = media_main(ct.as_deref());
     if main == "multipart/form-data" {
-        let empty = req
-            .headers()
-            .get(axum::http::header::CONTENT_LENGTH)
-            .and_then(|v| v.to_str().ok())
-            .is_some_and(|v| v.trim() == "0");
+        let empty = req.headers().get(axum::http::header::CONTENT_LENGTH).and_then(|v| v.to_str().ok()).is_some_and(|v| v.trim() == "0");
         if empty {
             return Ok((Data::Form(Vec::new()), false));
         }
@@ -178,10 +174,7 @@ async fn parse_request(req: Request) -> Result<(Data, bool)> {
             };
             let name = field.name().unwrap_or("").to_string();
             let file_name = field.file_name().map(str::to_string);
-            let bytes = field
-                .bytes()
-                .await
-                .map_err(|e| ApiError::parse_error(Some(&format!("Multipart form parse error - {e}"))))?;
+            let bytes = field.bytes().await.map_err(|e| ApiError::parse_error(Some(&format!("Multipart form parse error - {e}"))))?;
             total += bytes.len();
             if total > MULTIPART_LIMIT {
                 return Err(ApiError::django_bad_request().into());
@@ -342,7 +335,9 @@ fn env_bool(key: &str, default: &str) -> bool {
 impl ValidationEnv {
     pub fn from_env() -> Self {
         Self {
-            max_image_pixels: pl_core::config::var("PAPERLESS_MAX_IMAGE_PIXELS").and_then(|v| crate::py::int(&v)).and_then(|v| i64::try_from(v).ok()),
+            max_image_pixels: pl_core::config::var("PAPERLESS_MAX_IMAGE_PIXELS")
+                .and_then(|v| crate::py::int(&v))
+                .and_then(|v| i64::try_from(v).ok()),
             llm_allow_internal: env_bool("PAPERLESS_AI_LLM_ALLOW_INTERNAL_ENDPOINTS", "true"),
             remote_ocr_allow_internal: env_bool("PAPERLESS_REMOTE_OCR_ALLOW_INTERNAL_ENDPOINTS", "true"),
         }
@@ -462,7 +457,8 @@ fn py_strip(s: &str) -> &str {
 fn py_float_str(s: &str) -> Option<f64> {
     let t = py_strip(s);
     if t.contains('_') {
-        let ok = t.split('_').all(|p| !p.is_empty()) && t.chars().all(|c| c.is_ascii_digit() || matches!(c, '_' | '.' | 'e' | 'E' | '+' | '-'));
+        let ok =
+            t.split('_').all(|p| !p.is_empty()) && t.chars().all(|c| c.is_ascii_digit() || matches!(c, '_' | '.' | 'e' | 'E' | '+' | '-'));
         if !ok {
             return None;
         }
@@ -516,10 +512,15 @@ async fn validate_field(name: &str, kind: FieldKind, input: Input, env: &Validat
             if !parsed.is_null() && !parsed.is_object() {
                 return Err(vec![format!("{name} must be a JSON object.")]);
             }
-            if tag_mapping && let Value::Object(m) = &parsed && !m.values().all(Value::is_string) {
+            if tag_mapping
+                && let Value::Object(m) = &parsed
+                && !m.values().all(Value::is_string)
+            {
                 return Err(vec!["barcode_tag_mapping values must be strings.".into()]);
             }
-            if name == "user_args" && let Value::Object(m) = &parsed {
+            if name == "user_args"
+                && let Value::Object(m) = &parsed
+            {
                 let reserved = reserved_user_args(m);
                 if !reserved.is_empty() {
                     return Err(vec![format!("user_args may not set arguments managed by PaperRust: {}.", reserved.join(", "))]);
@@ -549,11 +550,7 @@ async fn validate_field(name: &str, kind: FieldKind, input: Input, env: &Validat
                 return v(raw);
             }
             let s = py_str(&raw);
-            if choices.contains(&s.as_str()) {
-                v(Value::String(s))
-            } else {
-                Err(vec![format!("\"{s}\" is not a valid choice.")])
-            }
+            if choices.contains(&s.as_str()) { v(Value::String(s)) } else { Err(vec![format!("\"{s}\" is not a valid choice.")]) }
         }
         FieldKind::Char(_) | FieldKind::Url(_) => {
             let max = if let FieldKind::Char(m) = kind { m } else { 256 };
@@ -954,7 +951,8 @@ async fn get_object(state: &AppState, pk: &str) -> Result<i32> {
     let Ok(id) = i32::try_from(pk) else {
         return Err(ApiError::not_found_model("ApplicationConfiguration").into());
     };
-    let exists: Option<i32> = sqlx::query_scalar(&format!("SELECT id FROM {TABLE} WHERE id = $1")).bind(id).fetch_optional(state.db()).await?;
+    let exists: Option<i32> =
+        sqlx::query_scalar(&format!("SELECT id FROM {TABLE} WHERE id = $1")).bind(id).fetch_optional(state.db()).await?;
     exists.ok_or_else(|| Error::Api(ApiError::not_found_model("ApplicationConfiguration")))
 }
 
@@ -1030,9 +1028,7 @@ async fn update_impl(state: AppState, ctx: RequestContext, auth: AuthUser, pk: S
     }
     let cols: Vec<&str> = crate::config::model_field_names().collect();
     let set = cols.iter().map(|c| format!("{c} = EXCLUDED.{c}")).collect::<Vec<_>>().join(", ");
-    let sql = format!(
-        "INSERT INTO {TABLE} SELECT * FROM jsonb_populate_record(NULL::{TABLE}, $1) ON CONFLICT (id) DO UPDATE SET {set}"
-    );
+    let sql = format!("INSERT INTO {TABLE} SELECT * FROM jsonb_populate_record(NULL::{TABLE}, $1) ON CONFLICT (id) DO UPDATE SET {set}");
     let res = sqlx::query(&sql).bind(Value::Object(instance.clone())).execute(&mut *tx).await;
     if let Err(e) = res {
         if let Some(s) = &stored_logo {
@@ -1052,7 +1048,13 @@ async fn update_impl(state: AppState, ctx: RequestContext, auth: AuthUser, pk: S
 }
 
 /// `PUT /api/config/{pk}/`
-pub async fn update(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser, UrlPath(pk): UrlPath<String>, req: Request) -> Response {
+pub async fn update(
+    State(state): State<AppState>,
+    ctx: RequestContext,
+    auth: AuthUser,
+    UrlPath(pk): UrlPath<String>,
+    req: Request,
+) -> Response {
     match update_impl(state, ctx, auth, pk, req, false).await {
         Ok(r) => r,
         Err(e) => e.into_response(),
@@ -1060,7 +1062,13 @@ pub async fn update(State(state): State<AppState>, ctx: RequestContext, auth: Au
 }
 
 /// `PATCH /api/config/{pk}/`
-pub async fn partial_update(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser, UrlPath(pk): UrlPath<String>, req: Request) -> Response {
+pub async fn partial_update(
+    State(state): State<AppState>,
+    ctx: RequestContext,
+    auth: AuthUser,
+    UrlPath(pk): UrlPath<String>,
+    req: Request,
+) -> Response {
     match update_impl(state, ctx, auth, pk, req, true).await {
         Ok(r) => r,
         Err(e) => e.into_response(),
@@ -1068,7 +1076,12 @@ pub async fn partial_update(State(state): State<AppState>, ctx: RequestContext, 
 }
 
 /// `DELETE /api/config/{pk}/` – `instance.delete()` (the logo file stays, like Django).
-pub async fn destroy(State(state): State<AppState>, _ctx: RequestContext, auth: AuthUser, UrlPath(pk): UrlPath<String>) -> Result<Response> {
+pub async fn destroy(
+    State(state): State<AppState>,
+    _ctx: RequestContext,
+    auth: AuthUser,
+    UrlPath(pk): UrlPath<String>,
+) -> Result<Response> {
     if !auth.user().has_perm("paperless.delete_applicationconfiguration") {
         return Err(pl_authz::AuthError::permission_denied().into());
     }
@@ -1095,7 +1108,10 @@ mod tests {
 
     #[tokio::test]
     async fn json_fields_like_drf() {
-        let ok = run(json!({"pages": "5.0", "deskew": "yes", "rotate_pages_threshold": true, "output_type": "", "app_title": "  T  "}), true).await.unwrap();
+        let ok =
+            run(json!({"pages": "5.0", "deskew": "yes", "rotate_pages_threshold": true, "output_type": "", "app_title": "  T  "}), true)
+                .await
+                .unwrap();
         assert_eq!(
             ok,
             vec![
@@ -1136,12 +1152,17 @@ mod tests {
             json!({"user_args": ["user_args may not set arguments managed by PaperRust: sidecar."]})
         );
         assert_eq!(
-            run(json!({"user_args": r#"{"sidecar": 1, "output_file": 2, "input_file_or_options": 3, "deskew": true}"#}), true).await.unwrap_err(),
+            run(json!({"user_args": r#"{"sidecar": 1, "output_file": 2, "input_file_or_options": 3, "deskew": true}"#}), true)
+                .await
+                .unwrap_err(),
             json!({"user_args": ["user_args may not set arguments managed by PaperRust: input_file_or_options, output_file, sidecar."]})
         );
         assert!(run(json!({"user_args": "{\"unpaper_args\": \"--pre-rotate 90\"}"}), true).await.is_ok());
         assert_eq!(run(json!({"user_args": ""}), true).await.unwrap(), vec![("user_args", Validated::Value(Value::Null))]);
-        assert_eq!(run(json!([1]), true).await.unwrap_err(), json!({"non_field_errors": ["Invalid data. Expected a dictionary, but got list."]}));
+        assert_eq!(
+            run(json!([1]), true).await.unwrap_err(),
+            json!({"non_field_errors": ["Invalid data. Expected a dictionary, but got list."]})
+        );
     }
 
     #[tokio::test]
@@ -1169,12 +1190,18 @@ mod tests {
         let e = validate_data(Data::Form(vec![]), false, false, &env()).await.unwrap().unwrap_err();
         assert_eq!(e, json!({"user_args": ["This field is required."], "barcode_tag_mapping": ["This field is required."]}));
         // PUT: missing booleans become NULL
-        let full = Data::Form(vec![("user_args".into(), FormItem::Text("{}".into())), ("barcode_tag_mapping".into(), FormItem::Text("null".into()))]);
+        let full = Data::Form(vec![
+            ("user_args".into(), FormItem::Text("{}".into())),
+            ("barcode_tag_mapping".into(), FormItem::Text("null".into())),
+        ]);
         let ok = validate_data(full, false, false, &env()).await.unwrap().unwrap();
         assert_eq!(ok.len(), 2 + FIELDS.iter().filter(|(_, k)| *k == FieldKind::Bool).count());
         let up = Upload { name: "a.txt".into(), data: b"x".to_vec() };
         let e = validate_data(Data::Form(vec![("app_logo".into(), FormItem::File(up))]), true, true, &env()).await.unwrap().unwrap_err();
-        assert_eq!(e, json!({"app_logo": ["File extension \u{201c}txt\u{201d} is not allowed. Allowed extensions are: jpg, png, gif, svg."]}));
+        assert_eq!(
+            e,
+            json!({"app_logo": ["File extension \u{201c}txt\u{201d} is not allowed. Allowed extensions are: jpg, png, gif, svg."]})
+        );
         let up = Upload { name: "a.png".into(), data: Vec::new() };
         let e = validate_data(Data::Form(vec![("app_logo".into(), FormItem::File(up))]), true, true, &env()).await.unwrap().unwrap_err();
         assert_eq!(e, json!({"app_logo": ["The submitted file is empty."]}));
@@ -1190,7 +1217,10 @@ mod tests {
             validate_outbound_http_url("http://127.0.0.1:11434", false).await,
             Err("Connection blocked: 127.0.0.1 resolves to a non-public address".into())
         );
-        assert_eq!(validate_outbound_http_url("http://[::1]/", false).await.unwrap_err(), "Connection blocked: ::1 resolves to a non-public address");
+        assert_eq!(
+            validate_outbound_http_url("http://[::1]/", false).await.unwrap_err(),
+            "Connection blocked: ::1 resolves to a non-public address"
+        );
     }
 
     #[test]

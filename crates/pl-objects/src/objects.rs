@@ -11,9 +11,9 @@ use axum::http::StatusCode;
 use pl_authz::owned::ObjectGrantees;
 use pl_authz::perms::{ObjRef, guardian_has_perm};
 use pl_authz::{AuthUser, User};
+use pl_core::sqlbind::SqlxBinder;
 use pl_core::{ApiError, RequestContext};
 use sea_query::{Alias, Expr, PostgresQueryBuilder, Query};
-use pl_core::sqlbind::SqlxBinder;
 use sqlx::{PgPool, Postgres, Row, Transaction};
 
 use crate::audit;
@@ -61,7 +61,12 @@ pub async fn check_object_perm(db: &PgPool, auth: &AuthUser, kind: Kind, row: &O
 
 /// Children map for retrieve/create/update (`TagSerializer.get_children` without `children_map`):
 /// visible tags below `root`, ordered by the request ordering, grouped by parent.
-pub async fn children_of(db: &PgPool, user: &User, root: &ObjectRow, ctx: &RequestContext) -> Result<HashMap<i64, Vec<ObjectRow>>, ApiError> {
+pub async fn children_of(
+    db: &PgPool,
+    user: &User,
+    root: &ObjectRow,
+    ctx: &RequestContext,
+) -> Result<HashMap<i64, Vec<ObjectRow>>, ApiError> {
     let mut out: HashMap<i64, Vec<ObjectRow>> = HashMap::new();
     if root.tag.is_none() {
         return Ok(out);
@@ -82,8 +87,7 @@ pub async fn children_of(db: &PgPool, user: &User, root: &ObjectRow, ctx: &Reque
     // Walk from the root through the parent edges, so only reachable (visible) nodes appear.
     let mut frontier = vec![root.id];
     while let Some(node) = frontier.pop() {
-        let kids: Vec<ObjectRow> =
-            rows.iter().filter(|r| r.tag.as_ref().and_then(|t| t.tn_parent_id) == Some(node)).cloned().collect();
+        let kids: Vec<ObjectRow> = rows.iter().filter(|r| r.tag.as_ref().and_then(|t| t.tn_parent_id) == Some(node)).cloned().collect();
         frontier.extend(kids.iter().map(|k| k.id));
         if !kids.is_empty() {
             out.insert(node, kids);
@@ -93,7 +97,13 @@ pub async fn children_of(db: &PgPool, user: &User, root: &ObjectRow, ctx: &Reque
 }
 
 /// Serialize one object outside the list action (retrieve/create/update responses).
-pub async fn serialize_single(db: &PgPool, kind: Kind, user: &User, ctx: &RequestContext, row: &ObjectRow) -> Result<serde_json::Value, ApiError> {
+pub async fn serialize_single(
+    db: &PgPool,
+    kind: Kind,
+    user: &User,
+    ctx: &RequestContext,
+    row: &ObjectRow,
+) -> Result<serde_json::Value, ApiError> {
     let children = if kind == Kind::Tag { Some(children_of(db, user, row, ctx).await?) } else { None };
     let full_perms = drf::full_perms(ctx);
     let grantees: HashMap<i64, ObjectGrantees> = if full_perms {
@@ -209,10 +219,7 @@ pub async fn delete_objects(
                     .await?;
             }
             Relation::M2m { table, column } => {
-                sqlx::query(&format!("DELETE FROM {table} WHERE {column} = ANY($1::bigint[])"))
-                    .bind(&all)
-                    .execute(&mut **tx)
-                    .await?;
+                sqlx::query(&format!("DELETE FROM {table} WHERE {column} = ANY($1::bigint[])")).bind(&all).execute(&mut **tx).await?;
             }
         }
     }

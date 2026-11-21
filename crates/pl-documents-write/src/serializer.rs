@@ -421,7 +421,11 @@ async fn validate_set_permissions_conn(
             let Some(ids) = ids else { continue };
             let Some(ids) = ids else {
                 // users: null → values_list over none() → []
-                if slot == 0 { upd.users = Some(vec![]) } else { upd.groups = Some(vec![]) }
+                if slot == 0 {
+                    upd.users = Some(vec![])
+                } else {
+                    upd.groups = Some(vec![])
+                }
                 continue;
             };
             let valid: Vec<i32> = ids.iter().flatten().filter_map(|i| i32::try_from(*i).ok()).collect();
@@ -582,10 +586,7 @@ pub async fn validate_cfi(
                         match def {
                             Some(d) => field = Some(d),
                             None => {
-                                errors.insert(
-                                    "field".into(),
-                                    msg(format!("Invalid pk \"{}\" - object does not exist.", py_str(fv2))),
-                                );
+                                errors.insert("field".into(), msg(format!("Invalid pk \"{}\" - object does not exist.", py_str(fv2))));
                             }
                         }
                     }
@@ -652,9 +653,7 @@ pub async fn validate_cfi(
                     .and_then(|e| e.get("select_options"))
                     .cloned()
                     .ok_or_else(|| ApiError::Uncaught("KeyError: 'select_options'".into()))?;
-                let found = opts
-                    .as_array()
-                    .is_some_and(|a| a.iter().any(|o| o.get("id").is_some_and(|id| py_eq(id, &v))));
+                let found = opts.as_array().is_some_and(|a| a.iter().any(|o| o.get("id").is_some_and(|id| py_eq(id, &v))));
                 if !found {
                     return nf(format!("Value must be an id of an element in {}", drf::py_repr(&opts)));
                 }
@@ -669,12 +668,10 @@ pub async fn validate_cfi(
                     }
                 }
                 let p32: Vec<i32> = parsed.iter().filter_map(|i| i32::try_from(*i).ok()).collect();
-                let count: i64 = sqlx::query_scalar(
-                    "SELECT count(*) FROM documents_document WHERE id = ANY($1) AND deleted_at IS NULL",
-                )
-                .bind(&p32)
-                .fetch_one(&mut *conn)
-                .await?;
+                let count: i64 = sqlx::query_scalar("SELECT count(*) FROM documents_document WHERE id = ANY($1) AND deleted_at IS NULL")
+                    .bind(&p32)
+                    .fetch_one(&mut *conn)
+                    .await?;
                 if count as usize != parsed.len() {
                     return nf("Some documents in value don't exist or were specified twice.".into());
                 }
@@ -703,8 +700,8 @@ fn py_eq(a: &Value, b: &Value) -> bool {
 
 /// `Document.objects.filter(id__in=ids).exclude(id__in=permitted_document_ids(user, "change_document")).exists()` == false.
 async fn permitted_change_all(conn: &mut PgConnection, user: &CurrentUser, ids: &[i32]) -> Result<bool, ApiError> {
-    use sea_query::{Expr, PostgresQueryBuilder, Query};
     use pl_core::sqlbind::SqlxBinder;
+    use sea_query::{Expr, PostgresQueryBuilder, Query};
     if ids.is_empty() {
         return Ok(true);
     }

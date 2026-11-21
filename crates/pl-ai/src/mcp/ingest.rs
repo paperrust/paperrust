@@ -29,7 +29,8 @@ const ODF: [(&str, &str); 3] = [
     ("ods", "application/vnd.oasis.opendocument.spreadsheet"),
     ("odp", "application/vnd.oasis.opendocument.presentation"),
 ];
-const OLE: [(&str, &str); 3] = [("doc", "application/msword"), ("xls", "application/vnd.ms-excel"), ("ppt", "application/vnd.ms-powerpoint")];
+const OLE: [(&str, &str); 3] =
+    [("doc", "application/msword"), ("xls", "application/vnd.ms-excel"), ("ppt", "application/vnd.ms-powerpoint")];
 
 fn ext_of(name: &str) -> String {
     name.rsplit_once('.').map(|(_, e)| e.to_ascii_lowercase()).unwrap_or_default()
@@ -90,10 +91,8 @@ pub fn safe_filename(name: &str, ext: &str) -> String {
         Some((s, _)) if !s.is_empty() => s,
         _ => base,
     };
-    let mut clean: String = stem
-        .chars()
-        .map(|c| if c.is_alphanumeric() || matches!(c, ' ' | '-' | '_' | '(' | ')' | ',') { c } else { '_' })
-        .collect();
+    let mut clean: String =
+        stem.chars().map(|c| if c.is_alphanumeric() || matches!(c, ' ' | '-' | '_' | '(' | ')' | ',') { c } else { '_' }).collect();
     clean = clean.trim().trim_matches('.').to_string();
     if clean.is_empty() {
         clean = "document".into();
@@ -223,7 +222,15 @@ mod tests {
 
     #[tokio::test]
     async fn ssrf_guard() {
-        for u in ["http://127.0.0.1/x", "http://10.0.0.1/", "http://[::1]/", "http://169.254.169.254/latest/meta-data", "file:///etc/passwd", "ftp://example.com/x", "http://0.0.0.0/"] {
+        for u in [
+            "http://127.0.0.1/x",
+            "http://10.0.0.1/",
+            "http://[::1]/",
+            "http://169.254.169.254/latest/meta-data",
+            "file:///etc/passwd",
+            "ftp://example.com/x",
+            "http://0.0.0.0/",
+        ] {
             assert!(fetch_url(u, 1000, false).await.is_err(), "{u}");
         }
     }

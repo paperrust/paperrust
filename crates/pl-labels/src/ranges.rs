@@ -12,9 +12,9 @@
 use serde::{Deserialize, Serialize};
 use sqlx::{PgConnection, Row};
 
-use crate::{ASN_MAX_STORABLE, Result, invalid};
 #[cfg(test)]
 use crate::LabelError;
+use crate::{ASN_MAX_STORABLE, Result, invalid};
 
 /// Migration (name, SQL) for `pl-cli migrate` (`paperrust_migrations`).
 pub const MIGRATION: (&str, &str) = ("pl_labels.0002_paperrust_asn_ranges", include_str!("../migrations/0002_paperrust_asn_ranges.sql"));
@@ -213,20 +213,29 @@ fn status_of(r: &sqlx::postgres::PgRow) -> Result<RangeStatus> {
     };
     let next = next_in_range(range.first_asn, range.last_asn, r.try_get("max_doc")?, r.try_get("max_printed")?);
     let remaining = next.map_or(0, |n| range.last_asn - n + 1);
-    Ok(RangeStatus { created: r.try_get("created")?, modified: r.try_get("modified")?, used: r.try_get("used")?, next_asn: next, remaining, range })
+    Ok(RangeStatus {
+        created: r.try_get("created")?,
+        modified: r.try_get("modified")?,
+        used: r.try_get("used")?,
+        next_asn: next,
+        remaining,
+        range,
+    })
 }
 
 /// Are the tables there? (Consumer/PATCH create nothing, they only read.)
 async fn tables_exist(db: &mut PgConnection) -> Result<bool> {
-    let ok: bool = sqlx::query_scalar("SELECT to_regclass('paperrust_asn_range') IS NOT NULL AND to_regclass('paperrust_asn_config') IS NOT NULL")
-        .fetch_one(&mut *db)
-        .await?;
+    let ok: bool =
+        sqlx::query_scalar("SELECT to_regclass('paperrust_asn_range') IS NOT NULL AND to_regclass('paperrust_asn_config') IS NOT NULL")
+            .fetch_one(&mut *db)
+            .await?;
     Ok(ok)
 }
 
 pub async fn get_config(db: &mut PgConnection) -> Result<RangeConfig> {
-    let row: Option<(bool, String)> =
-        sqlx::query_as("SELECT ranges_enabled, location_field_name FROM paperrust_asn_config WHERE id = 1").fetch_optional(&mut *db).await?;
+    let row: Option<(bool, String)> = sqlx::query_as("SELECT ranges_enabled, location_field_name FROM paperrust_asn_config WHERE id = 1")
+        .fetch_optional(&mut *db)
+        .await?;
     Ok(row.map(|(ranges_enabled, location_field_name)| RangeConfig { ranges_enabled, location_field_name }).unwrap_or_default())
 }
 
@@ -335,7 +344,8 @@ pub async fn location_target(db: &mut PgConnection, asn: i64) -> Result<Option<L
     if !cfg.ranges_enabled {
         return Ok(None);
     }
-    let rows: Vec<(i64, i64, String)> = sqlx::query_as("SELECT first_asn, last_asn, location FROM paperrust_asn_range").fetch_all(&mut *db).await?;
+    let rows: Vec<(i64, i64, String)> =
+        sqlx::query_as("SELECT first_asn, last_asn, location FROM paperrust_asn_range").fetch_all(&mut *db).await?;
     let Some(location) = rows.iter().find(|(f, l, _)| (*f..=*l).contains(&asn)).map(|r| r.2.clone()).filter(|l| !l.is_empty()) else {
         return Ok(None);
     };
@@ -356,15 +366,18 @@ pub fn should_write(existing: Option<&str>, t: &LocationTarget) -> bool {
 /// Id of the user field `name` of type text; creates it if missing. `None` if the name exists
 /// with another type (then the hook sets nothing).
 pub async fn ensure_location_field(db: &mut PgConnection, name: &str) -> Result<Option<i64>> {
-    let row: Option<(i32, String)> =
-        sqlx::query_as("SELECT id, data_type FROM documents_customfield WHERE name = $1 ORDER BY id LIMIT 1").bind(name).fetch_optional(&mut *db).await?;
+    let row: Option<(i32, String)> = sqlx::query_as("SELECT id, data_type FROM documents_customfield WHERE name = $1 ORDER BY id LIMIT 1")
+        .bind(name)
+        .fetch_optional(&mut *db)
+        .await?;
     if let Some((id, ty)) = row {
         return Ok((ty == "string").then_some(i64::from(id)));
     }
-    let id: i32 = sqlx::query_scalar("INSERT INTO documents_customfield (created, name, data_type) VALUES (now(), $1, 'string') RETURNING id")
-        .bind(name)
-        .fetch_one(&mut *db)
-        .await?;
+    let id: i32 =
+        sqlx::query_scalar("INSERT INTO documents_customfield (created, name, data_type) VALUES (now(), $1, 'string') RETURNING id")
+            .bind(name)
+            .fetch_one(&mut *db)
+            .await?;
     Ok(Some(i64::from(id)))
 }
 
@@ -386,11 +399,26 @@ mod tests {
     use super::*;
 
     fn r(id: i64, code: &str, first: i64, last: i64, loc: &str) -> AsnRange {
-        AsnRange { id, name: format!("R{id}"), code: code.into(), location: loc.into(), first_asn: first, last_asn: last, note: String::new() }
+        AsnRange {
+            id,
+            name: format!("R{id}"),
+            code: code.into(),
+            location: loc.into(),
+            first_asn: first,
+            last_asn: last,
+            note: String::new(),
+        }
     }
 
     fn input(code: &str, first: i64, last: i64) -> RangeInput {
-        RangeInput { name: " Zürich ".into(), code: code.into(), location: " Archiv Zürich, Regal 3 ".into(), first_asn: first, last_asn: last, note: String::new() }
+        RangeInput {
+            name: " Zürich ".into(),
+            code: code.into(),
+            location: " Archiv Zürich, Regal 3 ".into(),
+            first_asn: first,
+            last_asn: last,
+            note: String::new(),
+        }
     }
 
     fn field(res: Result<RangeInput>) -> String {
@@ -451,7 +479,11 @@ mod tests {
 
     #[test]
     fn hook_never_overwrites_manual_value() {
-        let t = LocationTarget { field_name: "Ablageort".into(), location: "Zürich".into(), known_locations: vec!["Zürich".into(), "Bern".into()] };
+        let t = LocationTarget {
+            field_name: "Ablageort".into(),
+            location: "Zürich".into(),
+            known_locations: vec!["Zürich".into(), "Bern".into()],
+        };
         assert!(should_write(None, &t));
         assert!(should_write(Some(""), &t));
         assert!(should_write(Some("  "), &t));

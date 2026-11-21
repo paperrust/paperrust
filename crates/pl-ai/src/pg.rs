@@ -38,12 +38,10 @@ fn kind_from(s: &str) -> Option<TaxonomyKind> {
 impl SideStore for PgSideStore {
     fn aliases(&self, kind: TaxonomyKind) -> BoxFuture<'_, BResult<Vec<Alias>>> {
         Box::pin(async move {
-            let r = sqlx::query(
-                "SELECT kind, target_id, alias, alias_key FROM paperrust_taxonomy_alias WHERE kind = $1 ORDER BY id",
-            )
-            .bind(kind.as_str())
-            .fetch_all(&self.pool)
-            .await;
+            let r = sqlx::query("SELECT kind, target_id, alias, alias_key FROM paperrust_taxonomy_alias WHERE kind = $1 ORDER BY id")
+                .bind(kind.as_str())
+                .fetch_all(&self.pool)
+                .await;
             match r {
                 Ok(rows) => Ok(rows
                     .iter()

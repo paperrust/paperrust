@@ -381,19 +381,53 @@ mod tests {
 
     #[test]
     fn index_fallthrough() {
-        for p in ["/", "/dashboard", "/documents/12/details", "/api/foo/", "/api", "/static/x.js", "/accounts/foo/",
-            "/admin", "/fetch/doc/abc", "/assets/", "/media/x", "/api/tags/1/2/3/", "/ws/status/"] {
+        for p in [
+            "/",
+            "/dashboard",
+            "/documents/12/details",
+            "/api/foo/",
+            "/api",
+            "/static/x.js",
+            "/accounts/foo/",
+            "/admin",
+            "/fetch/doc/abc",
+            "/assets/",
+            "/media/x",
+            "/api/tags/1/2/3/",
+            "/ws/status/",
+        ] {
             assert!(!is_upstream_view(p), "{p}");
         }
     }
 
     #[test]
     fn specific_views() {
-        for p in ["/api/", "/api/tags/", "/api/tags/5/", "/api/tags.json", "/api/tags/5.json/", "/api/documents/merge_as_versions/",
-            "/api/statistics/x", "/admin/", "/admin/auth/user/", "/fetch/doc/12", "/assets/logo.svg", "/assets/a/b.svg",
-            "/logo", "/logo/", "/logo/x.png", "/share/abc", "/share/abc/", "/favicon.ico", "/accounts/login/",
-            "/accounts/password/reset/key/1-abc/", "/accounts/oidc/x/login/callback/", "/accounts/google/login/",
-            "/api/auth/headless/browser/v1/config", "/api/documents/1/versions/2/"] {
+        for p in [
+            "/api/",
+            "/api/tags/",
+            "/api/tags/5/",
+            "/api/tags.json",
+            "/api/tags/5.json/",
+            "/api/documents/merge_as_versions/",
+            "/api/statistics/x",
+            "/admin/",
+            "/admin/auth/user/",
+            "/fetch/doc/12",
+            "/assets/logo.svg",
+            "/assets/a/b.svg",
+            "/logo",
+            "/logo/",
+            "/logo/x.png",
+            "/share/abc",
+            "/share/abc/",
+            "/favicon.ico",
+            "/accounts/login/",
+            "/accounts/password/reset/key/1-abc/",
+            "/accounts/oidc/x/login/callback/",
+            "/accounts/google/login/",
+            "/api/auth/headless/browser/v1/config",
+            "/api/documents/1/versions/2/",
+        ] {
             assert!(is_upstream_view(p), "{p}");
         }
     }
@@ -411,7 +445,10 @@ mod tests {
         assert_eq!(format_suffix("/static/a.json"), None);
         let req = |p: &str| axum::http::Request::builder().uri(p).body(axum::body::Body::empty()).unwrap_or_default();
         let r = rewrite_format_suffix(req("/api/tags/1.5/?x=1"));
-        assert_eq!((r.uri().path_and_query().map(|p| p.as_str()), r.extensions().get::<RejectFormat>().is_some()), (Some("/api/tags/1/?x=1"), true));
+        assert_eq!(
+            (r.uri().path_and_query().map(|p| p.as_str()), r.extensions().get::<RejectFormat>().is_some()),
+            (Some("/api/tags/1/?x=1"), true)
+        );
         let r = rewrite_format_suffix(req("/api/tags/2.json/"));
         assert_eq!((r.uri().path(), r.extensions().get::<RejectFormat>().is_some()), ("/api/tags/2/", false));
     }

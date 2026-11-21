@@ -7,8 +7,8 @@
 use crate::drf::{self, VErr, msg};
 use crate::pyfmt::{self, PyInt};
 use crate::schema::T_CF;
-use sea_query::{Alias, Expr, PostgresQueryBuilder, Query};
 use pl_core::sqlbind::SqlxBinder;
+use sea_query::{Alias, Expr, PostgresQueryBuilder, Query};
 use serde_json::{Map, Value, json};
 use sqlx::{PgConnection, Row};
 
@@ -166,9 +166,7 @@ impl<'a> P<'a> {
                 }
             },
         };
-        found.ok_or_else(|| {
-            VErr::Detail(msg(format!("{} is not a valid custom field.", pyfmt::repr(id_or_name))))
-        })
+        found.ok_or_else(|| VErr::Detail(msg(format!("{} is not a valid custom field.", pyfmt::repr(id_or_name)))))
     }
 
     async fn fetch_cf(&mut self, q: &sea_query::SelectStatement) -> Result<Option<Cf>, VErr> {
@@ -200,15 +198,12 @@ fn validate_op(cf: &Cf, raw_op: &Value) -> Result<(), VErr> {
     };
     let mut supported = cats.iter().any(|c| exprs(c).contains(&op.as_str()));
     if let Some(p) = &prefix
-        && !(DATE_COMPONENTS.contains(&p.as_str()) && cf.data_type == "date") {
-            supported = false;
-        }
+        && !(DATE_COMPONENTS.contains(&p.as_str()) && cf.data_type == "date")
+    {
+        supported = false;
+    }
     if !supported {
-        return Err(VErr::Detail(msg(format!(
-            "{} does not support query expr {}.",
-            cf.data_type,
-            pyfmt::repr(raw_op)
-        ))));
+        return Err(VErr::Detail(msg(format!("{} does not support query expr {}.", cf.data_type, pyfmt::repr(raw_op)))));
     }
     Ok(())
 }
@@ -235,12 +230,7 @@ fn serializer_field(cf: &Cf, full_op: &Value) -> Result<VField, VErr> {
     } else if dt == "date" {
         VField::Date
     } else if dt == "documentlink" {
-        VField::List {
-            child: Box::new(VField::Int { min: None, max: None }),
-            allow_empty: true,
-            min_len: None,
-            max_len: None,
-        }
+        VField::List { child: Box::new(VField::Int { min: None, max: None }), allow_empty: true, min_len: None, max_len: None }
     } else if dt == "select" {
         let opts = match &cf.extra_data {
             Value::Object(o) => match o.get("select_options") {
@@ -305,9 +295,10 @@ fn run_validation(f: &VField, data: &Value) -> Result<(), VErr> {
         VField::Select(opts) => {
             let mut d = data.clone();
             if let Value::Array(options) = opts
-                && let Some(o) = options.iter().find(|o| o.get("label") == Some(data)) {
-                    d = o.get("id").cloned().unwrap_or(Value::Null);
-                }
+                && let Some(o) = options.iter().find(|o| o.get("label") == Some(data))
+            {
+                d = o.get("id").cloned().unwrap_or(Value::Null);
+            }
             drf::char_field(&d, Some(16)).map(|_| ())
         }
         VField::Monetary => monetary_field(data),
@@ -315,10 +306,7 @@ fn run_validation(f: &VField, data: &Value) -> Result<(), VErr> {
             let items = match data {
                 Value::Array(a) => a,
                 other => {
-                    return Err(VErr::Detail(msg(format!(
-                        "Expected a list of items but got type \"{}\".",
-                        pyfmt::type_name(other)
-                    ))));
+                    return Err(VErr::Detail(msg(format!("Expected a list of items but got type \"{}\".", pyfmt::type_name(other)))));
                 }
             };
             if !allow_empty && items.is_empty() {
@@ -339,13 +327,15 @@ fn run_validation(f: &VField, data: &Value) -> Result<(), VErr> {
             }
             let mut errs = Vec::new();
             if let Some(mx) = max_len
-                && items.len() > *mx {
-                    errs.push(json!(format!("Ensure this field has no more than {mx} elements.")));
-                }
+                && items.len() > *mx
+            {
+                errs.push(json!(format!("Ensure this field has no more than {mx} elements.")));
+            }
             if let Some(mn) = min_len
-                && items.len() < *mn {
-                    errs.push(json!(format!("Ensure this field has at least {mn} elements.")));
-                }
+                && items.len() < *mn
+            {
+                errs.push(json!(format!("Ensure this field has at least {mn} elements.")));
+            }
             if !errs.is_empty() {
                 return Err(VErr::Detail(Value::Array(errs)));
             }
@@ -429,9 +419,11 @@ fn monetary_field(data: &Value) -> Result<(), VErr> {
     };
     let mut value: String = pyfmt::py_strip(&s).to_string();
     if let Some(first) = value.chars().next()
-        && !first.is_numeric() && first != '-' {
-            value = value.chars().skip(3).collect();
-        }
+        && !first.is_numeric()
+        && first != '-'
+    {
+        value = value.chars().skip(3).collect();
+    }
     // Decimal(value)
     let t = pyfmt::py_strip(&value);
     let body = t.strip_prefix(['+', '-']).unwrap_or(t);
@@ -454,9 +446,7 @@ fn date_field(data: &Value) -> Result<(), VErr> {
         if relative_date(s) {
             return Ok(());
         }
-        return Err(VErr::Detail(msg(
-            "Expected a date or a relative date such as \"today\" or \"in 30 days\".",
-        )));
+        return Err(VErr::Detail(msg("Expected a date or a relative date such as \"today\" or \"in 30 days\".")));
     }
     Err(VErr::Detail(msg("Date has wrong format. Use one of these formats instead: YYYY-MM-DD.")))
 }
@@ -473,21 +463,29 @@ fn parse_iso_date(s: &str) -> bool {
         if part.chars().all(|c| c.is_ascii_digit()) { part.parse().ok() } else { None }
     };
     // YYYY-MM-DD / YYYYMMDD
-    if b.len() == 10 && b[4] == b'-' && b[7] == b'-'
+    if b.len() == 10
+        && b[4] == b'-'
+        && b[7] == b'-'
         && let (Some(y), Some(m), Some(d)) = (digits(0..4), digits(5..7), digits(8..10))
-            && valid_ymd(y, m, d) {
-                return true;
-            }
+        && valid_ymd(y, m, d)
+    {
+        return true;
+    }
     if b.len() == 8
         && let (Some(y), Some(m), Some(d)) = (digits(0..4), digits(4..6), digits(6..8))
-            && valid_ymd(y, m, d) {
-                return true;
-            }
+        && valid_ymd(y, m, d)
+    {
+        return true;
+    }
     // ISO-Woche YYYY-Www-D / YYYYWwwD / YYYY-Www / YYYYWww
     let iso_week = |y: i64, w: i64, d: i64| -> bool {
         (1..=7).contains(&d)
-            && chrono::NaiveDate::from_isoywd_opt(y as i32, w as u32, chrono::Weekday::try_from((d - 1) as u8).unwrap_or(chrono::Weekday::Mon))
-                .is_some()
+            && chrono::NaiveDate::from_isoywd_opt(
+                y as i32,
+                w as u32,
+                chrono::Weekday::try_from((d - 1) as u8).unwrap_or(chrono::Weekday::Mon),
+            )
+            .is_some()
     };
     let wk = |s: &str| -> Option<(i64, i64, i64)> {
         let t: String = s.chars().filter(|c| *c != '-').collect();
@@ -510,9 +508,10 @@ fn parse_iso_date(s: &str) -> bool {
             || s.len() == 7 && !s.contains('-');
         if dashed_ok
             && let Some((y, w, d)) = wk(s)
-                && iso_week(y, w, d) {
-                    return true;
-                }
+            && iso_week(y, w, d)
+        {
+            return true;
+        }
     }
     // date_re: \d{4}-\d{1,2}-\d{1,2}$ (Python `$` allows a trailing \n)
     let t = s.strip_suffix('\n').unwrap_or(s);
@@ -571,10 +570,7 @@ mod tests {
     #[test]
     fn ops() {
         assert!(validate_op(&cf("string"), &json!("icontains")).is_ok());
-        assert_eq!(
-            detail(validate_op(&cf("boolean"), &json!("gt"))),
-            json!(["boolean does not support query expr 'gt'."])
-        );
+        assert_eq!(detail(validate_op(&cf("boolean"), &json!("gt"))), json!(["boolean does not support query expr 'gt'."]));
         assert!(validate_op(&cf("date"), &json!("year__gte")).is_ok());
         assert!(validate_op(&cf("integer"), &json!("year__gte")).is_err());
     }
@@ -582,10 +578,7 @@ mod tests {
     #[test]
     fn values() {
         assert!(validate_value(&cf("integer"), &json!("exact"), &json!(5)).is_ok());
-        assert_eq!(
-            detail(validate_value(&cf("integer"), &json!("in"), &json!([1, "x"]))),
-            json!({"1": ["A valid integer is required."]})
-        );
+        assert_eq!(detail(validate_value(&cf("integer"), &json!("in"), &json!([1, "x"]))), json!({"1": ["A valid integer is required."]}));
         assert_eq!(
             detail(validate_value(&cf("integer"), &json!("range"), &json!([1]))),
             json!(["Ensure this field has at least 2 elements."])
@@ -600,10 +593,7 @@ mod tests {
         assert!(validate_value(&cf("monetary"), &json!("gt"), &json!("abc")).is_err());
         assert!(validate_value(&cf("select"), &json!("exact"), &json!("A")).is_ok());
         assert!(validate_value(&cf("string"), &json!("exact"), &json!("")).is_ok());
-        assert_eq!(
-            detail(validate_value(&cf("url"), &json!("exact"), &json!(""))),
-            json!(["This field may not be blank."])
-        );
+        assert_eq!(detail(validate_value(&cf("url"), &json!("exact"), &json!(""))), json!(["This field may not be blank."]));
         assert!(validate_value(&cf("boolean"), &json!("exists"), &json!(true)).is_ok());
     }
 }

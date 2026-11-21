@@ -51,10 +51,7 @@ pub enum SetupChoice {
     ImportExport { source: PathBuf },
     /// Adopt an existing paperless-ngx database (2.20 or 3.x; SQLite/MariaDB/MySQL/PostgreSQL)
     /// (`paperrust-migrate-db`), optionally copy the old media folder (`MEDIA_ROOT`).
-    MigrateDb {
-        source_url: String,
-        media_dir: Option<PathBuf>,
-    },
+    MigrateDb { source_url: String, media_dir: Option<PathBuf> },
 }
 
 impl SetupChoice {
@@ -101,17 +98,10 @@ pub fn setup_from_env(get: impl Fn(&str) -> Option<String>) -> Option<SetupChoic
     if let Some(p) = get("PAPERRUST_DESKTOP_IMPORT") {
         let media = get("PAPERRUST_DESKTOP_IMPORT_MEDIA").map(PathBuf::from);
         // Not recognized → treated as an export; `validate_setup` then reports the reason.
-        return Some(
-            detect_setup(&p, media).unwrap_or(SetupChoice::ImportExport {
-                source: PathBuf::from(p.trim()),
-            }),
-        );
+        return Some(detect_setup(&p, media).unwrap_or(SetupChoice::ImportExport { source: PathBuf::from(p.trim()) }));
     }
     if let Some(u) = get("PAPERRUST_DESKTOP_IMPORT_DB") {
-        return Some(SetupChoice::MigrateDb {
-            source_url: u,
-            media_dir: get("PAPERRUST_DESKTOP_IMPORT_MEDIA").map(PathBuf::from),
-        });
+        return Some(SetupChoice::MigrateDb { source_url: u, media_dir: get("PAPERRUST_DESKTOP_IMPORT_MEDIA").map(PathBuf::from) });
     }
     admin_from_env(get).map(|c| SetupChoice::Fresh(Some(c)))
 }
@@ -122,46 +112,24 @@ pub fn setup_from_env(get: impl Fn(&str) -> Option<String>) -> Option<SetupChoic
 /// paperless folder with `data/db.sqlite3` or the SQLite file → database migration (the media folder
 /// next to it is found); `sqlite:`/`postgres://`/`mysql://`/`mariadb://` → database migration.
 /// The migration state (2.20, 3.0–3.4.2 or known newer) is checked by `paperrust-migrate-db` during the migration.
-pub fn detect_setup(
-    input: &str,
-    media: Option<PathBuf>,
-) -> std::result::Result<SetupChoice, String> {
+pub fn detect_setup(input: &str, media: Option<PathBuf>) -> std::result::Result<SetupChoice, String> {
     let input = input.trim().trim_matches('"');
     if input.is_empty() {
         return Err("Bitte Export, Datenordner oder Datenbank-URL angeben.".into());
     }
     let lower = input.to_ascii_lowercase();
-    if [
-        "sqlite:",
-        "postgres://",
-        "postgresql://",
-        "mysql://",
-        "mariadb://",
-    ]
-    .iter()
-    .any(|s| lower.starts_with(s))
-    {
-        let media =
-            media.or_else(|| sqlite_path(input).and_then(|p| p.parent().and_then(guess_media)));
-        return Ok(SetupChoice::MigrateDb {
-            source_url: input.to_string(),
-            media_dir: media,
-        });
+    if ["sqlite:", "postgres://", "postgresql://", "mysql://", "mariadb://"].iter().any(|s| lower.starts_with(s)) {
+        let media = media.or_else(|| sqlite_path(input).and_then(|p| p.parent().and_then(guess_media)));
+        return Ok(SetupChoice::MigrateDb { source_url: input.to_string(), media_dir: media });
     }
     let p = PathBuf::from(input);
     let is_zip = |p: &Path| {
         let mut b = [0u8; 4];
-        std::fs::File::open(p)
-            .and_then(|mut f| std::io::Read::read_exact(&mut f, &mut b))
-            .is_ok()
-            && b == *b"PK\x03\x04"
+        std::fs::File::open(p).and_then(|mut f| std::io::Read::read_exact(&mut f, &mut b)).is_ok() && b == *b"PK\x03\x04"
     };
     let is_sqlite = |p: &Path| {
         let mut b = [0u8; 16];
-        std::fs::File::open(p)
-            .and_then(|mut f| std::io::Read::read_exact(&mut f, &mut b))
-            .is_ok()
-            && &b == b"SQLite format 3\0"
+        std::fs::File::open(p).and_then(|mut f| std::io::Read::read_exact(&mut f, &mut b)).is_ok() && &b == b"SQLite format 3\0"
     };
     let db = |file: &Path, media: Option<PathBuf>| SetupChoice::MigrateDb {
         source_url: sqlite_url(file),
@@ -174,10 +142,7 @@ pub fn detect_setup(
         if is_sqlite(&p) {
             return Ok(db(&p, media));
         }
-        return Err(format!(
-            "{} ist weder ein ZIP-Export noch eine SQLite-Datenbank.",
-            p.display()
-        ));
+        return Err(format!("{} ist weder ein ZIP-Export noch eine SQLite-Datenbank.", p.display()));
     }
     if p.is_dir() {
         if p.join("manifest.json").is_file() {
@@ -188,33 +153,20 @@ pub fn detect_setup(
                 return Ok(db(&f, media));
             }
         }
-        return Err(format!(
-            "{} enthält weder manifest.json (Export) noch db.sqlite3 bzw. data/db.sqlite3.",
-            p.display()
-        ));
+        return Err(format!("{} enthält weder manifest.json (Export) noch db.sqlite3 bzw. data/db.sqlite3.", p.display()));
     }
     Err(format!("{} nicht gefunden.", p.display()))
 }
 
 /// Media folder next to a data folder (`<root>/data` + `<root>/media`).
 fn guess_media(data_dir: &Path) -> Option<PathBuf> {
-    [
-        Some(data_dir.join("media")),
-        data_dir.parent().map(|p| p.join("media")),
-    ]
-    .into_iter()
-    .flatten()
-    .find(|m| m.join("documents").is_dir())
+    [Some(data_dir.join("media")), data_dir.parent().map(|p| p.join("media"))].into_iter().flatten().find(|m| m.join("documents").is_dir())
 }
 
 fn sqlite_url(p: &Path) -> String {
     let abs = std::path::absolute(p).unwrap_or_else(|_| p.to_path_buf());
     let s = abs.to_string_lossy().replace('\\', "/");
-    if s.starts_with('/') {
-        format!("sqlite://{s}")
-    } else {
-        format!("sqlite:///{s}")
-    }
+    if s.starts_with('/') { format!("sqlite://{s}") } else { format!("sqlite:///{s}") }
 }
 
 /// Validation of the dialog inputs (Django rules roughly: user name `[\w.@+-]`, ≤ 150 characters;
@@ -222,10 +174,7 @@ fn sqlite_url(p: &Path) -> String {
 pub fn validate_admin(c: &AdminCredentials) -> std::result::Result<(), &'static str> {
     if c.username.is_empty()
         || c.username.chars().count() > 150
-        || !c
-            .username
-            .chars()
-            .all(|ch| ch.is_alphanumeric() || "_.@+-".contains(ch))
+        || !c.username.chars().all(|ch| ch.is_alphanumeric() || "_.@+-".contains(ch))
     {
         return Err("Benutzername: 1–150 Zeichen, Buchstaben, Ziffern und _ . @ + -");
     }
@@ -267,10 +216,7 @@ pub fn validate_setup(c: &SetupChoice, o: &SetupOptions) -> std::result::Result<
                     ))
                 }
             } else if source.is_file() {
-                if source
-                    .extension()
-                    .is_some_and(|e| e.eq_ignore_ascii_case("zip"))
-                {
+                if source.extension().is_some_and(|e| e.eq_ignore_ascii_case("zip")) {
                     Ok(())
                 } else {
                     Err("Bitte einen Export-Ordner oder eine ZIP-Datei angeben.".into())
@@ -279,27 +225,14 @@ pub fn validate_setup(c: &SetupChoice, o: &SetupOptions) -> std::result::Result<
                 Err(format!("{} nicht gefunden.", source.display()))
             }
         }
-        SetupChoice::MigrateDb {
-            source_url,
-            media_dir,
-        } => {
+        SetupChoice::MigrateDb { source_url, media_dir } => {
             if !o.can_migrate_db {
                 return Err("Dieses Paket enthält paperrust-migrate-db nicht.".into());
             }
-            let ok_scheme = [
-                "sqlite://",
-                "mysql://",
-                "mariadb://",
-                "postgres://",
-                "postgresql://",
-            ]
-            .iter()
-            .any(|s| source_url.starts_with(s));
+            let ok_scheme =
+                ["sqlite://", "mysql://", "mariadb://", "postgres://", "postgresql://"].iter().any(|s| source_url.starts_with(s));
             if !ok_scheme {
-                return Err(
-                    "Quelle: sqlite:///C:/pfad/db.sqlite3, mysql://…, mariadb://… oder postgres://…"
-                        .into(),
-                );
+                return Err("Quelle: sqlite:///C:/pfad/db.sqlite3, mysql://…, mariadb://… oder postgres://…".into());
             }
             if let Some(p) = sqlite_path(source_url)
                 && !p.is_file()
@@ -307,9 +240,7 @@ pub fn validate_setup(c: &SetupChoice, o: &SetupOptions) -> std::result::Result<
                 return Err(format!("SQLite-Datei {} nicht gefunden.", p.display()));
             }
             match media_dir {
-                Some(m) if !m.is_dir() => {
-                    Err(format!("Medienordner {} nicht gefunden.", m.display()))
-                }
+                Some(m) if !m.is_dir() => Err(format!("Medienordner {} nicht gefunden.", m.display())),
                 _ => Ok(()),
             }
         }
@@ -348,10 +279,14 @@ impl Control {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
     Stage(&'static str),
-    Ready { url: String },
+    Ready {
+        url: String,
+    },
     /// Reconciliation after "Switch from paperless-ngx": running (reported before `Ready`) or finished.
     SwitchCheck(SwitchCheck),
-    Restarting { attempt: u32 },
+    Restarting {
+        attempt: u32,
+    },
     BackupStarted,
     Stopping,
 }
@@ -372,9 +307,7 @@ pub struct SwitchCheck {
 impl SwitchCheck {
     pub fn running() -> Self {
         Self {
-            verdict: "RUNNING".into(),
-            summary: vec!["Der Abgleich zwischen paperless-ngx und PaperRust läuft …".into()],
-            report: None,
+            verdict: "RUNNING".into(), summary: vec!["Der Abgleich zwischen paperless-ngx und PaperRust läuft …".into()], report: None
         }
     }
 
@@ -388,9 +321,8 @@ impl SwitchCheck {
         };
         let html = logs.join("umstieg-bericht.html");
         let report = html.is_file().then_some(html);
-        let json: Option<serde_json::Value> = std::fs::read_to_string(logs.join("umstieg-bericht.json"))
-            .ok()
-            .and_then(|t| serde_json::from_str(&t).ok());
+        let json: Option<serde_json::Value> =
+            std::fs::read_to_string(logs.join("umstieg-bericht.json")).ok().and_then(|t| serde_json::from_str(&t).ok());
         let Some(j) = json else {
             return Self {
                 verdict: by_exit.into(),
@@ -399,10 +331,8 @@ impl SwitchCheck {
             };
         };
         let verdict = j["verdict"].as_str().filter(|v| matches!(*v, "OK" | "WARN" | "FAIL")).unwrap_or(by_exit).to_string();
-        let mut summary: Vec<String> = j["summary"]
-            .as_array()
-            .map(|a| a.iter().filter_map(|l| l.as_str().map(str::to_string)).collect())
-            .unwrap_or_default();
+        let mut summary: Vec<String> =
+            j["summary"].as_array().map(|a| a.iter().filter_map(|l| l.as_str().map(str::to_string)).collect()).unwrap_or_default();
         // the first findings (WARN/FAIL) in addition, at most three
         if let Some(f) = j["findings"].as_array() {
             for x in f.iter().filter(|x| matches!(x["level"].as_str(), Some("WARN" | "FAIL"))).take(3) {
@@ -464,26 +394,14 @@ impl BackupJob {
     /// also importable into paperless-ngx). Also runs with the server running (pg_dump is consistent
     /// thanks to MVCC; the exporter reads DB + files).
     async fn run(&self) -> Result<PathBuf> {
-        crate::perms::create_private_dir(&self.dir)
-            .map_err(crate::io_err(format!("{} anlegen", self.dir.display())))?;
-        self.pg
-            .dump(&self.db, &self.dir.join("paperrust.pgdump"))
-            .await?;
+        crate::perms::create_private_dir(&self.dir).map_err(crate::io_err(format!("{} anlegen", self.dir.display())))?;
+        self.pg.dump(&self.db, &self.dir.join("paperrust.pgdump")).await?;
         let export = self.dir.join("export");
         crate::perms::create_private_dir(&export).map_err(crate::io_err("export anlegen"))?;
         let export_s = export.display().to_string();
-        let st = self
-            .spec
-            .manage(
-                &["document_exporter", &export_s],
-                &[],
-                Duration::from_secs(6 * 3600),
-            )
-            .await?;
+        let st = self.spec.manage(&["document_exporter", &export_s], &[], Duration::from_secs(6 * 3600)).await?;
         if !st.success() {
-            return Err(DesktopError::Server(format!(
-                "document_exporter fehlgeschlagen ({st}); Details in logs/manage.log"
-            )));
+            return Err(DesktopError::Server(format!("document_exporter fehlgeschlagen ({st}); Details in logs/manage.log")));
         }
         tracing::info!(dir = %self.dir.display(), "Sicherung fertig");
         Ok(self.dir.clone())
@@ -525,19 +443,12 @@ impl Supervisor {
         let _ = std::fs::remove_file(paths.run.join(crate::pg::INITDB_PWFILE));
         let missing = layout.missing(|p| p.exists());
         if !missing.is_empty() {
-            return Err(DesktopError::Other(format!(
-                "Installation unvollständig, es fehlt: {}",
-                missing.join(", ")
-            )));
+            return Err(DesktopError::Other(format!("Installation unvollständig, es fehlt: {}", missing.join(", "))));
         }
         let (mut cfg, created) = DesktopConfig::load_or_create(&paths.config_file)?;
         let mut notices = Vec::new();
         // M4: check location, make the data directory accessible only to the user, once.
-        if let Some(w) =
-            crate::perms::location_warning(crate::paths::Os::current(), &paths.home, |k| {
-                std::env::var(k).ok()
-            })
-        {
+        if let Some(w) = crate::perms::location_warning(crate::paths::Os::current(), &paths.home, |k| std::env::var(k).ok()) {
             notices.push(w);
         }
         let mut dirty = false;
@@ -547,10 +458,7 @@ impl Supervisor {
                     cfg.setup.home_protected = true;
                     dirty = true;
                 }
-                Err(e) => notices.push(format!(
-                    "Rechte für {} ließen sich nicht einschränken: {e}",
-                    paths.home.display()
-                )),
+                Err(e) => notices.push(format!("Rechte für {} ließen sich nicht einschränken: {e}", paths.home.display())),
             }
         }
         // D-N3: configuration from before the application role → generate the password now.
@@ -574,9 +482,7 @@ impl Supervisor {
 
     /// What the first-start form can offer.
     pub fn setup_options(&self) -> SetupOptions {
-        SetupOptions {
-            can_migrate_db: self.layout.migrate_db_bin.is_some(),
-        }
+        SetupOptions { can_migrate_db: self.layout.migrate_db_bin.is_some() }
     }
 
     fn save(&self) -> Result<()> {
@@ -596,10 +502,8 @@ impl Supervisor {
         for k in ["PAPERLESS_TIME_ZONE", "PAPERLESS_OCR_LANGUAGE"] {
             spec.env.remove(k);
         }
-        let pairs = [
-            ("PAPERLESS_TIME_ZONE", self.cfg.server.time_zone.clone()),
-            ("PAPERLESS_OCR_LANGUAGE", self.cfg.server.ocr_language.clone()),
-        ];
+        let pairs =
+            [("PAPERLESS_TIME_ZONE", self.cfg.server.time_zone.clone()), ("PAPERLESS_OCR_LANGUAGE", self.cfg.server.ocr_language.clone())];
         for (k, v) in &pairs {
             match spec.manage(&["settings", "set", k, v, "--if-unset"], &[], Duration::from_secs(120)).await {
                 Ok(st) if st.success() => {}
@@ -680,14 +584,9 @@ impl Supervisor {
         // Two attempts: another process can strike between the port check and the bind.
         for attempt in 0..2 {
             let preferred = (attempt == 0).then_some(self.cfg.database.port);
-            let port = pick_port(preferred, &[self.cfg.server.port])
-                .map_err(crate::io_err("Port für PostgreSQL wählen"))?;
+            let port = pick_port(preferred, &[self.cfg.server.port]).map_err(crate::io_err("Port für PostgreSQL wählen"))?;
             if port != self.cfg.database.port {
-                tracing::info!(
-                    old = self.cfg.database.port,
-                    new = port,
-                    "PostgreSQL-Port gewechselt"
-                );
+                tracing::info!(old = self.cfg.database.port, new = port, "PostgreSQL-Port gewechselt");
                 self.cfg.database.port = port;
                 self.save()?;
             }
@@ -713,10 +612,7 @@ impl Supervisor {
                     }
                     // D-N3: server/manage run as the application role without superuser rights.
                     let db = &self.cfg.database;
-                    if let Err(e) = pg
-                        .ensure_app_role(&db.name, &db.app_user, &db.app_password)
-                        .await
-                    {
+                    if let Err(e) = pg.ensure_app_role(&db.name, &db.app_user, &db.app_password).await {
                         let _ = pg.stop().await;
                         return Err(e);
                     }
@@ -741,26 +637,16 @@ impl Supervisor {
     }
 
     fn backup_job(&self, pg: &PgCluster, dir: PathBuf) -> BackupJob {
-        BackupJob {
-            spec: self.spec(pg.port, self.cfg.server.port),
-            pg: pg.clone(),
-            db: self.cfg.database.name.clone(),
-            dir,
-        }
+        BackupJob { spec: self.spec(pg.port, self.cfg.server.port), pg: pg.clone(), db: self.cfg.database.name.clone(), dir }
     }
 
     /// Step 4.
     pub async fn migrate(&self, pg: &PgCluster) -> Result<()> {
-        let st = self
-            .spec(pg.port, self.cfg.server.port)
-            .manage(&["migrate"], &[], MIGRATE_TIMEOUT)
-            .await?;
+        let st = self.spec(pg.port, self.cfg.server.port).manage(&["migrate"], &[], MIGRATE_TIMEOUT).await?;
         if st.success() {
             Ok(())
         } else {
-            Err(DesktopError::Server(format!(
-                "manage migrate fehlgeschlagen ({st}); Details in logs/manage.log"
-            )))
+            Err(DesktopError::Server(format!("manage migrate fehlgeschlagen ({st}); Details in logs/manage.log")))
         }
     }
 
@@ -768,14 +654,8 @@ impl Supervisor {
     /// or documents). `AnonymousUser` (django-guardian, created by `migrate`) does not count.
     async fn database_content(&self, pg: &PgCluster) -> Result<(i64, i64)> {
         let db = &self.cfg.database.name;
-        let tables = pg
-            .query_scalar(
-                db,
-                "SELECT count(*) FROM pg_catalog.pg_tables WHERE schemaname = 'public'",
-            )
-            .await?
-            .parse::<i64>()
-            .unwrap_or(0);
+        let tables =
+            pg.query_scalar(db, "SELECT count(*) FROM pg_catalog.pg_tables WHERE schemaname = 'public'").await?.parse::<i64>().unwrap_or(0);
         if tables == 0 {
             return Ok((0, 0));
         }
@@ -794,11 +674,7 @@ impl Supervisor {
     }
 
     /// Step 3c: first-start choice, only for a database without users/documents.
-    async fn first_start_choice(
-        &mut self,
-        pg: &PgCluster,
-        prompt: &dyn AdminPrompt,
-    ) -> Result<Option<SetupChoice>> {
+    async fn first_start_choice(&mut self, pg: &PgCluster, prompt: &dyn AdminPrompt) -> Result<Option<SetupChoice>> {
         if self.cfg.setup.superuser_created {
             return Ok(None);
         }
@@ -810,9 +686,9 @@ impl Supervisor {
         let mut attempts = 0;
         let choice = loop {
             attempts += 1;
-            let c = prompt.choose_setup(&opts).ok_or_else(|| {
-                DesktopError::Other("Einrichtung abgebrochen: kein Administrator angelegt".into())
-            })?;
+            let c = prompt
+                .choose_setup(&opts)
+                .ok_or_else(|| DesktopError::Other("Einrichtung abgebrochen: kein Administrator angelegt".into()))?;
             match validate_setup(&c, &opts) {
                 Ok(()) => break c,
                 Err(msg) if attempts >= MAX_SETUP_ATTEMPTS => {
@@ -827,18 +703,9 @@ impl Supervisor {
             // (checked: no users, no documents). paperrust-migrate-db requires an empty
             // target → recreate the schema (as cluster superuser, owner application role).
             let db = &self.cfg.database;
-            tracing::warn!(
-                tables,
-                "leeres, schon migriertes Schema wird für den Datenbank-Umzug neu angelegt"
-            );
-            pg.run_script(
-                &db.name,
-                &format!(
-                    "DROP SCHEMA public CASCADE; CREATE SCHEMA public AUTHORIZATION \"{}\";",
-                    db.app_user
-                ),
-            )
-            .await?;
+            tracing::warn!(tables, "leeres, schon migriertes Schema wird für den Datenbank-Umzug neu angelegt");
+            pg.run_script(&db.name, &format!("DROP SCHEMA public CASCADE; CREATE SCHEMA public AUTHORIZATION \"{}\";", db.app_user))
+                .await?;
         }
         Ok(Some(choice))
     }
@@ -850,14 +717,10 @@ impl Supervisor {
     /// `media`: old media folder – needed so that when converting a paperless-ngx 2.x database the
     /// SHA-256 checksums are computed from the files (as in paperless-ngx 3).
     async fn migrate_db(&self, pg: &PgCluster, source_url: &str, media: Option<&Path>) -> Result<()> {
-        let bin = self.layout.migrate_db_bin.as_ref().ok_or_else(|| {
-            DesktopError::Other("paperrust-migrate-db fehlt in diesem Paket".into())
-        })?;
+        let bin =
+            self.layout.migrate_db_bin.as_ref().ok_or_else(|| DesktopError::Other("paperrust-migrate-db fehlt in diesem Paket".into()))?;
         let db = &self.cfg.database;
-        let target = format!(
-            "postgres://{}:{}@127.0.0.1:{}/{}?sslmode=disable",
-            db.app_user, db.app_password, pg.port, db.name
-        );
+        let target = format!("postgres://{}:{}@127.0.0.1:{}/{}?sslmode=disable", db.app_user, db.app_password, pg.port, db.name);
         let log_path = self.paths.logs.join("migrate-db.log");
         let _ = crate::logs::rotate(&log_path, crate::logs::KEEP);
         let log = crate::logs::open_append(&log_path).map_err(crate::io_err("migrate-db.log"))?;
@@ -870,8 +733,7 @@ impl Supervisor {
         if let Some(m) = media {
             c.arg("--media").arg(m);
         }
-        c
-            .env("PAPERRUST_MIGRATE_SOURCE", source_url)
+        c.env("PAPERRUST_MIGRATE_SOURCE", source_url)
             .env("PAPERRUST_MIGRATE_TARGET", &target)
             .env("NO_COLOR", "1")
             .current_dir(&self.paths.run)
@@ -879,9 +741,7 @@ impl Supervisor {
             .stdout(Stdio::from(log))
             .stderr(Stdio::from(err))
             .kill_on_drop(true);
-        let mut child = c
-            .spawn()
-            .map_err(crate::io_err(format!("{} starten", bin.display())))?;
+        let mut child = c.spawn().map_err(crate::io_err(format!("{} starten", bin.display())))?;
         let st = tokio::time::timeout(IMPORT_TIMEOUT, child.wait())
             .await
             .map_err(|_| DesktopError::Server("paperrust-migrate-db: Zeitüberschreitung".into()))?
@@ -890,26 +750,19 @@ impl Supervisor {
             tracing::info!(report = %report.display(), "Datenbank übernommen");
             Ok(())
         } else {
-            Err(DesktopError::Server(format!(
-                "paperrust-migrate-db fehlgeschlagen ({st}); Details in logs/migrate-db.log"
-            )))
+            Err(DesktopError::Server(format!("paperrust-migrate-db fehlgeschlagen ({st}); Details in logs/migrate-db.log")))
         }
     }
 
     /// Step 4b: `manage document_importer <folder|ZIP>`.
     async fn import_export(&self, pg: &PgCluster, source: &Path) -> Result<()> {
         let src = source.display().to_string();
-        let st = self
-            .spec(pg.port, self.cfg.server.port)
-            .manage(&["document_importer", &src], &[], IMPORT_TIMEOUT)
-            .await?;
+        let st = self.spec(pg.port, self.cfg.server.port).manage(&["document_importer", &src], &[], IMPORT_TIMEOUT).await?;
         if st.success() {
             tracing::info!(source = %src, "Export importiert");
             Ok(())
         } else {
-            Err(DesktopError::Server(format!(
-                "document_importer fehlgeschlagen ({st}); Details in logs/manage.log"
-            )))
+            Err(DesktopError::Server(format!("document_importer fehlgeschlagen ({st}); Details in logs/manage.log")))
         }
     }
 
@@ -917,24 +770,14 @@ impl Supervisor {
     /// superuser) → `preset` (`PAPERRUST_DESKTOP_ADMIN_*`) or local owner without a dialog
     /// (name from the operating system, random password that is stored nowhere). Then
     /// [`Self::ensure_owner`] – on every start, also for existing installations.
-    pub async fn ensure_superuser(
-        &mut self,
-        pg: &PgCluster,
-        preset: Option<AdminCredentials>,
-    ) -> Result<()> {
+    pub async fn ensure_superuser(&mut self, pg: &PgCluster, preset: Option<AdminCredentials>) -> Result<()> {
         if !self.cfg.setup.superuser_created {
-            let n = pg
-                .query_scalar(
-                    &self.cfg.database.name,
-                    "SELECT count(*) FROM auth_user WHERE is_superuser AND is_active",
-                )
-                .await?;
+            let n = pg.query_scalar(&self.cfg.database.name, "SELECT count(*) FROM auth_user WHERE is_superuser AND is_active").await?;
             if n.parse::<i64>().unwrap_or(0) == 0 {
                 let generated = preset.is_none();
                 let creds = match preset {
                     Some(c) => {
-                        validate_admin(&c)
-                            .map_err(|m| DesktopError::Other(format!("Einrichtung: {m}")))?;
+                        validate_admin(&c).map_err(|m| DesktopError::Other(format!("Einrichtung: {m}")))?;
                         c
                     }
                     None => AdminCredentials {
@@ -946,22 +789,13 @@ impl Supervisor {
                 let st = self
                     .spec(pg.port, self.cfg.server.port)
                     .manage(
-                        &[
-                            "createsuperuser",
-                            "--no-input",
-                            "--username",
-                            &creds.username,
-                            "--email",
-                            &creds.email,
-                        ],
+                        &["createsuperuser", "--no-input", "--username", &creds.username, "--email", &creds.email],
                         &[("DJANGO_SUPERUSER_PASSWORD", &creds.password)],
                         Duration::from_secs(120),
                     )
                     .await?;
                 if !st.success() {
-                    return Err(DesktopError::Server(format!(
-                        "createsuperuser fehlgeschlagen ({st}); Details in logs/manage.log"
-                    )));
+                    return Err(DesktopError::Server(format!("createsuperuser fehlgeschlagen ({st}); Details in logs/manage.log")));
                 }
                 if generated {
                     tracing::info!(user = %creds.username, "lokaler Eigentümer angelegt (automatische Anmeldung, kein Passwort-Dialog)");
@@ -986,19 +820,14 @@ impl Supervisor {
             let taken = pg
                 .query_scalar(
                     &self.cfg.database.name,
-                    &format!(
-                        "SELECT count(*) FROM auth_user WHERE lower(username) = lower({})",
-                        crate::autologin::sql_literal(&name)
-                    ),
+                    &format!("SELECT count(*) FROM auth_user WHERE lower(username) = lower({})", crate::autologin::sql_literal(&name)),
                 )
                 .await?;
             if taken.parse::<i64>().unwrap_or(1) == 0 {
                 return Ok(name);
             }
         }
-        Err(DesktopError::Other(
-            "kein freier Benutzername für den lokalen Eigentümer gefunden".into(),
-        ))
+        Err(DesktopError::Other("kein freier Benutzername für den lokalen Eigentümer gefunden".into()))
     }
 
     /// Check the owner for automatic login: active → stays; missing (existing installation,
@@ -1006,13 +835,7 @@ impl Supervisor {
     /// `desktop.toml`. Not fatal: without an owner only automatic login stays off.
     async fn ensure_owner(&mut self, pg: &PgCluster) {
         let current = self.cfg.setup.owner_user.clone();
-        let found = match pg
-            .query_scalar(
-                &self.cfg.database.name,
-                &crate::autologin::owner_query(&current),
-            )
-            .await
-        {
+        let found = match pg.query_scalar(&self.cfg.database.name, &crate::autologin::owner_query(&current)).await {
             Ok(f) => f,
             Err(e) => {
                 tracing::warn!(error = %e, "Eigentümer nicht prüfbar – automatische Anmeldung bleibt aus");
@@ -1066,16 +889,8 @@ impl Supervisor {
         if dir.is_dir() {
             return Ok(());
         }
-        crate::perms::create_private_dir(&dir)
-            .map_err(crate::io_err(format!("{} anlegen", dir.display())))?;
-        let st = self
-            .spec(pg.port, self.cfg.server.port)
-            .manage(
-                &["document_index", "reindex"],
-                &[],
-                Duration::from_secs(6 * 3600),
-            )
-            .await;
+        crate::perms::create_private_dir(&dir).map_err(crate::io_err(format!("{} anlegen", dir.display())))?;
+        let st = self.spec(pg.port, self.cfg.server.port).manage(&["document_index", "reindex"], &[], Duration::from_secs(6 * 3600)).await;
         match st {
             Ok(st) if st.success() => {
                 tracing::info!(dir = %dir.display(), "Volltext-Index aufgebaut");
@@ -1088,23 +903,15 @@ impl Supervisor {
                     Ok(st) => st.to_string(),
                     Err(e) => e.to_string(),
                 };
-                Err(DesktopError::Server(format!(
-                    "document_index reindex fehlgeschlagen ({detail}); Details in logs/manage.log"
-                )))
+                Err(DesktopError::Server(format!("document_index reindex fehlgeschlagen ({detail}); Details in logs/manage.log")))
             }
         }
     }
 
     /// Complete run (steps 3–8) without a control channel. `on_event` informs the shell;
     /// `shutdown` ends when the user wants to quit (Ctrl+C, tray "Beenden", closing the window).
-    pub async fn run(
-        self,
-        prompt: &dyn AdminPrompt,
-        on_event: &(dyn Fn(Event) + Sync),
-        shutdown: impl Future<Output = ()>,
-    ) -> Result<()> {
-        self.run_with_control(prompt, on_event, shutdown, Control::default())
-            .await
+    pub async fn run(self, prompt: &dyn AdminPrompt, on_event: &(dyn Fn(Event) + Sync), shutdown: impl Future<Output = ()>) -> Result<()> {
+        self.run_with_control(prompt, on_event, shutdown, Control::default()).await
     }
 
     /// Like [`Self::run`], additionally with backup requests of the shell ([`control_channel`]).
@@ -1117,9 +924,7 @@ impl Supervisor {
     ) -> Result<()> {
         on_event(Event::Stage("Datenbank starten"));
         let pg = self.start_database().await?;
-        let result = self
-            .run_with_db(&pg, prompt, on_event, shutdown, control)
-            .await;
+        let result = self.run_with_db(&pg, prompt, on_event, shutdown, control).await;
         on_event(Event::Stopping);
         crate::autologin::remove_token(&self.paths.run);
         let stopped = pg.stop().await;
@@ -1134,11 +939,7 @@ impl Supervisor {
         on_event: &(dyn Fn(Event) + Sync),
     ) -> Result<Option<SetupChoice>> {
         let choice = self.first_start_choice(pg, prompt).await?;
-        if let Some(SetupChoice::MigrateDb {
-            source_url,
-            media_dir,
-        }) = &choice
-        {
+        if let Some(SetupChoice::MigrateDb { source_url, media_dir }) = &choice {
             on_event(Event::Stage("Bestehende Datenbank übernehmen"));
             self.migrate_db(pg, source_url, media_dir.as_deref()).await?;
             if let Some(m) = media_dir {
@@ -1171,18 +972,10 @@ impl Supervisor {
     /// Switching (package Z1): verification report in the background after the first start –
     /// `paperrust-migrate-db verify` with a sample via the API of the just-started server
     /// (temporary token). Result `logs/umstieg-bericht.{html,json,txt}`; source only read.
-    fn spawn_switch_report(
-        &self,
-        choice: &SetupChoice,
-        pg: &PgCluster,
-        app_port: u16,
-    ) -> Option<tokio::task::JoinHandle<SwitchCheck>> {
+    fn spawn_switch_report(&self, choice: &SetupChoice, pg: &PgCluster, app_port: u16) -> Option<tokio::task::JoinHandle<SwitchCheck>> {
         let bin = self.layout.migrate_db_bin.clone()?;
         let db = &self.cfg.database;
-        let target = format!(
-            "postgres://{}:{}@127.0.0.1:{}/{}?sslmode=disable",
-            db.app_user, db.app_password, pg.port, db.name
-        );
+        let target = format!("postgres://{}:{}@127.0.0.1:{}/{}?sslmode=disable", db.app_user, db.app_password, pg.port, db.name);
         let mut c = tokio::process::Command::new(&bin);
         crate::pg::scrub_env(&mut c);
         crate::pg::detach_console(&mut c);
@@ -1201,10 +994,7 @@ impl Supervisor {
             SetupChoice::ImportExport { source } => {
                 c.arg("--from").arg(source);
             }
-            SetupChoice::MigrateDb {
-                source_url,
-                media_dir,
-            } => {
+            SetupChoice::MigrateDb { source_url, media_dir } => {
                 // URL (possibly with a password) only via the environment
                 c.env("PAPERRUST_MIGRATE_SOURCE", source_url);
                 if let Some(m) = media_dir {
@@ -1215,11 +1005,7 @@ impl Supervisor {
         }
         let log = crate::logs::open_append(&self.paths.logs.join("migrate-db.log")).ok()?;
         let err = log.try_clone().ok()?;
-        c.current_dir(&self.paths.run)
-            .stdin(Stdio::null())
-            .stdout(Stdio::from(log))
-            .stderr(Stdio::from(err))
-            .kill_on_drop(true);
+        c.current_dir(&self.paths.run).stdin(Stdio::null()).stdout(Stdio::from(log)).stderr(Stdio::from(err)).kill_on_drop(true);
         let logs = self.paths.logs.clone();
         // remove the old report: otherwise an aborted run would show the result of an earlier
         for ext in ["json", "html", "txt"] {
@@ -1259,14 +1045,9 @@ impl Supervisor {
         let mut switched = self.prepare(pg, prompt, on_event).await?;
         let mut switch_report: Option<tokio::task::JoinHandle<SwitchCheck>> = None;
 
-        let app_port = pick_port(Some(self.cfg.server.port), &[pg.port])
-            .map_err(crate::io_err("Port für PaperRust wählen"))?;
+        let app_port = pick_port(Some(self.cfg.server.port), &[pg.port]).map_err(crate::io_err("Port für PaperRust wählen"))?;
         if app_port != self.cfg.server.port {
-            tracing::warn!(
-                old = self.cfg.server.port,
-                new = app_port,
-                "App-Port belegt – neue Adresse (Lesezeichen/Anmeldung neu)"
-            );
+            tracing::warn!(old = self.cfg.server.port, new = app_port, "App-Port belegt – neue Adresse (Lesezeichen/Anmeldung neu)");
             self.cfg.server.port = app_port;
             self.save()?;
         }
@@ -1393,9 +1174,7 @@ impl Supervisor {
             };
             let st = st.map_err(crate::io_err("PaperRust-Server"))?;
             if st.code() == Some(RESTART_EXIT_CODE) {
-                tracing::info!(
-                    "PaperRust-Server beendet sich für einen Neustart (Exit-Code 75) – starte neu"
-                );
+                tracing::info!("PaperRust-Server beendet sich für einen Neustart (Exit-Code 75) – starte neu");
                 continue;
             }
             tracing::error!(status = %st, "PaperRust-Server unerwartet beendet");
@@ -1406,9 +1185,7 @@ impl Supervisor {
             restarts += 1;
             if restarts > MAX_RESTARTS {
                 finish_backup(&mut backup).await;
-                return Err(DesktopError::Server(format!(
-                    "{MAX_RESTARTS} Abstürze in 10 min – aufgegeben; Details in logs/server.log"
-                )));
+                return Err(DesktopError::Server(format!("{MAX_RESTARTS} Abstürze in 10 min – aufgegeben; Details in logs/server.log")));
             }
             on_event(Event::Restarting { attempt: restarts });
             tokio::time::sleep(Duration::from_secs(u64::from(restarts) * 2)).await;
@@ -1435,10 +1212,7 @@ impl Supervisor {
     pub async fn manage(mut self, args: &[String]) -> Result<i32> {
         let pg = self.start_database().await?;
         let argv: Vec<&str> = args.iter().map(String::as_str).collect();
-        let r = self
-            .spec(pg.port, self.cfg.server.port)
-            .manage(&argv, &[], Duration::from_secs(24 * 3600))
-            .await;
+        let r = self.spec(pg.port, self.cfg.server.port).manage(&argv, &[], Duration::from_secs(24 * 3600)).await;
         let stopped = pg.stop().await;
         let st = r?;
         stopped?;
@@ -1449,16 +1223,14 @@ impl Supervisor {
 /// `paperrust-desktop backup` with the app running: request a backup from the instance and wait for the
 /// result. `Ok(None)` = no instance running (then the caller backs up itself).
 pub async fn request_live_backup(paths: &AppPaths, timeout: Duration) -> Result<Option<PathBuf>> {
-    if let Acquire::Acquired(l) = InstanceLock::acquire(&paths.lock_file(), &paths.instance_file())?
-    {
+    if let Acquire::Acquired(l) = InstanceLock::acquire(&paths.lock_file(), &paths.instance_file())? {
         drop(l);
         return Ok(None);
     }
     let result = paths.backup_result_file();
     let _ = std::fs::remove_file(&result);
     let req = paths.backup_request_file();
-    std::fs::write(&req, b"backup")
-        .map_err(crate::io_err(format!("{} schreiben", req.display())))?;
+    std::fs::write(&req, b"backup").map_err(crate::io_err(format!("{} schreiben", req.display())))?;
     let start = Instant::now();
     loop {
         tokio::time::sleep(Duration::from_millis(500)).await;
@@ -1466,29 +1238,17 @@ pub async fn request_live_backup(paths: &AppPaths, timeout: Duration) -> Result<
             let _ = std::fs::remove_file(&result);
             return match text.split_once(' ') {
                 Some(("ok", dir)) => Ok(Some(PathBuf::from(dir.trim()))),
-                Some((_, msg)) => Err(DesktopError::Other(format!(
-                    "Sicherung fehlgeschlagen: {}",
-                    msg.trim()
-                ))),
-                None => Err(DesktopError::Other(format!(
-                    "Sicherung: unerwartete Antwort {text:?}"
-                ))),
+                Some((_, msg)) => Err(DesktopError::Other(format!("Sicherung fehlgeschlagen: {}", msg.trim()))),
+                None => Err(DesktopError::Other(format!("Sicherung: unerwartete Antwort {text:?}"))),
             };
         }
-        if let Acquire::Acquired(l) =
-            InstanceLock::acquire(&paths.lock_file(), &paths.instance_file())?
-        {
+        if let Acquire::Acquired(l) = InstanceLock::acquire(&paths.lock_file(), &paths.instance_file())? {
             drop(l);
             let _ = std::fs::remove_file(&req);
-            return Err(DesktopError::Other(
-                "PaperRust wurde während der Sicherung beendet".into(),
-            ));
+            return Err(DesktopError::Other("PaperRust wurde während der Sicherung beendet".into()));
         }
         if start.elapsed() > timeout {
-            return Err(DesktopError::Other(format!(
-                "Sicherung: keine Antwort nach {} s",
-                timeout.as_secs()
-            )));
+            return Err(DesktopError::Other(format!("Sicherung: keine Antwort nach {} s", timeout.as_secs())));
         }
     }
 }
@@ -1500,10 +1260,7 @@ async fn finish_backup(task: &mut Option<tokio::task::JoinHandle<()>>) {
         && !h.is_finished()
     {
         tracing::info!("Beenden: warte auf laufende Sicherung");
-        if tokio::time::timeout(BACKUP_SHUTDOWN_WAIT, &mut h)
-            .await
-            .is_err()
-        {
+        if tokio::time::timeout(BACKUP_SHUTDOWN_WAIT, &mut h).await.is_err() {
             tracing::warn!("Sicherung abgebrochen (Beenden)");
             h.abort();
         }
@@ -1512,10 +1269,7 @@ async fn finish_backup(task: &mut Option<tokio::task::JoinHandle<()>>) {
 
 /// `YYYYMMDD-HHMMSS` (UTC) without a date crate.
 pub fn backup_stamp() -> String {
-    let secs = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
+    let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
     stamp_from_unix(secs)
 }
 
@@ -1532,12 +1286,7 @@ pub fn stamp_from_unix(secs: u64) -> String {
     let d = doy - (153 * mp + 2) / 5 + 1;
     let m = if mp < 10 { mp + 3 } else { mp - 9 };
     let y = yoe + era * 400 + i64::from(m <= 2);
-    format!(
-        "{y:04}{m:02}{d:02}-{:02}{:02}{:02}",
-        rem / 3600,
-        rem % 3600 / 60,
-        rem % 60
-    )
+    format!("{y:04}{m:02}{d:02}-{:02}{:02}{:02}", rem / 3600, rem % 3600 / 60, rem % 60)
 }
 
 /// Waits for the reconciliation run (only called if one is running).
@@ -1579,11 +1328,7 @@ mod tests {
     }
 
     fn c(u: &str, e: &str, p: &str) -> AdminCredentials {
-        AdminCredentials {
-            username: u.into(),
-            email: e.into(),
-            password: p.into(),
-        }
+        AdminCredentials { username: u.into(), email: e.into(), password: p.into() }
     }
 
     #[test]
@@ -1614,19 +1359,12 @@ mod tests {
     #[test]
     fn setup_validation() {
         let dir = tempfile::tempdir().unwrap();
-        let with = SetupOptions {
-            can_migrate_db: true,
-        };
+        let with = SetupOptions { can_migrate_db: true };
         let without = SetupOptions::default();
         let export = dir.path().join("export");
         std::fs::create_dir_all(&export).unwrap();
-        let imp = |p: &Path| SetupChoice::ImportExport {
-            source: p.to_path_buf(),
-        };
-        assert!(
-            validate_setup(&imp(&export), &without).is_err(),
-            "ohne manifest.json"
-        );
+        let imp = |p: &Path| SetupChoice::ImportExport { source: p.to_path_buf() };
+        assert!(validate_setup(&imp(&export), &without).is_err(), "ohne manifest.json");
         std::fs::write(export.join("manifest.json"), "[]").unwrap();
         assert!(validate_setup(&imp(&export), &without).is_ok());
         let zip = dir.path().join("Export.ZIP");
@@ -1638,22 +1376,13 @@ mod tests {
         let db = dir.path().join("db.sqlite3");
         std::fs::write(&db, b"").unwrap();
         let url = format!("sqlite:///{}", db.display().to_string().replace('\\', "/"));
-        let mig = |u: &str, m: Option<PathBuf>| SetupChoice::MigrateDb {
-            source_url: u.into(),
-            media_dir: m,
-        };
+        let mig = |u: &str, m: Option<PathBuf>| SetupChoice::MigrateDb { source_url: u.into(), media_dir: m };
         assert!(validate_setup(&mig(&url, None), &with).is_ok(), "{url}");
         assert!(validate_setup(&mig(&url, None), &without).is_err());
         assert!(validate_setup(&mig("sqlite:///C:/gibt/es/nicht.sqlite3", None), &with).is_err());
         assert!(validate_setup(&mig("mysql://u:p@h/paperless", None), &with).is_ok());
         assert!(validate_setup(&mig("ftp://x", None), &with).is_err());
-        assert!(
-            validate_setup(
-                &mig("mysql://u:p@h/p", Some(dir.path().join("kein-ordner"))),
-                &with
-            )
-            .is_err()
-        );
+        assert!(validate_setup(&mig("mysql://u:p@h/p", Some(dir.path().join("kein-ordner"))), &with).is_err());
         assert!(validate_setup(&mig("mysql://u:p@h/p", Some(export.clone())), &with).is_ok());
     }
 
@@ -1663,50 +1392,26 @@ mod tests {
         let exp = d.path().join("export");
         std::fs::create_dir_all(&exp).unwrap();
         std::fs::write(exp.join("manifest.json"), "[]").unwrap();
-        assert!(
-            matches!(detect_setup(exp.to_str().unwrap(), None), Ok(SetupChoice::ImportExport { ref source }) if source == &exp)
-        );
+        assert!(matches!(detect_setup(exp.to_str().unwrap(), None), Ok(SetupChoice::ImportExport { ref source }) if source == &exp));
         let zip = d.path().join("e.zip");
         std::fs::write(&zip, b"PK\x03\x04rest").unwrap();
-        assert!(matches!(
-            detect_setup(&format!("\"{}\"", zip.display()), None),
-            Ok(SetupChoice::ImportExport { .. })
-        ));
+        assert!(matches!(detect_setup(&format!("\"{}\"", zip.display()), None), Ok(SetupChoice::ImportExport { .. })));
         // paperless folder with data/db.sqlite3 and media/documents
         let root = d.path().join("paperless");
         std::fs::create_dir_all(root.join("data")).unwrap();
         std::fs::create_dir_all(root.join("media/documents")).unwrap();
         std::fs::write(root.join("data/db.sqlite3"), b"SQLite format 3\0xx").unwrap();
-        for input in [
-            root.clone(),
-            root.join("data"),
-            root.join("data/db.sqlite3"),
-        ] {
+        for input in [root.clone(), root.join("data"), root.join("data/db.sqlite3")] {
             match detect_setup(input.to_str().unwrap(), None) {
-                Ok(SetupChoice::MigrateDb {
-                    source_url,
-                    media_dir,
-                }) => {
+                Ok(SetupChoice::MigrateDb { source_url, media_dir }) => {
                     assert!(source_url.starts_with("sqlite://"), "{source_url}");
-                    assert_eq!(
-                        sqlite_path(&source_url).unwrap(),
-                        std::path::absolute(root.join("data/db.sqlite3")).unwrap()
-                    );
-                    assert_eq!(
-                        media_dir,
-                        Some(root.join("data").parent().unwrap().join("media"))
-                    );
+                    assert_eq!(sqlite_path(&source_url).unwrap(), std::path::absolute(root.join("data/db.sqlite3")).unwrap());
+                    assert_eq!(media_dir, Some(root.join("data").parent().unwrap().join("media")));
                 }
                 _ => panic!("{input:?}"),
             }
         }
-        assert!(matches!(
-            detect_setup("postgres://u:p@h/db", None),
-            Ok(SetupChoice::MigrateDb {
-                media_dir: None,
-                ..
-            })
-        ));
+        assert!(matches!(detect_setup("postgres://u:p@h/db", None), Ok(SetupChoice::MigrateDb { media_dir: None, .. })));
         assert!(detect_setup(d.path().to_str().unwrap(), None).is_err());
         assert!(detect_setup("", None).is_err());
         // environment: PAPERRUST_DESKTOP_IMPORT also detects data folders
@@ -1716,36 +1421,20 @@ mod tests {
 
     #[test]
     fn sqlite_paths() {
-        assert_eq!(
-            sqlite_path("sqlite:///C:/x/db.sqlite3"),
-            Some(PathBuf::from("C:/x/db.sqlite3"))
-        );
-        assert_eq!(
-            sqlite_path("sqlite:///home/u/db.sqlite3?mode=ro"),
-            Some(PathBuf::from("/home/u/db.sqlite3"))
-        );
+        assert_eq!(sqlite_path("sqlite:///C:/x/db.sqlite3"), Some(PathBuf::from("C:/x/db.sqlite3")));
+        assert_eq!(sqlite_path("sqlite:///home/u/db.sqlite3?mode=ro"), Some(PathBuf::from("/home/u/db.sqlite3")));
         assert_eq!(sqlite_path("mysql://x"), None);
     }
 
     #[test]
     fn setup_from_environment() {
         let env = |pairs: &'static [(&'static str, &'static str)]| {
-            move |k: &str| {
-                pairs
-                    .iter()
-                    .find(|(n, _)| *n == k)
-                    .map(|(_, v)| (*v).to_string())
-            }
+            move |k: &str| pairs.iter().find(|(n, _)| *n == k).map(|(_, v)| (*v).to_string())
         };
         assert!(setup_from_env(env(&[])).is_none());
-        let s = setup_from_env(env(&[
-            ("PAPERRUST_DESKTOP_ADMIN_USER", "admin"),
-            ("PAPERRUST_DESKTOP_ADMIN_PASSWORD", "12345678"),
-        ]))
-        .unwrap();
-        assert!(
-            matches!(s, SetupChoice::Fresh(Some(ref a)) if a.username == "admin" && a.email.is_empty())
-        );
+        let s =
+            setup_from_env(env(&[("PAPERRUST_DESKTOP_ADMIN_USER", "admin"), ("PAPERRUST_DESKTOP_ADMIN_PASSWORD", "12345678")])).unwrap();
+        assert!(matches!(s, SetupChoice::Fresh(Some(ref a)) if a.username == "admin" && a.email.is_empty()));
         let s = setup_from_env(env(&[
             ("PAPERRUST_DESKTOP_IMPORT", "C:/export.zip"),
             ("PAPERRUST_DESKTOP_ADMIN_USER", "admin"),
@@ -1759,9 +1448,7 @@ mod tests {
             ("PAPERRUST_DESKTOP_IMPORT_MEDIA", "C:/media"),
         ]))
         .unwrap();
-        assert!(
-            matches!(s, SetupChoice::MigrateDb { ref media_dir, .. } if media_dir.as_deref() == Some(Path::new("C:/media")))
-        );
+        assert!(matches!(s, SetupChoice::MigrateDb { ref media_dir, .. } if media_dir.as_deref() == Some(Path::new("C:/media"))));
     }
 
     #[test]
@@ -1775,10 +1462,7 @@ mod tests {
         std::fs::write(b.join("x.txt"), "alt").unwrap();
         assert_eq!(copy_tree(&a, &b).unwrap(), 1);
         assert_eq!(std::fs::read_to_string(b.join("x.txt")).unwrap(), "alt");
-        assert_eq!(
-            std::fs::read_to_string(b.join("documents/originals/0001.pdf")).unwrap(),
-            "neu"
-        );
+        assert_eq!(std::fs::read_to_string(b.join("documents/originals/0001.pdf")).unwrap(), "neu");
     }
 
     #[tokio::test]
@@ -1789,11 +1473,7 @@ mod tests {
         let (tx, mut c) = control_channel();
         let (otx, _orx) = tokio::sync::oneshot::channel();
         tx.send(otx).unwrap();
-        assert!(
-            tokio::time::timeout(Duration::from_millis(50), c.next_backup())
-                .await
-                .is_ok()
-        );
+        assert!(tokio::time::timeout(Duration::from_millis(50), c.next_backup()).await.is_ok());
         drop(tx);
         let r = tokio::time::timeout(Duration::from_millis(50), c.next_backup()).await;
         assert!(r.is_err(), "geschlossener Kanal darf nicht feuern");
@@ -1823,11 +1503,7 @@ mod tests {
         let _ = Supervisor::open(paths.clone(), layout.clone());
         assert!(!stale_pw.exists(), "initdb.pw muss weg sein");
         // lock was released again on the error; with a held lock: AlreadyRunning
-        let Acquire::Acquired(held) =
-            InstanceLock::acquire(&paths.lock_file(), &paths.instance_file()).unwrap()
-        else {
-            panic!()
-        };
+        let Acquire::Acquired(held) = InstanceLock::acquire(&paths.lock_file(), &paths.instance_file()).unwrap() else { panic!() };
         held.publish("http://127.0.0.1:1234/").unwrap();
         match Supervisor::open(paths, layout).unwrap() {
             Opened::AlreadyRunning(Some(u)) => assert_eq!(u, "http://127.0.0.1:1234/"),

@@ -26,10 +26,7 @@ async fn trash_list_matches_django() {
     let state = pl_core::AppState::from_env().await.expect("state");
     let authz = Authz::new(state.db().clone(), AuthConfig::from_core(state.config()));
     let mut router: axum::Router<pl_core::AppState> = axum::Router::new();
-    for r in pl_documents_write::routes()
-        .into_iter()
-        .filter(|r| r.id == "trash.list")
-    {
+    for r in pl_documents_write::routes().into_iter().filter(|r| r.id == "trash.list") {
         router = router.route(r.path, r.handler);
     }
     let app: axum::Router = router.with_state(state).layer(axum::Extension(authz));
@@ -57,61 +54,31 @@ async fn trash_list_matches_django() {
     for auth in users {
         for accept in ["application/json", "application/json; version=9"] {
             for path in paths {
-                let mut rb = client
-                    .get(format!("{DJANGO}{path}"))
-                    .header("Accept", accept);
+                let mut rb = client.get(format!("{DJANGO}{path}")).header("Accept", accept);
                 if let Some(a) = auth {
                     rb = rb.header("Authorization", a);
                 }
                 let d = rb.send().await.expect("django");
                 let d_status = d.status().as_u16();
-                let d_ct = d
-                    .headers()
-                    .get("content-type")
-                    .and_then(|v| v.to_str().ok())
-                    .unwrap_or("")
-                    .to_string();
+                let d_ct = d.headers().get("content-type").and_then(|v| v.to_str().ok()).unwrap_or("").to_string();
                 let d_body = d.text().await.unwrap_or_default();
 
-                let mut req = Request::builder()
-                    .uri(path)
-                    .header("host", "127.0.0.1:8000")
-                    .header("accept", accept);
+                let mut req = Request::builder().uri(path).header("host", "127.0.0.1:8000").header("accept", accept);
                 if let Some(a) = auth {
                     req = req.header("authorization", a);
                 }
-                let r = app
-                    .clone()
-                    .oneshot(req.body(Body::empty()).expect("req"))
-                    .await
-                    .expect("rust");
+                let r = app.clone().oneshot(req.body(Body::empty()).expect("req")).await.expect("rust");
                 let r_status = r.status().as_u16();
-                let r_ct = r
-                    .headers()
-                    .get("content-type")
-                    .and_then(|v| v.to_str().ok())
-                    .unwrap_or("")
-                    .to_string();
-                let bytes = axum::body::to_bytes(r.into_body(), 64 << 20)
-                    .await
-                    .unwrap_or_default();
+                let r_ct = r.headers().get("content-type").and_then(|v| v.to_str().ok()).unwrap_or("").to_string();
+                let bytes = axum::body::to_bytes(r.into_body(), 64 << 20).await.unwrap_or_default();
                 let r_body = String::from_utf8_lossy(&bytes).into_owned();
-                if d_status == r_status
-                    && d_ct.split(';').next() == r_ct.split(';').next()
-                    && normalize(&d_body) == normalize(&r_body)
-                {
+                if d_status == r_status && d_ct.split(';').next() == r_ct.split(';').next() && normalize(&d_body) == normalize(&r_body) {
                     same += 1;
                 } else {
                     diff += 1;
                     println!("DIFF {auth:?} [{accept}] {path}");
-                    println!(
-                        "  django {d_status} {d_ct}: {}",
-                        d_body.chars().take(800).collect::<String>()
-                    );
-                    println!(
-                        "  rust   {r_status} {r_ct}: {}",
-                        r_body.chars().take(800).collect::<String>()
-                    );
+                    println!("  django {d_status} {d_ct}: {}", d_body.chars().take(800).collect::<String>());
+                    println!("  rust   {r_status} {r_ct}: {}", r_body.chars().take(800).collect::<String>());
                 }
             }
         }

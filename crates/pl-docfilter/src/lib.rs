@@ -20,8 +20,6 @@
 pub mod ast;
 pub mod cfquery;
 pub mod dates;
-mod relative_dp;
-mod relative_dp_data;
 pub mod db;
 pub mod error;
 pub mod filterset;
@@ -29,6 +27,8 @@ pub mod ordering;
 pub mod params;
 pub mod perms;
 pub mod pyval;
+mod relative_dp;
+mod relative_dp_data;
 pub mod search;
 pub mod sql;
 pub mod textfold;
@@ -40,10 +40,10 @@ use pl_core::ApiRoute;
 use sea_query::SelectStatement;
 
 pub use db::{ConnFilterDb, CustomFieldDef, FilterDb};
-pub use trigger::{CustomFieldQueryMatch, custom_field_query_matching_ids};
 pub use error::FilterError;
 pub use params::QueryParams;
 pub use sql::DOC;
+pub use trigger::{CustomFieldQueryMatch, custom_field_query_matching_ids};
 
 /// The requesting (authenticated) user.
 pub use pl_authz::User;
@@ -61,11 +61,7 @@ pub struct FilterContext {
 
 impl FilterContext {
     pub fn new(tz: Tz) -> Self {
-        FilterContext {
-            tz,
-            now: Utc::now(),
-            date_parser_languages: None,
-        }
+        FilterContext { tz, now: Utc::now(), date_parser_languages: None }
     }
 }
 
@@ -81,11 +77,7 @@ pub async fn apply<D: FilterDb>(
 ) -> Result<(), FilterError> {
     filterset::apply_filterset(q, params, user, ctx, db).await?;
     let search = params.get("search");
-    let fold = if search.is_some_and(|s| !s.trim().is_empty()) {
-        db.upper_fold().await
-    } else {
-        None
-    };
+    let fold = if search.is_some_and(|s| !s.trim().is_empty()) { db.upper_fold().await } else { None };
     search::search_cond_folded(search, fold.as_deref())?.apply_to(q);
     Ok(())
 }
@@ -95,26 +87,14 @@ pub async fn apply<D: FilterDb>(
 /// index (full scan with `UPPER` per row, see docs/contract/pgvalidate.md section 9);
 /// pl-documents then fetches page and count in **one** scan.
 pub fn has_content_text_filter(params: &QueryParams) -> bool {
-    const NAMES: [&str; 6] = [
-        "title_content",
-        "content__icontains",
-        "content__istartswith",
-        "content__iendswith",
-        "content__iexact",
-        "search",
-    ];
-    NAMES
-        .iter()
-        .any(|n| params.get(n).is_some_and(|v| !pyval::py_strip(v).is_empty()))
+    const NAMES: [&str; 6] =
+        ["title_content", "content__icontains", "content__istartswith", "content__iendswith", "content__iexact", "search"];
+    NAMES.iter().any(|n| params.get(n).is_some_and(|v| !pyval::py_strip(v).is_empty()))
 }
 
 /// `DocumentsOrderingFilter` + default ordering `-created, -id`. Expects a query
 /// without ORDER BY and sets the complete ordering.
-pub async fn apply_ordering<D: FilterDb>(
-    q: &mut SelectStatement,
-    ordering: Option<&str>,
-    db: &D,
-) -> Result<(), FilterError> {
+pub async fn apply_ordering<D: FilterDb>(q: &mut SelectStatement, ordering: Option<&str>, db: &D) -> Result<(), FilterError> {
     ordering::apply_ordering(q, ordering, db).await
 }
 

@@ -19,8 +19,8 @@ use regex::{Captures, Regex};
 use super::plugins::py_space;
 use super::syntax::{SNode, TextKind};
 use super::times::{
-    add_delta, disambiguated, fill_in, has_no_time_adt, is_ambiguous, is_void, py_check, relative_days, Adt, DErr,
-    DResult, Span, SpanKind, DL, DV,
+    Adt, DErr, DL, DResult, DV, Span, SpanKind, add_delta, disambiguated, fill_in, has_no_time_adt, is_ambiguous, is_void, py_check,
+    relative_days,
 };
 use crate::wc::errors::{Diagnostic, DiagnosticKind};
 use crate::wc::fields::{FieldKind, FieldRef, FieldRegistry, FieldSpec};
@@ -64,19 +64,13 @@ fn rd_add(dt: NaiveDateTime, rd: RelDelta) -> DResult<NaiveDateTime> {
     if days.abs() > 999_999_999 {
         return Err(DErr::Value);
     }
-    let delta = Duration::try_days(days)
-        .and_then(|d| Duration::try_seconds(secs).and_then(|s| d.checked_add(&s)))
-        .ok_or(DErr::Value)?;
+    let delta = Duration::try_days(days).and_then(|d| Duration::try_seconds(secs).and_then(|s| d.checked_add(&s))).ok_or(DErr::Value)?;
     add_delta(base, delta)
 }
 
 fn date_add_days(d: NaiveDate, days: i64) -> DResult<NaiveDate> {
     let r = d.checked_add_signed(Duration::try_days(days).ok_or(DErr::Value)?).ok_or(DErr::Value)?;
-    if (1..=9999).contains(&r.year()) {
-        Ok(r)
-    } else {
-        Err(DErr::Value)
-    }
+    if (1..=9999).contains(&r.year()) { Ok(r) } else { Err(DErr::Value) }
 }
 
 // -- grammar elements -------------------------------------------------------
@@ -117,10 +111,21 @@ enum El {
     Rx(Rx),
     /// `Regex(r"(?=(\s|$))")`
     LookWsEnd,
-    Seq { els: Vec<El>, sep: Option<Regex>, progressive: bool, simple_sep_ok: bool },
-    Combo { els: Vec<El>, sep: Option<Regex> },
+    Seq {
+        els: Vec<El>,
+        sep: Option<Regex>,
+        progressive: bool,
+        simple_sep_ok: bool,
+    },
+    Combo {
+        els: Vec<El>,
+        sep: Option<Regex>,
+    },
     Choice(Vec<El>),
-    Bag { els: Vec<El>, sep: Option<Regex> },
+    Bag {
+        els: Vec<El>,
+        sep: Option<Regex>,
+    },
 }
 
 const DEFAULT_SEP: &str = r"(\s+|\s*,\s*)";
@@ -224,12 +229,7 @@ fn build_grammar() -> Grammar {
     );
     let plusdate = rx(&plus_pat, W_TAIL, true, RxKind::Plus);
     let nowcompact = rx(r"now(?P<sign>[+-])(?P<n>[0-9]+)(?P<unit>[yMwdhms])", W_TAIL, false, RxKind::NowCompact);
-    let dayname = rx(
-        &format!("(?P<dir>next|last) +(?P<day>{})", DAYNAMES.join("|")),
-        W_TAIL,
-        true,
-        RxKind::Dayname,
-    );
+    let dayname = rx(&format!("(?P<dir>next|last) +(?P<day>{})", DAYNAMES.join("|")), W_TAIL, true, RxKind::Dayname);
 
     let dmy = El::Choice(vec![
         seq(vec![day_el(), month_el(), year_el()]),
@@ -274,25 +274,27 @@ fn build_grammar() -> Grammar {
     };
     let simple = El::Seq { els: vec![simple_seq, El::LookWsEnd], sep: None, progressive: false, simple_sep_ok: false };
 
-    let bundle = || El::Choice(vec![
-        rx(r"now(?P<sign>[+-])(?P<n>[0-9]+)(?P<unit>[yMwdhms])", W_TAIL, false, RxKind::NowCompact),
-        rx(&plus_pat, W_TAIL, true, RxKind::Plus),
-        El::Seq {
-            els: vec![
-                El::Seq {
-                    els: units.iter().map(|u| rx(u, "", true, RxKind::Units)).collect(),
-                    sep: sep_re("[- .:/T]*"),
-                    progressive: true,
-                    simple_sep_ok: true,
-                },
-                El::LookWsEnd,
-            ],
-            sep: None,
-            progressive: false,
-            simple_sep_ok: false,
-        },
-        build_datetime(),
-    ]);
+    let bundle = || {
+        El::Choice(vec![
+            rx(r"now(?P<sign>[+-])(?P<n>[0-9]+)(?P<unit>[yMwdhms])", W_TAIL, false, RxKind::NowCompact),
+            rx(&plus_pat, W_TAIL, true, RxKind::Plus),
+            El::Seq {
+                els: vec![
+                    El::Seq {
+                        els: units.iter().map(|u| rx(u, "", true, RxKind::Units)).collect(),
+                        sep: sep_re("[- .:/T]*"),
+                        progressive: true,
+                        simple_sep_ok: true,
+                    },
+                    El::LookWsEnd,
+                ],
+                sep: None,
+                progressive: false,
+                simple_sep_ok: false,
+            },
+            build_datetime(),
+        ])
+    };
     let first_bundle = El::Choice(vec![nowcompact, plusdate, simple, datetime]);
     let torange = El::Combo { els: vec![bundle(), rx("to", "", true, RxKind::Units), bundle()], sep: sep_re(DEFAULT_SEP) };
     Grammar { all: El::Choice(vec![torange, first_bundle]), time: time_el() }
@@ -300,12 +302,7 @@ fn build_grammar() -> Grammar {
 
 /// A fresh `self.datetime` Bag (elements are not shareable in this tree).
 fn build_datetime() -> El {
-    let dayname = rx(
-        &format!("(?P<dir>next|last) +(?P<day>{})", DAYNAMES.join("|")),
-        W_TAIL,
-        true,
-        RxKind::Dayname,
-    );
+    let dayname = rx(&format!("(?P<dir>next|last) +(?P<day>{})", DAYNAMES.join("|")), W_TAIL, true, RxKind::Dayname);
     let dmy = El::Choice(vec![
         seq(vec![day_el(), month_el(), year_el()]),
         seq(vec![month_el(), day_el(), year_el()]),
@@ -440,11 +437,7 @@ impl El {
                     }
                     first = false;
                 }
-                if !failed && (foundall || (!first && *progressive)) {
-                    Ok(Some((d, pos)))
-                } else {
-                    Ok(None)
-                }
+                if !failed && (foundall || (!first && *progressive)) { Ok(Some((d, pos))) } else { Ok(None) }
             }
             El::Combo { els, sep } => {
                 let mut pos = pos;
@@ -563,20 +556,12 @@ impl Rx {
 
     fn props_to_date(&self, c: &Captures<'_>, dt: NaiveDateTime) -> DResult<Option<DV>> {
         let today = || dt.date();
-        let ymd = |d: NaiveDate| -> DResult<DV> {
-            Ok(DV::A(Adt::ymd(i64::from(d.year()), i64::from(d.month()), i64::from(d.day()))?))
-        };
+        let ymd = |d: NaiveDate| -> DResult<DV> { Ok(DV::A(Adt::ymd(i64::from(d.year()), i64::from(d.month()), i64::from(d.day()))?)) };
         let g = |n: &str| int_group(c, n);
         let v = match self.kind {
-            RxKind::Units => DV::A(Adt::new(
-                g("year")?,
-                g("month")?,
-                g("day")?,
-                g("hour")?,
-                g("minute")?,
-                g("second")?,
-                g("microsecond")?,
-            )?),
+            RxKind::Units => {
+                DV::A(Adt::new(g("year")?, g("month")?, g("day")?, g("hour")?, g("minute")?, g("second")?, g("microsecond")?)?)
+            }
             RxKind::Day => DV::A(Adt::new(None, None, g("day")?, None, None, None, None)?),
             RxKind::Year => DV::A(Adt::new(g("year")?, None, None, None, None, None, None)?),
             RxKind::YearMonth => DV::A(Adt::new(g("year")?, g("month")?, None, None, None, None, None)?),
@@ -585,18 +570,12 @@ impl Rx {
                 let Some(i) = first_prefix_index(&MONTHS, text) else { return Ok(None) };
                 DV::A(Adt::new(None, Some(i as i64 + 1), None, None, None, None, None)?)
             }
-            RxKind::Time24 => {
-                DV::A(Adt::new(None, None, None, g("hour")?, g("mins")?, g("secs")?, g("usecs")?)?)
-            }
+            RxKind::Time24 => DV::A(Adt::new(None, None, None, g("hour")?, g("mins")?, g("secs")?, g("usecs")?)?),
             RxKind::Time12 => {
                 let isam = c.name("ampm").is_some_and(|m| m.as_str().to_lowercase().starts_with('a'));
                 let hour = g("hour")?.unwrap_or(0);
                 let hr = if hour == 12 {
-                    if isam {
-                        0
-                    } else {
-                        12
-                    }
+                    if isam { 0 } else { 12 }
                 } else if isam {
                     hour
                 } else {
@@ -648,15 +627,7 @@ impl Rx {
             RxKind::Tomorrow => ymd(date_add_days(today(), 1)?)?,
             RxKind::Yesterday => ymd(date_add_days(today(), -1)?)?,
             RxKind::ThisYear => DV::A(Adt::new(Some(i64::from(dt.year())), None, None, None, None, None, None)?),
-            RxKind::ThisMonth => DV::A(Adt::new(
-                Some(i64::from(dt.year())),
-                Some(i64::from(dt.month())),
-                None,
-                None,
-                None,
-                None,
-                None,
-            )?),
+            RxKind::ThisMonth => DV::A(Adt::new(Some(i64::from(dt.year())), Some(i64::from(dt.month())), None, None, None, None, None)?),
             RxKind::Today => ymd(today())?,
             RxKind::PrevYear => DV::A(Adt::new(Some(i64::from(dt.year()) - 1), None, None, None, None, None, None)?),
             RxKind::PrevMonth => {
@@ -736,8 +707,7 @@ pub struct DateParserPlugin {
     tz: Tz,
 }
 
-const KEYWORD_PHRASES: [(&str, &[&str]); 2] =
-    [("previous", &["week", "month", "quarter", "year"]), ("this", &["month", "year"])];
+const KEYWORD_PHRASES: [(&str, &[&str]); 2] = [("previous", &["week", "month", "quarter", "year"]), ("this", &["month", "year"])];
 const UNQUOTED_LOOKAHEAD: usize = 15;
 const TO_SEP_CHARS: &str = " \t\n\r\u{c}\u{b},";
 
@@ -842,7 +812,10 @@ impl DateParserPlugin {
                 if is_to && i > 0 && TO_SEP_CHARS.contains(chars[i - 1]) && chars.get(i + 2).is_some_and(|c| TO_SEP_CHARS.contains(*c)) {
                     let l: String = chars[..i].iter().collect();
                     let r: String = chars[i + 2..].iter().collect();
-                    return Some((l.trim_end_matches(|c| TO_SEP_CHARS.contains(c)).to_string(), r.trim_start_matches(|c| TO_SEP_CHARS.contains(c)).to_string()));
+                    return Some((
+                        l.trim_end_matches(|c| TO_SEP_CHARS.contains(c)).to_string(),
+                        r.trim_start_matches(|c| TO_SEP_CHARS.contains(c)).to_string(),
+                    ));
                 }
             }
             return None;
@@ -905,20 +878,13 @@ impl DateParserPlugin {
     }
 
     fn time_on_period_error(text: &str, spec: &FieldSpec, unit: &str, sc: Option<usize>, ec: Option<usize>) -> SNode {
-        let msg = format!(
-            "{} pairs a time of day with a whole {unit}; name a day, or drop the time",
-            crate::error::py_repr(text)
-        );
+        let msg = format!("{} pairs a time of day with a whole {unit}; name a day, or drop the time", crate::error::py_repr(text));
         Self::bad_date(text, spec, msg, sc, ec, None)
     }
 
     fn unquoted_error(text: &str, spec: &FieldSpec, sc: Option<usize>, ec: Option<usize>) -> SNode {
         let quoted = format!("\"{text}\"");
-        let msg = format!(
-            "{} is a date value written without quotes; quote it as {}:{quoted}",
-            crate::error::py_repr(text),
-            spec.name
-        );
+        let msg = format!("{} is a date value written without quotes; quote it as {}:{quoted}", crate::error::py_repr(text), spec.name);
         Self::bad_date(text, spec, msg, sc, ec, Some(quoted))
     }
 
@@ -1201,16 +1167,7 @@ impl DateParserPlugin {
             SNode::Text { boost, .. } => *boost,
             _ => 1.0,
         };
-        Ok(SNode::DateRange {
-            fieldname: spec.name.clone(),
-            lo: Some(lo),
-            hi: Some(hi),
-            incl_lo,
-            incl_hi,
-            boost,
-            sc: None,
-            ec: None,
-        })
+        Ok(SNode::DateRange { fieldname: spec.name.clone(), lo: Some(lo), hi: Some(hi), incl_lo, incl_hi, boost, sc: None, ec: None })
     }
 
     /// `range_to_node`
@@ -1328,10 +1285,7 @@ impl DateParserPlugin {
         };
         let date_only = spec.date_only;
         let fails_as_lo = |raw: &Option<DV>| -> bool {
-            individual(raw)
-                .and_then(|p| dl_dt(&dv_start(&p)))
-                .and_then(|lo| self.to_utc(lo, date_only, false, TzSel::Local))
-                .is_err()
+            individual(raw).and_then(|p| dl_dt(&dv_start(&p))).and_then(|lo| self.to_utc(lo, date_only, false, TzSel::Local)).is_err()
         };
         let incl_hi_typed = incl_hi;
         let fails_as_hi = |raw: &Option<DV>| -> bool {

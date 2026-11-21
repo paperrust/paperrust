@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::compat;
 use crate::difflib;
-use crate::normalize::{normalize_with, NameKind, Normalized};
+use crate::normalize::{NameKind, Normalized, normalize_with};
 use crate::similarity::{jaro_winkler, levenshtein_similarity, token_containment, token_set_ratio};
 
 /// Kind of a taxonomy object.
@@ -33,13 +33,8 @@ pub enum TaxonomyKind {
 }
 
 impl TaxonomyKind {
-    pub const ALL: [TaxonomyKind; 5] = [
-        TaxonomyKind::Correspondent,
-        TaxonomyKind::Tag,
-        TaxonomyKind::DocumentType,
-        TaxonomyKind::StoragePath,
-        TaxonomyKind::CustomField,
-    ];
+    pub const ALL: [TaxonomyKind; 5] =
+        [TaxonomyKind::Correspondent, TaxonomyKind::Tag, TaxonomyKind::DocumentType, TaxonomyKind::StoragePath, TaxonomyKind::CustomField];
 
     /// Value in the API (`correspondent`, `tag`, …).
     pub fn as_str(self) -> &'static str {
@@ -291,10 +286,7 @@ fn score_variants(q: &Variants, c: &Variants, query: &str, candidate: &str) -> (
             let cont = token_containment(&qa.tokens, &ca.tokens);
             let edit = 0.5 * jw + 0.5 * lev;
             s = edit.max(dl).max(ts * 0.95);
-            r.push(reason(
-                "fuzzy",
-                format!("Jaro-Winkler {jw:.2}, Levenshtein {lev:.2}, difflib {dl:.2}, Token-Set {ts:.2} ({label})"),
-            ));
+            r.push(reason("fuzzy", format!("Jaro-Winkler {jw:.2}, Levenshtein {lev:.2}, difflib {dl:.2}, Token-Set {ts:.2} ({label})")));
             let short_tokens = qa.tokens.len().min(ca.tokens.len());
             if cont >= 1.0 && short_tokens >= 1 {
                 let longest_short = if qa.tokens.len() <= ca.tokens.len() { &qa.tokens } else { &ca.tokens };
@@ -307,10 +299,7 @@ fn score_variants(q: &Variants, c: &Variants, query: &str, candidate: &str) -> (
         // Number incompatibility: "Steuern 2024" ≠ "Steuern 2025", "Konto 1" ≠ "Konto 2".
         if qa.numbers != ca.numbers && !(qa.numbers.is_empty() && ca.numbers.is_empty()) && s > 0.75 {
             s = 0.75;
-            r.push(reason(
-                "number_mismatch",
-                format!("unterschiedliche Zahlen ({:?} / {:?})", qa.numbers, ca.numbers),
-            ));
+            r.push(reason("number_mismatch", format!("unterschiedliche Zahlen ({:?} / {:?})", qa.numbers, ca.numbers)));
         }
         if s > best {
             best = s;
@@ -332,19 +321,12 @@ pub fn upstream_pair_match(query: &str, candidate: &str) -> bool {
 
 /// Finds candidates for `query` among the (already permission-filtered!) `entries` of a kind.
 /// `aliases` are the visible aliases of this kind.
-pub fn find_similar(
-    kind: TaxonomyKind,
-    query: &str,
-    entries: &[TaxonomyEntry],
-    aliases: &[Alias],
-    opts: &MatchOptions,
-) -> Vec<Candidate> {
+pub fn find_similar(kind: TaxonomyKind, query: &str, entries: &[TaxonomyEntry], aliases: &[Alias], opts: &MatchOptions) -> Vec<Candidate> {
     let nk = kind.name_kind();
     let mut out: Vec<Candidate> = Vec::new();
     match opts.mode {
         MatchMode::Upstream => {
-            let pool: Vec<(i64, String)> =
-                entries.iter().filter(|e| e.kind == kind).map(|e| (e.id, e.name.clone())).collect();
+            let pool: Vec<(i64, String)> = entries.iter().filter(|e| e.kind == kind).map(|e| (e.id, e.name.clone())).collect();
             for (id, name) in compat::match_names_to_pool(&[Some(query)], &pool) {
                 let extra = entries.iter().find(|e| e.id == id && e.kind == kind).and_then(|e| e.extra.clone());
                 let score = round4(difflib::ratio(&compat::py_normalize(&name), &compat::py_normalize(query)));
@@ -446,14 +428,7 @@ mod tests {
         names
             .iter()
             .enumerate()
-            .map(|(i, n)| TaxonomyEntry {
-                kind,
-                id: i as i64 + 1,
-                name: n.to_string(),
-                owner_id: None,
-                extra: None,
-                document_count: None,
-            })
+            .map(|(i, n)| TaxonomyEntry { kind, id: i as i64 + 1, name: n.to_string(), owner_id: None, extra: None, document_count: None })
             .collect()
     }
 
@@ -503,7 +478,13 @@ mod tests {
         assert!(!c.above_threshold);
         assert!(c.reasons.iter().any(|r| r.code == "number_mismatch"));
         // check_duplicate blocks anyway, because upstream would assign
-        let d = check_duplicate(TaxonomyKind::Tag, "Steuern 2025", &entries(TaxonomyKind::Tag, &["Steuern 2024"]), &[], &MatchOptions::default());
+        let d = check_duplicate(
+            TaxonomyKind::Tag,
+            "Steuern 2025",
+            &entries(TaxonomyKind::Tag, &["Steuern 2024"]),
+            &[],
+            &MatchOptions::default(),
+        );
         assert!(d.blocked);
     }
 
@@ -565,13 +546,7 @@ mod tests {
         e[1].owner_id = Some(7); // foreign
         e[2].owner_id = Some(5); // own
         e[3].owner_id = Some(7); // foreign, but released via group
-        let grants = vec![Grant {
-            kind: TaxonomyKind::Tag,
-            object_id: 4,
-            user_id: None,
-            group_id: Some(3),
-            codename: "view_tag".into(),
-        }];
+        let grants = vec![Grant { kind: TaxonomyKind::Tag, object_id: 4, user_id: None, group_id: Some(3), codename: "view_tag".into() }];
         let p = Principal { user_id: Some(5), is_active: true, is_superuser: false, group_ids: vec![3] };
         let vis: Vec<i64> = e.iter().filter(|x| p.can_view(x, &grants)).map(|x| x.id).collect();
         assert_eq!(vis, vec![1, 3, 4]);

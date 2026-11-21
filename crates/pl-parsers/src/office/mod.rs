@@ -25,32 +25,17 @@ use std::path::Path;
 
 use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime};
 
-use crate::{
-    Deadline, DocumentParser, MetadataEntry, ParseContext, ParseError, ParsedDocument, Result,
-    read_limited,
-};
+use crate::{Deadline, DocumentParser, MetadataEntry, ParseContext, ParseError, ParsedDocument, Result, read_limited};
 
 /// Tika MIME list in upstream order.
 pub const TIKA_MIME_TYPES: &[(&str, &str)] = &[
     ("application/msword", ".doc"),
-    (
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        ".docx",
-    ),
+    ("application/vnd.openxmlformats-officedocument.wordprocessingml.document", ".docx"),
     ("application/vnd.ms-excel", ".xls"),
-    (
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        ".xlsx",
-    ),
+    ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx"),
     ("application/vnd.ms-powerpoint", ".ppt"),
-    (
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        ".pptx",
-    ),
-    (
-        "application/vnd.openxmlformats-officedocument.presentationml.slideshow",
-        ".ppsx",
-    ),
+    ("application/vnd.openxmlformats-officedocument.presentationml.presentation", ".pptx"),
+    ("application/vnd.openxmlformats-officedocument.presentationml.slideshow", ".ppsx"),
     ("application/vnd.oasis.opendocument.presentation", ".odp"),
     ("application/vnd.oasis.opendocument.spreadsheet", ".ods"),
     ("application/vnd.oasis.opendocument.text", ".odt"),
@@ -92,11 +77,8 @@ pub fn slides(data: &[u8], mime_type: &str, ctx: &ParseContext) -> Result<Vec<Sl
     let deadline = Deadline::from_limits(&ctx.limits);
     match mime_type {
         "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-        | "application/vnd.openxmlformats-officedocument.presentationml.slideshow" => {
-            ooxml::pptx_slides(data, &ctx.limits, deadline)
-        }
-        "application/vnd.oasis.opendocument.presentation"
-        | "application/vnd.oasis.opendocument.graphics" => {
+        | "application/vnd.openxmlformats-officedocument.presentationml.slideshow" => ooxml::pptx_slides(data, &ctx.limits, deadline),
+        "application/vnd.oasis.opendocument.presentation" | "application/vnd.oasis.opendocument.graphics" => {
             odf::odp_slides(data, &ctx.limits, deadline)
         }
         "application/vnd.ms-powerpoint" => ole::ppt_slides(data, &ctx.limits, deadline),
@@ -171,13 +153,9 @@ pub fn extract(data: &[u8], mime_type: &str, ctx: &ParseContext) -> Result<Offic
         "application/vnd.oasis.opendocument.text"
         | "application/vnd.oasis.opendocument.spreadsheet"
         | "application/vnd.oasis.opendocument.presentation"
-        | "application/vnd.oasis.opendocument.graphics" => {
-            odf::extract(data, mime_type, &ctx.limits, deadline)
-        }
+        | "application/vnd.oasis.opendocument.graphics" => odf::extract(data, mime_type, &ctx.limits, deadline),
         "text/rtf" => rtf::extract(data, &ctx.limits, deadline),
-        ole::MIME_DOC | ole::MIME_XLS | ole::MIME_PPT => {
-            ole::extract(data, mime_type, &ctx.limits, deadline)
-        }
+        ole::MIME_DOC | ole::MIME_XLS | ole::MIME_PPT => ole::extract(data, mime_type, &ctx.limits, deadline),
         m => Err(ParseError::Unsupported(m.to_owned())),
     }
 }
@@ -195,11 +173,7 @@ pub fn parse_tika_date(s: &str, tz: chrono_tz::Tz) -> Option<DateTime<FixedOffse
         .or_else(|_| NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S"))
         .or_else(|_| NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M"))
         .ok()
-        .or_else(|| {
-            NaiveDate::parse_from_str(s, "%Y-%m-%d")
-                .ok()
-                .and_then(|d| d.and_hms_opt(0, 0, 0))
-        })?;
+        .or_else(|| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok().and_then(|d| d.and_hms_opt(0, 0, 0)))?;
     Some(crate::mail::make_aware(naive, tz).0)
 }
 
@@ -218,19 +192,13 @@ pub struct OfficeDocumentParser {
 
 impl Default for OfficeDocumentParser {
     fn default() -> Self {
-        Self {
-            converter: None,
-            enabled: true,
-        }
+        Self { converter: None, enabled: true }
     }
 }
 
 impl std::fmt::Debug for OfficeDocumentParser {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("OfficeDocumentParser")
-            .field("enabled", &self.enabled)
-            .field("converter", &self.converter.is_some())
-            .finish()
+        f.debug_struct("OfficeDocumentParser").field("enabled", &self.enabled).field("converter", &self.converter.is_some()).finish()
     }
 }
 
@@ -248,10 +216,7 @@ impl DocumentParser for OfficeDocumentParser {
         if !self.enabled || UNSUPPORTED_LEGACY.contains(&mime_type) {
             return None;
         }
-        TIKA_MIME_TYPES
-            .iter()
-            .any(|(m, _)| *m == mime_type)
-            .then_some(10)
+        TIKA_MIME_TYPES.iter().any(|(m, _)| *m == mime_type).then_some(10)
     }
     fn can_produce_archive(&self) -> bool {
         false
@@ -264,10 +229,7 @@ impl DocumentParser for OfficeDocumentParser {
     fn parse(&self, path: &Path, mime_type: &str, ctx: &ParseContext) -> Result<ParsedDocument> {
         let data = read_limited(path, &ctx.limits)?;
         let c = extract(&data, mime_type, ctx)?;
-        let date = c
-            .created
-            .as_deref()
-            .and_then(|s| parse_tika_date(s, ctx.time_zone));
+        let date = c.created.as_deref().and_then(|s| parse_tika_date(s, ctx.time_zone));
         // PaperRust: a generator error (e.g. WordCraft in a child process) does not abort
         // reading – it continues as without a generator (original without archive PDF).
         let archive_path = match &self.converter {
@@ -287,29 +249,16 @@ impl DocumentParser for OfficeDocumentParser {
             }
             None => None,
         };
-        Ok(ParsedDocument {
-            text: crate::pystr::py_strip(&c.text).to_owned(),
-            date,
-            archive_path,
-        })
+        Ok(ParsedDocument { text: crate::pystr::py_strip(&c.text).to_owned(), date, archive_path })
     }
     fn page_count(&self, _p: &Path, _m: &str, _c: &ParseContext) -> Option<u32> {
         // upstream: pages of the archive PDF; without archive None
         None
     }
-    fn extract_metadata(
-        &self,
-        path: &Path,
-        mime_type: &str,
-        ctx: &ParseContext,
-    ) -> Vec<MetadataEntry> {
+    fn extract_metadata(&self, path: &Path, mime_type: &str, ctx: &ParseContext) -> Vec<MetadataEntry> {
         let res = read_limited(path, &ctx.limits).and_then(|d| extract(&d, mime_type, ctx));
         match res {
-            Ok(c) => c
-                .metadata
-                .into_iter()
-                .map(|(k, v)| MetadataEntry::new("", "", k, v))
-                .collect(),
+            Ok(c) => c.metadata.into_iter().map(|(k, v)| MetadataEntry::new("", "", k, v)).collect(),
             Err(e) => {
                 tracing::warn!(target: "paperless.parsing.tika", "Error while fetching document metadata for {}: {}", path.display(), e);
                 Vec::new()

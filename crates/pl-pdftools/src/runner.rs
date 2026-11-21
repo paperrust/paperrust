@@ -82,7 +82,8 @@ impl Limits {
     /// limit), live from the environment or UI.
     pub fn from_env() -> Self {
         let d = Limits::default();
-        let timeout = parse_u64(pl_core::config::var("PAPERRUST_PDFTOOL_TIMEOUT")).filter(|s| *s >= 1).map(Duration::from_secs).unwrap_or(d.timeout);
+        let timeout =
+            parse_u64(pl_core::config::var("PAPERRUST_PDFTOOL_TIMEOUT")).filter(|s| *s >= 1).map(Duration::from_secs).unwrap_or(d.timeout);
         let memory_mb = parse_u64(pl_core::config::var("PAPERRUST_PDFTOOL_MEMORY_MB")).unwrap_or(d.memory_mb);
         Limits { timeout, memory_mb }
     }
@@ -275,7 +276,20 @@ pub async fn run_with(tool: &Path, op: Op, limits: Limits) -> Result<Reply, RunE
 }
 
 /// Environment variables the child may keep (no secrets).
-const KEEP_ENV: &[&str] = &["PATH", "SystemRoot", "SYSTEMROOT", "TEMP", "TMP", "TMPDIR", "RUST_BACKTRACE", "WINDIR", "LOCALAPPDATA", "XDG_DATA_HOME", "XDG_DATA_DIRS", "HOME"];
+const KEEP_ENV: &[&str] = &[
+    "PATH",
+    "SystemRoot",
+    "SYSTEMROOT",
+    "TEMP",
+    "TMP",
+    "TMPDIR",
+    "RUST_BACKTRACE",
+    "WINDIR",
+    "LOCALAPPDATA",
+    "XDG_DATA_HOME",
+    "XDG_DATA_DIRS",
+    "HOME",
+];
 
 /// Run without tokio (for synchronous callers such as the parsers during ingestion, which run in
 /// `spawn_blocking`) with the found tool and limits from the environment.
@@ -439,13 +453,19 @@ mod tests {
 
     #[test]
     fn missing_tool_is_io_error_blocking() {
-        let r = run_blocking_with(Path::new("definitely-not-here-pdftool.exe"), Op::SelfTest { mode: crate::job::SelfTest::Panic }, Limits::default());
+        let r = run_blocking_with(
+            Path::new("definitely-not-here-pdftool.exe"),
+            Op::SelfTest { mode: crate::job::SelfTest::Panic },
+            Limits::default(),
+        );
         assert!(matches!(r, Err(RunError::Io(_))), "{r:?}");
     }
 
     #[tokio::test]
     async fn missing_tool_is_io_error() {
-        let r = run_with(Path::new("definitely-not-here-pdftool.exe"), Op::SelfTest { mode: crate::job::SelfTest::Panic }, Limits::default()).await;
+        let r =
+            run_with(Path::new("definitely-not-here-pdftool.exe"), Op::SelfTest { mode: crate::job::SelfTest::Panic }, Limits::default())
+                .await;
         assert!(matches!(r, Err(RunError::Io(_))), "{r:?}");
     }
 }

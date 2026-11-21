@@ -106,11 +106,7 @@ async fn setup() -> (Router, sqlx::PgPool, Ids) {
 }
 
 async fn call(router: &Router, method: &str, uri: &str, token: &str, body: Option<Value>) -> (StatusCode, Value) {
-    let mut b = Request::builder()
-        .method(method)
-        .uri(uri)
-        .header("host", "localhost")
-        .header("authorization", format!("Token {token}"));
+    let mut b = Request::builder().method(method).uri(uri).header("host", "localhost").header("authorization", format!("Token {token}"));
     let body = match body {
         Some(v) => {
             b = b.header("content-type", "application/json");
@@ -156,8 +152,7 @@ async fn roles_end_to_end() {
         call(&r, "POST", &format!("/roles/{read}/assign"), SU_TOKEN, Some(json!({"users":[ids.plain],"groups":[ids.group]}))).await;
     assert_eq!(st, StatusCode::OK, "{out}");
     assert_eq!(out["users"][0]["role_id"], read);
-    let (_, res) =
-        call(&r, "GET", &format!("/roles/resolve?users={}&groups={}", ids.plain, ids.group), SU_TOKEN, None).await;
+    let (_, res) = call(&r, "GET", &format!("/roles/resolve?users={}&groups={}", ids.plain, ids.group), SU_TOKEN, None).await;
     assert_eq!(res["users"][ids.plain.to_string()], read);
     assert_eq!(res["groups"][ids.group.to_string()], read);
     let n: i64 = sqlx::query_scalar(
@@ -214,8 +209,7 @@ async fn roles_end_to_end() {
     let cid = role["id"].as_i64().unwrap();
     assert_eq!(role["builtin"], false);
     assert_eq!(call(&r, "POST", "/roles", SU_TOKEN, Some(body)).await.0, StatusCode::BAD_REQUEST, "doppelter Name");
-    let (st, _) =
-        call(&r, "POST", "/roles", SU_TOKEN, Some(json!({"name":"X","permissions":["documents.fly_document"]}))).await;
+    let (st, _) = call(&r, "POST", "/roles", SU_TOKEN, Some(json!({"name":"X","permissions":["documents.fly_document"]}))).await;
     assert_eq!(st, StatusCode::BAD_REQUEST);
     let (st, role) = call(&r, "PATCH", &format!("/roles/{cid}"), SU_TOKEN, Some(json!({"description":"Belege"}))).await;
     assert_eq!(st, StatusCode::OK);

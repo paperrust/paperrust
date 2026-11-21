@@ -19,9 +19,9 @@ use pl_authz::models::{DOCUMENT, PAPERLESS_TASK};
 use pl_authz::perms::{self, ACKNOWLEDGE_TASKS_PERMISSIONS, ObjRef};
 use pl_authz::{AuthUser, User, objects};
 use pl_core::pagination::{PageRequest, fetch_page, paginated_body};
+use pl_core::sqlbind::SqlxBinder as _;
 use pl_core::{ApiError, AppState, Drf, QueryParams, RequestContext};
 use sea_query::{Cond, Condition, Expr, ExprTrait as _, Func, PostgresQueryBuilder, Query, SelectStatement};
-use pl_core::sqlbind::SqlxBinder as _;
 use serde_json::{Map, Value, json};
 use sqlx::{PgPool, Row as _};
 
@@ -43,9 +43,7 @@ fn select_tasks(cond: Condition) -> SelectStatement {
 async fn owner_exists(db: &PgPool, id: Option<i64>) -> Result<bool> {
     let Some(id) = id else { return Ok(false) };
     let q = Query::select()
-        .expr(Expr::exists(
-            Query::select().expr(Expr::val(1)).from(a("auth_user")).and_where(Expr::col(a("id")).eq(id)).to_owned(),
-        ))
+        .expr(Expr::exists(Query::select().expr(Expr::val(1)).from(a("auth_user")).and_where(Expr::col(a("id")).eq(id)).to_owned()))
         .to_owned();
     let (sql, values) = q.build_sqlx(PostgresQueryBuilder);
     let (b,): (bool,) = sqlx::query_as_with(&sql, values).fetch_one(db).await?;
@@ -58,9 +56,7 @@ async fn filtered_condition(db: &PgPool, ctx: &RequestContext, tz: &Tz, user: &U
     let exists = owner_exists(db, candidate).await?;
     let f = query::parse_filter(q, ctx.language, tz, |id| exists && Some(id) == candidate)
         .map_err(|e| Error::Api(ApiError::validation(e.to_value())))?;
-    Ok(Cond::all()
-        .add(query::base_condition(user, is_v9(ctx), q))
-        .add(query::filter_condition(&f, ctx.language)))
+    Ok(Cond::all().add(query::base_condition(user, is_v9(ctx), q)).add(query::filter_condition(&f, ctx.language)))
 }
 
 fn is_v9(ctx: &RequestContext) -> bool {
@@ -70,16 +66,10 @@ fn is_v9(ctx: &RequestContext) -> bool {
 /// Serialize rows with the serializer of the request's API version.
 async fn serialize_rows(db: &PgPool, ctx: &RequestContext, tz: &Tz, user: &User, rows: &[TaskRow]) -> Result<Vec<Value>> {
     if !is_v9(ctx) {
-        return rows
-            .iter()
-            .map(|r| serialize::v10(r, ctx.language, tz).map_err(|e| Error::Api(ApiError::internal(e))))
-            .collect();
+        return rows.iter().map(|r| serialize::v10(r, ctx.language, tz).map_err(|e| Error::Api(ApiError::internal(e)))).collect();
     }
     let dups = duplicate_documents(db, user, rows).await?;
-    Ok(rows
-        .iter()
-        .map(|r| serialize::v9(r, tz, dups.get(&r.id).cloned().unwrap_or_default()))
-        .collect())
+    Ok(rows.iter().map(|r| serialize::v9(r, tz, dups.get(&r.id).cloned().unwrap_or_default())).collect())
 }
 
 /// `TaskSerializerV9.get_duplicate_documents` for all rows in one query.
@@ -269,14 +259,8 @@ pub async fn summary(State(state): State<AppState>, ctx: RequestContext, auth: A
             a("avg_wait_time_seconds"),
         )
         .expr_as(Func::max(Expr::col((a(T), a("date_created")))), a("last_run"))
-        .expr_as(
-            Expr::cust("MAX(\"t\".\"date_done\") FILTER (WHERE \"t\".\"status\" = 'success')"),
-            a("last_success"),
-        )
-        .expr_as(
-            Expr::cust("MAX(\"t\".\"date_done\") FILTER (WHERE \"t\".\"status\" = 'failure')"),
-            a("last_failure"),
-        )
+        .expr_as(Expr::cust("MAX(\"t\".\"date_done\") FILTER (WHERE \"t\".\"status\" = 'success')"), a("last_success"))
+        .expr_as(Expr::cust("MAX(\"t\".\"date_done\") FILTER (WHERE \"t\".\"status\" = 'failure')"), a("last_failure"))
         .from_as(a(TABLE), a(T))
         .cond_where(cond)
         .group_by_col((a(T), a("task_type")));
@@ -309,9 +293,7 @@ pub async fn status_counts(State(state): State<AppState>, ctx: RequestContext, a
     let db = state.db();
     let tz = state.config().tz;
     // _STATUS_COUNT_EXCLUDED_FILTERS = {"status", "is_complete"}
-    let reduced = QueryParams::from_pairs(
-        ctx.query.pairs().iter().filter(|(k, _)| k != "status" && k != "is_complete").cloned(),
-    );
+    let reduced = QueryParams::from_pairs(ctx.query.pairs().iter().filter(|(k, _)| k != "status" && k != "is_complete").cloned());
     let cond = filtered_condition(db, &ctx, &tz, auth.user(), &reduced).await?;
     let in_statuses = |s: &[&str]| -> sea_query::SimpleExpr {
         let list = s.iter().map(|v| format!("'{v}'")).collect::<Vec<_>>().join(", ");
@@ -341,9 +323,7 @@ pub async fn active(State(state): State<AppState>, ctx: RequestContext, auth: Au
     let tz = state.config().tz;
     let user = auth.user();
     let mut sel = select_tasks(query::base_condition(user, is_v9(&ctx), &ctx.query));
-    sel.and_where(col("status").is_in(["pending", "started"]))
-        .order_by((a(T), a("date_created")), sea_query::Order::Desc)
-        .limit(50);
+    sel.and_where(col("status").is_in(["pending", "started"])).order_by((a(T), a("date_created")), sea_query::Order::Desc).limit(50);
     let (sql, values) = sel.build_sqlx(PostgresQueryBuilder);
     let rows = rows_of(&sqlx::query_with(&sql, values).fetch_all(db).await?)?;
     let data = serialize_rows(db, &ctx, &tz, user, &rows).await?;

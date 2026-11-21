@@ -87,7 +87,12 @@ fn handle(mut c: TcpStream, base: &str, op_host: Option<&str>, seen: &Mutex<Seen
         let _ = c.write_all(body);
     };
     if key.as_deref() != Some(KEY) {
-        respond(&mut c, "401 Unauthorized", &[("Content-Type", "application/json".into())], br#"{"error":{"code":"401","message":"Access denied due to invalid subscription key."}}"#);
+        respond(
+            &mut c,
+            "401 Unauthorized",
+            &[("Content-Type", "application/json".into())],
+            br#"{"error":{"code":"401","message":"Access denied due to invalid subscription key."}}"#,
+        );
         return;
     }
     let api = "api-version=2024-11-30";
@@ -103,7 +108,12 @@ fn handle(mut c: TcpStream, base: &str, op_host: Option<&str>, seen: &Mutex<Seen
     } else if method == "GET" && path == format!("/documentintelligence/documentModels/prebuilt-read/analyzeResults/res-42?{api}") {
         g.polls += 1;
         if g.polls == 1 {
-            respond(&mut c, "200 OK", &[("Retry-After", "1".into()), ("Content-Type", "application/json".into())], br#"{"status":"running"}"#);
+            respond(
+                &mut c,
+                "200 OK",
+                &[("Retry-After", "1".into()), ("Content-Type", "application/json".into())],
+                br#"{"status":"running"}"#,
+            );
         } else {
             respond(
                 &mut c,
@@ -144,7 +154,8 @@ fn azure_flow_text_and_archive() {
     let tmp = tempfile::tempdir().unwrap();
     let doc = tmp.path().join("scan.png");
     std::fs::write(&doc, b"\x89PNG fake").unwrap();
-    let out = pl_ocr::remote::parse(&cfg(&format!("{base}/"), KEY, true), &tmp.path().join("work"), &doc, "image/png", true, &no_local).unwrap();
+    let out =
+        pl_ocr::remote::parse(&cfg(&format!("{base}/"), KEY, true), &tmp.path().join("work"), &doc, "image/png", true, &no_local).unwrap();
     assert_eq!(out.text, "Hallo Azure\nZeile 2");
     let archive = out.archive_path.expect("archive");
     assert_eq!(std::fs::read(archive).unwrap(), PDF);
@@ -164,7 +175,8 @@ fn azure_errors_are_parse_errors_without_key() {
     let tmp = tempfile::tempdir().unwrap();
     let doc = tmp.path().join("a.pdf");
     std::fs::write(&doc, b"%PDF-1.4").unwrap();
-    let err = pl_ocr::remote::parse(&cfg(&base, "wrong-secret-key", true), tmp.path(), &doc, "application/pdf", true, &no_local).unwrap_err();
+    let err =
+        pl_ocr::remote::parse(&cfg(&base, "wrong-secret-key", true), tmp.path(), &doc, "application/pdf", true, &no_local).unwrap_err();
     let msg = err.message();
     assert_eq!(err.class_name(), "ParseError");
     assert!(msg.starts_with("Azure AI Vision parsing failed: (401) Access denied"), "{msg}");
@@ -208,8 +220,11 @@ fn connection_goes_to_pinned_address() {
     let endpoint = format!("http://{host}:{port}");
     let pin = (host.to_string(), std::net::SocketAddr::from(([127, 0, 0, 1], port)));
     let (text, pdf) = pl_ocr::remote::azure_analyze_pinned(&endpoint, KEY, b"x".to_vec(), Some(pin)).unwrap();
-    assert_eq!(text, "Hallo Azure
-Zeile 2");
+    assert_eq!(
+        text,
+        "Hallo Azure
+Zeile 2"
+    );
     assert_eq!(pdf, PDF);
     assert!(seen.lock().unwrap().requests.len() >= 3);
 }

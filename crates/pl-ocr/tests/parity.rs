@@ -86,9 +86,7 @@ fn cfg_from(over: &Value, threads: i64) -> OcrConfig {
 fn num_eq(a: &Value, b: &Value) -> bool {
     match (a, b) {
         (Value::Number(x), Value::Number(y)) => (x.as_f64().unwrap() - y.as_f64().unwrap()).abs() < 1e-9,
-        (Value::Object(x), Value::Object(y)) => {
-            x.len() == y.len() && x.iter().all(|(k, v)| y.get(k).is_some_and(|w| num_eq(v, w)))
-        }
+        (Value::Object(x), Value::Object(y)) => x.len() == y.len() && x.iter().all(|(k, v)| y.get(k).is_some_and(|w| num_eq(v, w))),
         (Value::Array(x), Value::Array(y)) => x.len() == y.len() && x.iter().zip(y).all(|(v, w)| num_eq(v, w)),
         _ => a == b,
     }
@@ -262,11 +260,8 @@ fn parse_control_flow_matches_upstream() {
             }),
             Err(e) => json!({"error": format!("ParseError: {}", e.message())}),
         };
-        let want = if s.get("error").is_some() {
-            json!({"error": s["error"]})
-        } else {
-            json!({"text": s["text"], "archive": s["archive"]})
-        };
+        let want =
+            if s.get("error").is_some() { json!({"error": s["error"]}) } else { json!({"text": s["text"], "archive": s["archive"]}) };
         let calls = n.v(&Value::Array(mock.calls.borrow().clone()));
         let extract = n.v(&json!(*mock.extract_calls.borrow()));
         if got != want || !num_eq(&calls, &s["calls"]) || extract != s["extract_calls"] {

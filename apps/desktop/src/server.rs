@@ -60,23 +60,13 @@ pub fn detect_lan_ipv4() -> Option<std::net::Ipv4Addr> {
     let s = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
     s.connect("192.0.2.1:9").ok()?; // TEST-NET-1 (RFC 5737), only for route selection
     match s.local_addr().ok()?.ip() {
-        std::net::IpAddr::V4(ip)
-            if !ip.is_loopback() && !ip.is_unspecified() && !ip.is_link_local() =>
-        {
-            Some(ip)
-        }
+        std::net::IpAddr::V4(ip) if !ip.is_loopback() && !ip.is_unspecified() && !ip.is_link_local() => Some(ip),
         _ => None,
     }
 }
 
 /// Complete environment for `paperrust serve --worker` and `paperrust manage …`.
-pub fn server_env(
-    cfg: &DesktopConfig,
-    paths: &AppPaths,
-    layout: &InstallLayout,
-    db_port: u16,
-    app_port: u16,
-) -> BTreeMap<String, String> {
+pub fn server_env(cfg: &DesktopConfig, paths: &AppPaths, layout: &InstallLayout, db_port: u16, app_port: u16) -> BTreeMap<String, String> {
     let p = |x: &Path| x.display().to_string();
     let mut e = BTreeMap::new();
     let mut set = |k: &str, v: String| {
@@ -110,10 +100,7 @@ pub fn server_env(
     match lan_host(cfg) {
         Some(host) => {
             set("PAPERLESS_URL", format!("http://{host}:{app_port}"));
-            set(
-                "PAPERLESS_ALLOWED_HOSTS",
-                format!("127.0.0.1,localhost,{host}"),
-            );
+            set("PAPERLESS_ALLOWED_HOSTS", format!("127.0.0.1,localhost,{host}"));
             set("PAPERRUST_BIND", format!("0.0.0.0:{app_port}"));
             set("PAPERRUST_SHARE_MODE", "lan".into());
         }
@@ -158,10 +145,7 @@ pub fn server_env(
     }
     // Logs go to files: no ANSI color codes (tracing-subscriber honors NO_COLOR).
     set("NO_COLOR", "1".into());
-    set(
-        "PAPERRUST_LOG",
-        std::env::var("PAPERRUST_DESKTOP_SERVER_LOG").unwrap_or_else(|_| "info".into()),
-    );
+    set("PAPERRUST_LOG", std::env::var("PAPERRUST_DESKTOP_SERVER_LOG").unwrap_or_else(|_| "info".into()));
     // Origin "Desktop app" instead of "environment" in the UI (docs/SETTINGS.md §2.6).
     let managed: Vec<String> = e
         .keys()
@@ -175,14 +159,7 @@ pub fn server_env(
 
 /// Variables whose value is never logged.
 pub fn is_secret(key: &str) -> bool {
-    matches!(
-        key,
-        "PAPERLESS_DBPASS"
-            | "PAPERLESS_SECRET_KEY"
-            | "DJANGO_SUPERUSER_PASSWORD"
-            | "PGPASSWORD"
-            | crate::autologin::TOKEN_ENV
-    )
+    matches!(key, "PAPERLESS_DBPASS" | "PAPERLESS_SECRET_KEY" | "DJANGO_SUPERUSER_PASSWORD" | "PGPASSWORD" | crate::autologin::TOKEN_ENV)
 }
 
 #[derive(Clone)]
@@ -197,11 +174,7 @@ pub struct ServerSpec {
 /// D-N1: `Debug` without secrets (DB password, `SECRET_KEY` …).
 impl std::fmt::Debug for ServerSpec {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let env: BTreeMap<&str, &str> = self
-            .env
-            .iter()
-            .map(|(k, v)| (k.as_str(), if is_secret(k) { "***" } else { v.as_str() }))
-            .collect();
+        let env: BTreeMap<&str, &str> = self.env.iter().map(|(k, v)| (k.as_str(), if is_secret(k) { "***" } else { v.as_str() })).collect();
         f.debug_struct("ServerSpec")
             .field("program", &self.program)
             .field("env", &env)
@@ -224,15 +197,9 @@ impl ServerSpec {
     }
 
     /// `paperrust manage <args…>`; output to `manage.log`. Returns: exit status.
-    pub async fn manage(
-        &self,
-        args: &[&str],
-        extra_env: &[(&str, &str)],
-        timeout: Duration,
-    ) -> Result<ExitStatus> {
+    pub async fn manage(&self, args: &[&str], extra_env: &[(&str, &str)], timeout: Duration) -> Result<ExitStatus> {
         let log_path = self.log_dir.join("manage.log");
-        let _ =
-            crate::logs::rotate_if_larger(&log_path, crate::logs::max_bytes(), crate::logs::KEEP);
+        let _ = crate::logs::rotate_if_larger(&log_path, crate::logs::max_bytes(), crate::logs::KEEP);
         let mut log = crate::logs::open_append(&log_path).map_err(io_err("manage.log öffnen"))?;
         {
             use std::io::Write;
@@ -242,22 +209,13 @@ impl ServerSpec {
         let mut full = vec!["manage"];
         full.extend_from_slice(args);
         let mut c = self.command(&full, extra_env);
-        c.stdin(Stdio::null())
-            .stdout(Stdio::from(log))
-            .stderr(Stdio::from(err))
-            .kill_on_drop(true);
-        let mut child = c
-            .spawn()
-            .map_err(io_err(format!("{} starten", self.program.display())))?;
+        c.stdin(Stdio::null()).stdout(Stdio::from(log)).stderr(Stdio::from(err)).kill_on_drop(true);
+        let mut child = c.spawn().map_err(io_err(format!("{} starten", self.program.display())))?;
         match tokio::time::timeout(timeout, child.wait()).await {
             Ok(r) => r.map_err(io_err("paperrust manage")),
             Err(_) => {
                 let _ = child.kill().await;
-                Err(DesktopError::Server(format!(
-                    "manage {}: Zeitüberschreitung ({} s)",
-                    args.join(" "),
-                    timeout.as_secs()
-                )))
+                Err(DesktopError::Server(format!("manage {}: Zeitüberschreitung ({} s)", args.join(" "), timeout.as_secs())))
             }
         }
     }
@@ -267,29 +225,16 @@ impl ServerSpec {
     /// (D-N5, CORE-REQUEST 6, implemented since R1).
     pub fn spawn_server(&self) -> Result<ServerProcess> {
         let log_path = self.log_dir.join("server.log");
-        crate::logs::rotate(&log_path, crate::logs::KEEP)
-            .map_err(io_err("server.log rotieren"))?;
+        crate::logs::rotate(&log_path, crate::logs::KEEP).map_err(io_err("server.log rotieren"))?;
         // Output via pipes through the supervisor: size rotation during operation (logs.rs). If the
         // supervisor dies, the child ends anyway (stdin EOF or job object).
         let log = std::sync::Arc::new(std::sync::Mutex::new(
-            crate::logs::RotatingFile::open(&log_path, crate::logs::max_bytes(), crate::logs::KEEP)
-                .map_err(io_err("server.log öffnen"))?,
+            crate::logs::RotatingFile::open(&log_path, crate::logs::max_bytes(), crate::logs::KEEP).map_err(io_err("server.log öffnen"))?,
         ));
         let instance_id = crate::config::random_secret(24);
-        let mut c = self.command(
-            &["serve", "--worker"],
-            &[
-                ("PAPERRUST_STOP_ON_STDIN_EOF", "1"),
-                ("PAPERRUST_INSTANCE_ID", &instance_id),
-            ],
-        );
-        c.stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .kill_on_drop(true);
-        let mut child = c
-            .spawn()
-            .map_err(io_err(format!("{} starten", self.program.display())))?;
+        let mut c = self.command(&["serve", "--worker"], &[("PAPERRUST_STOP_ON_STDIN_EOF", "1"), ("PAPERRUST_INSTANCE_ID", &instance_id)]);
+        c.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).kill_on_drop(true);
+        let mut child = c.spawn().map_err(io_err(format!("{} starten", self.program.display())))?;
         if let Some(o) = child.stdout.take() {
             tokio::spawn(crate::logs::pump(o, log.clone()));
         }
@@ -297,19 +242,12 @@ impl ServerSpec {
             tokio::spawn(crate::logs::pump(e, log));
         }
         let stdin = child.stdin.take();
-        Ok(ServerProcess {
-            child,
-            stdin,
-            instance_id,
-        })
+        Ok(ServerProcess { child, stdin, instance_id })
     }
 }
 
 fn unix_now() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
 }
 
 pub struct ServerProcess {
@@ -343,24 +281,16 @@ impl ServerProcess {
         loop {
             if let Some(st) = self.try_exited() {
                 let msg = format!("beendet beim Start ({st}); Details in logs/server.log");
-                return Err(if crate::ports::is_listening(port) {
-                    DesktopError::PortTaken(msg)
-                } else {
-                    DesktopError::Server(msg)
-                });
+                return Err(if crate::ports::is_listening(port) { DesktopError::PortTaken(msg) } else { DesktopError::Server(msg) });
             }
             if let Some(h) = health_probe(port).await
                 && h.ok
             {
                 if !h.is_ours(&self.instance_id) {
-                    return Err(DesktopError::PortTaken(format!(
-                        "auf 127.0.0.1:{port} antwortet ein anderer Dienst"
-                    )));
+                    return Err(DesktopError::PortTaken(format!("auf 127.0.0.1:{port} antwortet ein anderer Dienst")));
                 }
                 if let Some(st) = self.try_exited() {
-                    return Err(DesktopError::PortTaken(format!(
-                        "beendet beim Start ({st}), Port {port} von anderem Prozess belegt"
-                    )));
+                    return Err(DesktopError::PortTaken(format!("beendet beim Start ({st}), Port {port} von anderem Prozess belegt")));
                 }
                 if let (Some(pid), Some(owner)) = (self.pid(), listener_pid(port).await)
                     && owner != pid
@@ -372,10 +302,7 @@ impl ServerProcess {
                 return Ok(());
             }
             if start.elapsed() > timeout {
-                return Err(DesktopError::Server(format!(
-                    "nach {} s nicht bereit",
-                    timeout.as_secs()
-                )));
+                return Err(DesktopError::Server(format!("nach {} s nicht bereit", timeout.as_secs())));
             }
             tokio::time::sleep(Duration::from_millis(300)).await;
         }
@@ -403,14 +330,8 @@ impl ServerProcess {
                 Ok(())
             }
             _ => {
-                tracing::warn!(
-                    grace_s = grace.as_secs(),
-                    "PaperRust-Server reagiert nicht – wird hart beendet"
-                );
-                self.child
-                    .kill()
-                    .await
-                    .map_err(io_err("PaperRust-Server beenden"))
+                tracing::warn!(grace_s = grace.as_secs(), "PaperRust-Server reagiert nicht – wird hart beendet");
+                self.child.kill().await.map_err(io_err("PaperRust-Server beenden"))
             }
         }
     }
@@ -435,9 +356,7 @@ impl Health {
         if !compact.contains(SERVICE_FIELD) || instance_id.is_empty() {
             return false;
         }
-        compact.find(INSTANCE_FIELD).is_some_and(|i| {
-            compact[i + INSTANCE_FIELD.len()..].split('"').next() == Some(instance_id)
-        })
+        compact.find(INSTANCE_FIELD).is_some_and(|i| compact[i + INSTANCE_FIELD.len()..].split('"').next() == Some(instance_id))
     }
 }
 
@@ -449,27 +368,17 @@ pub async fn health(port: u16) -> bool {
 /// `GET /__rs/health` on 127.0.0.1; `None` = no connection/response.
 pub async fn health_probe(port: u16) -> Option<Health> {
     let probe = async {
-        let mut s = tokio::net::TcpStream::connect(("127.0.0.1", port))
-            .await
-            .ok()?;
-        let req = format!(
-            "GET /__rs/health HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n"
-        );
+        let mut s = tokio::net::TcpStream::connect(("127.0.0.1", port)).await.ok()?;
+        let req = format!("GET /__rs/health HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n");
         s.write_all(req.as_bytes()).await.ok()?;
         // Response is small (JSON < 1 KiB); `Connection: close` → the server closes afterwards.
         let mut buf = Vec::with_capacity(1024);
         let _ = (&mut s).take(16 * 1024).read_to_end(&mut buf).await;
         let text = String::from_utf8_lossy(&buf);
         let body = text.split_once("\r\n\r\n").map(|(_, b)| b).unwrap_or("");
-        Some(Health {
-            ok: is_ok_status_line(&buf),
-            body: body.to_string(),
-        })
+        Some(Health { ok: is_ok_status_line(&buf), body: body.to_string() })
     };
-    tokio::time::timeout(Duration::from_secs(3), probe)
-        .await
-        .ok()
-        .flatten()
+    tokio::time::timeout(Duration::from_secs(3), probe).await.ok().flatten()
 }
 
 /// Windows: PID of the process listening on `127.0.0.1:port` (`netstat -ano -p TCP`).
@@ -481,10 +390,7 @@ pub async fn listener_pid(port: u16) -> Option<u32> {
     let mut c = Command::new("netstat");
     c.args(["-ano", "-p", "TCP"]).stdin(Stdio::null());
     detach_console(&mut c);
-    let out = tokio::time::timeout(Duration::from_secs(10), c.output())
-        .await
-        .ok()?
-        .ok()?;
+    let out = tokio::time::timeout(Duration::from_secs(10), c.output()).await.ok()?.ok()?;
     parse_netstat_listener(&String::from_utf8_lossy(&out.stdout), port)
 }
 
@@ -494,11 +400,7 @@ pub fn parse_netstat_listener(out: &str, port: u16) -> Option<u32> {
     let local = format!("127.0.0.1:{port}");
     out.lines().find_map(|l| {
         let f: Vec<&str> = l.split_whitespace().collect();
-        if f.len() >= 5 && f[0] == "TCP" && f[1] == local && f[2] == "0.0.0.0:0" {
-            f[f.len() - 1].parse().ok()
-        } else {
-            None
-        }
+        if f.len() >= 5 && f[0] == "TCP" && f[1] == local && f[2] == "0.0.0.0:0" { f[f.len() - 1].parse().ok() } else { None }
     })
 }
 
@@ -547,45 +449,24 @@ mod tests {
         assert_eq!(e["PAPERLESS_DBPORT"], "54417");
         assert_eq!(e["PAPERRUST_BIND"], "127.0.0.1:58080");
         // automatic OCR limiting in the server (pl-core resources) stays active
-        for k in [
-            "PAPERLESS_TASK_WORKERS",
-            "PAPERLESS_THREADS_PER_WORKER",
-            "PAPERRUST_TASK_WORKERS",
-            "PAPERRUST_THREADS_PER_WORKER",
-        ] {
+        for k in ["PAPERLESS_TASK_WORKERS", "PAPERLESS_THREADS_PER_WORKER", "PAPERRUST_TASK_WORKERS", "PAPERRUST_THREADS_PER_WORKER"] {
             assert!(!e.contains_key(k), "{k} must be left to the server's automatic cap");
         }
         assert_eq!(e["PAPERLESS_URL"], "http://127.0.0.1:58080");
         assert_eq!(e["PAPERLESS_DBPASS"], cfg.database.app_password);
         assert_eq!(e["PAPERLESS_MEDIA_ROOT"], paths.media.display().to_string());
-        assert_eq!(
-            e["PAPERLESS_SCRATCH_DIR"],
-            paths.scratch.display().to_string()
-        );
+        assert_eq!(e["PAPERLESS_SCRATCH_DIR"], paths.scratch.display().to_string());
         assert_eq!(e["NO_COLOR"], "1");
         assert_eq!(e["PAPERRUST_DB_REQUIRE_AUTH"], "scram-sha-256");
-        assert!(
-            !e.keys().any(|k| k.starts_with("PAPERLESS_RS_")),
-            "nur noch PAPERRUST_*"
-        );
+        assert!(!e.keys().any(|k| k.starts_with("PAPERLESS_RS_")), "nur noch PAPERRUST_*");
         assert!(e.contains_key("PAPERRUST_PDFIUM_PATH"));
         assert!(e.contains_key("PAPERRUST_ROUTES"));
         assert_eq!(
             e["PAPERLESS_THUMBNAIL_FONT_NAME"],
-            Path::new("/opt/pr")
-                .join("fonts")
-                .join("LiberationSerif-Regular.ttf")
-                .display()
-                .to_string()
+            Path::new("/opt/pr").join("fonts").join("LiberationSerif-Regular.ttf").display().to_string()
         );
-        assert!(e.keys().all(|k| k.starts_with("PAPERLESS_")
-            || k.starts_with("PAPERRUST_")
-            || k == "NO_COLOR"));
-        assert!(
-            is_secret("PAPERLESS_DBPASS")
-                && is_secret("PAPERLESS_SECRET_KEY")
-                && !is_secret("PAPERLESS_DBHOST")
-        );
+        assert!(e.keys().all(|k| k.starts_with("PAPERLESS_") || k.starts_with("PAPERRUST_") || k == "NO_COLOR"));
+        assert!(is_secret("PAPERLESS_DBPASS") && is_secret("PAPERLESS_SECRET_KEY") && !is_secret("PAPERLESS_DBHOST"));
     }
 
     #[test]
@@ -598,18 +479,12 @@ mod tests {
         assert_eq!(e["PAPERLESS_LOGGING_DIR"], paths.logs.display().to_string());
         // lan_address without lan_sharing: no effect
         cfg.server.lan_address = "192.168.1.20".into();
-        assert_eq!(
-            server_env(&cfg, &paths, &layout, 1, 58_080)["PAPERRUST_BIND"],
-            "127.0.0.1:58080"
-        );
+        assert_eq!(server_env(&cfg, &paths, &layout, 1, 58_080)["PAPERRUST_BIND"], "127.0.0.1:58080");
         cfg.server.lan_sharing = true;
         let e = server_env(&cfg, &paths, &layout, 54_417, 58_080);
         assert_eq!(e["PAPERRUST_BIND"], "0.0.0.0:58080");
         assert_eq!(e["PAPERLESS_URL"], "http://192.168.1.20:58080");
-        assert_eq!(
-            e["PAPERLESS_ALLOWED_HOSTS"],
-            "127.0.0.1,localhost,192.168.1.20"
-        );
+        assert_eq!(e["PAPERLESS_ALLOWED_HOSTS"], "127.0.0.1,localhost,192.168.1.20");
         assert_eq!(e["PAPERRUST_SHARE_MODE"], "lan");
         // database stays local
         assert_eq!(e["PAPERLESS_DBHOST"], "127.0.0.1");
@@ -660,10 +535,7 @@ mod tests {
 
     #[test]
     fn health_must_be_ours() {
-        let h = |body: &str| Health {
-            ok: true,
-            body: body.into(),
-        };
+        let h = |body: &str| Health { ok: true, body: body.into() };
         let today = r#"{"status":"ok","service":"paperrust","version":"0.1.0","instance":"abc","rust_routes":5}"#;
         assert!(h(today).is_ours("abc"));
         assert!(h(r#"{"service": "paperrust", "instance": "abc"}"#).is_ours("abc"));
@@ -694,38 +566,21 @@ mod tests {
             while let Ok((mut s, _)) = l.accept().await {
                 let mut b = [0u8; 256];
                 let _ = s.read(&mut b).await;
-                let _ = s
-                    .write_all(b"HTTP/1.1 200 OK\r\nconnection: close\r\n\r\n{\"status\":\"ok\"}")
-                    .await;
+                let _ = s.write_all(b"HTTP/1.1 200 OK\r\nconnection: close\r\n\r\n{\"status\":\"ok\"}").await;
             }
         });
         let h = health_probe(port).await.unwrap();
         assert!(h.ok && !h.is_ours("x"));
         // Child process that never listens itself: wait_healthy must reject the foreign service
         let child = if cfg!(windows) {
-            Command::new("cmd")
-                .args(["/C", "ping -n 30 127.0.0.1 >NUL"])
-                .stdin(Stdio::piped())
-                .kill_on_drop(true)
-                .spawn()
+            Command::new("cmd").args(["/C", "ping -n 30 127.0.0.1 >NUL"]).stdin(Stdio::piped()).kill_on_drop(true).spawn()
         } else {
-            Command::new("sleep")
-                .arg("30")
-                .stdin(Stdio::piped())
-                .kill_on_drop(true)
-                .spawn()
+            Command::new("sleep").arg("30").stdin(Stdio::piped()).kill_on_drop(true).spawn()
         };
         let mut child = child.unwrap();
         let stdin = child.stdin.take();
-        let mut proc = ServerProcess {
-            child,
-            stdin,
-            instance_id: "x".into(),
-        };
-        let err = proc
-            .wait_healthy(port, Duration::from_secs(5))
-            .await
-            .unwrap_err();
+        let mut proc = ServerProcess { child, stdin, instance_id: "x".into() };
+        let err = proc.wait_healthy(port, Duration::from_secs(5)).await.unwrap_err();
         assert!(matches!(err, DesktopError::PortTaken(_)), "{err}");
         let _ = proc.stop(Duration::from_secs(1)).await;
     }
@@ -738,9 +593,7 @@ mod tests {
             if let Ok((mut s, _)) = l.accept().await {
                 let mut b = [0u8; 256];
                 let _ = s.read(&mut b).await;
-                let _ = s
-                    .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\n{}")
-                    .await;
+                let _ = s.write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\n{}").await;
             }
         });
         assert!(health(port).await);

@@ -69,8 +69,19 @@ async fn lists_have_drf_shape_and_masked_passwords() {
         assert_eq!(
             k,
             [
-                "id", "name", "imap_server", "imap_port", "imap_security", "username", "password",
-                "character_set", "is_token", "owner", "user_can_change", "account_type", "expiration"
+                "id",
+                "name",
+                "imap_server",
+                "imap_port",
+                "imap_security",
+                "username",
+                "password",
+                "character_set",
+                "is_token",
+                "owner",
+                "user_can_change",
+                "account_type",
+                "expiration"
             ]
         );
     }
@@ -96,11 +107,10 @@ async fn destroy_sets_workflow_trigger_filter_null() {
     let Some((_router, pool)) = setup().await else { panic!("PL_MAIL_TEST_DB not reachable") };
     for account in [false, true] {
         let mut tx = pool.begin().await.unwrap();
-        let (rule_id, account_id): (i32, i32) =
-            sqlx::query_as("SELECT id, account_id FROM paperless_mail_mailrule ORDER BY id LIMIT 1")
-                .fetch_one(&mut *tx)
-                .await
-                .expect("mail rule in reference db");
+        let (rule_id, account_id): (i32, i32) = sqlx::query_as("SELECT id, account_id FROM paperless_mail_mailrule ORDER BY id LIMIT 1")
+            .fetch_one(&mut *tx)
+            .await
+            .expect("mail rule in reference db");
         let (trigger_id,): (i32,) = sqlx::query_as("SELECT id FROM documents_workflowtrigger ORDER BY id LIMIT 1")
             .fetch_one(&mut *tx)
             .await

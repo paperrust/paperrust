@@ -1,10 +1,10 @@
 //! MCP resources (`paperrust://document/{id}`) and prompts. Both need the scope `read`
 //! and the user's read permission on the document.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use super::backend::{Actor, Backend, DocumentDetail, SearchParams};
-use super::{codes, McpService};
+use super::{McpService, codes};
 
 pub const URI_PREFIX: &str = "paperrust://document/";
 /// At most this many characters of content per resource/prompt (more via `get_document_content`).
@@ -158,7 +158,8 @@ pub async fn get<B: Backend>(svc: &McpService<B>, actor: &Actor, params: &Value)
     match name {
         "summarize_document" => {
             let d = load(svc, actor, doc_id_arg(params)?).await?;
-            let lang = arg(params, "language").map(|l| format!(" Answer in {}.", l.chars().take(20).collect::<String>())).unwrap_or_default();
+            let lang =
+                arg(params, "language").map(|l| format!(" Answer in {}.", l.chars().take(20).collect::<String>())).unwrap_or_default();
             let more = if d.content.chars().count() > MAX_PROMPT_CHARS {
                 " The text below is truncated; fetch further parts with get_document_content (page/chunk)."
             } else {

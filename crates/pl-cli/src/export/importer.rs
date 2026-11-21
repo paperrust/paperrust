@@ -26,12 +26,8 @@ use crate::ctx::Ctx;
 use crate::pyjson::py_float_repr;
 use crate::{CliError, CliResult};
 
-const OPTS: &[args::Opt] = &[
-    args::PROGRESS,
-    flag(&["--data-only"], "data_only"),
-    value(&["--passphrase"], "passphrase"),
-    value(&["--batch-size"], "batch_size"),
-];
+const OPTS: &[args::Opt] =
+    &[args::PROGRESS, flag(&["--data-only"], "data_only"), value(&["--passphrase"], "passphrase"), value(&["--batch-size"], "batch_size")];
 
 #[derive(Debug, Clone, Default)]
 pub struct ImportOptions {
@@ -195,7 +191,13 @@ impl Iterator for ManifestIter {
 fn py_str(v: &Value) -> String {
     match v {
         Value::String(s) => s.clone(),
-        Value::Bool(b) => if *b { "True".into() } else { "False".into() },
+        Value::Bool(b) => {
+            if *b {
+                "True".into()
+            } else {
+                "False".into()
+            }
+        }
         Value::Number(n) => match n.as_f64() {
             Some(f) if n.is_f64() => py_float_repr(f),
             _ => n.to_string(),
@@ -242,8 +244,17 @@ fn to_python(model: &str, pk: &Value, f: &Field, v: &Value) -> CliResult<Param> 
             Value::String(s) if matches!(s.as_str(), "f" | "False" | "0") => "false".into(),
             _ => return Err(deser(model, pk, &f.name, v, "value must be either True or False.")),
         },
-        "AutoField" | "BigAutoField" | "SmallAutoField" | "IntegerField" | "BigIntegerField" | "SmallIntegerField"
-        | "PositiveIntegerField" | "PositiveSmallIntegerField" | "PositiveBigIntegerField" | "ForeignKey" | "OneToOneField" => match v {
+        "AutoField"
+        | "BigAutoField"
+        | "SmallAutoField"
+        | "IntegerField"
+        | "BigIntegerField"
+        | "SmallIntegerField"
+        | "PositiveIntegerField"
+        | "PositiveSmallIntegerField"
+        | "PositiveBigIntegerField"
+        | "ForeignKey"
+        | "OneToOneField" => match v {
             Value::Number(n) => match (n.as_i64(), n.as_f64()) {
                 (Some(i), _) => i.to_string(),
                 (None, Some(f)) if f.is_finite() => (f.trunc() as i64).to_string(),
@@ -295,7 +306,13 @@ fn default_param(f: &Field, now: &str, today: &str) -> Param {
         _ => {
             let empty_ok = matches!(
                 f.internal_type.as_str(),
-                "CharField" | "TextField" | "SlugField" | "FilePathField" | "FileField" | "EmailField" | "URLField"
+                "CharField"
+                    | "TextField"
+                    | "SlugField"
+                    | "FilePathField"
+                    | "FileField"
+                    | "EmailField"
+                    | "URLField"
                     | "GenericIPAddressField"
             );
             if empty_ok && !f.null { Param::Text(Some(String::new())) } else { Param::Text(None) }
@@ -329,11 +346,7 @@ struct Loader<'a> {
 
 impl Loader<'_> {
     fn insert_columns<'m>(&self, model: &'m Model) -> Vec<&'m Field> {
-        model
-            .fields
-            .iter()
-            .filter(|f| !f.generated && !(self.skip_treenode && super::tagtree::is_derived(&model.label, &f.name)))
-            .collect()
+        model.fields.iter().filter(|f| !f.generated && !(self.skip_treenode && super::tagtree::is_derived(&model.label, &f.name))).collect()
     }
 
     fn add(&mut self, rec: &Value) -> CliResult<Option<String>> {
@@ -356,7 +369,10 @@ impl Loader<'_> {
             let p = if f.primary_key {
                 match to_python(&label, &pk, f, &pk)? {
                     Param::Text(None) => {
-                        return Err(CliError::Command(format!("Could not coerce pk={} for {label}: missing", crate::pyjson::dumps(&pk, None))));
+                        return Err(CliError::Command(format!(
+                            "Could not coerce pk={} for {label}: missing",
+                            crate::pyjson::dumps(&pk, None)
+                        )));
                     }
                     p => p,
                 }
@@ -440,7 +456,8 @@ impl Loader<'_> {
                 v
             }
         };
-        let updates: Vec<String> = cols.iter().filter(|f| !f.primary_key).map(|f| format!("\"{0}\" = EXCLUDED.\"{0}\"", f.column)).collect();
+        let updates: Vec<String> =
+            cols.iter().filter(|f| !f.primary_key).map(|f| format!("\"{0}\" = EXCLUDED.\"{0}\"", f.column)).collect();
         let statements: Vec<String> = if is_view {
             // compatibility view: first update existing rows, then insert missing ones (like
             // Django's save(): UPDATE, otherwise INSERT)
@@ -529,7 +546,6 @@ impl Loader<'_> {
     }
 }
 
-
 fn import_failed(e: sqlx::Error) -> CliError {
     CliError::Command(format!("Database import failed: {e}"))
 }
@@ -568,19 +584,26 @@ pub(crate) fn cascade_delete<'a>(
                         .await?;
                 }
                 Some("PROTECT") | Some("RESTRICT") => {
-                    let n: i64 = sqlx::query_scalar(&format!("SELECT count(*) FROM \"{}\" WHERE \"{}\" = ANY($1::int8[])", r.table, r.column))
-                        .bind(&ids)
-                        .fetch_one(&mut *conn)
-                        .await?;
+                    let n: i64 =
+                        sqlx::query_scalar(&format!("SELECT count(*) FROM \"{}\" WHERE \"{}\" = ANY($1::int8[])", r.table, r.column))
+                            .bind(&ids)
+                            .fetch_one(&mut *conn)
+                            .await?;
                     if n > 0 {
-                        return Err(CliError::Command(format!("Cannot delete some instances of model '{label}' because they are referenced through protected foreign keys: '{}'", r.table)));
+                        return Err(CliError::Command(format!(
+                            "Cannot delete some instances of model '{label}' because they are referenced through protected foreign keys: '{}'",
+                            r.table
+                        )));
                     }
                 }
                 _ => {}
             }
         }
         if let Some(m) = d.models.get(label) {
-            sqlx::query(&format!("DELETE FROM \"{}\" WHERE \"{}\" = ANY($1::int8[])", m.table, m.pk_column)).bind(&ids).execute(&mut *conn).await?;
+            sqlx::query(&format!("DELETE FROM \"{}\" WHERE \"{}\" = ANY($1::int8[])", m.table, m.pk_column))
+                .bind(&ids)
+                .execute(&mut *conn)
+                .await?;
         }
         Ok(())
     })
@@ -592,7 +615,8 @@ mod futures_lite {
 
 async fn delete_all(conn: &mut PgConnection, d: &descriptor::Descriptor, label: &str) -> CliResult {
     let Some(m) = d.models.get(label) else { return Ok(()) };
-    let ids: Vec<i64> = sqlx::query_scalar::<_, i64>(&format!("SELECT \"{}\"::int8 FROM \"{}\"", m.pk_column, m.table)).fetch_all(&mut *conn).await?;
+    let ids: Vec<i64> =
+        sqlx::query_scalar::<_, i64>(&format!("SELECT \"{}\"::int8 FROM \"{}\"", m.pk_column, m.table)).fetch_all(&mut *conn).await?;
     cascade_delete(conn, d, label, ids).await
 }
 
@@ -718,7 +742,8 @@ pub async fn import(c: &Ctx, o: &ImportOptions) -> CliResult {
     if !version_path.exists() && !metadata_path.exists() {
         println!("No version.json or metadata.json file located");
     } else if metadata_path.exists() {
-        let data: Value = serde_json::from_slice(&std::fs::read(&metadata_path)?).map_err(|e| CliError::Other(format!("metadata.json: {e}")))?;
+        let data: Value =
+            serde_json::from_slice(&std::fs::read(&metadata_path)?).map_err(|e| CliError::Other(format!("metadata.json: {e}")))?;
         version = data.get("version").and_then(Value::as_str).map(str::to_string);
         if let Some(cs) = data.get(EXPORTER_CRYPTO_SETTINGS_NAME) {
             let Some(pass) = &o.passphrase else {
@@ -733,7 +758,8 @@ pub async fn import(c: &Ctx, o: &ImportOptions) -> CliResult {
             crypt = Some(fernet::derive(pass, salt, iters, size).map_err(CliError::Command)?);
         }
     } else {
-        let data: Value = serde_json::from_slice(&std::fs::read(&version_path)?).map_err(|e| CliError::Other(format!("version.json: {e}")))?;
+        let data: Value =
+            serde_json::from_slice(&std::fs::read(&version_path)?).map_err(|e| CliError::Other(format!("version.json: {e}")))?;
         version = data.get("version").and_then(Value::as_str).map(str::to_string);
     }
     if let Some(v) = &version
@@ -752,7 +778,8 @@ pub async fn import(c: &Ctx, o: &ImportOptions) -> CliResult {
     let mut conn = c.pool.acquire().await?;
     let mut tx = conn.begin().await?;
     sqlx::query(&format!("SET LOCAL TimeZone = '{}'", c.cfg.time_zone.replace('\'', ""))).execute(&mut *tx).await?;
-    let now: String = sqlx::query_scalar("SELECT to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"')").fetch_one(&mut *tx).await?;
+    let now: String =
+        sqlx::query_scalar("SELECT to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"')").fetch_one(&mut *tx).await?;
     let today = chrono::Utc::now().with_timezone(&c.cfg.tz).date_naive().format("%Y-%m-%d").to_string();
     let r = async {
         delete_all(&mut tx, d, "contenttypes.contenttype").await?;
@@ -854,7 +881,10 @@ pub(crate) fn crypto_params(cs: &Value) -> CliResult<(u32, usize)> {
     };
     let size = match cs.get(EXPORTER_CRYPTO_KEY_SIZE_NAME) {
         None => 32,
-        Some(v) => v.as_u64().filter(|n| *n == 32).ok_or_else(|| CliError::Command(format!("Invalid key size {v} in metadata.json (expected 32)")))?,
+        Some(v) => v
+            .as_u64()
+            .filter(|n| *n == 32)
+            .ok_or_else(|| CliError::Command(format!("Invalid key size {v} in metadata.json (expected 32)")))?,
     };
     Ok((u32::try_from(iters).map_err(|_| CliError::Command("Invalid key iteration count".into()))?, size as usize))
 }
@@ -905,7 +935,9 @@ fn check_manifest_validity(dir: &Path, paths: &[PathBuf], data_only: bool) -> Cl
                     if let Some(f) = rec.get(EXPORTER_SHARE_LINK_BUNDLE_NAME).and_then(Value::as_str)
                         && safepath::source_in(dir, f)?.is_none()
                     {
-                        return Err(CliError::Command(format!("The manifest file refers to \"{f}\" which does not appear to be in the source directory.")));
+                        return Err(CliError::Command(format!(
+                            "The manifest file refers to \"{f}\" which does not appear to be in the source directory."
+                        )));
                     }
                 }
                 _ => {}
@@ -939,7 +971,9 @@ fn check_document(dir: &Path, rec: &Value) -> CliResult {
         return Err(CliError::Command("The manifest file contains a record which does not refer to an actual document file.".into()));
     };
     let Some(p) = safepath::source_in(dir, doc_file)? else {
-        return Err(CliError::Command(format!("The manifest file refers to \"{doc_file}\" which does not appear to be in the source directory.")));
+        return Err(CliError::Command(format!(
+            "The manifest file refers to \"{doc_file}\" which does not appear to be in the source directory."
+        )));
     };
     std::fs::File::open(&p).map_err(|_| CliError::Command(format!("Failed to read from original file {}", p.display())))?;
     if let Some(t) = rec.get(EXPORTER_THUMBNAIL_NAME).and_then(Value::as_str).filter(|s| !s.is_empty()) {
@@ -963,7 +997,8 @@ fn decrypt_record(f: &Fernet, rec: &mut Value) -> CliResult {
         if let Some(Value::String(s)) = fields.get(name)
             && !s.is_empty()
         {
-            let plain = f.decrypt_string(s).map_err(|_| CliError::Command("cryptography.fernet.InvalidToken (wrong passphrase?)".into()))?;
+            let plain =
+                f.decrypt_string(s).map_err(|_| CliError::Command("cryptography.fernet.InvalidToken (wrong passphrase?)".into()))?;
             fields.insert(name.clone(), Value::String(plain));
         }
     }
@@ -1106,7 +1141,8 @@ mod tests {
     /// H2: `filename`/`archive_filename` from the manifest must not leave ORIGINALS_DIR/ARCHIVE_DIR.
     #[test]
     fn h2_unsafe_stored_filenames_rejected() {
-        let (_d, ok) = prepared_export(serde_json::json!({"filename": "2024/Firma/Rechnung.pdf", "archive_filename": "2024/Firma/Rechnung.pdf"}), &[]);
+        let (_d, ok) =
+            prepared_export(serde_json::json!({"filename": "2024/Firma/Rechnung.pdf", "archive_filename": "2024/Firma/Rechnung.pdf"}), &[]);
         validity(&ok, false).unwrap();
         // upstream on Windows stores `\` as the separator – valid
         let (_dw, okw) = prepared_export(serde_json::json!({"filename": "ACME Corp\\2019\\Letter (edited).pdf"}), &[]);
@@ -1181,8 +1217,17 @@ mod tests {
     #[test]
     fn crypto_params_bounded() {
         assert_eq!(crypto_params(&serde_json::json!({})).unwrap(), (1_000_000, 32));
-        assert_eq!(crypto_params(&serde_json::json!({EXPORTER_CRYPTO_KEY_ITERATIONS_NAME: 1_000_000, EXPORTER_CRYPTO_KEY_SIZE_NAME: 32})).unwrap(), (1_000_000, 32));
-        for bad in [serde_json::json!(0), serde_json::json!(4_000_000_000u64), serde_json::json!(u64::MAX), serde_json::json!("1000"), serde_json::json!(-1)] {
+        assert_eq!(
+            crypto_params(&serde_json::json!({EXPORTER_CRYPTO_KEY_ITERATIONS_NAME: 1_000_000, EXPORTER_CRYPTO_KEY_SIZE_NAME: 32})).unwrap(),
+            (1_000_000, 32)
+        );
+        for bad in [
+            serde_json::json!(0),
+            serde_json::json!(4_000_000_000u64),
+            serde_json::json!(u64::MAX),
+            serde_json::json!("1000"),
+            serde_json::json!(-1),
+        ] {
             assert!(crypto_params(&serde_json::json!({EXPORTER_CRYPTO_KEY_ITERATIONS_NAME: bad})).is_err(), "{bad}");
         }
         // previously `vec![0u8; key_size]` from input data
@@ -1215,9 +1260,13 @@ mod tests {
         let d = descriptor::get();
         let doc = &d.models["documents.document"];
         let f = doc.field("archive_serial_number").unwrap();
-        assert!(matches!(to_python("documents.document", &Value::from(1), f, &Value::from(5.0)).unwrap(), Param::Text(Some(ref s)) if s == "5"));
+        assert!(
+            matches!(to_python("documents.document", &Value::from(1), f, &Value::from(5.0)).unwrap(), Param::Text(Some(ref s)) if s == "5")
+        );
         let title = doc.field("title").unwrap();
-        assert!(matches!(to_python("documents.document", &Value::from(1), title, &Value::from(1.5)).unwrap(), Param::Text(Some(ref s)) if s == "1.5"));
+        assert!(
+            matches!(to_python("documents.document", &Value::from(1), title, &Value::from(1.5)).unwrap(), Param::Text(Some(ref s)) if s == "1.5")
+        );
         let filename = doc.field("filename").unwrap();
         assert!(matches!(default_param(filename, "n", "t"), Param::Text(None)));
         let created = doc.field("created").unwrap();

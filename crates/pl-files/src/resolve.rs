@@ -14,11 +14,7 @@ pub struct Params(pub Vec<(String, String)>);
 impl Params {
     pub fn parse(raw: Option<&str>) -> Self {
         let raw = raw.unwrap_or("");
-        Params(
-            url::form_urlencoded::parse(raw.as_bytes())
-                .map(|(k, v)| (k.into_owned(), v.into_owned()))
-                .collect(),
-        )
+        Params(url::form_urlencoded::parse(raw.as_bytes()).map(|(k, v)| (k.into_owned(), v.into_owned())).collect())
     }
     pub fn get(&self, key: &str) -> Option<&str> {
         self.0.iter().rev().find(|(k, _)| k == key).map(|(_, v)| v.as_str())

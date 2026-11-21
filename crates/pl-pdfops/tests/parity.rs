@@ -133,7 +133,12 @@ fn codes_json(codes: &[Barcode]) -> Value {
     Value::Array(codes.iter().map(|c| json!([c.page, c.value, c.format])).collect())
 }
 
-fn scan(path: &Path, s: ScanSettings, work: &Path, renderer: &dyn pl_ocr::render::PdfRenderer) -> Result<(PathBuf, Vec<Barcode>), PdfOpsError> {
+fn scan(
+    path: &Path,
+    s: ScanSettings,
+    work: &Path,
+    renderer: &dyn pl_ocr::render::PdfRenderer,
+) -> Result<(PathBuf, Vec<Barcode>), PdfOpsError> {
     let ext = path.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
     let pdf = if ext == "tif" || ext == "tiff" { pl_pdfops::convert::convert_from_tiff_to_pdf(path, work)? } else { path.to_path_buf() };
     let t = std::time::Instant::now();

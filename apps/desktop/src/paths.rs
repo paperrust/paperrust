@@ -40,31 +40,20 @@ pub fn resolve_home(os: Os, get: impl Fn(&str) -> Option<String>) -> Result<Path
     if let Some(h) = non_empty(HOME_ENV) {
         return Ok(PathBuf::from(h));
     }
-    let missing = |what: &str| {
-        DesktopError::Other(format!(
-            "Datenverzeichnis nicht bestimmbar: {what} nicht gesetzt (oder {HOME_ENV} setzen)"
-        ))
-    };
+    let missing =
+        |what: &str| DesktopError::Other(format!("Datenverzeichnis nicht bestimmbar: {what} nicht gesetzt (oder {HOME_ENV} setzen)"));
     match os {
         Os::Windows => {
             if let Some(local) = non_empty("LOCALAPPDATA") {
                 Ok(PathBuf::from(local).join("PaperRust"))
             } else if let Some(profile) = non_empty("USERPROFILE") {
-                Ok(PathBuf::from(profile)
-                    .join("AppData")
-                    .join("Local")
-                    .join("PaperRust"))
+                Ok(PathBuf::from(profile).join("AppData").join("Local").join("PaperRust"))
             } else {
                 Err(missing("LOCALAPPDATA/USERPROFILE"))
             }
         }
         Os::MacOs => non_empty("HOME")
-            .map(|h| {
-                PathBuf::from(h)
-                    .join("Library")
-                    .join("Application Support")
-                    .join("PaperRust")
-            })
+            .map(|h| PathBuf::from(h).join("Library").join("Application Support").join("PaperRust"))
             .ok_or_else(|| missing("HOME")),
         Os::Unix => {
             // XDG: only absolute paths count, relative ones are ignored (basedir specification).
@@ -72,14 +61,7 @@ pub fn resolve_home(os: Os, get: impl Fn(&str) -> Option<String>) -> Result<Path
             if let Some(x) = non_empty("XDG_DATA_HOME").filter(|x| x.starts_with('/')) {
                 Ok(PathBuf::from(x).join("paperrust"))
             } else {
-                non_empty("HOME")
-                    .map(|h| {
-                        PathBuf::from(h)
-                            .join(".local")
-                            .join("share")
-                            .join("paperrust")
-                    })
-                    .ok_or_else(|| missing("HOME"))
+                non_empty("HOME").map(|h| PathBuf::from(h).join(".local").join("share").join("paperrust")).ok_or_else(|| missing("HOME"))
             }
         }
     }
@@ -146,8 +128,7 @@ impl AppPaths {
             &self.media.join("documents").join("thumbnails"),
         ] {
             // Unix 0700 (M4); Windows: ACL inherited from the root directory (perms::protect_home).
-            crate::perms::create_private_dir(d)
-                .map_err(io_err(format!("Verzeichnis {} anlegen", d.display())))?;
+            crate::perms::create_private_dir(d).map_err(io_err(format!("Verzeichnis {} anlegen", d.display())))?;
         }
         Ok(())
     }
@@ -212,28 +193,15 @@ mod tests {
     use std::path::Path;
 
     fn env<'a>(pairs: &'a [(&'a str, &'a str)]) -> impl Fn(&str) -> Option<String> + 'a {
-        move |k| {
-            pairs
-                .iter()
-                .find(|(n, _)| *n == k)
-                .map(|(_, v)| v.to_string())
-        }
+        move |k| pairs.iter().find(|(n, _)| *n == k).map(|(_, v)| v.to_string())
     }
 
     #[test]
     fn windows_uses_localappdata() {
-        let h = resolve_home(
-            Os::Windows,
-            env(&[
-                ("LOCALAPPDATA", r"C:\Users\a\AppData\Local"),
-                ("APPDATA", r"C:\Users\a\AppData\Roaming"),
-            ]),
-        )
-        .unwrap();
-        assert_eq!(
-            h,
-            PathBuf::from(r"C:\Users\a\AppData\Local").join("PaperRust")
-        );
+        let h =
+            resolve_home(Os::Windows, env(&[("LOCALAPPDATA", r"C:\Users\a\AppData\Local"), ("APPDATA", r"C:\Users\a\AppData\Roaming")]))
+                .unwrap();
+        assert_eq!(h, PathBuf::from(r"C:\Users\a\AppData\Local").join("PaperRust"));
         let h = resolve_home(Os::Windows, env(&[("USERPROFILE", r"C:\Users\a")])).unwrap();
         assert!(h.ends_with(Path::new("AppData").join("Local").join("PaperRust")));
         assert!(resolve_home(Os::Windows, env(&[])).is_err());
@@ -242,22 +210,11 @@ mod tests {
     #[test]
     fn macos_and_xdg() {
         let h = resolve_home(Os::MacOs, env(&[("HOME", "/Users/a")])).unwrap();
-        assert_eq!(
-            h,
-            PathBuf::from("/Users/a/Library/Application Support/PaperRust")
-        );
-        let h = resolve_home(
-            Os::Unix,
-            env(&[("HOME", "/home/a"), ("XDG_DATA_HOME", "/data/x")]),
-        )
-        .unwrap();
+        assert_eq!(h, PathBuf::from("/Users/a/Library/Application Support/PaperRust"));
+        let h = resolve_home(Os::Unix, env(&[("HOME", "/home/a"), ("XDG_DATA_HOME", "/data/x")])).unwrap();
         assert_eq!(h, PathBuf::from("/data/x/paperrust"));
         // relative XDG_DATA_HOME is ignored
-        let h = resolve_home(
-            Os::Unix,
-            env(&[("HOME", "/home/a"), ("XDG_DATA_HOME", "rel")]),
-        )
-        .unwrap();
+        let h = resolve_home(Os::Unix, env(&[("HOME", "/home/a"), ("XDG_DATA_HOME", "rel")])).unwrap();
         assert_eq!(h, PathBuf::from("/home/a/.local/share/paperrust"));
         assert!(resolve_home(Os::Unix, env(&[])).is_err());
     }
@@ -265,15 +222,7 @@ mod tests {
     #[test]
     fn override_wins_everywhere() {
         for os in [Os::Windows, Os::MacOs, Os::Unix] {
-            let h = resolve_home(
-                os,
-                env(&[
-                    (HOME_ENV, "/portable"),
-                    ("HOME", "/home/a"),
-                    ("LOCALAPPDATA", "C:/x"),
-                ]),
-            )
-            .unwrap();
+            let h = resolve_home(os, env(&[(HOME_ENV, "/portable"), ("HOME", "/home/a"), ("LOCALAPPDATA", "C:/x")])).unwrap();
             assert_eq!(h, PathBuf::from("/portable"));
         }
         // empty counts as unset
@@ -294,9 +243,6 @@ mod tests {
         let p = AppPaths::under(dir.path().join("home"));
         p.ensure_dirs().unwrap();
         assert!(p.media.is_dir() && p.logs.is_dir() && p.run.is_dir());
-        assert!(
-            !p.pgdata.exists(),
-            "initdb braucht ein nicht existierendes/leeres Verzeichnis"
-        );
+        assert!(!p.pgdata.exists(), "initdb braucht ein nicht existierendes/leeres Verzeichnis");
     }
 }

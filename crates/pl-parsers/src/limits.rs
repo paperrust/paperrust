@@ -56,10 +56,7 @@ pub struct Deadline {
 
 impl Deadline {
     pub fn new(limit: Duration) -> Self {
-        Self {
-            start: Instant::now(),
-            limit,
-        }
+        Self { start: Instant::now(), limit }
     }
 
     pub fn from_limits(l: &Limits) -> Self {
@@ -67,11 +64,7 @@ impl Deadline {
     }
 
     pub fn check(&self) -> Result<()> {
-        if self.start.elapsed() > self.limit {
-            Err(ParseError::Timeout(self.limit))
-        } else {
-            Ok(())
-        }
+        if self.start.elapsed() > self.limit { Err(ParseError::Timeout(self.limit)) } else { Ok(()) }
     }
 }
 
@@ -84,18 +77,12 @@ pub(crate) struct TextSink {
 
 impl TextSink {
     pub fn new(max: usize) -> Self {
-        Self {
-            buf: String::new(),
-            max,
-        }
+        Self { buf: String::new(), max }
     }
 
     pub fn push_str(&mut self, s: &str) -> Result<()> {
         if self.buf.len().saturating_add(s.len()) > self.max {
-            return Err(ParseError::LimitExceeded(format!(
-                "extracted text > {} bytes",
-                self.max
-            )));
+            return Err(ParseError::LimitExceeded(format!("extracted text > {} bytes", self.max)));
         }
         self.buf.push_str(s);
         Ok(())

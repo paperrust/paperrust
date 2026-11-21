@@ -144,14 +144,23 @@ async fn observe(pool: &PgPool, std: &fake_imap::Shared, g: &fake_imap::Shared, 
             })
         })
         .collect();
-    let rows = sqlx::query("SELECT id, name, match, matching_algorithm, is_insensitive, owner_id FROM documents_correspondent WHERE id > 12 ORDER BY id")
-        .fetch_all(pool)
-        .await
-        .unwrap();
+    let rows = sqlx::query(
+        "SELECT id, name, match, matching_algorithm, is_insensitive, owner_id FROM documents_correspondent WHERE id > 12 ORDER BY id",
+    )
+    .fetch_all(pool)
+    .await
+    .unwrap();
     let correspondents = rows
         .iter()
         .map(|r| {
-            json!([r.get::<i32, _>("id"), r.get::<String, _>("name"), r.get::<String, _>("match"), r.get::<i16, _>("matching_algorithm"), r.get::<bool, _>("is_insensitive"), r.get::<Option<i32>, _>("owner_id")])
+            json!([
+                r.get::<i32, _>("id"),
+                r.get::<String, _>("name"),
+                r.get::<String, _>("match"),
+                r.get::<i16, _>("matching_algorithm"),
+                r.get::<bool, _>("is_insensitive"),
+                r.get::<Option<i32>, _>("owner_id")
+            ])
         })
         .collect();
     let rows = sqlx::query(
@@ -254,7 +263,8 @@ fn hex(b: &[u8]) -> String {
 
 async fn wait_queue_idle(pool: &PgPool) {
     for _ in 0..600 {
-        let (n,): (i64,) = sqlx::query_as("SELECT count(*) FROM paperrust_task_queue WHERE state IN ('queued', 'running')").fetch_one(pool).await.unwrap();
+        let (n,): (i64,) =
+            sqlx::query_as("SELECT count(*) FROM paperrust_task_queue WHERE state IN ('queued', 'running')").fetch_one(pool).await.unwrap();
         if n == 0 {
             return;
         }
@@ -279,7 +289,12 @@ impl pl_queue::TaskQueue for EagerQueue {
     fn status(&self, _id: uuid::Uuid) -> Bf<'_, Option<pl_queue::TaskInfo>> {
         Box::pin(async { Ok(None) })
     }
-    fn enqueue_chord(&self, header: Vec<pl_queue::Signature>, body: pl_queue::Signature, _on_error: Option<pl_queue::Signature>) -> Bf<'_, uuid::Uuid> {
+    fn enqueue_chord(
+        &self,
+        header: Vec<pl_queue::Signature>,
+        body: pl_queue::Signature,
+        _on_error: Option<pl_queue::Signature>,
+    ) -> Bf<'_, uuid::Uuid> {
         Box::pin(async move {
             for sig in header {
                 let ctx = TaskContext {
@@ -492,11 +507,9 @@ async fn mail_worker_queue_e2e() {
     // lock: second parallel run is skipped
     let mut lock = pool.acquire().await.unwrap();
     sqlx::query("SELECT pg_advisory_lock($1)").bind(fetch::tasks::MAIL_FETCH_LOCK_ID).execute(&mut *lock).await.unwrap();
-    let core = pl_core::Config::from_env_map(Env::from_pairs([(
-        "PAPERLESS_SECRET_KEY",
-        "pl-w6-tests-only-0123456789abcdefghijklmnopqrstuvwxyz",
-    )]))
-    .unwrap();
+    let core =
+        pl_core::Config::from_env_map(Env::from_pairs([("PAPERLESS_SECRET_KEY", "pl-w6-tests-only-0123456789abcdefghijklmnopqrstuvwxyz")]))
+            .unwrap();
     let q: Arc<dyn pl_queue::TaskQueue> = Arc::new(PgQueue::new(pool.clone(), 3));
     let w = MailWorker::new(pool.clone(), q, MailWorkerConfig::from_core(&core));
     assert_eq!(fetch::process_mail_accounts(&w, None).await.unwrap(), fetch::tasks::SKIPPED);

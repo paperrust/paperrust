@@ -32,10 +32,7 @@ async fn mark_code_used(state: &AppState, user_id: i64, code: &str) -> Result<bo
 }
 
 fn now_f64() -> f64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs_f64())
-        .unwrap_or(0.0)
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs_f64()).unwrap_or(0.0)
 }
 
 /// `APIView.initial` throttling for scope `login`.
@@ -114,17 +111,10 @@ async fn obtain_token_inner(state: AppState, req: Request) -> HResult<Response> 
     };
     check_username_throttle(&state, &username).await?;
 
-    let authz = parts
-        .extensions
-        .get::<Authz>()
-        .cloned()
-        .ok_or_else(|| server_error("pl_authz::Authz missing in request extensions"))?;
+    let authz = parts.extensions.get::<Authz>().cloned().ok_or_else(|| server_error("pl_authz::Authz missing in request extensions"))?;
     // S7: client IP (ipware over headers + TCP peer) in the failed-login log
     let meta = pl_authz::RequestMeta {
-        remote_addr: parts
-            .extensions
-            .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
-            .map(|c| c.0.ip()),
+        remote_addr: parts.extensions.get::<axum::extract::ConnectInfo<std::net::SocketAddr>>().map(|c| c.0.ip()),
         ..Default::default()
     };
     let Some(user) = authz.authenticate_credentials_from(&username, &password, &parts.headers, &meta).await? else {
@@ -160,9 +150,7 @@ async fn obtain_token_inner(state: AppState, req: Request) -> HResult<Response> 
 /// Labels in English (upstream translates DRF's `Username`/`Password`/`Token` with the active
 /// language; Known difference).
 pub fn options_metadata() -> Value {
-    let field = |required: bool, read_only: bool, label: &str| {
-        json!({"type": "string", "required": required, "read_only": read_only, "label": label})
-    };
+    let field = |required: bool, read_only: bool, label: &str| json!({"type": "string", "required": required, "read_only": read_only, "label": label});
     json!({
         "name": "Paperless Obtain Auth Token",
         "description": "",

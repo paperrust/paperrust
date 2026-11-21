@@ -162,7 +162,9 @@ impl LabelJob {
                 s
             }
             (Some(_), None) => return invalid("sheet", "A custom layout needs the sheet dimensions."),
-            (None, None) => sheets::preset(sheets::DEFAULT_PRESET).ok_or_else(|| LabelError::Invalid("preset".into(), "missing default".into()))?,
+            (None, None) => {
+                sheets::preset(sheets::DEFAULT_PRESET).ok_or_else(|| LabelError::Invalid("preset".into(), "missing default".into()))?
+            }
         };
         sheet.validate()?;
         let prefix = self.prefix.clone().unwrap_or_else(|| default_prefix.to_string());
@@ -372,7 +374,11 @@ fn sep_texts(lang: &str, value: &str, retain: bool) -> SepTexts {
             title: "Trennblatt",
             body: format!(
                 "Legen Sie dieses Blatt im Scanner-Stapel jeweils vor ein neues Dokument. PaperRust teilt den Scan an diesem Barcode („{value}“) auf. {} Voraussetzung: Barcode-Aufteilung ist eingeschaltet (PAPERRUST_CONSUMER_ENABLE_BARCODES). Das Blatt ist wiederverwendbar – bitte nicht beschriften oder knicken.",
-                if retain { "Das Trennblatt bleibt als erste Seite des neuen Dokuments erhalten." } else { "Das Trennblatt selbst wird verworfen." }
+                if retain {
+                    "Das Trennblatt bleibt als erste Seite des neuen Dokuments erhalten."
+                } else {
+                    "Das Trennblatt selbst wird verworfen."
+                }
             ),
             footer: "Mit 100 % (Originalgröße) drucken – nicht „An Seite anpassen“. Erstellt mit PaperRust.",
         }
@@ -381,7 +387,11 @@ fn sep_texts(lang: &str, value: &str, retain: bool) -> SepTexts {
             title: "Separator sheet",
             body: format!(
                 "Put this sheet in front of each new document in the scanner stack. PaperRust splits the scan at this barcode (\"{value}\"). {} Requirement: barcode splitting is enabled (PAPERRUST_CONSUMER_ENABLE_BARCODES). The sheet is reusable – please do not write on it or fold it.",
-                if retain { "The separator sheet is kept as the first page of the new document." } else { "The separator sheet itself is discarded." }
+                if retain {
+                    "The separator sheet is kept as the first page of the new document."
+                } else {
+                    "The separator sheet itself is discarded."
+                }
             ),
             footer: "Print at 100 % (actual size) – not \"fit to page\". Created with PaperRust.",
         }
@@ -591,16 +601,14 @@ mod tests {
         let j = SeparatorJob { copies: Some(3), lang: Some("de".into()), ..Default::default() };
         let pages = j.pages("PATCHT", false).unwrap();
         assert_eq!(pages.len(), 3);
-        let texts: Vec<&str> = pages[0]
-            .prims
-            .iter()
-            .filter_map(|p| if let Prim::Text { text, .. } = p { Some(text.as_str()) } else { None })
-            .collect();
+        let texts: Vec<&str> =
+            pages[0].prims.iter().filter_map(|p| if let Prim::Text { text, .. } = p { Some(text.as_str()) } else { None }).collect();
         assert!(texts.contains(&"Trennblatt") && texts.contains(&"PATCHT"));
         assert!(j.pdf("PATCHT", true).unwrap().starts_with(b"%PDF"));
         assert!(SeparatorJob { paper: Some("a5".into()), ..Default::default() }.pages("PATCHT", false).is_err());
         assert!(SeparatorJob { copies: Some(0), ..Default::default() }.pages("PATCHT", false).is_err());
-        let letter = SeparatorJob { paper: Some("letter".into()), code: CodeType::Code128, ..Default::default() }.pages("PATCHT", false).unwrap();
+        let letter =
+            SeparatorJob { paper: Some("letter".into()), code: CodeType::Code128, ..Default::default() }.pages("PATCHT", false).unwrap();
         assert_eq!(letter[0].width, sheets::LETTER.0);
     }
 }

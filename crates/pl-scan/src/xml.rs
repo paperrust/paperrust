@@ -81,10 +81,7 @@ pub fn parse(data: &[u8]) -> Option<Node> {
             }
             Event::Text(ref t) => {
                 if let Some(cur) = stack.last_mut() {
-                    let s = t
-                        .xml10_content()
-                        .map(|c| c.into_owned())
-                        .unwrap_or_else(|_| String::from_utf8_lossy(t.as_ref()).into_owned());
+                    let s = t.xml10_content().map(|c| c.into_owned()).unwrap_or_else(|_| String::from_utf8_lossy(t.as_ref()).into_owned());
                     cur.text.push_str(&s);
                 }
             }
@@ -134,7 +131,8 @@ mod tests {
 
     #[test]
     fn tree_ignores_prefixes() {
-        let n = parse(br#"<?xml version="1.0"?><scan:A xmlns:scan="x" xmlns:pwg="y"><pwg:B>1 &amp; 2</pwg:B><C/><B>3</B></scan:A>"#).unwrap();
+        let n =
+            parse(br#"<?xml version="1.0"?><scan:A xmlns:scan="x" xmlns:pwg="y"><pwg:B>1 &amp; 2</pwg:B><C/><B>3</B></scan:A>"#).unwrap();
         assert_eq!(n.name, "A");
         assert_eq!(n.text_of("B").as_deref(), Some("1 & 2"));
         assert_eq!(n.children_named("B").count(), 2);

@@ -20,16 +20,16 @@ use std::net::{IpAddr, SocketAddr};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use axum::Router;
 use axum::body::Bytes;
 use axum::extract::{ConnectInfo, State};
-use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
+use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::post;
-use axum::Router;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use super::backend::{Actor, Backend};
-use super::{codes, error_response, negotiate_version, McpService, PROTOCOL_VERSIONS};
+use super::{McpService, PROTOCOL_VERSIONS, codes, error_response, negotiate_version};
 
 pub const SESSION_HEADER: &str = "mcp-session-id";
 pub const VERSION_HEADER: &str = "mcp-protocol-version";
@@ -339,9 +339,10 @@ async fn authenticate<B: Backend>(svc: &McpService<B>, peer: Option<IpAddr>, hea
 fn accepts_json(headers: &HeaderMap) -> bool {
     match headers.get(header::ACCEPT).and_then(|v| v.to_str().ok()) {
         None => true,
-        Some(a) => a.split(',').map(|p| p.split(';').next().unwrap_or("").trim().to_ascii_lowercase()).any(|m| {
-            m == "application/json" || m == "application/*" || m == "*/*" || m == "text/event-stream"
-        }),
+        Some(a) => a
+            .split(',')
+            .map(|p| p.split(';').next().unwrap_or("").trim().to_ascii_lowercase())
+            .any(|m| m == "application/json" || m == "application/*" || m == "*/*" || m == "text/event-stream"),
     }
 }
 
@@ -436,7 +437,12 @@ pub fn peer_ip(ext: &axum::http::Extensions) -> Option<IpAddr> {
     ext.get::<ConnectInfo<SocketAddr>>().map(|c| c.0.ip())
 }
 
-async fn post_h<B: Backend>(State(svc): State<Arc<McpService<B>>>, ext: axum::http::Extensions, headers: HeaderMap, body: Bytes) -> Response {
+async fn post_h<B: Backend>(
+    State(svc): State<Arc<McpService<B>>>,
+    ext: axum::http::Extensions,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
     handle_post_from(&svc, peer_ip(&ext), &headers, &body).await
 }
 
@@ -475,11 +481,7 @@ pub mod testclient {
         }
 
         pub async fn raw(&self, body: &Value, extra: &[(&str, &str)]) -> Result<(u16, HeaderMap, Value), reqwest::Error> {
-            let mut req = self
-                .http
-                .post(format!("{}/mcp", self.base))
-                .header("accept", "application/json, text/event-stream")
-                .json(body);
+            let mut req = self.http.post(format!("{}/mcp", self.base)).header("accept", "application/json, text/event-stream").json(body);
             if let Some(t) = &self.token {
                 req = req.header("authorization", format!("Token {t}"));
             }

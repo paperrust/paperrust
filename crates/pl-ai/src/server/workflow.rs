@@ -18,7 +18,7 @@ use serde_json::{Map, Value};
 use sqlx::Row;
 
 use super::data::{self, Cat};
-use super::index::{enqueue, AiTaskError};
+use super::index::{AiTaskError, enqueue};
 use crate::compat;
 use crate::llm::LlmError;
 use crate::schema::{ClassificationSuggestions, TaxonomyChoice};
@@ -48,11 +48,24 @@ pub trait DocWriter: Send + Sync {
     /// `document.tags.remove(*ids)` (for undo only).
     fn remove_tags<'a>(&'a self, state: &'a AppState, doc_id: i64, tag_ids: &'a [i64]) -> BoxFuture<'a, Result<(), String>>;
     /// `Model.objects.get_or_create(name=name[:128], owner=owner)` → (id, created?).
-    fn get_or_create<'a>(&'a self, state: &'a AppState, cat: Cat, name: &'a str, owner: Option<i64>) -> BoxFuture<'a, Result<(i64, bool), String>>;
+    fn get_or_create<'a>(
+        &'a self,
+        state: &'a AppState,
+        cat: Cat,
+        name: &'a str,
+        owner: Option<i64>,
+    ) -> BoxFuture<'a, Result<(i64, bool), String>>;
     /// PaperRust: `CustomFieldInstance.objects.update_or_create(document, field, defaults={<col>: value})`.
     /// Default: direct SQL ([`sql_set_custom_field`], without django-auditlog and without file name update);
     /// the worker (pl-server `ConsumerDocWriter`) uses pl-documents-write `cfi::update_or_create` (audit, file name).
-    fn set_custom_field<'a>(&'a self, state: &'a AppState, doc_id: i64, field_id: i64, data_type: &'a str, value: &'a Value) -> BoxFuture<'a, Result<(), String>> {
+    fn set_custom_field<'a>(
+        &'a self,
+        state: &'a AppState,
+        doc_id: i64,
+        field_id: i64,
+        data_type: &'a str,
+        value: &'a Value,
+    ) -> BoxFuture<'a, Result<(), String>> {
         Box::pin(sql_set_custom_field(state, doc_id, field_id, data_type, value))
     }
     /// PaperRust: remove custom field (soft delete, for undo only).
@@ -96,7 +109,10 @@ fn bound(data_type: &str, v: &Value) -> Result<Bound, String> {
     })
 }
 
-fn bind_value<'q>(q: sqlx::query::Query<'q, sqlx::Postgres, sqlx::postgres::PgArguments>, b: &Bound) -> sqlx::query::Query<'q, sqlx::Postgres, sqlx::postgres::PgArguments> {
+fn bind_value<'q>(
+    q: sqlx::query::Query<'q, sqlx::Postgres, sqlx::postgres::PgArguments>,
+    b: &Bound,
+) -> sqlx::query::Query<'q, sqlx::Postgres, sqlx::postgres::PgArguments> {
     match b {
         Bound::Text(s) => q.bind(s.clone()),
         Bound::Bool(x) => q.bind(*x),
@@ -112,19 +128,21 @@ pub async fn sql_set_custom_field(state: &AppState, doc_id: i64, field_id: i64, 
     let col = custom_value_column(data_type).ok_or_else(|| format!("data type {data_type} is not supported"))?;
     let b = bound(data_type, value)?;
     let mut tx = state.db().begin().await.map_err(e)?;
-    let existing: Option<i32> = sqlx::query_scalar("SELECT id FROM documents_customfieldinstance WHERE document_id = $1 AND field_id = $2 LIMIT 1")
-        .bind(doc_id as i32)
-        .bind(field_id as i32)
-        .fetch_optional(&mut *tx)
-        .await
-        .map_err(e)?;
+    let existing: Option<i32> =
+        sqlx::query_scalar("SELECT id FROM documents_customfieldinstance WHERE document_id = $1 AND field_id = $2 LIMIT 1")
+            .bind(doc_id as i32)
+            .bind(field_id as i32)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(e)?;
     match existing {
         Some(id) => {
             let sql = format!("UPDATE documents_customfieldinstance SET {col} = $2, deleted_at = NULL WHERE id = $1");
             bind_value(sqlx::query(&sql).bind(id), &b).execute(&mut *tx).await.map_err(e)?;
         }
         None => {
-            let sql = format!("INSERT INTO documents_customfieldinstance (created, document_id, field_id, {col}) VALUES (now(), $1, $2, $3)");
+            let sql =
+                format!("INSERT INTO documents_customfieldinstance (created, document_id, field_id, {col}) VALUES (now(), $1, $2, $3)");
             bind_value(sqlx::query(&sql).bind(doc_id as i32).bind(field_id as i32), &b).execute(&mut *tx).await.map_err(e)?;
         }
     }
@@ -134,12 +152,14 @@ pub async fn sql_set_custom_field(state: &AppState, doc_id: i64, field_id: i64, 
 
 /// Removes a custom field (soft, `deleted_at`).
 pub async fn sql_remove_custom_field(state: &AppState, doc_id: i64, field_id: i64) -> Result<(), String> {
-    sqlx::query("UPDATE documents_customfieldinstance SET deleted_at = now() WHERE document_id = $1 AND field_id = $2 AND deleted_at IS NULL")
-        .bind(doc_id as i32)
-        .bind(field_id as i32)
-        .execute(state.db())
-        .await
-        .map_err(e)?;
+    sqlx::query(
+        "UPDATE documents_customfieldinstance SET deleted_at = now() WHERE document_id = $1 AND field_id = $2 AND deleted_at IS NULL",
+    )
+    .bind(doc_id as i32)
+    .bind(field_id as i32)
+    .execute(state.db())
+    .await
+    .map_err(e)?;
     Ok(())
 }
 
@@ -255,18 +275,25 @@ impl DocWriter for SqlDocWriter {
         })
     }
 
-    fn get_or_create<'a>(&'a self, state: &'a AppState, cat: Cat, name: &'a str, owner: Option<i64>) -> BoxFuture<'a, Result<(i64, bool), String>> {
+    fn get_or_create<'a>(
+        &'a self,
+        state: &'a AppState,
+        cat: Cat,
+        name: &'a str,
+        owner: Option<i64>,
+    ) -> BoxFuture<'a, Result<(i64, bool), String>> {
         Box::pin(async move {
             let table = cat.model().table;
             let name: String = name.chars().take(128).collect();
             let owner32 = owner.map(|o| o as i32);
             let mut tx = state.db().begin().await.map_err(e)?;
-            let found: Option<i32> = sqlx::query_scalar(&format!("SELECT id FROM {table} WHERE name = $1 AND owner_id IS NOT DISTINCT FROM $2 LIMIT 1"))
-                .bind(&name)
-                .bind(owner32)
-                .fetch_optional(&mut *tx)
-                .await
-                .map_err(e)?;
+            let found: Option<i32> =
+                sqlx::query_scalar(&format!("SELECT id FROM {table} WHERE name = $1 AND owner_id IS NOT DISTINCT FROM $2 LIMIT 1"))
+                    .bind(&name)
+                    .bind(owner32)
+                    .fetch_optional(&mut *tx)
+                    .await
+                    .map_err(e)?;
             if let Some(id) = found {
                 return Ok((i64::from(id), false));
             }
@@ -324,11 +351,13 @@ pub struct ActionRow {
 }
 
 async fn load_action(state: &AppState, id: i64) -> Result<Option<ActionRow>, String> {
-    let r = sqlx::query("SELECT id, ai_suggestion_fields, ai_create_missing, ai_overwrite_existing FROM documents_workflowaction WHERE id = $1")
-        .bind(id as i32)
-        .fetch_optional(state.db())
-        .await
-        .map_err(e)?;
+    let r = sqlx::query(
+        "SELECT id, ai_suggestion_fields, ai_create_missing, ai_overwrite_existing FROM documents_workflowaction WHERE id = $1",
+    )
+    .bind(id as i32)
+    .fetch_optional(state.db())
+    .await
+    .map_err(e)?;
     Ok(r.map(|r| ActionRow {
         id,
         fields: r
@@ -401,7 +430,8 @@ pub async fn apply_ai_suggestions(state: &AppState, action_id: i64, document_id:
         tracing::warn!(target: "pl_ai", action_id, document_id, "Workflow action or document no longer exists, not applying AI suggestions");
         return Ok(Value::Null);
     };
-    let Some(doc) = data::load_doc(state.db(), document_id).await.map_err(|x| AiTaskError::new("DatabaseError", x.status().to_string()))? else {
+    let Some(doc) = data::load_doc(state.db(), document_id).await.map_err(|x| AiTaskError::new("DatabaseError", x.status().to_string()))?
+    else {
         tracing::warn!(target: "pl_ai", action_id, document_id, "Workflow action or document no longer exists, not applying AI suggestions");
         return Ok(Value::Null);
     };

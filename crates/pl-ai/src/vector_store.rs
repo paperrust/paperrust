@@ -10,7 +10,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::Once;
 
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::node::TextNode;
 
@@ -189,9 +189,7 @@ fn open_connection(path: &Path) -> SResult<Connection> {
     conn.query_row("PRAGMA journal_mode=WAL", [], |_| Ok(()))?;
     conn.execute_batch("PRAGMA synchronous=NORMAL")?;
     conn.execute_batch("CREATE TABLE IF NOT EXISTS index_meta (key TEXT PRIMARY KEY, value TEXT)")?;
-    conn.execute_batch(
-        "CREATE TABLE IF NOT EXISTS document_chunks (chunk_id TEXT PRIMARY KEY, document_id INTEGER NOT NULL)",
-    )?;
+    conn.execute_batch("CREATE TABLE IF NOT EXISTS document_chunks (chunk_id TEXT PRIMARY KEY, document_id INTEGER NOT NULL)")?;
     conn.execute_batch("CREATE INDEX IF NOT EXISTS idx_document_chunks_document_id ON document_chunks (document_id)")?;
     conn.execute_batch("CREATE TABLE IF NOT EXISTS document_meta (document_id INTEGER PRIMARY KEY, modified TEXT NOT NULL)")?;
     Ok(conn)
@@ -236,11 +234,7 @@ impl VecStore {
     }
 
     pub fn table_exists(&self) -> SResult<bool> {
-        Ok(self
-            .conn
-            .query_row("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", [TABLE], |_| Ok(()))
-            .optional()?
-            .is_some())
+        Ok(self.conn.query_row("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", [TABLE], |_| Ok(())).optional()?.is_some())
     }
 
     pub fn vector_dim(&self) -> SResult<Option<i64>> {
@@ -391,14 +385,10 @@ impl VecStore {
             sql.push_str(&w);
         }
         let mut st = self.conn.prepare(&sql)?;
-        let mut binds: Vec<rusqlite::types::Value> = vec![
-            rusqlite::types::Value::Blob(pack(embedding)),
-            rusqlite::types::Value::Integer(top_k as i64),
-        ];
+        let mut binds: Vec<rusqlite::types::Value> =
+            vec![rusqlite::types::Value::Blob(pack(embedding)), rusqlite::types::Value::Integer(top_k as i64)];
         binds.extend(p.iter().map(WhereParam::to_sql));
-        let rows = st.query_map(rusqlite::params_from_iter(binds.iter()), |r| {
-            Ok((r.get::<_, String>(1)?, r.get::<_, Option<f64>>(3)?))
-        })?;
+        let rows = st.query_map(rusqlite::params_from_iter(binds.iter()), |r| Ok((r.get::<_, String>(1)?, r.get::<_, Option<f64>>(3)?)))?;
         let mut out = Vec::new();
         for r in rows.take(top_k) {
             let (nc, dist) = r?;
@@ -564,7 +554,8 @@ mod tests {
         st.upsert_document(50_000, &[row("50000-a", 50_000)]).unwrap();
         assert_eq!(st.indexed_document_ids().unwrap(), [1, 40_000, 50_000].into_iter().collect());
         let docs = |f: &[DocFilter]| {
-            let mut d: Vec<i64> = st.query(&[0.1, 0.2, 0.3, 0.4], 10, f).unwrap().iter().filter_map(|h| h.node.ref_doc_id.as_deref()?.parse().ok()).collect();
+            let mut d: Vec<i64> =
+                st.query(&[0.1, 0.2, 0.3, 0.4], 10, f).unwrap().iter().filter_map(|h| h.node.ref_doc_id.as_deref()?.parse().ok()).collect();
             d.sort_unstable();
             d
         };
@@ -576,7 +567,10 @@ mod tests {
     // upstream fix d14cfc93f (#14678): TestVecChunkSize / TestIndexPageSize
     fn row(id: &str, doc: i64) -> Row {
         let mut rel = serde_json::Map::new();
-        rel.insert("1".into(), serde_json::json!({"node_id": doc.to_string(), "node_type": "4", "metadata": {}, "hash": "", "class_name": "RelatedNodeInfo"}));
+        rel.insert(
+            "1".into(),
+            serde_json::json!({"node_id": doc.to_string(), "node_type": "4", "metadata": {}, "hash": "", "class_name": "RelatedNodeInfo"}),
+        );
         Row {
             node: TextNode {
                 id: id.into(),
@@ -589,10 +583,12 @@ mod tests {
                 end_char_idx: None,
                 metadata_template: "{key}: {value}".into(),
                 metadata_separator: "
-".into(),
+"
+                .into(),
                 text_template: "{metadata_str}
 
-{content}".into(),
+{content}"
+                    .into(),
                 ref_doc_id: Some(doc.to_string()),
             },
             embedding: vec![0.1, 0.2, 0.3, 0.4],

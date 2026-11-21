@@ -23,17 +23,12 @@ struct Signal {
 
 fn global() -> &'static Signal {
     static S: OnceLock<Signal> = OnceLock::new();
-    S.get_or_init(|| Signal {
-        flag: AtomicBool::new(false),
-        notify: Notify::new(),
-    })
+    S.get_or_init(|| Signal { flag: AtomicBool::new(false), notify: Notify::new() })
 }
 
 /// Does a supervisor restart the process on exit 75?
 pub fn supported(env: &pl_core::config::Env) -> bool {
-    env.get(SUPERVISED_VAR)
-        .and_then(pl_core::config::str_to_bool)
-        .unwrap_or(false)
+    env.get(SUPERVISED_VAR).and_then(pl_core::config::str_to_bool).unwrap_or(false)
 }
 
 /// Request a restart (ends the process in an orderly way with exit 75).
@@ -70,17 +65,11 @@ mod tests {
         let w = tokio::spawn(requested_wait());
         tokio::task::yield_now().await;
         request("test");
-        tokio::time::timeout(std::time::Duration::from_secs(2), w)
-            .await
-            .unwrap()
-            .unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(2), w).await.unwrap().unwrap();
         assert!(requested());
         // then done immediately
         requested_wait().await;
-        assert!(supported(&pl_core::config::Env::from_pairs([(
-            SUPERVISED_VAR,
-            "1"
-        )])));
+        assert!(supported(&pl_core::config::Env::from_pairs([(SUPERVISED_VAR, "1")])));
         assert!(!supported(&pl_core::config::Env::from_pairs([("X", "1")])));
     }
 }

@@ -16,7 +16,7 @@ use pl_ai::mcp::knowledge::{IndexState, KnowledgeIndex, Passage};
 use pl_ai::mcp::memory::{MemDocument, MemUser, MemoryBackend};
 use pl_ai::mcp::{Actor, McpService, McpSettings};
 use pl_ai::taxonomy::{TaxonomyEntry, TaxonomyKind};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 const ALICE: &str = "alicetoken0000000000000000000000000000000";
 const BOB: &str = "bobtoken000000000000000000000000000000000";
@@ -56,8 +56,24 @@ fn doc(id: i64, title: &str, content: &str, owner: Option<i64>, grants: Vec<(i64
 
 fn backend() -> Arc<MemoryBackend> {
     let b = MemoryBackend::default();
-    b.add_user(MemUser { id: 1, username: "alice".into(), token: ALICE.into(), is_superuser: false, is_active: true, groups: vec![], perms: all_perms() });
-    b.add_user(MemUser { id: 2, username: "bob".into(), token: BOB.into(), is_superuser: false, is_active: true, groups: vec![], perms: all_perms() });
+    b.add_user(MemUser {
+        id: 1,
+        username: "alice".into(),
+        token: ALICE.into(),
+        is_superuser: false,
+        is_active: true,
+        groups: vec![],
+        perms: all_perms(),
+    });
+    b.add_user(MemUser {
+        id: 2,
+        username: "bob".into(),
+        token: BOB.into(),
+        is_superuser: false,
+        is_active: true,
+        groups: vec![],
+        perms: all_perms(),
+    });
     b.add_user(MemUser {
         id: 3,
         username: "reader".into(),
@@ -65,7 +81,10 @@ fn backend() -> Arc<MemoryBackend> {
         is_superuser: false,
         is_active: true,
         groups: vec![],
-        perms: ["documents.view_document", "documents.view_tag", "documents.view_correspondent", "documents.view_note"].iter().map(|s| s.to_string()).collect(),
+        perms: ["documents.view_document", "documents.view_tag", "documents.view_correspondent", "documents.view_note"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
     });
     b.add_entry(entry(TaxonomyKind::Correspondent, 10, "Swisscom (Schweiz) AG", None, None));
     b.add_entry(entry(TaxonomyKind::Correspondent, 12, "Geheimbank Privat AG", Some(2), None));
@@ -83,8 +102,20 @@ fn backend() -> Arc<MemoryBackend> {
     ));
     b.add_document(doc(101, "Bobs Kontoauszug", "Geheimbank Kontoauszug Rechnung Saldo 1000000", Some(2), vec![]));
     b.add_document(doc(102, "Mietvertrag", "Mietvertrag Wohnung Zürich. Kündigungsfrist drei Monate.", None, vec![]));
-    b.add_saved_view(Some(1), SavedViewInfo { id: 7, name: "Rechnungen".into(), sort_field: Some("created".into()), sort_reverse: true, filter_rules: vec![(19, Some("rechnung".into()))] });
-    b.add_saved_view(Some(1), SavedViewInfo { id: 8, name: "Kaputt".into(), sort_field: None, sort_reverse: false, filter_rules: vec![(999, None)] });
+    b.add_saved_view(
+        Some(1),
+        SavedViewInfo {
+            id: 7,
+            name: "Rechnungen".into(),
+            sort_field: Some("created".into()),
+            sort_reverse: true,
+            filter_rules: vec![(19, Some("rechnung".into()))],
+        },
+    );
+    b.add_saved_view(
+        Some(1),
+        SavedViewInfo { id: 8, name: "Kaputt".into(), sort_field: None, sort_reverse: false, filter_rules: vec![(999, None)] },
+    );
     b.add_saved_view(Some(2), SavedViewInfo { id: 9, name: "Bobs".into(), sort_field: None, sort_reverse: false, filter_rules: vec![] });
     Arc::new(b)
 }
@@ -102,7 +133,11 @@ fn all_groups() -> McpSettings {
     McpSettings { tool_groups: vec!["read".into(), "write".into(), "ingest".into()], ..Default::default() }
 }
 
-async fn start_with(settings: McpSettings, llm: Option<pl_ai::llm::LlmClient>, k: Option<Arc<dyn KnowledgeIndex>>) -> (String, Arc<MemoryBackend>) {
+async fn start_with(
+    settings: McpSettings,
+    llm: Option<pl_ai::llm::LlmClient>,
+    k: Option<Arc<dyn KnowledgeIndex>>,
+) -> (String, Arc<MemoryBackend>) {
     let b = backend();
     let mut svc = McpService::new(b.clone(), settings, llm, Arc::new(IdentityTruncator));
     if let Some(k) = k {
@@ -143,7 +178,18 @@ async fn protocol_listing_conformance() {
     // default: read + write, no ingest
     let tools = c.request("tools/list", json!({})).await.unwrap()["result"]["tools"].clone();
     let n = names(&tools);
-    for t in ["ask_documents", "get_document_content", "list_recent_documents", "run_saved_view", "get_custom_fields", "set_custom_field", "add_note", "list_notes", "get_task_status", "update_document"] {
+    for t in [
+        "ask_documents",
+        "get_document_content",
+        "list_recent_documents",
+        "run_saved_view",
+        "get_custom_fields",
+        "set_custom_field",
+        "add_note",
+        "list_notes",
+        "get_task_status",
+        "update_document",
+    ] {
         assert!(n.contains(&t.to_string()), "{t} fehlt: {n:?}");
     }
     assert!(!n.contains(&"add_document".to_string()));
@@ -184,13 +230,17 @@ async fn resources_and_prompts_respect_permissions() {
         let r = c.request("resources/read", json!({"uri": uri})).await.unwrap();
         assert_eq!(r["error"]["code"], -32002, "{uri}: {r}");
     }
-    let p = c.request("prompts/get", json!({"name": "summarize_document", "arguments": {"document_id": "100", "language": "de"}})).await.unwrap();
+    let p = c
+        .request("prompts/get", json!({"name": "summarize_document", "arguments": {"document_id": "100", "language": "de"}}))
+        .await
+        .unwrap();
     let msgs = p["result"]["messages"].as_array().unwrap();
     assert!(msgs[0]["content"]["text"].as_str().unwrap().contains("untrusted"));
     assert_eq!(msgs[1]["content"]["resource"]["uri"], "paperrust://document/100");
     let p = c.request("prompts/get", json!({"name": "file_document", "arguments": {"document_id": 101}})).await.unwrap();
     assert!(p["error"].is_object(), "{p}");
-    let p = c.request("prompts/get", json!({"name": "ask_archive", "arguments": {"question": "Wann ist die Rechnung fällig?"}})).await.unwrap();
+    let p =
+        c.request("prompts/get", json!({"name": "ask_archive", "arguments": {"question": "Wann ist die Rechnung fällig?"}})).await.unwrap();
     assert!(p["result"]["messages"][0]["content"]["text"].as_str().unwrap().contains("ask_documents"));
 }
 
@@ -205,7 +255,9 @@ async fn tool_groups_and_token_scopes() {
     b.set_token_scopes(ALICE, &["read"]);
     let mut alice = client(&base, ALICE).await;
     let n = names(&alice.request("tools/list", json!({})).await.unwrap()["result"]["tools"]);
-    assert!(n.contains(&"ask_documents".to_string()) && !n.contains(&"update_document".to_string()) && !n.contains(&"add_document".to_string()));
+    assert!(
+        n.contains(&"ask_documents".to_string()) && !n.contains(&"update_document".to_string()) && !n.contains(&"add_document".to_string())
+    );
     let r = alice.call("update_document", json!({"id": 100, "title": "x"})).await.unwrap();
     assert_eq!(r["isError"], true);
     assert!(r.to_string().contains("not granted"), "{r}");
@@ -319,11 +371,12 @@ async fn add_document_limits_and_ssrf() {
     assert!(b.submissions().is_empty());
 
     // URL fetch on: internal addresses are rejected (SSRF)
-    let pdf_server = serve(axum::Router::new().route("/doc.pdf", get(|| async { PDF.to_vec() })).route(
-        "/redirect",
-        get(|| async { (axum::http::StatusCode::FOUND, [("location", "http://169.254.169.254/latest/meta-data")]) }),
-    ))
-    .await;
+    let pdf_server =
+        serve(axum::Router::new().route("/doc.pdf", get(|| async { PDF.to_vec() })).route(
+            "/redirect",
+            get(|| async { (axum::http::StatusCode::FOUND, [("location", "http://169.254.169.254/latest/meta-data")]) }),
+        ))
+        .await;
     let settings = McpSettings { allow_url_fetch: true, ..all_groups() };
     let (base, b) = start_with(settings, None, None).await;
     let mut c = client(&base, ALICE).await;
@@ -374,17 +427,33 @@ impl KnowledgeIndex for FakeIndex {
         let s = self.0;
         Box::pin(async move { s })
     }
-    fn semantic<'a>(&'a self, _actor: &'a Actor, _q: &'a str, top_k: usize, restrict: Option<&'a [i64]>) -> BoxFuture<'a, Result<Vec<Passage>, String>> {
+    fn semantic<'a>(
+        &'a self,
+        _actor: &'a Actor,
+        _q: &'a str,
+        top_k: usize,
+        restrict: Option<&'a [i64]>,
+    ) -> BoxFuture<'a, Result<Vec<Passage>, String>> {
         Box::pin(async move {
             let all = vec![
-                Passage { document_id: 101, text: "Geheimbank Kontoauszug Rechnung Saldo".into(), llm_text: "Saldo 1000000".into(), score: 0.99 },
+                Passage {
+                    document_id: 101,
+                    text: "Geheimbank Kontoauszug Rechnung Saldo".into(),
+                    llm_text: "Saldo 1000000".into(),
+                    score: 0.99,
+                },
                 Passage {
                     document_id: 100,
                     text: "Seite 2: Total CHF 89.90 fällig am 30.06.2024".into(),
                     llm_text: "title: Swisscom Rechnung Mai\n\nSeite 2: Total CHF 89.90 fällig am 30.06.2024".into(),
                     score: 0.9,
                 },
-                Passage { document_id: 102, text: "Kündigungsfrist drei Monate.".into(), llm_text: "Kündigungsfrist drei Monate.".into(), score: 0.5 },
+                Passage {
+                    document_id: 102,
+                    text: "Kündigungsfrist drei Monate.".into(),
+                    llm_text: "Kündigungsfrist drei Monate.".into(),
+                    score: 0.5,
+                },
             ];
             Ok(all.into_iter().filter(|p| restrict.is_none_or(|r| r.contains(&p.document_id))).take(top_k).collect())
         })

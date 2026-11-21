@@ -44,7 +44,9 @@ pub type R<T> = Result<T, Internal>;
 /// Django's `server_error` page (DEBUG=False, no 500.html).
 pub fn server_error(e: &Internal) -> Response {
     tracing::error!(target: "pl_accounts", "internal error: {}", e.0);
-    let mut r = Response::new(Body::from("\n<!doctype html>\n<html lang=\"en\">\n<head>\n  <title>Server Error (500)</title>\n</head>\n<body>\n  <h1>Server Error (500)</h1><p></p>\n</body>\n</html>\n"));
+    let mut r = Response::new(Body::from(
+        "\n<!doctype html>\n<html lang=\"en\">\n<head>\n  <title>Server Error (500)</title>\n</head>\n<body>\n  <h1>Server Error (500)</h1><p></p>\n</body>\n</html>\n",
+    ));
     *r.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
     r.headers_mut().insert(CONTENT_TYPE, HeaderValue::from_static("text/html; charset=utf-8"));
     r
@@ -248,8 +250,18 @@ impl Ctx {
         {
             h.insert("x-csrftoken", v);
         }
-        pl_authz::csrf::enforce_csrf(&self.s.auth, &pl_authz::csrf::RequestInfo { method: self.method.as_str(), headers: &h })
-            .map_err(|e| e.replace("from the 'X-Csrftoken' HTTP header", if self.post("csrfmiddlewaretoken").is_some_and(|t| !t.is_empty()) { "from POST" } else { "from the 'X-Csrftoken' HTTP header" }))
+        pl_authz::csrf::enforce_csrf(&self.s.auth, &pl_authz::csrf::RequestInfo { method: self.method.as_str(), headers: &h }).map_err(
+            |e| {
+                e.replace(
+                    "from the 'X-Csrftoken' HTTP header",
+                    if self.post("csrfmiddlewaretoken").is_some_and(|t| !t.is_empty()) {
+                        "from POST"
+                    } else {
+                        "from the 'X-Csrftoken' HTTP header"
+                    },
+                )
+            },
+        )
     }
 
     /// `get_token(request)`: masked token, cookie is (re)sent.
@@ -377,7 +389,10 @@ mod tests {
 
     #[test]
     fn qs_and_iri() {
-        assert_eq!(parse_qs("next=/a/?x=1&b=&c=a+b"), vec![("next".into(), "/a/?x=1".into()), ("b".into(), "".into()), ("c".into(), "a b".into())]);
+        assert_eq!(
+            parse_qs("next=/a/?x=1&b=&c=a+b"),
+            vec![("next".into(), "/a/?x=1".into()), ("b".into(), "".into()), ("c".into(), "a b".into())]
+        );
         assert_eq!(iri_to_uri("/documents/?q=ä b"), "/documents/?q=%C3%A4%20b");
         assert_eq!(new_csrf_secret().len(), 32);
     }

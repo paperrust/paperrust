@@ -28,26 +28,20 @@ pub(crate) async fn idents(db: &PgPool, kind: Kind, ids: &[i64]) -> DomainResult
     if out.len() < ids.len() {
         let missing: Vec<i64> = ids.iter().copied().filter(|i| !out.contains_key(i)).collect();
         // pl_sync 0003: creates missing identities (from stage 5 only kinds 7–9)
-        sqlx::query("SELECT paperrust_sync_ensure($1, $2::int8[])")
-        .bind(kind.code())
-        .bind(&missing)
-        .execute(db)
-        .await
-        .map_err(db_err)?;
+        sqlx::query("SELECT paperrust_sync_ensure($1, $2::int8[])").bind(kind.code()).bind(&missing).execute(db).await.map_err(db_err)?;
         out.extend(fetch(db, kind, &missing).await?);
     }
     Ok(out)
 }
 
 async fn fetch(db: &PgPool, kind: Kind, ids: &[i64]) -> DomainResult<HashMap<i64, Ident>> {
-    let rows: Vec<(i64, Uuid, i64)> = sqlx::query_as(
-        "SELECT local_id::int8, uuid, rev FROM paperrust_sync_object WHERE kind = $1 AND local_id = ANY($2::int8[])",
-    )
-    .bind(kind.code())
-    .bind(ids)
-    .fetch_all(db)
-    .await
-    .map_err(db_err)?;
+    let rows: Vec<(i64, Uuid, i64)> =
+        sqlx::query_as("SELECT local_id::int8, uuid, rev FROM paperrust_sync_object WHERE kind = $1 AND local_id = ANY($2::int8[])")
+            .bind(kind.code())
+            .bind(ids)
+            .fetch_all(db)
+            .await
+            .map_err(db_err)?;
     Ok(rows.into_iter().map(|(id, uuid, rev)| (id, Ident { uuid, rev })).collect())
 }
 
@@ -78,10 +72,6 @@ pub(crate) async fn ref_ids(db: &PgPool, kind: Kind, field: &str, uuids: &[Uuid]
     let map = resolve(db, kind, uuids).await?;
     uuids
         .iter()
-        .map(|u| {
-            map.get(u)
-                .map(|(id, _)| *id)
-                .ok_or_else(|| DomainError::field(field, format!("Unknown {} \"{u}\".", kind.as_str())))
-        })
+        .map(|u| map.get(u).map(|(id, _)| *id).ok_or_else(|| DomainError::field(field, format!("Unknown {} \"{u}\".", kind.as_str()))))
         .collect()
 }

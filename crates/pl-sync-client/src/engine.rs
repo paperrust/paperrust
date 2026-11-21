@@ -202,7 +202,13 @@ impl SyncClient {
     }
 
     /// Raw forwarding to the server (gateway), with device or v1 token depending on the flavor.
-    pub async fn raw(&self, method: &str, path_and_query: &str, headers: &[(String, String)], body: Vec<u8>) -> Result<crate::remote::RawResponse> {
+    pub async fn raw(
+        &self,
+        method: &str,
+        path_and_query: &str,
+        headers: &[(String, String)],
+        body: Vec<u8>,
+    ) -> Result<crate::remote::RawResponse> {
         match &self.inner.ngx {
             Some(n) => n.raw(method, path_and_query, headers, body).await,
             None => self.inner.remote.raw(method, path_and_query, headers, body).await,
@@ -529,9 +535,11 @@ impl SyncClient {
             sendable(self.refresh_profile_data()).await;
         }
 
-        let full_due = row.last_full_sync.as_deref().and_then(|t| chrono::DateTime::parse_from_rfc3339(t).ok()).is_none_or(|t| {
-            chrono::Utc::now().signed_duration_since(t.with_timezone(&chrono::Utc)) > FULL_SYNC_EVERY
-        });
+        let full_due = row
+            .last_full_sync
+            .as_deref()
+            .and_then(|t| chrono::DateTime::parse_from_rfc3339(t).ok())
+            .is_none_or(|t| chrono::Utc::now().signed_duration_since(t.with_timezone(&chrono::Utc)) > FULL_SYNC_EVERY);
         let epoch_changed = matches!((row.perm_epoch, info.perm_epoch), (Some(a), Some(b)) if a != b);
 
         if feed {
@@ -800,15 +808,8 @@ impl SyncClient {
 
     /// Selected documents whose content is outdated (feed update without details).
     async fn fetch_stale_details(&self, rep: &mut SyncReport) -> Result<()> {
-        let stale: Vec<String> = self
-            .inner
-            .replica
-            .document_states()
-            .await?
-            .into_iter()
-            .filter(|(_, _, sel, det)| *sel && !*det)
-            .map(|(k, ..)| k)
-            .collect();
+        let stale: Vec<String> =
+            self.inner.replica.document_states().await?.into_iter().filter(|(_, _, sel, det)| *sel && !*det).map(|(k, ..)| k).collect();
         if stale.is_empty() {
             return Ok(());
         }

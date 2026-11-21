@@ -27,13 +27,13 @@ use std::sync::Arc;
 use pl_authz::User;
 use pl_authz::models::DOCUMENT;
 use pl_docfilter::sql::{
-    CF, CFI, CORRESPONDENT, Cond, DOC, DOC_TAGS, DOCTYPE, NOTE, STORAGEPATH, TAG, TextLookup as SqlLookup, col,
-    doc_col, effective_content, exists, scalar, select_one_from, text_lookup,
+    CF, CFI, CORRESPONDENT, Cond, DOC, DOC_TAGS, DOCTYPE, NOTE, STORAGEPATH, TAG, TextLookup as SqlLookup, col, doc_col, effective_content,
+    exists, scalar, select_one_from, text_lookup,
 };
 use pl_docfilter::textfold::{UpperFold, folded_lookup};
 use pl_domain::filter::{
-    CfColumn, CfCond, CfSortValue, CfTest, CfValue, CmpOp, DatePart, DocFilter, InstanceCond, NamedRel, NumCol,
-    PartTest, Pred, Sort, SortKey, TagCond, TextCol, TextLookup, TsCol,
+    CfColumn, CfCond, CfSortValue, CfTest, CfValue, CmpOp, DatePart, DocFilter, InstanceCond, NamedRel, NumCol, PartTest, Pred, Sort,
+    SortKey, TagCond, TextCol, TextLookup, TsCol,
 };
 use sea_query::{Alias, Expr, ExprTrait, JoinType, Order, Query, SelectStatement, SimpleExpr, Value};
 
@@ -115,11 +115,7 @@ pub fn wants_fold(p: &Pred) -> bool {
 
 /// Calibrated folding of the DB, if the predicate needs it.
 pub async fn fold_for(db: &sqlx::PgPool, p: &Pred) -> Option<Arc<UpperFold>> {
-    if wants_fold(p) {
-        pl_docfilter::FilterDb::upper_fold(db).await
-    } else {
-        None
-    }
+    if wants_fold(p) { pl_docfilter::FilterDb::upper_fold(db).await } else { None }
 }
 
 /// Names of the trigram indexes (migration `pl_store.0002_paperrust_doc_trgm`).
@@ -194,9 +190,7 @@ pub async fn trigram_for(db: &sqlx::PgPool, p: &Pred) -> bool {
 /// Title/content leaves that could run via the trigram index.
 fn trigram_leaves<'p>(p: &'p Pred, out: &mut Vec<(TextCol, TextLookup, &'p str)>) {
     match p {
-        Pred::Text { col: c @ (TextCol::Title | TextCol::Content), lookup, value }
-            if trigram_eligible(*lookup, value) =>
-        {
+        Pred::Text { col: c @ (TextCol::Title | TextCol::Content), lookup, value } if trigram_eligible(*lookup, value) => {
             out.push((*c, *lookup, value.as_str()));
         }
         Pred::And(v) | Pred::Or(v) => v.iter().for_each(|x| trigram_leaves(x, out)),
@@ -216,12 +210,7 @@ async fn trigram_probe(db: &sqlx::PgPool, c: TextCol, lookup: TextLookup, value:
     static CACHE: OnceLock<Cache> = OnceLock::new();
     let column = if matches!(c, TextCol::Title) { "title" } else { "content" };
     let o = db.connect_options();
-    let key = format!(
-        "{}:{}/{}|{column}|{lookup:?}|{value}",
-        o.get_host(),
-        o.get_port(),
-        o.get_database().unwrap_or("")
-    );
+    let key = format!("{}:{}/{}|{column}|{lookup:?}|{value}", o.get_host(), o.get_port(), o.get_database().unwrap_or(""));
     let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
     if let Some((at, n)) = cache.lock().ok().and_then(|m| m.get(&key).copied())
         && at.elapsed() < TRGM_PROBE_TTL
@@ -234,10 +223,7 @@ async fn trigram_probe(db: &sqlx::PgPool, c: TextCol, lookup: TextLookup, value:
         .and_where(text_lookup(doc_col(column), sql_lookup(lookup), value))
         .limit((TRGM_MAX_CANDIDATES + 1) as u64)
         .to_string(sea_query::PostgresQueryBuilder);
-    let n: i64 = sqlx::query_scalar(&format!("SELECT count(*) FROM ({inner}) AS pl_trgm_probe"))
-        .fetch_one(db)
-        .await
-        .ok()?;
+    let n: i64 = sqlx::query_scalar(&format!("SELECT count(*) FROM ({inner}) AS pl_trgm_probe")).fetch_one(db).await.ok()?;
     if let Ok(mut m) = cache.lock() {
         if m.len() > 1000 {
             m.retain(|_, (at, _)| at.elapsed() < TRGM_PROBE_TTL);
@@ -495,12 +481,8 @@ impl<'a> Builder<'a> {
                 Cond::Expr(doc_col(fk).in_subquery(sub))
             }
             Pred::Created { op, date } => Cond::Expr(cmp(doc_col("created"), *op, Expr::val(*date).into())),
-            Pred::CreatedBetween { from, to } => {
-                Cond::Expr(doc_col("created").between(Expr::val(*from), Expr::val(*to)))
-            }
-            Pred::CreatedPart { part, op, value } => {
-                Cond::Expr(cmp(extract(*part, doc_col("created")), *op, Expr::val(*value).into()))
-            }
+            Pred::CreatedBetween { from, to } => Cond::Expr(doc_col("created").between(Expr::val(*from), Expr::val(*to))),
+            Pred::CreatedPart { part, op, value } => Cond::Expr(cmp(extract(*part, doc_col("created")), *op, Expr::val(*value).into())),
             Pred::Ts { col, op, at } => Cond::Expr(cmp(doc_col(ts_col(*col)), *op, Expr::val(*at).into())),
             Pred::TsNotNull { col } => Cond::Expr(doc_col(ts_col(*col)).is_not_null()),
             Pred::TsPart { col, part, tz, op, value } => {
@@ -521,18 +503,14 @@ impl<'a> Builder<'a> {
                 let e = self.duplicates_exists();
                 Cond::Expr(if *b { pl_docfilter::filterset::duplicate_candidates().and(e) } else { e.not() })
             }
-            Pred::SharedBy(uid) => {
-                Cond::Expr(doc_col("owner_id").eq(*uid).and(pl_docfilter::perms::document_is_shared()))
-            }
+            Pred::SharedBy(uid) => Cond::Expr(doc_col("owner_id").eq(*uid).and(pl_docfilter::perms::document_is_shared())),
         }
     }
 
     /// Title/content leaf that can run via the trigram index.
     fn trgm_arm<'p>(&self, p: &'p Pred) -> Option<(TextCol, TextLookup, &'p str)> {
         match p {
-            Pred::Text { col: c @ (TextCol::Title | TextCol::Content), lookup, value }
-                if self.trgm && trigram_eligible(*lookup, value) =>
-            {
+            Pred::Text { col: c @ (TextCol::Title | TextCol::Content), lookup, value } if self.trgm && trigram_eligible(*lookup, value) => {
                 Some((*c, *lookup, value.as_str()))
             }
             _ => None,
@@ -628,8 +606,7 @@ impl<'a> Builder<'a> {
     /// visibility directly on the duplicate row.
     fn duplicates_exists(&self) -> SimpleExpr {
         let mut sel = select_one_from(DOC, "dup");
-        sel.and_where(col("dup", "root_document_id").is_null())
-            .and_where(col("dup", "id").eq(doc_col("id")).not());
+        sel.and_where(col("dup", "root_document_id").is_null()).and_where(col("dup", "id").eq(doc_col("id")).not());
         if let Some(v) = self.vis.root_row("dup") {
             sel.and_where(v);
         }
@@ -758,16 +735,9 @@ fn instance_cond(c: &InstanceCond) -> Option<SimpleExpr> {
                 .and_where(lk(col("cfn", "name")))
                 .to_owned();
             let mut any = col("ci", "field_id").in_subquery(field_names);
-            for c in [
-                "value_text",
-                "value_bool",
-                "value_int",
-                "value_float",
-                "value_date",
-                "value_url",
-                "value_monetary",
-                "value_document_ids",
-            ] {
+            for c in
+                ["value_text", "value_bool", "value_int", "value_float", "value_date", "value_url", "value_monetary", "value_document_ids"]
+            {
                 any = any.or(lk(col("ci", c)));
             }
             if !select_option_ids.is_empty() {
@@ -782,8 +752,7 @@ fn instance_cond(c: &InstanceCond) -> Option<SimpleExpr> {
 /// cq.field_id = <id> [AND cond])`
 fn cf_exists(field_id: i64, cond: Option<SimpleExpr>) -> SimpleExpr {
     let mut sel = select_one_from(CFI, "cq");
-    sel.and_where(col("cq", "document_id").eq(doc_col("id")))
-        .and_where(col("cq", "field_id").eq(field_id));
+    sel.and_where(col("cq", "document_id").eq(doc_col("id"))).and_where(col("cq", "field_id").eq(field_id));
     if let Some(e) = cond {
         sel.and_where(e);
     }
@@ -939,10 +908,9 @@ fn join_cf_sort(q: &mut SelectStatement, field_id: i64) {
 fn cf_sort_value(field_id: i64, v: &CfSortValue) -> SimpleExpr {
     let _ = field_id;
     match v {
-        CfSortValue::Column(c) => Expr::cust_with_exprs(
-            "CASE WHEN $1 IS NULL THEN $2 END",
-            [col(CF_SORT_ALIAS, "deleted_at"), col(CF_SORT_ALIAS, cf_column(*c))],
-        ),
+        CfSortValue::Column(c) => {
+            Expr::cust_with_exprs("CASE WHEN $1 IS NULL THEN $2 END", [col(CF_SORT_ALIAS, "deleted_at"), col(CF_SORT_ALIAS, cf_column(*c))])
+        }
         CfSortValue::SelectOptions(opts) => {
             let field_match = || col(CF_SORT_ALIAS, "id").is_not_null();
             let mut case: Option<sea_query::CaseStatement> = None;
@@ -1030,10 +998,8 @@ pub fn apply_sort(q: &mut SelectStatement, sort: &Sort) {
         }
         Sort::CustomField { field_id, value, desc } => {
             join_cf_sort(q, *field_id);
-            let has = Expr::cust_with_exprs(
-                "($1 IS NOT NULL AND $2 IS NULL)",
-                [col(CF_SORT_ALIAS, "id"), col(CF_SORT_ALIAS, "deleted_at")],
-            );
+            let has =
+                Expr::cust_with_exprs("($1 IS NOT NULL AND $2 IS NULL)", [col(CF_SORT_ALIAS, "id"), col(CF_SORT_ALIAS, "deleted_at")]);
             q.order_by_expr(has, Order::Desc);
             q.order_by_expr(cf_sort_value(*field_id, value), if *desc { Order::Desc } else { Order::Asc });
         }
@@ -1212,7 +1178,8 @@ mod tests {
         assert_eq!(s.matches("get_bit(").count(), 1, "{s}");
         // own content read individually from the text table, title directly (no hit set for the title);
         // the view's text column does not appear in the outer row
-        let own = format!(r#"SELECT "hit_t"."content" FROM "paperrust_document_content" AS "hit_t" WHERE "hit_t"."document_id" = "{DOC}"."id""#);
+        let own =
+            format!(r#"SELECT "hit_t"."content" FROM "paperrust_document_content" AS "hit_t" WHERE "hit_t"."document_id" = "{DOC}"."id""#);
         assert!(s.contains(&own), "{s}");
         assert!(s.contains(&format!(r#"UPPER(("{DOC}"."title")::text)"#)), "{s}");
         for gone in ["content", "xmin"] {

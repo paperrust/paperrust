@@ -20,8 +20,7 @@ use crate::error::{IndexerError, Result};
 use crate::lock::{BATCH_LOCK_TIMEOUT, IndexFileLock, LOCK_TIMEOUT};
 use crate::record::DocumentRecord;
 use crate::settings::{
-    OpenOutcome, clear_rebuild_marker, open_or_create, open_or_rebuild_index, touch_rebuild_marker,
-    wipe_index, write_sentinels,
+    OpenOutcome, clear_rebuild_marker, open_or_create, open_or_rebuild_index, touch_rebuild_marker, wipe_index, write_sentinels,
 };
 
 /// tantivy-py `Index.writer()` default heap (used by `WriteBatch`).
@@ -45,10 +44,7 @@ impl IndexerConfig {
     /// (same derivation as pl-search).
     pub fn from_env() -> Self {
         let s = pl_search::SearchSettings::from_env();
-        Self {
-            index_dir: s.index_dir,
-            language: s.language,
-        }
+        Self { index_dir: s.index_dir, language: s.language }
     }
 
     fn lang(&self) -> Option<&str> {
@@ -82,12 +78,7 @@ pub struct RebuildOptions {
 
 impl Default for RebuildOptions {
     fn default() -> Self {
-        Self {
-            writer_heap_bytes: REBUILD_HEAP_BYTES,
-            recreate: false,
-            if_needed: false,
-            take_lock: true,
-        }
+        Self { writer_heap_bytes: REBUILD_HEAP_BYTES, recreate: false, if_needed: false, take_lock: true }
     }
 }
 
@@ -131,12 +122,7 @@ impl Indexer {
         let lock = IndexFileLock::acquire_with_retries(dir, lock_timeout).await?;
         let index = open_or_create(dir, self.cfg.lang())?;
         let writer: IndexWriter<TantivyDocument> = index.writer(WRITER_HEAP_BYTES)?;
-        Ok(WriteBatch {
-            schema: index.schema(),
-            writer: Some(writer),
-            _index: index,
-            lock: Some(lock),
-        })
+        Ok(WriteBatch { schema: index.schema(), writer: Some(writer), _index: index, lock: Some(lock) })
     }
 
     /// Batch for attempt `attempt` (0 = first). From the second attempt on (BEFUNDE B8) the
@@ -316,11 +302,7 @@ impl Indexer {
         }
         // upstream assumes INDEX_DIR exists (paperless creates it at startup).
         std::fs::create_dir_all(&dir)?;
-        let _lock = if opts.take_lock {
-            Some(IndexFileLock::acquire_with_retries(&dir, BATCH_LOCK_TIMEOUT).await?)
-        } else {
-            None
-        };
+        let _lock = if opts.take_lock { Some(IndexFileLock::acquire_with_retries(&dir, BATCH_LOCK_TIMEOUT).await?) } else { None };
         if opts.recreate {
             wipe_index(&dir)?;
         }
@@ -359,13 +341,7 @@ impl Indexer {
         Ok((index, writer))
     }
 
-    async fn rebuild_from_db(
-        &self,
-        dir: &Path,
-        heap: usize,
-        pool: &PgPool,
-        ids: &[i64],
-    ) -> Result<usize> {
+    async fn rebuild_from_db(&self, dir: &Path, heap: usize, pool: &PgPool, ids: &[i64]) -> Result<usize> {
         let (index, writer) = self.start_rebuild(dir, heap)?;
         let schema = index.schema();
         let mut count = 0usize;
@@ -401,9 +377,7 @@ pub struct WriteBatch {
 
 impl WriteBatch {
     fn writer(&self) -> Result<&IndexWriter<TantivyDocument>> {
-        self.writer
-            .as_ref()
-            .ok_or_else(|| IndexerError::InvalidValue("WriteBatch already finished".into()))
+        self.writer.as_ref().ok_or_else(|| IndexerError::InvalidValue("WriteBatch already finished".into()))
     }
 
     /// Preparation of a retry (see [`Indexer::batch_attempt`]).
@@ -426,8 +400,7 @@ impl WriteBatch {
 
     /// `WriteBatch.remove(doc_id)`: `delete_documents_by_query(term_query(id))`.
     pub fn remove(&mut self, doc_id: i64) -> Result<()> {
-        let id = u64::try_from(doc_id)
-            .map_err(|_| IndexerError::InvalidValue("negative document id".into()))?;
+        let id = u64::try_from(doc_id).map_err(|_| IndexerError::InvalidValue("negative document id".into()))?;
         let field = self.schema.get_field("id")?;
         let query = TermQuery::new(Term::from_field_u64(field, id), IndexRecordOption::Basic);
         self.writer()?.delete_query(Box::new(query))?;
@@ -480,10 +453,7 @@ impl WriteBatch {
     /// the file lock.
     pub fn commit(mut self) -> Result<()> {
         let result = (|| -> Result<()> {
-            let mut writer = self
-                .writer
-                .take()
-                .ok_or_else(|| IndexerError::InvalidValue("WriteBatch already finished".into()))?;
+            let mut writer = self.writer.take().ok_or_else(|| IndexerError::InvalidValue("WriteBatch already finished".into()))?;
             writer.commit()?;
             writer.wait_merging_threads()?;
             Ok(())
@@ -546,9 +516,7 @@ mod tests {
             fuzzy_threshold: None,
             time_zone: chrono_tz::UTC,
         });
-        let ids = backend
-            .search_ids("v2", None, None, false, pl_search::SearchMode::Text, None, None)
-            .unwrap();
+        let ids = backend.search_ids("v2", None, None, false, pl_search::SearchMode::Text, None, None).unwrap();
         assert_eq!(ids, vec![2]);
     }
 
@@ -608,8 +576,7 @@ mod tests {
         let dir = tmp.path().join("index");
         let ix = Indexer::new(IndexerConfig { index_dir: dir.clone(), language: Some("en".into()) });
         let n_docs: i64 = 30;
-        ix.rebuild_from_records(&(1..=n_docs).map(|i| record(i, &format!("doc{i} v0"))).collect::<Vec<_>>(), 128_000_000)
-            .unwrap();
+        ix.rebuild_from_records(&(1..=n_docs).map(|i| record(i, &format!("doc{i} v0"))).collect::<Vec<_>>(), 128_000_000).unwrap();
         let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let reader = {
             let (dir, stop) = (dir.clone(), stop.clone());

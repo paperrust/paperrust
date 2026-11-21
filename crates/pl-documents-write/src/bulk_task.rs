@@ -68,11 +68,7 @@ pub async fn enqueue(
     raw_parameters: &Map<String, Value>,
     from_webui: bool,
 ) -> Result<Uuid, ApiError> {
-    let source = if from_webui {
-        pl_core::tasks::trigger_source::WEB_UI
-    } else {
-        pl_core::tasks::trigger_source::API_UPLOAD
-    };
+    let source = if from_webui { pl_core::tasks::trigger_source::WEB_UI } else { pl_core::tasks::trigger_source::API_UPLOAD };
     let mut req = TaskRequest::new(TASK_NAME).trigger_source(source);
     req.kwargs = kwargs(user_id, session_actor, meta, ids, method, raw_parameters);
     Ok(pl_core::tasks::send_task(state, req).await?)
@@ -92,10 +88,7 @@ fn kwargs(
     m.insert("parameters".into(), Value::Object(raw_parameters.clone()));
     m.insert("user_id".into(), json!(user_id));
     m.insert("actor".into(), Value::Bool(session_actor));
-    m.insert(
-        "audit_meta".into(),
-        json!({"remote_addr": meta.remote_addr, "remote_port": meta.remote_port, "cid": meta.cid}),
-    );
+    m.insert("audit_meta".into(), json!({"remote_addr": meta.remote_addr, "remote_port": meta.remote_port, "cid": meta.cid}));
     m
 }
 
@@ -145,7 +138,11 @@ async fn execute_inner(state: &AppState, kwargs: &Map<String, Value>) -> Result<
         .filter(|m| m.queueable())
         .ok_or_else(|| fail("ValueError", format!("Unsupported bulk operation: {operation}")))?;
     let ids: Vec<i64> = match kwargs.get("document_ids") {
-        Some(Value::Array(a)) => a.iter().map(Value::as_i64).collect::<Option<_>>().ok_or_else(|| fail("TypeError", "document_ids must be a list of integers"))?,
+        Some(Value::Array(a)) => a
+            .iter()
+            .map(Value::as_i64)
+            .collect::<Option<_>>()
+            .ok_or_else(|| fail("TypeError", "document_ids must be a list of integers"))?,
         _ => return Err(fail("TypeError", "execute_bulk_operation() missing 'document_ids'")),
     };
     let mut parameters = match kwargs.get("parameters") {
@@ -153,10 +150,8 @@ async fn execute_inner(state: &AppState, kwargs: &Map<String, Value>) -> Result<
         None | Some(Value::Null) => Map::new(),
         Some(_) => return Err(fail("TypeError", "parameters must be a dict")),
     };
-    let user_id = kwargs
-        .get("user_id")
-        .and_then(Value::as_i64)
-        .ok_or_else(|| fail("TypeError", "execute_bulk_operation() missing 'user_id'"))?;
+    let user_id =
+        kwargs.get("user_id").and_then(Value::as_i64).ok_or_else(|| fail("TypeError", "execute_bulk_operation() missing 'user_id'"))?;
     let session_actor = kwargs.get("actor").and_then(Value::as_bool).unwrap_or(true);
     let am = kwargs.get("audit_meta");
     let meta = RequestMeta {

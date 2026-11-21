@@ -487,10 +487,7 @@ pub fn format_cursor(seq: i64) -> String {
 
 /// Liest `c1.<seq>`.
 pub fn parse_cursor(s: &str) -> Result<i64> {
-    s.strip_prefix("c1.")
-        .and_then(|n| n.parse::<i64>().ok())
-        .filter(|n| *n >= 0)
-        .ok_or_else(|| SyncError::InvalidCursor(s.to_string()))
+    s.strip_prefix("c1.").and_then(|n| n.parse::<i64>().ok()).filter(|n| *n >= 0).ok_or_else(|| SyncError::InvalidCursor(s.to_string()))
 }
 
 /// `u` = upsert, `d` = delete (Tombstone).
@@ -610,8 +607,7 @@ pub async fn wait_for_changes(pool: &PgPool, after: i64, timeout: Duration) -> R
     // second connection from `pool` (otherwise every waiting client would hold one connection and wait
     // for a second – with as many clients as pool connections everything would stall until the time limit).
     async fn has(listener: &mut sqlx::postgres::PgListener, after: i64) -> Result<bool> {
-        let max: i64 =
-            sqlx::query_scalar("SELECT coalesce(max(seq), 0) FROM paperrust_sync_log").fetch_one(&mut *listener).await?;
+        let max: i64 = sqlx::query_scalar("SELECT coalesce(max(seq), 0) FROM paperrust_sync_log").fetch_one(&mut *listener).await?;
         Ok(max > after)
     }
     if has(&mut listener, after).await? {

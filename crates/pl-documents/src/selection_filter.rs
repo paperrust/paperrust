@@ -40,20 +40,12 @@ fn py_str(v: &Value) -> String {
 /// The ORM part of the selection filters as a `QueryDict`-like parameter list.
 pub fn orm_params(filters: &Map<String, Value>) -> QueryParams {
     QueryParams::from_pairs(
-        filters
-            .iter()
-            .filter(|(k, v)| !SEARCH_PARAM_NAMES.contains(&k.as_str()) && !v.is_null())
-            .map(|(k, v)| (k.clone(), py_str(v))),
+        filters.iter().filter(|(k, v)| !SEARCH_PARAM_NAMES.contains(&k.as_str()) && !v.is_null()).map(|(k, v)| (k.clone(), py_str(v))),
     )
 }
 
 /// Document ids of an `all=true` selection.
-pub async fn resolve_all(
-    state: &AppState,
-    user: &User,
-    filters: Option<&Map<String, Value>>,
-    excluded: &[i64],
-) -> ApiResult<Vec<i64>> {
+pub async fn resolve_all(state: &AppState, user: &User, filters: Option<&Map<String, Value>>, excluded: &[i64]) -> ApiResult<Vec<i64>> {
     let mut q = resolve_all_query(state, user, filters, excluded).await?;
     q.order_by((a(DOC), a("created")), Order::Desc).order_by((a(DOC), a("id")), Order::Desc);
     id_list(state.db(), &q).await

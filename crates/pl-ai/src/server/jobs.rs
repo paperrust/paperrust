@@ -25,11 +25,11 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use pl_authz::{AuthUser, User};
+use pl_core::sqlbind::SqlxBinder as _;
 use pl_core::{ApiError, AppState, Drf, RequestContext};
 use sea_query::{Alias as A, Expr, Query, SelectStatement};
-use pl_core::sqlbind::SqlxBinder as _;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sqlx::Row;
 
 use super::store::{body_json, require_superuser, storage_err};
@@ -63,7 +63,11 @@ pub fn filter_query(user: &User, f: &JobFilter, after: Option<i64>) -> SelectSta
         .from_as(A::new("documents_document"), A::new("d"))
         .and_where(Expr::col((A::new("d"), A::new("deleted_at"))).is_null())
         .and_where(Expr::col((A::new("d"), A::new("root_document_id"))).is_null())
-        .and_where(Expr::col((A::new("d"), A::new("id"))).in_subquery(pl_authz::objects::permitted_document_ids(Some(user), "change_document", false)));
+        .and_where(Expr::col((A::new("d"), A::new("id"))).in_subquery(pl_authz::objects::permitted_document_ids(
+            Some(user),
+            "change_document",
+            false,
+        )));
     if !f.tags.is_empty() {
         let ids: Vec<i32> = f.tags.iter().filter_map(|t| i32::try_from(*t).ok()).collect();
         let mut sub = Query::select();
@@ -102,7 +106,8 @@ pub fn filter_query(user: &User, f: &JobFilter, after: Option<i64>) -> SelectSta
 const JOB_COLUMNS: &str = "id, created, created_by_id, run_id, mode, filter, status, total, processed, applied, suggested, errors, last_document_id, cancel_requested, heartbeat, finished, message";
 
 fn job_json(r: &sqlx::postgres::PgRow) -> Value {
-    let dt = |k: &str| r.try_get::<Option<chrono::DateTime<chrono::Utc>>, _>(k).ok().flatten().map(|d| pl_core::datetime::python_isoformat(&d));
+    let dt =
+        |k: &str| r.try_get::<Option<chrono::DateTime<chrono::Utc>>, _>(k).ok().flatten().map(|d| pl_core::datetime::python_isoformat(&d));
     let n = |k: &str| r.try_get::<i32, _>(k).unwrap_or_default();
     json!({
         "id": r.try_get::<i64, _>("id").unwrap_or_default(),
@@ -144,7 +149,8 @@ async fn count(state: &AppState, user: &User, f: &JobFilter) -> Result<i64, ApiE
 }
 
 fn parse_filter(b: &Value) -> Result<JobFilter, ApiError> {
-    serde_json::from_value(b.get("filter").cloned().unwrap_or(json!({}))).map_err(|_| ApiError::validation(json!({"filter": ["Invalid filter."]})))
+    serde_json::from_value(b.get("filter").cloned().unwrap_or(json!({})))
+        .map_err(|_| ApiError::validation(json!({"filter": ["Invalid filter."]})))
 }
 
 /// POST /api/x-ai/jobs/preview/ → `{"count"}` (how many documents match).
@@ -161,18 +167,31 @@ pub async fn preview(State(state): State<AppState>, ctx: RequestContext, auth: A
 pub async fn list(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser) -> Result<Response, ApiError> {
     require_superuser(&auth)?;
     mark_stale(&state).await;
-    let rows = sqlx::query(&format!("SELECT {JOB_COLUMNS} FROM paperrust_ai_job ORDER BY created DESC, id DESC LIMIT 20")).fetch_all(state.db()).await.map_err(storage_err)?;
+    let rows = sqlx::query(&format!("SELECT {JOB_COLUMNS} FROM paperrust_ai_job ORDER BY created DESC, id DESC LIMIT 20"))
+        .fetch_all(state.db())
+        .await
+        .map_err(storage_err)?;
     let results: Vec<Value> = rows.iter().map(job_json).collect();
     Ok(Drf::ok(json!({"count": results.len(), "results": results})).indent(ctx.negotiation.indent).into_response())
 }
 
 async fn load(state: &AppState, id: &str) -> Result<sqlx::postgres::PgRow, ApiError> {
     let id = super::py_int(id).ok_or_else(ApiError::not_found)?;
-    sqlx::query(&format!("SELECT {JOB_COLUMNS} FROM paperrust_ai_job WHERE id = $1")).bind(id).fetch_optional(state.db()).await.map_err(storage_err)?.ok_or_else(ApiError::not_found)
+    sqlx::query(&format!("SELECT {JOB_COLUMNS} FROM paperrust_ai_job WHERE id = $1"))
+        .bind(id)
+        .fetch_optional(state.db())
+        .await
+        .map_err(storage_err)?
+        .ok_or_else(ApiError::not_found)
 }
 
 /// GET /api/x-ai/jobs/{id}/
-pub async fn retrieve(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser, Path(id): Path<String>) -> Result<Response, ApiError> {
+pub async fn retrieve(
+    State(state): State<AppState>,
+    ctx: RequestContext,
+    auth: AuthUser,
+    Path(id): Path<String>,
+) -> Result<Response, ApiError> {
     require_superuser(&auth)?;
     mark_stale(&state).await;
     let r = load(&state, &id).await?;
@@ -181,7 +200,10 @@ pub async fn retrieve(State(state): State<AppState>, ctx: RequestContext, auth: 
 
 async fn busy(state: &AppState) -> Result<bool, ApiError> {
     mark_stale(state).await;
-    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM paperrust_ai_job WHERE status IN ('queued', 'running')").fetch_one(state.db()).await.map_err(storage_err)?;
+    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM paperrust_ai_job WHERE status IN ('queued', 'running')")
+        .fetch_one(state.db())
+        .await
+        .map_err(storage_err)?;
     Ok(n > 0)
 }
 
@@ -224,7 +246,12 @@ pub async fn create(State(state): State<AppState>, ctx: RequestContext, auth: Au
 }
 
 /// POST /api/x-ai/jobs/{id}/cancel/
-pub async fn cancel(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser, Path(id): Path<String>) -> Result<Response, ApiError> {
+pub async fn cancel(
+    State(state): State<AppState>,
+    ctx: RequestContext,
+    auth: AuthUser,
+    Path(id): Path<String>,
+) -> Result<Response, ApiError> {
     require_superuser(&auth)?;
     let r = load(&state, &id).await?;
     let jid: i64 = r.try_get("id").map_err(ApiError::internal)?;
@@ -242,7 +269,12 @@ pub async fn cancel(State(state): State<AppState>, ctx: RequestContext, auth: Au
 }
 
 /// POST /api/x-ai/jobs/{id}/resume/ – resume an interrupted job.
-pub async fn resume(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser, Path(id): Path<String>) -> Result<Response, ApiError> {
+pub async fn resume(
+    State(state): State<AppState>,
+    ctx: RequestContext,
+    auth: AuthUser,
+    Path(id): Path<String>,
+) -> Result<Response, ApiError> {
     require_superuser(&auth)?;
     mark_stale(&state).await;
     let r = load(&state, &id).await?;
@@ -279,9 +311,8 @@ async fn enqueue_job(state: &AppState, id: i64) -> Result<(), ApiError> {
         tokio::spawn(async move { run_job_reporting(&st, id).await });
         return Ok(());
     }
-    let mut req = pl_core::tasks::TaskRequest::new(BACKFILL_TASK)
-        .kwarg("job_id", id)
-        .trigger_source(pl_core::tasks::trigger_source::MANUAL);
+    let mut req =
+        pl_core::tasks::TaskRequest::new(BACKFILL_TASK).kwarg("job_id", id).trigger_source(pl_core::tasks::trigger_source::MANUAL);
     req.time_limit = (Some(BACKFILL_TIME_LIMIT_SECS), None);
     if let Err(e) = pl_core::tasks::send_task(state, req).await {
         mark_failed(state, id, "could not queue the job").await;
@@ -316,12 +347,14 @@ pub fn pause_for(per_minute: u32) -> std::time::Duration {
 /// Runs a job (also for the worker, task `paperrust.ai.backfill`, kwargs `job_id`).
 /// Aborts if `cancel_requested` is set or AI was switched off.
 pub async fn run_job(state: &AppState, id: i64) -> Result<(), String> {
-    let r = sqlx::query("SELECT created_by_id, run_id, mode, filter, total, processed, last_document_id, status FROM paperrust_ai_job WHERE id = $1")
-        .bind(id)
-        .fetch_optional(state.db())
-        .await
-        .map_err(|e| e.to_string())?
-        .ok_or("job not found")?;
+    let r = sqlx::query(
+        "SELECT created_by_id, run_id, mode, filter, total, processed, last_document_id, status FROM paperrust_ai_job WHERE id = $1",
+    )
+    .bind(id)
+    .fetch_optional(state.db())
+    .await
+    .map_err(|e| e.to_string())?
+    .ok_or("job not found")?;
     let status: String = r.try_get("status").map_err(|e| e.to_string())?;
     if status != "queued" {
         return Ok(());
@@ -339,17 +372,33 @@ pub async fn run_job(state: &AppState, id: i64) -> Result<(), String> {
     let total = i64::from(r.try_get::<i32, _>("total").unwrap_or(0));
     let mut processed = i64::from(r.try_get::<i32, _>("processed").unwrap_or(0));
     let mut last: Option<i64> = r.try_get::<Option<i32>, _>("last_document_id").ok().flatten().map(i64::from);
-    sqlx::query("UPDATE paperrust_ai_job SET status = 'running', heartbeat = now() WHERE id = $1").bind(id).execute(state.db()).await.map_err(|e| e.to_string())?;
+    sqlx::query("UPDATE paperrust_ai_job SET status = 'running', heartbeat = now() WHERE id = $1")
+        .bind(id)
+        .execute(state.db())
+        .await
+        .map_err(|e| e.to_string())?;
     let mut new_left = u32::MAX;
     loop {
-        let flags = sqlx::query("SELECT cancel_requested FROM paperrust_ai_job WHERE id = $1").bind(id).fetch_one(state.db()).await.map_err(|e| e.to_string())?;
+        let flags = sqlx::query("SELECT cancel_requested FROM paperrust_ai_job WHERE id = $1")
+            .bind(id)
+            .fetch_one(state.db())
+            .await
+            .map_err(|e| e.to_string())?;
         if flags.try_get::<bool, _>(0).unwrap_or(false) {
-            sqlx::query("UPDATE paperrust_ai_job SET status = 'cancelled', finished = now() WHERE id = $1").bind(id).execute(state.db()).await.map_err(|e| e.to_string())?;
+            sqlx::query("UPDATE paperrust_ai_job SET status = 'cancelled', finished = now() WHERE id = $1")
+                .bind(id)
+                .execute(state.db())
+                .await
+                .map_err(|e| e.to_string())?;
             return Ok(());
         }
         let cfg = super::effective_config(state).await.map_err(|e| e.status().to_string())?;
         if !cfg.ai_enabled {
-            sqlx::query("UPDATE paperrust_ai_job SET status = 'cancelled', finished = now(), message = 'AI disabled' WHERE id = $1").bind(id).execute(state.db()).await.map_err(|e| e.to_string())?;
+            sqlx::query("UPDATE paperrust_ai_job SET status = 'cancelled', finished = now(), message = 'AI disabled' WHERE id = $1")
+                .bind(id)
+                .execute(state.db())
+                .await
+                .map_err(|e| e.to_string())?;
             return Ok(());
         }
         if new_left == u32::MAX {
@@ -392,7 +441,11 @@ pub async fn run_job(state: &AppState, id: i64) -> Result<(), String> {
             let _ = sqlx::query("UPDATE paperrust_ai_job SET heartbeat = now() WHERE id = $1").bind(id).execute(state.db()).await;
         }
     }
-    sqlx::query("UPDATE paperrust_ai_job SET status = 'done', finished = now() WHERE id = $1").bind(id).execute(state.db()).await.map_err(|e| e.to_string())?;
+    sqlx::query("UPDATE paperrust_ai_job SET status = 'done', finished = now() WHERE id = $1")
+        .bind(id)
+        .execute(state.db())
+        .await
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 

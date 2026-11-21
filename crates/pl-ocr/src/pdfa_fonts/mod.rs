@@ -134,7 +134,14 @@ pub fn choose_face(base: &str, flags: i64, italic_angle: f64, weight: Option<f64
     }
     let family = if l.contains("courier") || l.contains("mono") || l.contains("consol") || flags & 1 != 0 {
         Family::Mono
-    } else if l.contains("times") || l.contains("serif") && !l.contains("sansserif") || l.contains("roman") || l.contains("georgia") || l.contains("garamond") || l.contains("book") || (flags & 2 != 0 && !l.contains("sans")) {
+    } else if l.contains("times")
+        || l.contains("serif") && !l.contains("sansserif")
+        || l.contains("roman")
+        || l.contains("georgia")
+        || l.contains("garamond")
+        || l.contains("book")
+        || (flags & 2 != 0 && !l.contains("sans"))
+    {
         Family::Serif
     } else {
         Family::Sans
@@ -257,7 +264,12 @@ pub fn embed_missing(doc: &mut Document) -> Vec<String> {
     embed_missing_with(doc, &load_from_dirs)
 }
 
-fn embed_one(doc: &mut Document, id: ObjectId, load: &dyn Fn(Face) -> Option<Vec<u8>>, cache: &mut HashMap<Face, Option<Vec<u8>>>) -> Option<String> {
+fn embed_one(
+    doc: &mut Document,
+    id: ObjectId,
+    load: &dyn Fn(Face) -> Option<Vec<u8>>,
+    cache: &mut HashMap<Face, Option<Vec<u8>>>,
+) -> Option<String> {
     let font = doc.get_dictionary(id).ok()?.clone();
     let base = base_name(font.get(b"BaseFont").ok().and_then(name_of).unwrap_or(b"Unknown"));
     let fd = font.get(b"FontDescriptor").ok().and_then(|o| dict_ref(doc, o)).cloned();

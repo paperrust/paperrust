@@ -26,10 +26,12 @@ pub fn visible_cond(user: &User, kind: Kind, codename: &'static str, alias: &str
 
 /// `.filter(pk__in=permitted_object_ids(user, model, perm))` (no superuser shortcut in the caller).
 pub fn permitted_ids_cond(user: &User, kind: Kind, codename: &str, alias: &str) -> Condition {
-    Condition::all().add(
-        Expr::col((a(alias), a("id")))
-            .in_subquery(authz_objects::permitted_object_ids(Some(user), kind.model(), codename, &PermOpts::default())),
-    )
+    Condition::all().add(Expr::col((a(alias), a("id"))).in_subquery(authz_objects::permitted_object_ids(
+        Some(user),
+        kind.model(),
+        codename,
+        &PermOpts::default(),
+    )))
 }
 
 /// `restrict_queryset_to_visible(qs, user, perm)`.
@@ -140,9 +142,12 @@ pub fn document_count_source_ext(user: &User, kind: Kind, ids: Option<&[i64]>, w
     };
     let prefilter = (ids.is_none() && !user.is_superuser).then(|| {
         let mut vis = Query::select();
-        vis.column((a("pl_dco"), a("id")))
-            .from_as(a(kind.table()), a("pl_dco"))
-            .cond_where(visible_cond(user, kind, kind.codename("view"), "pl_dco"));
+        vis.column((a("pl_dco"), a("id"))).from_as(a(kind.table()), a("pl_dco")).cond_where(visible_cond(
+            user,
+            kind,
+            kind.codename("view"),
+            "pl_dco",
+        ));
         vis
     });
     if let Some(vis) = &prefilter

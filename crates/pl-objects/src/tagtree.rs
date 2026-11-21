@@ -165,8 +165,19 @@ mod tests {
     /// Tree of the reference seed data (reference/seed.py).
     fn seed() -> TagTree {
         TagTree::from_edges([
-            (1, None), (2, None), (3, Some(2)), (4, Some(3)), (5, Some(3)), (6, Some(2)), (7, Some(6)), (8, Some(6)),
-            (9, Some(8)), (10, None), (11, Some(10)), (12, Some(10)), (13, None),
+            (1, None),
+            (2, None),
+            (3, Some(2)),
+            (4, Some(3)),
+            (5, Some(3)),
+            (6, Some(2)),
+            (7, Some(6)),
+            (8, Some(6)),
+            (9, Some(8)),
+            (10, None),
+            (11, Some(10)),
+            (12, Some(10)),
+            (13, None),
         ])
     }
 

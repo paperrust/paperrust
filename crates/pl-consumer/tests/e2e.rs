@@ -98,8 +98,7 @@ fn make_env(pool: PgPool, f: impl FnOnce(&mut ConsumerSettings)) -> Env {
     let exe = tbase.join("bin").join(if cfg!(windows) { "tesseract.exe" } else { "tesseract" });
     let t = pl_ocr::engine::TesseractCli { program: exe, tessdata_dir: Some(tbase.join("tessdata")), psm: None };
     parsing.tesseract = Some(t).filter(|t| t.is_available());
-    parsing.pdfium =
-        pl_ocr::render::PdfiumRenderer::load(&repo().join("reference/venv/Lib/site-packages/pypdfium2_raw/pdfium.dll")).ok();
+    parsing.pdfium = pl_ocr::render::PdfiumRenderer::load(&repo().join("reference/venv/Lib/site-packages/pypdfium2_raw/pdfium.dll")).ok();
     let has_ocr = parsing.tesseract.is_some() && parsing.pdfium.is_some();
     let index_dir = s.data_dir.join("index");
     std::fs::create_dir_all(&index_dir).unwrap();
@@ -414,15 +413,10 @@ async fn e2e_watcher_oneshot_subdirs_as_tags_impl() {
     w.run(true, rx).await;
     assert!(!f.exists(), "consumed");
     let tag: i32 = sqlx::query_scalar("select id from documents_tag where name = 'Projekt Q'").fetch_one(&pool).await.unwrap();
-    let id: i32 = sqlx::query_scalar("select max(id) from documents_document where original_filename = 'notiz.txt'")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-    let tags: Vec<i32> = sqlx::query_scalar("select tag_id from documents_document_tags where document_id = $1")
-        .bind(id)
-        .fetch_all(&pool)
-        .await
-        .unwrap();
+    let id: i32 =
+        sqlx::query_scalar("select max(id) from documents_document where original_filename = 'notiz.txt'").fetch_one(&pool).await.unwrap();
+    let tags: Vec<i32> =
+        sqlx::query_scalar("select tag_id from documents_document_tags where document_id = $1").bind(id).fetch_all(&pool).await.unwrap();
     assert!(tags.contains(&tag));
     assert!(env.consume_dir().join("Projekt Q/.DS_Store").exists(), "ignored file untouched");
 }

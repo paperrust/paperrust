@@ -55,10 +55,10 @@ pub async fn mock_server(handler: impl Fn(&Recorded) -> (u16, String) + Send + S
                 let mut parts = first.split(' ');
                 let method = parts.next().unwrap_or("").to_string();
                 let path = parts.next().unwrap_or("").to_string();
-                let headers: Vec<(String, String)> = lines
-                    .filter_map(|l| l.split_once(':').map(|(k, v)| (k.trim().to_string(), v.trim().to_string())))
-                    .collect();
-                let len: usize = headers.iter().find(|(k, _)| k.eq_ignore_ascii_case("content-length")).and_then(|(_, v)| v.parse().ok()).unwrap_or(0);
+                let headers: Vec<(String, String)> =
+                    lines.filter_map(|l| l.split_once(':').map(|(k, v)| (k.trim().to_string(), v.trim().to_string()))).collect();
+                let len: usize =
+                    headers.iter().find(|(k, _)| k.eq_ignore_ascii_case("content-length")).and_then(|(_, v)| v.parse().ok()).unwrap_or(0);
                 let mut body = buf[head_end + 4..].to_vec();
                 while body.len() < len {
                     let n = match s.read(&mut tmp).await {

@@ -93,13 +93,7 @@ pub const DM5_LABEL_SYNC: Stage = Stage {
         include_str!("../migrations/dm5_paperrust_label_sync.sql")
     ),
     down: include_str!("../migrations/dm5_paperrust_label_sync.down.sql"),
-    views: &[
-        "documents_tag",
-        "documents_correspondent",
-        "documents_documenttype",
-        "documents_storagepath",
-        "documents_customfield",
-    ],
+    views: &["documents_tag", "documents_correspondent", "documents_documenttype", "documents_storagepath", "documents_customfield"],
 };
 
 /// All stages in application order.
@@ -201,10 +195,29 @@ mod tests {
     fn view_triggers_cover_every_column() {
         // The view triggers write every v3.4.2 column (except content_length, which is computed).
         let cols = [
-            "deleted_at", "restored_at", "transaction_id", "title", "content", "mime_type", "checksum", "archive_checksum",
-            "page_count", "created", "modified", "added", "filename", "archive_filename", "original_filename",
-            "archive_serial_number", "correspondent_id", "document_type_id", "storage_path_id", "owner_id",
-            "root_document_id", "version_label", "version_index",
+            "deleted_at",
+            "restored_at",
+            "transaction_id",
+            "title",
+            "content",
+            "mime_type",
+            "checksum",
+            "archive_checksum",
+            "page_count",
+            "created",
+            "modified",
+            "added",
+            "filename",
+            "archive_filename",
+            "original_filename",
+            "archive_serial_number",
+            "correspondent_id",
+            "document_type_id",
+            "storage_path_id",
+            "owner_id",
+            "root_document_id",
+            "version_label",
+            "version_index",
         ];
         let up = DM1_DOCUMENT.up;
         for f in ["paperrust_document_view_ins", "paperrust_document_view_upd"] {

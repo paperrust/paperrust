@@ -28,11 +28,7 @@ use crate::http::{Caller, V2Json};
 use crate::settings::{Access, R, SettingsError, actor, confirm_password, handle, snapshot};
 
 fn superuser(p: &Principal) -> R<()> {
-    if Access::of(p).superuser {
-        Ok(())
-    } else {
-        Err(SettingsError::forbidden())
-    }
+    if Access::of(p).superuser { Ok(()) } else { Err(SettingsError::forbidden()) }
 }
 
 /// `GET /settings/origin`
@@ -46,9 +42,7 @@ pub async fn origin(State(state): State<AppState>, Caller(p): Caller) -> R<Respo
         "must_stay": count(Verdict::MustStay), "no_effect": count(Verdict::NoEffect),
         "obsolete": count(Verdict::Obsolete), "unknown": count(Verdict::Unknown),
     });
-    Ok(crate::http::json(
-        &json!({"items": items, "summary": summary, "rev": s.rev}),
-    ))
+    Ok(crate::http::json(&json!({"items": items, "summary": summary, "rev": s.rev})))
 }
 
 #[derive(Debug, Deserialize)]
@@ -60,11 +54,7 @@ pub struct AdoptBody {
 }
 
 /// `POST /settings/adopt`
-pub async fn adopt(
-    State(state): State<AppState>,
-    Caller(p): Caller,
-    V2Json(body): V2Json<AdoptBody>,
-) -> R<Response> {
+pub async fn adopt(State(state): State<AppState>, Caller(p): Caller, V2Json(body): V2Json<AdoptBody>) -> R<Response> {
     superuser(&p)?;
     let h = handle(&state);
     let s = snapshot(&state, &h).await?;
@@ -72,15 +62,10 @@ pub async fn adopt(
     let mut skipped = Vec::new();
     let origin = migration::origin(&s);
     for k in &body.keys {
-        let it = origin
-            .iter()
-            .find(|i| i.name == *k || i.key == pl_settings::schema::find(k).map(|d| d.key));
+        let it = origin.iter().find(|i| i.name == *k || i.key == pl_settings::schema::find(k).map(|d| d.key));
         match it {
             Some(i) if matches!(i.verdict, Verdict::Adoptable | Verdict::Adopted) => {
-                changes.push((
-                    i.key.unwrap_or_default().to_string(),
-                    Input::Raw(i.raw.clone()),
-                ));
+                changes.push((i.key.unwrap_or_default().to_string(), Input::Raw(i.raw.clone())));
             }
             Some(i) => skipped.push(json!({"name": k, "reason": i.reason, "verdict": i.verdict})),
             None => skipped.push(json!({"name": k, "reason": "not set in the environment"})),
@@ -99,45 +84,25 @@ pub async fn adopt(
         }
     }
     if changes.is_empty() {
-        return Ok(crate::http::json(
-            &json!({"adopted": [], "skipped": skipped, "rev": s.rev}),
-        ));
+        return Ok(crate::http::json(&json!({"adopted": [], "skipped": skipped, "rev": s.rev})));
     }
     // The migration may also adopt locked keys (they stay locked as long as the environment sets them).
-    let opts = ApplyOptions {
-        expected_rev: None,
-        env: None,
-        if_unset: false,
-    };
-    let rev = store::apply(
-        state.db(),
-        h.secret_box(),
-        &changes,
-        &opts,
-        &actor(&p),
-        Action::Adopt,
-    )
-    .await?;
+    let opts = ApplyOptions { expected_rev: None, env: None, if_unset: false };
+    let rev = store::apply(state.db(), h.secret_box(), &changes, &opts, &actor(&p), Action::Adopt).await?;
     if let Err(e) = h.reload(state.db()).await {
         tracing::warn!(error = %e, "settings reload after adopt failed");
     }
     let adopted: Vec<&str> = changes.iter().map(|(k, _)| k.as_str()).collect();
-    Ok(crate::http::json(
-        &json!({"adopted": adopted, "skipped": skipped, "rev": rev}),
-    ))
+    Ok(crate::http::json(&json!({"adopted": adopted, "skipped": skipped, "rev": rev})))
 }
 
 fn text(body: String, filename: &str) -> Response {
     let mut r = (StatusCode::OK, body).into_response();
-    r.headers_mut().insert(
-        header::CONTENT_TYPE,
-        HeaderValue::from_static("text/plain; charset=utf-8"),
-    );
+    r.headers_mut().insert(header::CONTENT_TYPE, HeaderValue::from_static("text/plain; charset=utf-8"));
     if let Ok(v) = HeaderValue::from_str(&format!("attachment; filename=\"{filename}\"")) {
         r.headers_mut().insert(header::CONTENT_DISPOSITION, v);
     }
-    r.headers_mut()
-        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    r.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     r
 }
 
@@ -145,51 +110,27 @@ fn text(body: String, filename: &str) -> Response {
 pub async fn slim_env(State(state): State<AppState>, Caller(p): Caller) -> R<Response> {
     superuser(&p)?;
     let s = snapshot(&state, &handle(&state)).await?;
-    let items: Vec<_> = migration::origin(&s)
-        .into_iter()
-        .filter(|i| i.source != "desktop")
-        .collect();
-    Ok(text(
-        migration::slim_env(&items, &[], true),
-        "docker-compose.env",
-    ))
+    let items: Vec<_> = migration::origin(&s).into_iter().filter(|i| i.source != "desktop").collect();
+    Ok(text(migration::slim_env(&items, &[], true), "docker-compose.env"))
 }
 
 /// `POST /settings/check-file` (multipart `file` or text body, ≤ 1 MiB)
-pub async fn check_file(
-    State(state): State<AppState>,
-    Caller(p): Caller,
-    req: Request,
-) -> R<Response> {
+pub async fn check_file(State(state): State<AppState>, Caller(p): Caller, req: Request) -> R<Response> {
     superuser(&p)?;
-    let ct = req
-        .headers()
-        .get(header::CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .to_ascii_lowercase();
+    let ct = req.headers().get(header::CONTENT_TYPE).and_then(|v| v.to_str().ok()).unwrap_or("").to_ascii_lowercase();
     let content = if ct.starts_with("multipart/") {
         let mut mp = axum::extract::Multipart::from_request(req, &state)
             .await
             .map_err(|e| SettingsError::field("file", format!("Invalid upload: {e}")))?;
         let mut found = None;
-        while let Some(f) = mp
-            .next_field()
-            .await
-            .map_err(|e| SettingsError::field("file", format!("Invalid upload: {e}")))?
-        {
+        while let Some(f) = mp.next_field().await.map_err(|e| SettingsError::field("file", format!("Invalid upload: {e}")))? {
             if f.name() == Some("file") {
-                found =
-                    Some(f.bytes().await.map_err(|e| {
-                        SettingsError::field("file", format!("Invalid upload: {e}"))
-                    })?);
+                found = Some(f.bytes().await.map_err(|e| SettingsError::field("file", format!("Invalid upload: {e}")))?);
             }
         }
         found.ok_or_else(|| SettingsError::field("file", "No file was submitted."))?
     } else {
-        Bytes::from_request(req, &state)
-            .await
-            .map_err(|_| SettingsError::field("file", "Could not read the request body."))?
+        Bytes::from_request(req, &state).await.map_err(|_| SettingsError::field("file", "Could not read the request body."))?
     };
     if content.len() > 1024 * 1024 {
         return Err(SettingsError::field("file", "File too large (1 MiB max)."));
@@ -198,12 +139,7 @@ pub async fn check_file(
     let parsed = migration::parse_file(&text_in);
     let s = snapshot(&state, &handle(&state)).await?;
     let items = migration::check_pairs(&parsed.pairs, Some(&s));
-    let others: Vec<(String, String)> = parsed
-        .pairs
-        .iter()
-        .filter(|(k, _)| !migration::is_ours(k))
-        .cloned()
-        .collect();
+    let others: Vec<(String, String)> = parsed.pairs.iter().filter(|(k, _)| !migration::is_ours(k)).cloned().collect();
     // The file comes from the admin themselves – the slim version may contain its values.
     let slim = migration::slim_env(&items, &others, false);
     Ok(crate::http::json(&json!({
@@ -225,66 +161,41 @@ pub struct ExportBody {
 }
 
 /// `POST /settings/export`
-pub async fn export(
-    State(state): State<AppState>,
-    Caller(p): Caller,
-    V2Json(body): V2Json<ExportBody>,
-) -> R<Response> {
+pub async fn export(State(state): State<AppState>, Caller(p): Caller, V2Json(body): V2Json<ExportBody>) -> R<Response> {
     superuser(&p)?;
     let h = handle(&state);
     let fmt = body.format.as_deref().unwrap_or("json");
     if body.include_secrets {
         confirm_password(&p, body.password.as_deref())?;
         if fmt != "json" {
-            return Err(SettingsError::field(
-                "format",
-                "Secrets can only be exported as encrypted JSON.",
-            ));
+            return Err(SettingsError::field("format", "Secrets can only be exported as encrypted JSON."));
         }
     }
     match fmt {
         "json" => {
-            let mut conn = state
-                .db()
-                .acquire()
-                .await
-                .map_err(SettingsError::internal)?;
-            let doc = store::export(&mut conn, h.secret_box(), body.include_secrets)
-                .await
-                .map_err(SettingsError::internal)?;
+            let mut conn = state.db().acquire().await.map_err(SettingsError::internal)?;
+            let doc = store::export(&mut conn, h.secret_box(), body.include_secrets).await.map_err(SettingsError::internal)?;
             let out = if body.include_secrets {
                 let pass = body
                     .passphrase
                     .as_deref()
                     .filter(|p| !p.is_empty())
-                    .ok_or_else(|| {
-                        SettingsError::field(
-                            "passphrase",
-                            "A passphrase is required to export secrets.",
-                        )
-                    })?;
-                pl_settings::transfer::encrypt(&doc, pass)
-                    .map_err(|e| SettingsError::field("passphrase", e))?
+                    .ok_or_else(|| SettingsError::field("passphrase", "A passphrase is required to export secrets."))?;
+                pl_settings::transfer::encrypt(&doc, pass).map_err(|e| SettingsError::field("passphrase", e))?
             } else {
                 doc
             };
             let mut r = crate::http::json(&out);
-            r.headers_mut().insert(
-                header::CONTENT_DISPOSITION,
-                HeaderValue::from_static("attachment; filename=\"paperrust-settings.json\""),
-            );
             r.headers_mut()
-                .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+                .insert(header::CONTENT_DISPOSITION, HeaderValue::from_static("attachment; filename=\"paperrust-settings.json\""));
+            r.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
             Ok(r)
         }
         "env" => {
             let s = snapshot(&state, &h).await?;
             Ok(text(store::export_env(&s, false), "paperrust-settings.env"))
         }
-        other => Err(SettingsError::field(
-            "format",
-            format!("Unknown format {other} (json|env)."),
-        )),
+        other => Err(SettingsError::field("format", format!("Unknown format {other} (json|env)."))),
     }
 }
 
@@ -298,22 +209,15 @@ pub struct ImportBody {
 }
 
 /// `POST /settings/import`
-pub async fn import(
-    State(state): State<AppState>,
-    Caller(p): Caller,
-    V2Json(body): V2Json<ImportBody>,
-) -> R<Response> {
+pub async fn import(State(state): State<AppState>, Caller(p): Caller, V2Json(body): V2Json<ImportBody>) -> R<Response> {
     superuser(&p)?;
     let h = handle(&state);
     let doc = if pl_settings::transfer::is_encrypted(&body.data) {
-        let pass = body.passphrase.as_deref().ok_or_else(|| {
-            SettingsError::field(
-                "passphrase",
-                "This file is encrypted – enter the passphrase.",
-            )
-        })?;
-        pl_settings::transfer::decrypt(&body.data, pass)
-            .map_err(|e| SettingsError::field("passphrase", e))?
+        let pass = body
+            .passphrase
+            .as_deref()
+            .ok_or_else(|| SettingsError::field("passphrase", "This file is encrypted – enter the passphrase."))?;
+        pl_settings::transfer::decrypt(&body.data, pass).map_err(|e| SettingsError::field("passphrase", e))?
     } else {
         body.data.clone()
     };
@@ -327,11 +231,8 @@ pub async fn import(
             rows.push(json!({"key": k, "status": "unknown"}));
             continue;
         };
-        let locked = def.ac_field.is_none()
-            && def
-                .env_names()
-                .iter()
-                .any(|n| env.origin_exact(n) == Some(pl_core::config::EnvOrigin::Process));
+        let locked =
+            def.ac_field.is_none() && def.env_names().iter().any(|n| env.origin_exact(n) == Some(pl_core::config::EnvOrigin::Process));
         let writable = def.ac_field.is_some() || pl_settings::layer::rule_n(def);
         let cur = s.get(def.key).and_then(|e| e.value.clone());
         let new = match &input {
@@ -349,42 +250,20 @@ pub async fn import(
             "change"
         };
         let show = |v: &Option<String>| {
-            if def.secret {
-                v.as_ref().map(|_| "***".to_string())
-            } else {
-                v.clone()
-            }
+            if def.secret { v.as_ref().map(|_| "***".to_string()) } else { v.clone() }
         };
-        rows.push(
-            json!({"key": def.key, "status": status, "current": show(&cur), "new": show(&new)}),
-        );
+        rows.push(json!({"key": def.key, "status": status, "current": show(&cur), "new": show(&new)}));
         if status == "change" {
             apply.push((def.key.to_string(), input));
         }
     }
     if body.dry_run || apply.is_empty() {
-        return Ok(crate::http::json(
-            &json!({"dry_run": body.dry_run, "items": rows, "applied": 0, "rev": s.rev}),
-        ));
+        return Ok(crate::http::json(&json!({"dry_run": body.dry_run, "items": rows, "applied": 0, "rev": s.rev})));
     }
-    let opts = ApplyOptions {
-        expected_rev: None,
-        env: Some(env),
-        if_unset: false,
-    };
-    let rev = store::apply(
-        state.db(),
-        h.secret_box(),
-        &apply,
-        &opts,
-        &actor(&p),
-        Action::Import,
-    )
-    .await?;
+    let opts = ApplyOptions { expected_rev: None, env: Some(env), if_unset: false };
+    let rev = store::apply(state.db(), h.secret_box(), &apply, &opts, &actor(&p), Action::Import).await?;
     if let Err(e) = h.reload(state.db()).await {
         tracing::warn!(error = %e, "settings reload after import failed");
     }
-    Ok(crate::http::json(
-        &json!({"dry_run": false, "items": rows, "applied": apply.len(), "rev": rev}),
-    ))
+    Ok(crate::http::json(&json!({"dry_run": false, "items": rows, "applied": apply.len(), "rev": rev})))
 }

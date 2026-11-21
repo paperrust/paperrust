@@ -41,10 +41,9 @@ pub fn repr_value(v: &Value) -> String {
         },
         Value::String(s) => repr_str(s),
         Value::Array(a) => format!("[{}]", a.iter().map(repr_value).collect::<Vec<_>>().join(", ")),
-        Value::Object(m) => format!(
-            "{{{}}}",
-            m.iter().map(|(k, v)| format!("{}: {}", repr_str(k), repr_value(v))).collect::<Vec<_>>().join(", ")
-        ),
+        Value::Object(m) => {
+            format!("{{{}}}", m.iter().map(|(k, v)| format!("{}: {}", repr_str(k), repr_value(v))).collect::<Vec<_>>().join(", "))
+        }
     }
 }
 

@@ -61,13 +61,7 @@ impl RotatingFile {
     pub fn open(path: &Path, max: u64, keep: usize) -> io::Result<Self> {
         let file = open_append(path)?;
         let len = file.metadata().map(|m| m.len()).unwrap_or(0);
-        Ok(Self {
-            path: path.to_path_buf(),
-            file: Some(file),
-            len,
-            max,
-            keep,
-        })
+        Ok(Self { path: path.to_path_buf(), file: Some(file), len, max, keep })
     }
 
     fn rotate_now(&mut self) -> io::Result<()> {
@@ -185,15 +179,9 @@ pub fn init(log_dir: &Path) -> io::Result<PathBuf> {
     let path = log_dir.join("desktop.log");
     rotate(&path, KEEP)?;
     let file = RotatingFile::open(&path, max_bytes(), KEEP)?;
-    let filter = std::env::var("PAPERRUST_DESKTOP_LOG")
-        .ok()
-        .and_then(|f| EnvFilter::try_new(f).ok())
-        .unwrap_or_else(|| EnvFilter::new("info"));
-    let _ = tracing_subscriber::fmt()
-        .with_env_filter(filter)
-        .with_ansi(false)
-        .with_writer(Mutex::new(Tee { file }))
-        .try_init();
+    let filter =
+        std::env::var("PAPERRUST_DESKTOP_LOG").ok().and_then(|f| EnvFilter::try_new(f).ok()).unwrap_or_else(|| EnvFilter::new("info"));
+    let _ = tracing_subscriber::fmt().with_env_filter(filter).with_ansi(false).with_writer(Mutex::new(Tee { file })).try_init();
     Ok(path)
 }
 
@@ -210,8 +198,7 @@ mod tests {
             rotate(&p, 3).unwrap();
         }
         assert!(!p.exists());
-        let read =
-            |n: usize| std::fs::read_to_string(dir.path().join(format!("x.log.{n}"))).unwrap();
+        let read = |n: usize| std::fs::read_to_string(dir.path().join(format!("x.log.{n}"))).unwrap();
         assert_eq!(read(1), "run 6");
         assert_eq!(read(2), "run 5");
         assert_eq!(read(3), "run 4");

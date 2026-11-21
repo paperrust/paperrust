@@ -23,15 +23,7 @@ use crate::layout::EXE;
 use crate::{DesktopError, Result, io_err};
 
 /// Tools that must be in the package.
-pub const REQUIRED_TOOLS: &[&str] = &[
-    "initdb",
-    "pg_ctl",
-    "postgres",
-    "pg_isready",
-    "createdb",
-    "psql",
-    "pg_dump",
-];
+pub const REQUIRED_TOOLS: &[&str] = &["initdb", "pg_ctl", "postgres", "pg_isready", "createdb", "psql", "pg_dump"];
 
 /// Password file for `initdb` in `run/`; if it stays behind after a crash, the
 /// supervisor deletes it the next time it opens (D-N2).
@@ -102,11 +94,7 @@ pub fn parse_major(version_output: &str) -> Option<u32> {
 
 /// Major version of a data directory (`PG_VERSION`).
 pub fn data_major(pgdata: &Path) -> Option<u32> {
-    std::fs::read_to_string(pgdata.join("PG_VERSION"))
-        .ok()?
-        .trim()
-        .parse()
-        .ok()
+    std::fs::read_to_string(pgdata.join("PG_VERSION")).ok()?.trim().parse().ok()
 }
 
 /// Data directory and tools must have the same major version.
@@ -124,12 +112,7 @@ pub fn check_compat(tools_major: u32, data_major: Option<u32>) -> Result<()> {
 }
 
 /// Arguments for `initdb`.
-pub fn initdb_args(
-    pgdata: &Path,
-    user: &str,
-    pwfile: &Path,
-    locale_provider: &str,
-) -> Vec<OsString> {
+pub fn initdb_args(pgdata: &Path, user: &str, pwfile: &Path, locale_provider: &str) -> Vec<OsString> {
     let mut a: Vec<OsString> = vec![
         "-D".into(),
         pgdata.into(),
@@ -145,16 +128,9 @@ pub fn initdb_args(
     ];
     match locale_provider {
         // ICU: language-correct sorting (roughly similar to Docker Postgres with en_US.utf8).
-        "icu" => a.extend([
-            "--locale-provider=icu".into(),
-            "--icu-locale=und".into(),
-            "--locale=C".into(),
-        ]),
+        "icu" => a.extend(["--locale-provider=icu".into(), "--icu-locale=und".into(), "--locale=C".into()]),
         // PG ≥ 17: platform independent, stable sorting (code points), no OS locale needed.
-        _ => a.extend([
-            "--locale-provider=builtin".into(),
-            "--builtin-locale=C.UTF-8".into(),
-        ]),
+        _ => a.extend(["--locale-provider=builtin".into(), "--builtin-locale=C.UTF-8".into()]),
     }
     a
 }
@@ -240,11 +216,7 @@ pub(crate) fn detach_console(cmd: &mut Command) {
 pub(crate) fn scrub_env(cmd: &mut Command) {
     for (k, _) in std::env::vars_os() {
         let k = k.to_string_lossy();
-        if k.starts_with("PG")
-            || k.starts_with("PAPERLESS_")
-            || k.starts_with("PAPERRUST_")
-            || k.starts_with("DJANGO_SUPERUSER_")
-        {
+        if k.starts_with("PG") || k.starts_with("PAPERLESS_") || k.starts_with("PAPERRUST_") || k.starts_with("DJANGO_SUPERUSER_") {
             cmd.env_remove(k.as_ref());
         }
     }
@@ -255,20 +227,13 @@ async fn output_with_timeout(mut cmd: Command, what: &str, timeout: Duration) ->
     let fut = cmd.output();
     match tokio::time::timeout(timeout, fut).await {
         Ok(r) => r.map_err(io_err(format!("{what} starten"))),
-        Err(_) => Err(DesktopError::Postgres(format!(
-            "{what}: keine Antwort nach {} s",
-            timeout.as_secs()
-        ))),
+        Err(_) => Err(DesktopError::Postgres(format!("{what}: keine Antwort nach {} s", timeout.as_secs()))),
     }
 }
 
 fn fail(what: &str, out: &Output) -> DesktopError {
     let err = String::from_utf8_lossy(&out.stderr);
-    let msg = err
-        .lines()
-        .rfind(|l| !l.trim().is_empty())
-        .unwrap_or("")
-        .trim();
+    let msg = err.lines().rfind(|l| !l.trim().is_empty()).unwrap_or("").trim();
     DesktopError::Postgres(format!("{what} fehlgeschlagen ({}): {msg}", out.status))
 }
 
@@ -284,16 +249,7 @@ impl PgCluster {
         password: String,
         locale_provider: String,
     ) -> Self {
-        Self {
-            bin,
-            pgdata,
-            log_dir,
-            run_dir,
-            port,
-            user,
-            password,
-            locale_provider,
-        }
+        Self { bin, pgdata, log_dir, run_dir, port, user, password, locale_provider }
     }
 
     pub fn tool(&self, name: &str) -> PathBuf {
@@ -327,8 +283,7 @@ impl PgCluster {
         c.arg("--version");
         let out = output_with_timeout(c, "pg_ctl --version", Duration::from_secs(20)).await?;
         let text = String::from_utf8_lossy(&out.stdout);
-        parse_major(&text)
-            .ok_or_else(|| DesktopError::Postgres(format!("Version nicht lesbar: {}", text.trim())))
+        parse_major(&text).ok_or_else(|| DesktopError::Postgres(format!("Version nicht lesbar: {}", text.trim())))
     }
 
     pub fn is_initialized(&self) -> bool {
@@ -340,26 +295,16 @@ impl PgCluster {
         if self.is_initialized() {
             return Ok(());
         }
-        if self.pgdata.exists()
-            && std::fs::read_dir(&self.pgdata)
-                .map(|mut d| d.next().is_some())
-                .unwrap_or(true)
-        {
+        if self.pgdata.exists() && std::fs::read_dir(&self.pgdata).map(|mut d| d.next().is_some()).unwrap_or(true) {
             return Err(DesktopError::Postgres(format!(
                 "{} ist nicht leer, enthält aber keinen Cluster (abgebrochener Erst-Start?). Verzeichnis prüfen und ggf. löschen.",
                 self.pgdata.display()
             )));
         }
         let pwfile = self.run_dir.join(INITDB_PWFILE);
-        crate::config::write_private(&pwfile, self.password.as_bytes())
-            .map_err(io_err("Passwortdatei für initdb schreiben"))?;
+        crate::config::write_private(&pwfile, self.password.as_bytes()).map_err(io_err("Passwortdatei für initdb schreiben"))?;
         let mut c = self.cmd("initdb");
-        c.args(initdb_args(
-            &self.pgdata,
-            &self.user,
-            &pwfile,
-            &self.locale_provider,
-        ));
+        c.args(initdb_args(&self.pgdata, &self.user, &pwfile, &self.locale_provider));
         let res = output_with_timeout(c, "initdb", Duration::from_secs(300)).await;
         let _ = std::fs::remove_file(&pwfile);
         let out = res?;
@@ -376,8 +321,7 @@ impl PgCluster {
 
     pub fn write_runtime_conf(&self) -> Result<()> {
         let p = self.pgdata.join("paperrust.conf");
-        std::fs::write(&p, runtime_conf(self.port))
-            .map_err(io_err(format!("{} schreiben", p.display())))
+        std::fs::write(&p, runtime_conf(self.port)).map_err(io_err(format!("{} schreiben", p.display())))
     }
 
     pub async fn status(&self) -> Result<PgStatus> {
@@ -401,14 +345,9 @@ impl PgCluster {
         self.write_runtime_conf()?;
         // Size limit: PostgreSQL keeps its log open, so rotate only before the start (logs.rs).
         for f in ["postgresql.log", "pg_ctl.log"] {
-            let _ = crate::logs::rotate_if_larger(
-                &self.log_dir.join(f),
-                crate::logs::max_bytes(),
-                crate::logs::KEEP,
-            );
+            let _ = crate::logs::rotate_if_larger(&self.log_dir.join(f), crate::logs::max_bytes(), crate::logs::KEEP);
         }
-        let ctl_log = crate::logs::open_append(&self.log_dir.join("pg_ctl.log"))
-            .map_err(io_err("pg_ctl.log öffnen"))?;
+        let ctl_log = crate::logs::open_append(&self.log_dir.join("pg_ctl.log")).map_err(io_err("pg_ctl.log öffnen"))?;
         let mut c = self.cmd("pg_ctl");
         c.arg("start")
             .arg("-D")
@@ -440,10 +379,7 @@ impl PgCluster {
                 return Ok(());
             }
             if start.elapsed() > timeout {
-                return Err(DesktopError::Postgres(format!(
-                    "nimmt nach {} s keine Verbindungen an",
-                    timeout.as_secs()
-                )));
+                return Err(DesktopError::Postgres(format!("nimmt nach {} s keine Verbindungen an", timeout.as_secs())));
             }
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
@@ -462,10 +398,7 @@ impl PgCluster {
         }
         for mode in ["fast", "immediate"] {
             let mut c = self.cmd("pg_ctl");
-            c.arg("stop")
-                .arg("-D")
-                .arg(&self.pgdata)
-                .args(["-m", mode, "-w", "-t", "60", "-s"]);
+            c.arg("stop").arg("-D").arg(&self.pgdata).args(["-m", mode, "-w", "-t", "60", "-s"]);
             match output_with_timeout(c, "pg_ctl stop", Duration::from_secs(80)).await {
                 Ok(o) if o.status.success() => {
                     tracing::info!(mode, "PostgreSQL gestoppt");
@@ -483,14 +416,7 @@ impl PgCluster {
     /// `createdb` (idempotent: "already exists" counts as success).
     pub async fn ensure_database(&self, name: &str) -> Result<()> {
         let mut c = self.client("createdb");
-        c.args([
-            "-E",
-            "UTF8",
-            "-T",
-            "template0",
-            "--maintenance-db=postgres",
-            name,
-        ]);
+        c.args(["-E", "UTF8", "-T", "template0", "--maintenance-db=postgres", name]);
         let out = output_with_timeout(c, "createdb", Duration::from_secs(60)).await?;
         if out.status.success() || String::from_utf8_lossy(&out.stderr).contains("already exists") {
             Ok(())
@@ -502,24 +428,9 @@ impl PgCluster {
     /// A value via `psql -tAc` (only fixed, internally formulated queries – no user input).
     pub async fn query_scalar(&self, db: &str, sql: &str) -> Result<String> {
         let mut c = self.client("psql");
-        c.args([
-            "-X",
-            "-q",
-            "-t",
-            "-A",
-            "-v",
-            "ON_ERROR_STOP=1",
-            "-d",
-            db,
-            "-c",
-            sql,
-        ]);
+        c.args(["-X", "-q", "-t", "-A", "-v", "ON_ERROR_STOP=1", "-d", db, "-c", sql]);
         let out = output_with_timeout(c, "psql", Duration::from_secs(60)).await?;
-        if out.status.success() {
-            Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
-        } else {
-            Err(fail("psql", &out))
-        }
+        if out.status.success() { Ok(String::from_utf8_lossy(&out.stdout).trim().to_string()) } else { Err(fail("psql", &out)) }
     }
 
     /// SQL script via stdin to `psql` (for scripts with secrets: none of it on the command line).
@@ -533,29 +444,20 @@ impl PgCluster {
             .kill_on_drop(true);
         let mut child = c.spawn().map_err(io_err("psql starten"))?;
         if let Some(mut stdin) = child.stdin.take() {
-            stdin
-                .write_all(sql.as_bytes())
-                .await
-                .map_err(io_err("psql: Skript übergeben"))?;
+            stdin.write_all(sql.as_bytes()).await.map_err(io_err("psql: Skript übergeben"))?;
             drop(stdin);
         }
         let out = tokio::time::timeout(Duration::from_secs(120), child.wait_with_output())
             .await
             .map_err(|_| DesktopError::Postgres("psql: keine Antwort nach 120 s".into()))?
             .map_err(io_err("psql"))?;
-        if out.status.success() {
-            Ok(())
-        } else {
-            Err(fail("psql", &out))
-        }
+        if out.status.success() { Ok(()) } else { Err(fail("psql", &out)) }
     }
 
     /// Create/align the application role and hand over ownership ([`app_role_sql`], D-N3).
     pub async fn ensure_app_role(&self, db: &str, role: &str, password: &str) -> Result<()> {
         if role == self.user {
-            return Err(DesktopError::Postgres(
-                "Anwendungsrolle darf nicht der Cluster-Superuser sein".into(),
-            ));
+            return Err(DesktopError::Postgres("Anwendungsrolle darf nicht der Cluster-Superuser sein".into()));
         }
         self.run_script(db, &app_role_sql(db, role, password)).await
     }
@@ -563,14 +465,9 @@ impl PgCluster {
     /// `pg_dump -Fc` of the database `name` to `out_file`.
     pub async fn dump(&self, name: &str, out_file: &Path) -> Result<()> {
         let mut c = self.client("pg_dump");
-        c.args(["-Fc", "--no-owner", "-d", name, "-f"])
-            .arg(out_file);
+        c.args(["-Fc", "--no-owner", "-d", name, "-f"]).arg(out_file);
         let out = output_with_timeout(c, "pg_dump", Duration::from_secs(3600)).await?;
-        if out.status.success() {
-            Ok(())
-        } else {
-            Err(fail("pg_dump", &out))
-        }
+        if out.status.success() { Ok(()) } else { Err(fail("pg_dump", &out)) }
     }
 }
 
@@ -597,23 +494,13 @@ mod tests {
 
     #[test]
     fn initdb_never_gets_password_on_command_line() {
-        let a = initdb_args(
-            Path::new("/d"),
-            "paperrust",
-            Path::new("/r/initdb.pw"),
-            "builtin",
-        );
+        let a = initdb_args(Path::new("/d"), "paperrust", Path::new("/r/initdb.pw"), "builtin");
         let s: Vec<String> = a.iter().map(|x| x.to_string_lossy().into_owned()).collect();
         assert!(s.contains(&"--auth=scram-sha-256".to_string()));
         assert!(s.contains(&"--builtin-locale=C.UTF-8".to_string()));
-        assert!(
-            s.iter()
-                .any(|x| x.starts_with("--pwfile=") && x.ends_with("initdb.pw"))
-        );
-        let icu: Vec<String> = initdb_args(Path::new("/d"), "u", Path::new("/p"), "icu")
-            .iter()
-            .map(|x| x.to_string_lossy().into_owned())
-            .collect();
+        assert!(s.iter().any(|x| x.starts_with("--pwfile=") && x.ends_with("initdb.pw")));
+        let icu: Vec<String> =
+            initdb_args(Path::new("/d"), "u", Path::new("/p"), "icu").iter().map(|x| x.to_string_lossy().into_owned()).collect();
         assert!(icu.contains(&"--locale-provider=icu".to_string()));
     }
 

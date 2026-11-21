@@ -47,11 +47,7 @@ impl Source {
             if !std::path::Path::new(&path).is_file() {
                 bail!("SQLite-Datei nicht gefunden: {path}");
             }
-            let opts = SqliteConnectOptions::new()
-                .filename(&path)
-                .read_only(true)
-                .create_if_missing(false)
-                .pragma("query_only", "1");
+            let opts = SqliteConnectOptions::new().filename(&path).read_only(true).create_if_missing(false).pragma("query_only", "1");
             let mut c = SqliteConnection::connect_with(&opts)
                 .await
                 .with_context(|| format!("SQLite-Datei {path} lässt sich nicht (nur lesend) öffnen"))?;
@@ -125,27 +121,28 @@ impl Source {
     }
 
     pub async fn tables(&mut self) -> Result<BTreeSet<String>> {
-        let v: Vec<String> = match self {
-            Source::Sqlite(c) => {
-                sqlx::query_scalar("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\'")
-                    .fetch_all(c)
-                    .await?
-            }
-            Source::MySql(c) => {
-                let rows: Vec<Vec<u8>> = sqlx::query_scalar(
-                    "SELECT CAST(table_name AS CHAR) FROM information_schema.tables \
+        let v: Vec<String> =
+            match self {
+                Source::Sqlite(c) => {
+                    sqlx::query_scalar("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\'")
+                        .fetch_all(c)
+                        .await?
+                }
+                Source::MySql(c) => {
+                    let rows: Vec<Vec<u8>> = sqlx::query_scalar(
+                        "SELECT CAST(table_name AS CHAR) FROM information_schema.tables \
                      WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'",
+                    )
+                    .fetch_all(c)
+                    .await?;
+                    rows.into_iter().map(|b| String::from_utf8_lossy(&b).into_owned()).collect()
+                }
+                Source::Pg(c) => sqlx::query_scalar(
+                    "SELECT table_name::text FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'",
                 )
                 .fetch_all(c)
-                .await?;
-                rows.into_iter().map(|b| String::from_utf8_lossy(&b).into_owned()).collect()
-            }
-            Source::Pg(c) => {
-                sqlx::query_scalar("SELECT table_name::text FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'")
-                    .fetch_all(c)
-                    .await?
-            }
-        };
+                .await?,
+            };
         Ok(v.into_iter().collect())
     }
 
@@ -296,7 +293,9 @@ impl Source {
     pub fn stream<'a>(&'a mut self, sql: &'a str, cols: &'a [&'a Column]) -> BoxStream<'a, Result<Vec<Raw>>> {
         match self {
             Source::Sqlite(c) => sqlx::query(sql).fetch(c).map(|r| r.map_err(anyhow::Error::from).and_then(sqlite_row)).boxed(),
-            Source::MySql(c) => sqlx::query(sql).fetch(c).map(move |r| r.map_err(anyhow::Error::from).and_then(|r| mysql_row(&r, cols))).boxed(),
+            Source::MySql(c) => {
+                sqlx::query(sql).fetch(c).map(move |r| r.map_err(anyhow::Error::from).and_then(|r| mysql_row(&r, cols))).boxed()
+            }
             Source::Pg(c) => sqlx::query(sql).fetch(c).map(|r| r.map_err(anyhow::Error::from).and_then(|r| pg_row(&r))).boxed(),
         }
     }

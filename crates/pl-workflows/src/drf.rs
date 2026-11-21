@@ -3,8 +3,8 @@
 //! Error texts 1:1 from DRF.
 
 use crate::pyfmt::{self, PyInt};
-use sea_query::{Alias, Expr, PostgresQueryBuilder, Query};
 use pl_core::sqlbind::SqlxBinder;
+use sea_query::{Alias, Expr, PostgresQueryBuilder, Query};
 use serde_json::{Map, Value, json};
 use sqlx::PgConnection;
 
@@ -50,9 +50,15 @@ impl Choices {
 
 #[derive(Debug, Clone, Copy)]
 pub enum Kind {
-    Int { min: Option<i64>, max: Option<i64> },
+    Int {
+        min: Option<i64>,
+        max: Option<i64>,
+    },
     Bool,
-    Char { max_len: Option<usize>, allow_blank: bool },
+    Char {
+        max_len: Option<usize>,
+        allow_blank: bool,
+    },
     Choice(Choices),
     MultiChoice(Choices),
     /// `PrimaryKeyRelatedField` on a table (column `id`, AutoField int4)
@@ -116,9 +122,10 @@ pub async fn run_field(db: &mut PgConnection, ctx: Ctx, spec: &FieldSpec, input:
     }
     // RelatedField.run_validation: "" → None
     if let (Kind::Pk(_), Some(Value::String(s))) = (&spec.kind, &data)
-        && s.is_empty() {
-            data = Some(Value::Null);
-        }
+        && s.is_empty()
+    {
+        data = Some(Value::Null);
+    }
     let Some(data) = data else {
         if ctx.partial {
             return Ok(Out::Skip);
@@ -147,12 +154,8 @@ async fn to_internal(db: &mut PgConnection, kind: Kind, data: &Value) -> Result<
         Kind::Char { max_len, .. } => char_field(data, max_len),
         Kind::Choice(c) => choice_field(c, data),
         Kind::MultiChoice(c) => {
-            let items = iter_items(data).ok_or_else(|| {
-                VErr::Detail(msg(format!(
-                    "Expected a list of items but got type \"{}\".",
-                    pyfmt::type_name(data)
-                )))
-            })?;
+            let items = iter_items(data)
+                .ok_or_else(|| VErr::Detail(msg(format!("Expected a list of items but got type \"{}\".", pyfmt::type_name(data)))))?;
             let mut out: Vec<Value> = Vec::new();
             for it in items {
                 let v = choice_field(c, &it)?;
@@ -164,12 +167,8 @@ async fn to_internal(db: &mut PgConnection, kind: Kind, data: &Value) -> Result<
         }
         Kind::Pk(table) => pk_lookup(db, table, data).await,
         Kind::ManyPk(table) => {
-            let items = iter_items(data).ok_or_else(|| {
-                VErr::Detail(msg(format!(
-                    "Expected a list of items but got type \"{}\".",
-                    pyfmt::type_name(data)
-                )))
-            })?;
+            let items = iter_items(data)
+                .ok_or_else(|| VErr::Detail(msg(format!("Expected a list of items but got type \"{}\".", pyfmt::type_name(data)))))?;
             let mut out = Vec::with_capacity(items.len());
             for it in items {
                 out.push(pk_lookup(db, table, &it).await?);
@@ -192,9 +191,10 @@ fn iter_items(data: &Value) -> Option<Vec<Value>> {
 /// `IntegerField.to_internal_value` + min/max validators.
 pub fn int_field(data: &Value, min: Option<i64>, max: Option<i64>) -> Result<Value, VErr> {
     if let Value::String(s) = data
-        && s.chars().count() > 1000 {
-            return Err(VErr::Detail(msg("String value too large.")));
-        }
+        && s.chars().count() > 1000
+    {
+        return Err(VErr::Detail(msg("String value too large.")));
+    }
     let s = pyfmt::py_str(data);
     let s = strip_re_decimal(&s);
     let parsed = match data {
@@ -213,15 +213,15 @@ pub fn int_field(data: &Value, min: Option<i64>, max: Option<i64>) -> Result<Val
         }
     };
     if let Some(mx) = max
-        && n > mx as i128 {
-            return Err(VErr::Detail(msg(format!("Ensure this value is less than or equal to {mx}."))));
-        }
+        && n > mx as i128
+    {
+        return Err(VErr::Detail(msg(format!("Ensure this value is less than or equal to {mx}."))));
+    }
     if let Some(mn) = min
-        && n < mn as i128 {
-            return Err(VErr::Detail(msg(format!(
-                "Ensure this value is greater than or equal to {mn}."
-            ))));
-        }
+        && n < mn as i128
+    {
+        return Err(VErr::Detail(msg(format!("Ensure this value is greater than or equal to {mn}."))));
+    }
     if n > i64::MAX as i128 || n < i64::MIN as i128 {
         // upstream: DB error (integer out of range) → 500
         return Err(VErr::Server("integer out of range".into()));
@@ -274,9 +274,10 @@ pub fn char_field(data: &Value, max_len: Option<usize>) -> Result<Value, VErr> {
     let s = pyfmt::py_strip(&s).to_string();
     let mut errs = Vec::new();
     if let Some(m) = max_len
-        && s.chars().count() > m {
-            errs.push(json!(format!("Ensure this field has no more than {m} characters.")));
-        }
+        && s.chars().count() > m
+    {
+        errs.push(json!(format!("Ensure this field has no more than {m} characters.")));
+    }
     if s.contains('\0') {
         errs.push(json!("Null characters are not allowed."));
     }
@@ -289,19 +290,12 @@ pub fn char_field(data: &Value, max_len: Option<usize>) -> Result<Value, VErr> {
 /// `ChoiceField.to_internal_value`
 pub fn choice_field(c: Choices, data: &Value) -> Result<Value, VErr> {
     let key = pyfmt::py_str(data);
-    c.lookup(&key).ok_or_else(|| {
-        VErr::Detail(msg(format!("\"{}\" is not a valid choice.", key)))
-    })
+    c.lookup(&key).ok_or_else(|| VErr::Detail(msg(format!("\"{}\" is not a valid choice.", key))))
 }
 
 /// `PrimaryKeyRelatedField.to_internal_value` (queryset `<table>.objects.all()`).
 pub async fn pk_lookup(db: &mut PgConnection, table: &'static str, data: &Value) -> Result<Value, VErr> {
-    let incorrect = || {
-        VErr::Detail(msg(format!(
-            "Incorrect type. Expected pk value, received {}.",
-            pyfmt::type_name(data)
-        )))
-    };
+    let incorrect = || VErr::Detail(msg(format!("Incorrect type. Expected pk value, received {}.", pyfmt::type_name(data))));
     if data.is_boolean() {
         return Err(incorrect());
     }
@@ -317,10 +311,7 @@ pub async fn pk_lookup(db: &mut PgConnection, table: &'static str, data: &Value)
         Some(id) => row_exists(db, table, id).await?,
     };
     if !exists {
-        return Err(VErr::Detail(msg(format!(
-            "Invalid pk \"{}\" - object does not exist.",
-            pyfmt::py_str(data)
-        ))));
+        return Err(VErr::Detail(msg(format!("Invalid pk \"{}\" - object does not exist.", pyfmt::py_str(data)))));
     }
     Ok(json!(n))
 }
@@ -338,7 +329,8 @@ pub async fn row_exists(db: &mut PgConnection, table: &'static str, id: i64) -> 
 
 /// `Serializer.to_internal_value`: fields in order, errors collected.
 pub async fn validate_fields(
-    db: &mut PgConnection, ctx: Ctx,
+    db: &mut PgConnection,
+    ctx: Ctx,
     specs: &[FieldSpec],
     data: &Map<String, Value>,
 ) -> Result<Map<String, Value>, VErr> {
@@ -366,10 +358,7 @@ pub async fn validate_fields(
 pub fn expect_object(data: &Value) -> Result<&Map<String, Value>, VErr> {
     match data {
         Value::Object(o) => Ok(o),
-        other => Err(non_field(format!(
-            "Invalid data. Expected a dictionary, but got {}.",
-            pyfmt::type_name(other)
-        ))),
+        other => Err(non_field(format!("Invalid data. Expected a dictionary, but got {}.", pyfmt::type_name(other)))),
     }
 }
 
@@ -407,10 +396,7 @@ mod tests {
         assert_eq!(int_field(&json!(5.0), None, None).unwrap(), json!(5));
         assert_eq!(d(int_field(&json!(5.5), None, None).unwrap_err()), json!(["A valid integer is required."]));
         assert_eq!(d(int_field(&json!(true), None, None).unwrap_err()), json!(["A valid integer is required."]));
-        assert_eq!(
-            d(int_field(&json!(0), Some(1), Some(10)).unwrap_err()),
-            json!(["Ensure this value is greater than or equal to 1."])
-        );
+        assert_eq!(d(int_field(&json!(0), Some(1), Some(10)).unwrap_err()), json!(["Ensure this value is greater than or equal to 1."]));
         assert_eq!(
             d(int_field(&json!("99999999999999999999999"), Some(1), Some(10)).unwrap_err()),
             json!(["Ensure this value is less than or equal to 10."])
@@ -431,10 +417,7 @@ mod tests {
         assert_eq!(char_field(&json!("  a "), Some(3)).unwrap(), json!("a"));
         assert_eq!(char_field(&json!(1.5), None).unwrap(), json!("1.5"));
         assert_eq!(d(char_field(&json!(true), None).unwrap_err()), json!(["Not a valid string."]));
-        assert_eq!(
-            d(char_field(&json!("abcd"), Some(3)).unwrap_err()),
-            json!(["Ensure this field has no more than 3 characters."])
-        );
+        assert_eq!(d(char_field(&json!("abcd"), Some(3)).unwrap_err()), json!(["Ensure this field has no more than 3 characters."]));
         let c = Choices::Ints(&[1, 2]);
         assert_eq!(choice_field(c, &json!("2")).unwrap(), json!(2));
         assert_eq!(d(choice_field(c, &json!(1.0)).unwrap_err()), json!(["\"1.0\" is not a valid choice."]));

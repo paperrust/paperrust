@@ -10,9 +10,7 @@
 use std::collections::HashSet;
 
 use chrono::{DateTime, Datelike, FixedOffset, NaiveDate, TimeZone, Utc};
-use pl_matching::dates::{
-    DateParserConfig, RegexDateParser, ocr_to_dateparser_languages, parse_dateparser_languages, parse_ignore_dates,
-};
+use pl_matching::dates::{DateParserConfig, RegexDateParser, ocr_to_dateparser_languages, parse_dateparser_languages, parse_ignore_dates};
 
 fn utc(y: i32, m: u32, d: u32, h: u32, mi: u32, s: u32) -> DateTime<FixedOffset> {
     Utc.with_ymd_and_hms(y, m, d, h, mi, s).unwrap().fixed_offset()
@@ -33,9 +31,7 @@ fn config_with_ignore_dates() -> DateParserConfig {
     DateParserConfig {
         languages: vec!["en".into(), "de".into()],
         timezone_str: "America/New_York".into(),
-        ignore_dates: [NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), NaiveDate::from_ymd_opt(2024, 12, 25).unwrap()]
-            .into_iter()
-            .collect(),
+        ignore_dates: [NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), NaiveDate::from_ymd_opt(2024, 12, 25).unwrap()].into_iter().collect(),
         reference_time: utc(2024, 1, 15, 12, 0, 0),
         filename_date_order: Some("DMY".into()),
         content_date_order: "MDY".into(),

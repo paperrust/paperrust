@@ -22,16 +22,10 @@ pub fn parse_etags(s: &str) -> Vec<String> {
     if s.trim() == "*" {
         return vec!["*".to_string()];
     }
-    s.split(',')
-        .map(|p| p.trim())
-        .filter(|p| etag_match(p))
-        .map(|p| p.to_string())
-        .collect()
+    s.split(',').map(|p| p.trim()).filter(|p| etag_match(p)).map(|p| p.to_string()).collect()
 }
 
-const MONTHS: [&str; 12] = [
-    "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec",
-];
+const MONTHS: [&str; 12] = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 
 fn is_word(c: char) -> bool {
     c.is_alphanumeric() || c == '_'
@@ -141,17 +135,9 @@ fn header_str<'a>(h: &'a HeaderMap, name: &str) -> &'a str {
 pub fn evaluate(method: &Method, h: &HeaderMap, etag: Option<&str>, last_modified: Option<i64>) -> Precondition {
     let safe = method == Method::GET || method == Method::HEAD;
     let if_match = parse_etags(header_str(h, "if-match"));
-    let ius = h
-        .get("if-unmodified-since")
-        .and_then(|v| v.to_str().ok())
-        .filter(|s| !s.is_empty())
-        .and_then(parse_http_date);
+    let ius = h.get("if-unmodified-since").and_then(|v| v.to_str().ok()).filter(|s| !s.is_empty()).and_then(parse_http_date);
     let if_none_match = parse_etags(header_str(h, "if-none-match"));
-    let ims = h
-        .get("if-modified-since")
-        .and_then(|v| v.to_str().ok())
-        .filter(|s| !s.is_empty())
-        .and_then(parse_http_date);
+    let ims = h.get("if-modified-since").and_then(|v| v.to_str().ok()).filter(|s| !s.is_empty()).and_then(parse_http_date);
 
     // Step 1: If-Match
     if !if_match.is_empty() {
@@ -182,9 +168,7 @@ pub fn evaluate(method: &Method, h: &HeaderMap, etag: Option<&str>, last_modifie
             Some(_) if if_none_match == ["*"] => false,
             Some(t) => {
                 let t = t.strip_prefix("W/").unwrap_or(t);
-                !if_none_match
-                    .iter()
-                    .any(|e| e.strip_prefix("W/").unwrap_or(e) == t)
+                !if_none_match.iter().any(|e| e.strip_prefix("W/").unwrap_or(e) == t)
             }
         };
         if !passes {
@@ -219,8 +203,7 @@ pub fn precondition_response(p: &Precondition) -> Option<Response> {
         Precondition::Failed => {
             let mut r = Response::new(Body::empty());
             *r.status_mut() = StatusCode::PRECONDITION_FAILED;
-            r.headers_mut()
-                .insert(header::CONTENT_TYPE, HeaderValue::from_static(crate::compat::HTML));
+            r.headers_mut().insert(header::CONTENT_TYPE, HeaderValue::from_static(crate::compat::HTML));
             Some(r)
         }
     }

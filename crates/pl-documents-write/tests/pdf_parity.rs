@@ -50,11 +50,8 @@ fn token(user: &str) -> Option<String> {
 }
 
 fn reset() {
-    let st = std::process::Command::new("bash")
-        .arg(w13_dir().join("reset.sh"))
-        .stdout(std::process::Stdio::null())
-        .status()
-        .expect("reset.sh");
+    let st =
+        std::process::Command::new("bash").arg(w13_dir().join("reset.sh")).stdout(std::process::Stdio::null()).status().expect("reset.sh");
     assert!(st.success(), "reset failed");
 }
 
@@ -95,11 +92,8 @@ async fn run_setup(case: &Value) {
     }
 }
 
-const TABLES: &[(&str, &str, &[&str])] = &[
-    ("documents_document", "id", &[]),
-    ("auditlog_logentry", "id", &["id"]),
-    ("documents_paperlesstask", "id", &["id"]),
-];
+const TABLES: &[(&str, &str, &[&str])] =
+    &[("documents_document", "id", &[]), ("auditlog_logentry", "id", &["id"]), ("documents_paperlesstask", "id", &["id"])];
 
 struct Norm {
     t0: DateTime<Utc>,
@@ -252,12 +246,11 @@ type QueueRow = (String, Value, Value, Value, Value, Value, Option<String>);
 /// Plan from `paperrust_task_queue` / `paperrust_task_group` (Rust side).
 async fn rust_plan(files: &mut BTreeMap<String, Value>) -> Value {
     let mut c = sqlx::PgConnection::connect(&db_url()).await.expect("db");
-    let rows: Vec<QueueRow> = sqlx::query_as(
-        "SELECT task_name, args, kwargs, headers, link, link_error, group_id FROM paperrust_task_queue ORDER BY id",
-    )
-    .fetch_all(&mut c)
-    .await
-    .expect("queue rows");
+    let rows: Vec<QueueRow> =
+        sqlx::query_as("SELECT task_name, args, kwargs, headers, link, link_error, group_id FROM paperrust_task_queue ORDER BY id")
+            .fetch_all(&mut c)
+            .await
+            .expect("queue rows");
     let groups: Vec<(String, Option<Value>, Option<Value>)> =
         sqlx::query_as("SELECT group_id, body, on_error FROM paperrust_task_group").fetch_all(&mut c).await.expect("groups");
     let groups: HashMap<String, (Option<Value>, Option<Value>)> = groups.into_iter().map(|(g, b, o)| (g, (b, o))).collect();
@@ -347,10 +340,7 @@ async fn rust_call(case: &Value, norm: &mut Norm) -> Resp {
     pl_documents_write::hooks::set_pdf_ops(Arc::new(pl_documents_write::pdf_edit::NativePdfOps));
     let authz = Authz::new(state.db().clone(), AuthConfig::from_core(state.config()));
     let route = pl_documents_write::routes().into_iter().find(|r| r.id == "documents.bulk_edit").expect("route");
-    let app: axum::Router = axum::Router::new()
-        .route(route.path, route.handler)
-        .with_state(state)
-        .layer(axum::Extension(authz));
+    let app: axum::Router = axum::Router::new().route(route.path, route.handler).with_state(state).layer(axum::Extension(authz));
     let mut req = Request::builder()
         .method("POST")
         .uri("/api/documents/bulk_edit/")
@@ -426,8 +416,8 @@ struct Captured {
 #[ignore = "braucht die W13-Referenz-Kopie (tests/parity/pl-documents-write/w13/django-start.sh) und w13env.sh"]
 async fn pdf_methods_match_django() {
     assert_eq!(std::env::var("PAPERLESS_DBNAME").as_deref(), Ok("pl_w13_ref"), "source w13env.sh first");
-    let cases: Vec<Value> = serde_json::from_str(&std::fs::read_to_string(w13_dir().join("pdf_cases.json")).expect("pdf_cases.json"))
-        .expect("cases json");
+    let cases: Vec<Value> =
+        serde_json::from_str(&std::fs::read_to_string(w13_dir().join("pdf_cases.json")).expect("pdf_cases.json")).expect("cases json");
     let only: Option<Vec<String>> = std::env::var("W13_CASES").ok().map(|s| s.split(',').map(str::to_string).collect());
     let t0 = Utc::now() - chrono::Duration::seconds(5);
     let mut report = Vec::new();
@@ -465,7 +455,8 @@ async fn pdf_methods_match_django() {
         let (df, rf) = (serde_json::to_value(&d.files).unwrap_or_default(), serde_json::to_value(&r.files).unwrap_or_default());
         diff_values("files", &df, &rf, &mut diffs);
         // Known upstream deviation (contract, Known differences): diffs under these prefixes do not count.
-        let accept: Vec<String> = case["accept"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default();
+        let accept: Vec<String> =
+            case["accept"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default();
         let accepted = diffs.iter().filter(|d| accept.iter().any(|p| d.starts_with(p.as_str()))).count();
         diffs.retain(|d| !accept.iter().any(|p| d.starts_with(p.as_str())));
         if accepted > 0 {

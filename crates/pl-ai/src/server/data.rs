@@ -5,12 +5,12 @@
 
 use std::collections::BTreeMap;
 
-use pl_authz::models::{ObjectModel, CORRESPONDENT, DOCUMENT_TYPE, STORAGE_PATH, TAG};
-use pl_authz::objects::{permitted_document_ids, permitted_object_ids, user_is_active_superuser, PermOpts};
 use pl_authz::User;
+use pl_authz::models::{CORRESPONDENT, DOCUMENT_TYPE, ObjectModel, STORAGE_PATH, TAG};
+use pl_authz::objects::{PermOpts, permitted_document_ids, permitted_object_ids, user_is_active_superuser};
 use pl_core::ApiError;
-use sea_query::{Alias, Expr, Order, PostgresQueryBuilder, Query, SelectStatement};
 use pl_core::sqlbind::SqlxBinder;
+use sea_query::{Alias, Expr, Order, PostgresQueryBuilder, Query, SelectStatement};
 use serde_json::Value;
 use sqlx::{PgPool, Row};
 
@@ -179,10 +179,7 @@ pub async fn filter_permitted_docs(db: &PgPool, user: Option<&User>, ids: &[i64]
 
 /// IDs of all documents in the trash (`Document.deleted_objects`).
 pub async fn trashed_ids(db: &PgPool) -> DResult<Vec<i64>> {
-    let rows = sqlx::query("SELECT id FROM documents_document WHERE deleted_at IS NOT NULL")
-        .fetch_all(db)
-        .await
-        .map_err(db_err)?;
+    let rows = sqlx::query("SELECT id FROM documents_document WHERE deleted_at IS NOT NULL").fetch_all(db).await.map_err(db_err)?;
     Ok(rows.iter().filter_map(|r| r.try_get::<i32, _>(0).ok().map(i64::from)).collect())
 }
 
@@ -250,10 +247,7 @@ pub async fn permitted_pool(db: &PgPool, user: Option<&User>, cat: Cat) -> DResu
 }
 
 fn rows_id_name(rows: Vec<sqlx::postgres::PgRow>) -> DResult<Vec<(i64, String)>> {
-    Ok(rows
-        .iter()
-        .filter_map(|r| Some((i64::from(r.try_get::<i32, _>(0).ok()?), r.try_get::<String, _>(1).ok()?)))
-        .collect())
+    Ok(rows.iter().filter_map(|r| Some((i64::from(r.try_get::<i32, _>(0).ok()?), r.try_get::<String, _>(1).ok()?))).collect())
 }
 
 /// Similar documents for the RAG context: id → (title, filename, effective content);
@@ -267,7 +261,8 @@ pub async fn context_docs(
         return Ok(BTreeMap::new());
     }
     let ids32: Vec<i32> = ids.iter().map(|i| *i as i32).collect();
-    let allowed: Option<Vec<i64>> = if user_is_active_superuser(user) { None } else { Some(filter_permitted_docs(db, user, ids, true).await?) };
+    let allowed: Option<Vec<i64>> =
+        if user_is_active_superuser(user) { None } else { Some(filter_permitted_docs(db, user, ids, true).await?) };
     let sql = format!(
         "SELECT d.id, d.title, d.filename, ({EFFECTIVE_CONTENT}) AS eff FROM documents_document d WHERE d.id = ANY($1) AND d.deleted_at IS NULL"
     );

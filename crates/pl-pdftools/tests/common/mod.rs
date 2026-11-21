@@ -210,7 +210,8 @@ pub fn first_page_image(path: &Path) -> Option<(String, image::GrayImage)> {
     };
     let (_, v) = xo.iter().next()?;
     let s = doc.get_object(v.as_reference().ok()?).ok()?.as_stream().ok()?;
-    let filter = s.dict.get(b"Filter").ok().and_then(|f| f.as_name().ok()).map(|n| String::from_utf8_lossy(n).into_owned()).unwrap_or_default();
+    let filter =
+        s.dict.get(b"Filter").ok().and_then(|f| f.as_name().ok()).map(|n| String::from_utf8_lossy(n).into_owned()).unwrap_or_default();
     let w = s.dict.get(b"Width").ok()?.as_i64().ok()? as u32;
     let h = s.dict.get(b"Height").ok()?.as_i64().ok()? as u32;
     let img = if filter == "DCTDecode" {

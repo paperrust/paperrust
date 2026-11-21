@@ -121,10 +121,7 @@ pub struct FieldSpec {
 
 impl fmt::Debug for FieldSpec {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("FieldSpec")
-            .field("name", &self.name)
-            .field("kind", &self.kind)
-            .finish_non_exhaustive()
+        f.debug_struct("FieldSpec").field("name", &self.name).field("kind", &self.kind).finish_non_exhaustive()
     }
 }
 
@@ -196,10 +193,7 @@ impl FieldRegistry {
     }
 
     fn lookup(&self, raw: &str) -> Option<&FieldSpec> {
-        self.by_name
-            .iter()
-            .find(|(n, _)| n == raw)
-            .and_then(|(_, i)| self.specs.get(*i))
+        self.by_name.iter().find(|(n, _)| n == raw).and_then(|(_, i)| self.specs.get(*i))
     }
 
     pub fn specs(&self) -> &[FieldSpec] {
@@ -239,8 +233,7 @@ impl FieldRegistry {
 
     /// `FieldRegistry.is_bare_json_field`
     pub fn is_bare_json_field(&self, raw: &str) -> bool {
-        self.lookup(raw)
-            .is_some_and(|s| s.kind == FieldKind::Json && s.default_subpath().is_none())
+        self.lookup(raw).is_some_and(|s| s.kind == FieldKind::Json && s.default_subpath().is_none())
     }
 
     /// `FieldRegistry.exists_strategy` (resolved from kind/fast).

@@ -173,7 +173,8 @@ impl BackupConfig {
                 if bucket.is_empty() {
                     return Err("PAPERRUST_BACKUP_TARGET: s3:// needs a bucket name".into());
                 }
-                let endpoint = get("PAPERRUST_BACKUP_S3_ENDPOINT").map(|s| s.trim().trim_end_matches('/').to_string()).filter(|s| !s.is_empty());
+                let endpoint =
+                    get("PAPERRUST_BACKUP_S3_ENDPOINT").map(|s| s.trim().trim_end_matches('/').to_string()).filter(|s| !s.is_empty());
                 let Some(endpoint) = endpoint else {
                     return Err("PAPERRUST_BACKUP_S3_ENDPOINT is required for an s3:// target".into());
                 };
@@ -188,7 +189,10 @@ impl BackupConfig {
                 };
                 Some(Target::S3(S3Config {
                     endpoint,
-                    region: get("PAPERRUST_BACKUP_S3_REGION").map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).unwrap_or_else(|| "us-east-1".into()),
+                    region: get("PAPERRUST_BACKUP_S3_REGION")
+                        .map(|s| s.trim().to_string())
+                        .filter(|s| !s.is_empty())
+                        .unwrap_or_else(|| "us-east-1".into()),
                     access_key: get("PAPERRUST_BACKUP_S3_ACCESS_KEY").unwrap_or_default().trim().to_string(),
                     secret_key: get("PAPERRUST_BACKUP_S3_SECRET_KEY").unwrap_or_default().trim().to_string(),
                     bucket: bucket.to_string(),

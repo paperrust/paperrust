@@ -153,11 +153,7 @@ impl<'r> QueryParser<'r> {
     }
 
     fn boosted(node: Node, boost: f64) -> Node {
-        if boost != 1.0 {
-            Node::Boosted(Box::new(node), boost)
-        } else {
-            node
-        }
+        if boost != 1.0 { Node::Boosted(Box::new(node), boost) } else { node }
     }
 
     /// SyntaxNode.query(parser) for every node type.
@@ -231,7 +227,15 @@ impl<'r> QueryParser<'r> {
     }
 
     /// PhrasePlugin.PhraseNode.query
-    fn phrase_query(&mut self, fieldname: Option<&str>, text: &str, slop: u32, boost: f64, sc: Option<usize>, ec: Option<usize>) -> Option<Node> {
+    fn phrase_query(
+        &mut self,
+        fieldname: Option<&str>,
+        text: &str,
+        slop: u32,
+        boost: f64,
+        sc: Option<usize>,
+        ec: Option<usize>,
+    ) -> Option<Node> {
         let r = self.field_ref(fieldname);
         let is_u64 = r.as_ref().and_then(|r| self.registry.resolve(r)).is_some_and(|rf| rf.spec.kind == FieldKind::U64);
         if is_u64 && text != "*" {
@@ -314,10 +318,8 @@ impl<'r> QueryParser<'r> {
         match py_int(text).and_then(|v| u64::try_from(v).ok()) {
             Some(v) => Ok(v),
             None => {
-                let mut d = Diagnostic::new(
-                    DiagnosticKind::BadNumber,
-                    format!("{} is not a valid number for {r}", crate::error::py_repr(text)),
-                );
+                let mut d =
+                    Diagnostic::new(DiagnosticKind::BadNumber, format!("{} is not a valid number for {r}", crate::error::py_repr(text)));
                 d.startchar = sc;
                 d.endchar = ec;
                 d.field = Some(r.clone());

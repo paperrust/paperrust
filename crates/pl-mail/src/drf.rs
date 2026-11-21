@@ -18,7 +18,8 @@ pub const MSG_NULL_CHARS: &str = "Null characters are not allowed.";
 pub const MSG_INT_INVALID: &str = "A valid integer is required.";
 pub const MSG_INT_TOO_LONG: &str = "String value too large.";
 pub const MSG_BOOL_INVALID: &str = "Must be a valid boolean.";
-pub const MSG_DATETIME_INVALID: &str = "Datetime has wrong format. Use one of these formats instead: YYYY-MM-DDThh:mm[:ss[.uuuuuu]][+HH:MM|-HH:MM|Z].";
+pub const MSG_DATETIME_INVALID: &str =
+    "Datetime has wrong format. Use one of these formats instead: YYYY-MM-DDThh:mm[:ss[.uuuuuu]][+HH:MM|-HH:MM|Z].";
 
 /// Error list of a field (`["msg", ...]`) or nested errors (`{...}`).
 pub type FieldError = Value;
@@ -268,12 +269,7 @@ pub enum PkLookup {
 
 /// Checks the type; error = `Incorrect type…`.
 pub fn pk_lookup(v: &Value) -> Result<PkLookup, FieldError> {
-    let incorrect = || {
-        err(format!(
-            "Incorrect type. Expected pk value, received {}.",
-            pyval::type_name(v)
-        ))
-    };
+    let incorrect = || err(format!("Incorrect type. Expected pk value, received {}.", pyval::type_name(v)));
     if v.is_boolean() {
         return Err(incorrect());
     }
@@ -293,10 +289,7 @@ pub fn many_list(v: &Value) -> Result<Vec<Value>, FieldError> {
         Value::Array(a) => Ok(a.clone()),
         // a dict is iterable in Python → keys
         Value::Object(o) => Ok(o.keys().map(|k| Value::String(k.clone())).collect()),
-        _ => Err(err(format!(
-            "Expected a list of items but got type \"{}\".",
-            pyval::type_name(v)
-        ))),
+        _ => Err(err(format!("Expected a list of items but got type \"{}\".", pyval::type_name(v)))),
     }
 }
 
@@ -366,11 +359,7 @@ fn from_isoformat(s: &str) -> Option<(NaiveDateTime, Option<FixedOffset>)> {
     if digits.len() != 8 || !digits.bytes().all(|b| b.is_ascii_digit()) {
         return None;
     }
-    let d = NaiveDate::from_ymd_opt(
-        digits[..4].parse().ok()?,
-        digits[4..6].parse().ok()?,
-        digits[6..8].parse().ok()?,
-    )?;
+    let d = NaiveDate::from_ymd_opt(digits[..4].parse().ok()?, digits[4..6].parse().ok()?, digits[6..8].parse().ok()?)?;
     if rest.is_empty() {
         return Some((d.and_hms_opt(0, 0, 0)?, None));
     }
@@ -497,30 +486,16 @@ pub fn datetime_field(v: &Value, tz: Tz) -> Result<DateTime<Utc>, FieldError> {
         return Err(err(MSG_DATETIME_INVALID));
     };
     if let Some(off) = offset {
-        return off
-            .from_local_datetime(&naive)
-            .single()
-            .map(|d| d.with_timezone(&Utc))
-            .ok_or_else(|| err("Datetime value out of range."));
+        return off.from_local_datetime(&naive).single().map(|d| d.with_timezone(&Utc)).ok_or_else(|| err("Datetime value out of range."));
     }
     // make_aware(value, current tz), ambiguous → error, non-existent → offset before (fold=0)
     match tz.from_local_datetime(&naive) {
         LocalResult::Single(d) => Ok(d.with_timezone(&Utc)),
-        LocalResult::Ambiguous(_, _) => Err(err(format!(
-            "Invalid datetime for the timezone \"{}\".",
-            tz.name()
-        ))),
+        LocalResult::Ambiguous(_, _) => Err(err(format!("Invalid datetime for the timezone \"{}\".", tz.name()))),
         LocalResult::None => {
             let before = naive - Duration::hours(3);
-            let off = tz
-                .from_local_datetime(&before)
-                .earliest()
-                .map(|d| d.offset().fix())
-                .ok_or_else(|| err(MSG_DATETIME_INVALID))?;
-            off.from_local_datetime(&naive)
-                .single()
-                .map(|d| d.with_timezone(&Utc))
-                .ok_or_else(|| err(MSG_DATETIME_INVALID))
+            let off = tz.from_local_datetime(&before).earliest().map(|d| d.offset().fix()).ok_or_else(|| err(MSG_DATETIME_INVALID))?;
+            off.from_local_datetime(&naive).single().map(|d| d.with_timezone(&Utc)).ok_or_else(|| err(MSG_DATETIME_INVALID))
         }
     }
 }
@@ -531,13 +506,7 @@ use chrono::Offset;
 pub fn fmt_datetime(dt: &DateTime<Utc>, tz: Tz) -> String {
     let local = dt.with_timezone(&tz);
     let off = local.offset().fix().local_minus_utc();
-    let mut s = format!(
-        "{:04}-{:02}-{:02}T{}",
-        local.year(),
-        local.month(),
-        local.day(),
-        local.format("%H:%M:%S")
-    );
+    let mut s = format!("{:04}-{:02}-{:02}T{}", local.year(), local.month(), local.day(), local.format("%H:%M:%S"));
     let micros = local.timestamp_subsec_micros();
     if micros != 0 {
         s.push_str(&format!(".{micros:06}"));
@@ -675,14 +644,8 @@ mod tests {
         assert!(!boolean_field(&json!(0.0)).unwrap());
         assert!(boolean_field(&json!(2)).is_err());
         assert_eq!(choice_field(&json!("2"), &[1, 2, 3]).unwrap(), 2);
-        assert_eq!(
-            choice_field(&json!(2.0), &[1, 2, 3]).unwrap_err(),
-            json!(["\"2.0\" is not a valid choice."])
-        );
-        assert_eq!(
-            choice_field(&json!(true), &[1, 2]).unwrap_err(),
-            json!(["\"True\" is not a valid choice."])
-        );
+        assert_eq!(choice_field(&json!(2.0), &[1, 2, 3]).unwrap_err(), json!(["\"2.0\" is not a valid choice."]));
+        assert_eq!(choice_field(&json!(true), &[1, 2]).unwrap_err(), json!(["\"True\" is not a valid choice."]));
     }
 
     #[test]
@@ -690,18 +653,9 @@ mod tests {
         assert_eq!(pk_lookup(&json!("5")).unwrap(), PkLookup::Id(5));
         assert_eq!(pk_lookup(&json!(5.7)).unwrap(), PkLookup::Id(5));
         assert_eq!(pk_lookup(&json!(99999999999i64)).unwrap(), PkLookup::OutOfRange);
-        assert_eq!(
-            pk_lookup(&json!("x")).unwrap_err(),
-            json!(["Incorrect type. Expected pk value, received str."])
-        );
-        assert_eq!(
-            pk_lookup(&json!(false)).unwrap_err(),
-            json!(["Incorrect type. Expected pk value, received bool."])
-        );
-        assert_eq!(
-            pk_does_not_exist(&json!(7)),
-            json!(["Invalid pk \"7\" - object does not exist."])
-        );
+        assert_eq!(pk_lookup(&json!("x")).unwrap_err(), json!(["Incorrect type. Expected pk value, received str."]));
+        assert_eq!(pk_lookup(&json!(false)).unwrap_err(), json!(["Incorrect type. Expected pk value, received bool."]));
+        assert_eq!(pk_does_not_exist(&json!(7)), json!(["Invalid pk \"7\" - object does not exist."]));
     }
 
     #[test]
@@ -716,10 +670,7 @@ mod tests {
         assert_eq!(fmt_datetime(&d, chrono_tz::UTC), "2024-07-01T00:00:00Z");
         let d = datetime_field(&json!("2024-7-1T1:2:3.5+0130"), chrono_tz::UTC).unwrap();
         assert_eq!(fmt_datetime(&d, chrono_tz::UTC), "2024-06-30T23:32:03.500000Z");
-        assert_eq!(
-            datetime_field(&json!("gestern"), tz).unwrap_err(),
-            json!([MSG_DATETIME_INVALID])
-        );
+        assert_eq!(datetime_field(&json!("gestern"), tz).unwrap_err(), json!([MSG_DATETIME_INVALID]));
         assert_eq!(datetime_field(&json!(5), tz).unwrap_err(), json!([MSG_DATETIME_INVALID]));
         // ambiguous (October changeover)
         assert!(datetime_field(&json!("2024-10-27T02:30:00"), tz).is_err());

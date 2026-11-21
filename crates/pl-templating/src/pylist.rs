@@ -11,13 +11,13 @@
 
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use minijinja::machinery::{tokenize, Token, WhitespaceConfig};
+use minijinja::machinery::{Token, WhitespaceConfig, tokenize};
 use minijinja::syntax::SyntaxConfig;
 use minijinja::value::{Enumerator, Object, ObjectRepr, Value, ValueKind};
 use minijinja::{Error, ErrorKind, State};
 
 use crate::methods::PyArgs;
-use crate::pyvalue::{invalid, py_eq_inner, py_repr, MAX_SEQ_ITEMS};
+use crate::pyvalue::{MAX_SEQ_ITEMS, invalid, py_eq_inner, py_repr};
 
 /// Methods that modify a list (trigger for the rewriting).
 const MUTATORS: &[&str] = &["append", "extend", "insert", "pop", "remove", "clear", "reverse", "sort"];
@@ -218,12 +218,9 @@ pub fn fn_pl_list(v: Value) -> Result<Value, Error> {
 /// Rewrites list literals into `__pl_list([...])` if the template calls a modifying
 /// list method (`.append(` etc.). Otherwise unchanged. `None` on a splitting error.
 pub(crate) fn wrap_list_literals(src: &str, ws: WhitespaceConfig) -> Option<String> {
-    let toks: Vec<(Token<'_>, minijinja::machinery::Span)> =
-        tokenize(src, false, SyntaxConfig, ws).collect::<Result<_, _>>().ok()?;
+    let toks: Vec<(Token<'_>, minijinja::machinery::Span)> = tokenize(src, false, SyntaxConfig, ws).collect::<Result<_, _>>().ok()?;
     let calls_mutator = toks.windows(3).any(|w| {
-        matches!(w[0].0, Token::Dot)
-            && matches!(w[1].0, Token::Ident(n) if MUTATORS.contains(&n))
-            && matches!(w[2].0, Token::ParenOpen)
+        matches!(w[0].0, Token::Dot) && matches!(w[1].0, Token::Ident(n) if MUTATORS.contains(&n)) && matches!(w[2].0, Token::ParenOpen)
     });
     if !calls_mutator {
         return Some(src.to_string());
@@ -291,7 +288,10 @@ mod tests {
 
     #[test]
     fn append_and_friends() {
-        assert_eq!(r("{% set x = [] %}{% for t in tags %}{% if x.append(t|upper) %}{% endif %}{% endfor %}{{ x|join('-') }}").unwrap(), "B-A");
+        assert_eq!(
+            r("{% set x = [] %}{% for t in tags %}{% if x.append(t|upper) %}{% endif %}{% endfor %}{{ x|join('-') }}").unwrap(),
+            "B-A"
+        );
         assert_eq!(r("{% set x = [] %}{{ x.append(1) }}|{{ x }}").unwrap(), "None|[1]");
         assert_eq!(r("{% set x = [3, 1] %}{{ x.extend([2]) or '' }}{{ x.sort() or '' }}{{ x }}").unwrap(), "[1, 2, 3]");
         assert_eq!(r("{% set x = [1, 2, 3] %}{{ x.pop() }}{{ x.pop(0) }}{{ x }}{{ x|length }}").unwrap(), "31[2]1");

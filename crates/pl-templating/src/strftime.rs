@@ -7,10 +7,8 @@
 use chrono::{Datelike, FixedOffset, NaiveDateTime, Timelike};
 
 const DAYS: [&str; 7] = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-const MONTHS: [&str; 12] = [
-    "January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
-    "November", "December",
-];
+const MONTHS: [&str; 12] =
+    ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 /// Python time zone information of a value.
 #[derive(Debug, Clone, Copy)]
@@ -30,11 +28,7 @@ fn tz_name(off: FixedOffset) -> String {
     let sign = if secs < 0 { '-' } else { '+' };
     let a = secs.abs();
     let (h, m, s) = (a / 3600, (a % 3600) / 60, a % 60);
-    if s != 0 {
-        format!("UTC{sign}{h:02}:{m:02}:{s:02}")
-    } else {
-        format!("UTC{sign}{h:02}:{m:02}")
-    }
+    if s != 0 { format!("UTC{sign}{h:02}:{m:02}:{s:02}") } else { format!("UTC{sign}{h:02}:{m:02}") }
 }
 
 fn utcoffset(off: FixedOffset, colon: bool) -> String {
@@ -43,11 +37,7 @@ fn utcoffset(off: FixedOffset, colon: bool) -> String {
     let a = secs.abs();
     let (h, m, s) = (a / 3600, (a % 3600) / 60, a % 60);
     let sep = if colon { ":" } else { "" };
-    if s != 0 {
-        format!("{sign}{h:02}{sep}{m:02}{sep}{s:02}")
-    } else {
-        format!("{sign}{h:02}{sep}{m:02}")
-    }
+    if s != 0 { format!("{sign}{h:02}{sep}{m:02}{sep}{s:02}") } else { format!("{sign}{h:02}{sep}{m:02}") }
 }
 
 fn iso_week(dt: &NaiveDateTime) -> (i32, u32) {
@@ -58,11 +48,7 @@ fn iso_week(dt: &NaiveDateTime) -> (i32, u32) {
 /// `%U` / `%W`.
 fn week_number(dt: &NaiveDateTime, monday_first: bool) -> u32 {
     let yday = dt.ordinal0() as i64; // 0-based
-    let wday = if monday_first {
-        dt.weekday().num_days_from_monday() as i64
-    } else {
-        dt.weekday().num_days_from_sunday() as i64
-    };
+    let wday = if monday_first { dt.weekday().num_days_from_monday() as i64 } else { dt.weekday().num_days_from_sunday() as i64 };
     ((yday + 7 - wday) / 7) as u32
 }
 

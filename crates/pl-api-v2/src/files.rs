@@ -6,9 +6,9 @@ use std::io::SeekFrom;
 use axum::body::Body;
 use axum::http::{HeaderMap, HeaderValue, Method, StatusCode, header};
 use axum::response::Response;
+use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
 use pl_domain::DomainError;
 use pl_domain::model::FileRef;
-use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
 use tokio::io::{AsyncReadExt as _, AsyncSeekExt as _};
 
 use crate::error::{V2Error, V2Result};
@@ -114,12 +114,7 @@ pub async fn serve(method: &Method, h: &HeaderMap, f: FileRef) -> V2Result<Respo
     let etag = match &f.checksum {
         Some(c) => format!("\"{c}\""),
         None => {
-            let mtime = meta
-                .modified()
-                .ok()
-                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                .map(|d| d.as_secs())
-                .unwrap_or(0);
+            let mtime = meta.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_secs()).unwrap_or(0);
             format!("W/\"{mtime}-{len}\"")
         }
     };

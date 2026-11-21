@@ -204,13 +204,7 @@ fn dirs(root: &Path) -> Vec<String> {
 
 async fn rows_json(pool: &PgPool, sql: &str) -> Vec<Value> {
     let wrapped = format!("SELECT to_jsonb(x)::text FROM ({sql}) x");
-    sqlx::query(&wrapped)
-        .fetch_all(pool)
-        .await
-        .unwrap()
-        .iter()
-        .map(|r| serde_json::from_str(&r.get::<String, _>(0)).unwrap())
-        .collect()
+    sqlx::query(&wrapped).fetch_all(pool).await.unwrap().iter().map(|r| serde_json::from_str(&r.get::<String, _>(0)).unwrap()).collect()
 }
 
 const COMPARE: &[(&str, &str)] = &[
@@ -243,12 +237,10 @@ async fn reset_db(server: &str, name: &str) -> PgPool {
     // v3.4.2 snapshot → PaperRust tag migration (adjacency list) as at startup
     sqlx::raw_sql(TAG_ADJACENCY).execute(&pool).await.unwrap();
     sqlx::raw_sql(SETUP).execute(&pool).await.unwrap();
-    sqlx::raw_sql(
-        "CREATE TABLE eq_t0 AS SELECT now() AS t0, (SELECT coalesce(max(id), 0) FROM auditlog_logentry) AS audit_max",
-    )
-    .execute(&pool)
-    .await
-    .unwrap();
+    sqlx::raw_sql("CREATE TABLE eq_t0 AS SELECT now() AS t0, (SELECT coalesce(max(id), 0) FROM auditlog_logentry) AS audit_max")
+        .execute(&pool)
+        .await
+        .unwrap();
     pool
 }
 

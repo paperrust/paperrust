@@ -223,7 +223,9 @@ fn analyze_ops(
                         out.has_images = true;
                         let jpeg = match stream.dict.get(b"Filter").map(|o| deref(doc, o)) {
                             Ok(Object::Name(n)) => n.as_slice() == b"DCTDecode",
-                            Ok(Object::Array(a)) => a.iter().any(|f| matches!(deref(doc, f), Object::Name(n) if n.as_slice() == b"DCTDecode")),
+                            Ok(Object::Array(a)) => {
+                                a.iter().any(|f| matches!(deref(doc, f), Object::Name(n) if n.as_slice() == b"DCTDecode"))
+                            }
                             _ => false,
                         };
                         if !jpeg {
@@ -242,9 +244,10 @@ fn analyze_ops(
                     }
                     Ok(b"Form") if depth < 8 => {
                         if let Some(i) = id
-                            && !seen.insert(i) {
-                                continue;
-                            }
+                            && !seen.insert(i)
+                        {
+                            continue;
+                        }
                         let m = stream
                             .dict
                             .get(b"Matrix")
@@ -707,10 +710,11 @@ pub fn build_from_images(pages: &[ImagePageSpec], meta: &OutputMeta) -> Result<V
         }
         let page_id = push_page(&mut doc, pages_id, page)?;
         if let Some(ocr) = &p.ocr
-            && !ocr.words.is_empty() {
-                overlay_text(&mut doc, page_id, ocr, &mut font)?;
-                used_font = true;
-            }
+            && !ocr.words.is_empty()
+        {
+            overlay_text(&mut doc, page_id, ocr, &mut font)?;
+            used_font = true;
+        }
     }
     if used_font {
         font.finish(&mut doc);
@@ -808,7 +812,14 @@ pub fn build_from_pdf(original: &[u8], edits: &[PageEdit], meta: &OutputMeta) ->
                 res.set("XObject", xo);
                 let content = format!(
                     "q {} {} {} {} {} {} cm {} 0 0 {} 0 0 cm /PlOcrPage Do Q\n",
-                    fmt(m[0]), fmt(m[1]), fmt(m[2]), fmt(m[3]), fmt(m[4]), fmt(m[5]), fmt(dw), fmt(dh)
+                    fmt(m[0]),
+                    fmt(m[1]),
+                    fmt(m[2]),
+                    fmt(m[3]),
+                    fmt(m[4]),
+                    fmt(m[5]),
+                    fmt(dw),
+                    fmt(dh)
                 );
                 {
                     let pd = page_dict_mut(&mut doc, page_id)?;
@@ -881,7 +892,8 @@ pub fn pdf_date_to_xmp(s: &str) -> Option<String> {
         return None;
     }
     let part = |a: usize, b: usize, d: &str| digits.get(a..b).unwrap_or(d).to_string();
-    let (y, mo, da, h, mi, se) = (part(0, 4, "0000"), part(4, 6, "01"), part(6, 8, "01"), part(8, 10, "00"), part(10, 12, "00"), part(12, 14, "00"));
+    let (y, mo, da, h, mi, se) =
+        (part(0, 4, "0000"), part(4, 6, "01"), part(6, 8, "01"), part(8, 10, "00"), part(10, 12, "00"), part(12, 14, "00"));
     let rest = &s[digits.len()..];
     let tz = match rest.chars().next() {
         Some('Z') => "Z".to_string(),
@@ -941,7 +953,10 @@ fn build_xmp(get: &dyn Fn(&[u8]) -> Option<String>, meta: &OutputMeta, part: Opt
         x.push_str(&format!("<dc:creator><rdf:Seq><rdf:li>{}</rdf:li></rdf:Seq></dc:creator>\n", xml_escape(&t)));
     }
     if let Some(t) = get(b"Subject") {
-        x.push_str(&format!("<dc:description><rdf:Alt><rdf:li xml:lang=\"x-default\">{}</rdf:li></rdf:Alt></dc:description>\n", xml_escape(&t)));
+        x.push_str(&format!(
+            "<dc:description><rdf:Alt><rdf:li xml:lang=\"x-default\">{}</rdf:li></rdf:Alt></dc:description>\n",
+            xml_escape(&t)
+        ));
     }
     if let Some(t) = get(b"Keywords") {
         x.push_str(&format!("<pdf:Keywords>{}</pdf:Keywords>\n", xml_escape(&t)));
@@ -1022,7 +1037,8 @@ pub fn finish_with_report(mut doc: Document, meta: &OutputMeta) -> Result<(Vec<u
             }
         }
         // Only text strings (and Trapped) make sense in Info: remove other types
-        let bad: Vec<Vec<u8>> = info.iter().filter(|(_, v)| !matches!(v, Object::String(..) | Object::Name(_))).map(|(k, _)| k.clone()).collect();
+        let bad: Vec<Vec<u8>> =
+            info.iter().filter(|(_, v)| !matches!(v, Object::String(..) | Object::Name(_))).map(|(k, _)| k.clone()).collect();
         for k in bad {
             info.remove(&k);
         }
@@ -1119,9 +1135,11 @@ pub fn finish_with_report(mut doc: Document, meta: &OutputMeta) -> Result<(Vec<u
             );
             // XMP is uncompressed in the file: replace the claim with the same number of spaces
             // (offsets stay valid).
-            let claim = format!("<pdfaid:part>{part}</pdfaid:part>
+            let claim = format!(
+                "<pdfaid:part>{part}</pdfaid:part>
 <pdfaid:conformance>B</pdfaid:conformance>
-");
+"
+            );
             if let Some(pos) = out.windows(claim.len()).position(|w| w == claim.as_bytes()) {
                 out[pos..pos + claim.len()].fill(b' ');
             }
@@ -1185,13 +1203,7 @@ mod tests {
 
     #[test]
     fn image_pdf_with_text_layer_is_extractable() {
-        let spec = ImagePageSpec {
-            image: PageImage::Raw(gray(850, 1100)),
-            dpi_x: 100.0,
-            dpi_y: 100.0,
-            rotate: 0,
-            ocr: Some(sample_ocr()),
-        };
+        let spec = ImagePageSpec { image: PageImage::Raw(gray(850, 1100)), dpi_x: 100.0, dpi_y: 100.0, rotate: 0, ocr: Some(sample_ocr()) };
         let pdf = build_from_images(&[spec], &OutputMeta::default()).unwrap();
         let text = extract_text(&pdf).unwrap();
         let norm = crate::text::post_process_text(Some(&text)).unwrap();

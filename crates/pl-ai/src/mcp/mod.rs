@@ -29,7 +29,7 @@ mod tools_ext;
 
 use std::sync::Arc;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 pub use backend::{Actor, Backend};
 

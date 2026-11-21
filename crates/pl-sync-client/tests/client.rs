@@ -168,7 +168,10 @@ async fn initial_sync_then_incremental_feed() {
     let s = body(&gw.handle(get("/local/search", Some("q=mahnung"))).await);
     assert_eq!(s["items"].as_array().unwrap().len(), 1);
     let q = gw
-        .handle(GwRequest { query: Some("source=local".into()), ..post("/rs/api/v2/documents/query", json!({"filter": {"text": {"query": "abgaben"}}, "count": true})) })
+        .handle(GwRequest {
+            query: Some("source=local".into()),
+            ..post("/rs/api/v2/documents/query", json!({"filter": {"text": {"query": "abgaben"}}, "count": true}))
+        })
         .await;
     assert_eq!(body(&q)["count"], 14);
 }
@@ -177,7 +180,10 @@ async fn initial_sync_then_incremental_feed() {
 async fn deselect_keeps_metadata_but_drops_files() {
     let e = env(true, 10).await;
     login(&e.client).await;
-    e.client.apply_selection(&[tag_sel(1, "both"), SelectionItem { kind: "document".into(), key: uid(1, 1), files: "none".into() }]).await.unwrap();
+    e.client
+        .apply_selection(&[tag_sel(1, "both"), SelectionItem { kind: "document".into(), key: uid(1, 1), files: "none".into() }])
+        .await
+        .unwrap();
     e.client.sync_once().await.unwrap();
     let r = e.client.replica();
     assert_eq!(r.count_documents(true).await.unwrap(), 6);
@@ -216,7 +222,10 @@ async fn limits_refuse_selection() {
     assert!(matches!(e.client.apply_selection(&[tag_sel(1, "none")]).await, Err(Error::LimitExceeded(_))));
     // Gateway: 422 limit_exceeded with hint
     let gw = Gateway::new(e.client.clone());
-    let mut req = post("/local/selection", json!({"items": [{"type": "tag", "key": uid(1, 1), "files": "none"}, {"type": "tag", "key": uid(2, 1), "files": "none"}]}));
+    let mut req = post(
+        "/local/selection",
+        json!({"items": [{"type": "tag", "key": uid(1, 1), "files": "none"}, {"type": "tag", "key": uid(2, 1), "files": "none"}]}),
+    );
     req.method = "PUT".into();
     let r = gw.handle(req).await;
     assert_eq!(r.status, 422);
@@ -306,7 +315,8 @@ async fn file_cache_resume_and_checksum() {
     e.mock.with(|s| s.files.insert((uid(1, 3), "original".into()), b"%PDF-tampered".to_vec()));
     r.delete_file(&uid(1, 3), "original").await.unwrap();
     std::fs::remove_file(&target).unwrap();
-    let err = e.client.files().fetch(r, pl_sync_client::files::Source::PaperRust(e.client.remote()), &doc, "original", true).await.unwrap_err();
+    let err =
+        e.client.files().fetch(r, pl_sync_client::files::Source::PaperRust(e.client.remote()), &doc, "original", true).await.unwrap_err();
     assert!(matches!(err, Error::Checksum(_)));
     assert!(!target.exists());
     // Thumbnail: 304 via If-None-Match
@@ -336,7 +346,10 @@ async fn gateway_online_offline_switch() {
     assert!(auths.last().unwrap().starts_with("Bearer prt_"));
     assert!(!auths.iter().any(|a| a.contains("stolen")));
     // gesperrte Pfade
-    assert_eq!(gw.handle(post("/rs/api/v2/auth/devices", json!({"username": USER, "password": PASS, "device_name": "x"}))).await.status, 403);
+    assert_eq!(
+        gw.handle(post("/rs/api/v2/auth/devices", json!({"username": USER, "password": PASS, "device_name": "x"}))).await.status,
+        403
+    );
     assert_eq!(gw.handle(get("/api/token/", None)).await.status, 403);
     // Page paths outside app/API = links into the classic UI → notice page
     let r = gw.handle(get("/etc/passwd", None)).await;
@@ -519,7 +532,14 @@ async fn entry_points_are_spawnable() {
     let path = dir.path().to_path_buf();
     let h = tokio::spawn(async move {
         let secrets: Arc<dyn SecretStore> = Arc::new(MemoryStore::default());
-        let cfg = ProfileConfig { profile_id: "s".into(), url, tls: TlsOptions::default(), dir: path, device_name: "x".into(), flavor: "paperrust".into() };
+        let cfg = ProfileConfig {
+            profile_id: "s".into(),
+            url,
+            tls: TlsOptions::default(),
+            dir: path,
+            device_name: "x".into(),
+            flavor: "paperrust".into(),
+        };
         let c = SyncClient::open(cfg, secrets).await.unwrap();
         c.login(USER, Zeroizing::new(PASS.into()), None).await.unwrap();
         let gw = Gateway::new(c.clone());

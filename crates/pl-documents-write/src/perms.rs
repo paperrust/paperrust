@@ -5,8 +5,8 @@
 //! Document object permissions. `permitted_document_ids` comes from pl-authz; `set_permissions_for_objects`
 //! is local here (CORE-REQUEST to pl-authz, if wanted there jointly).
 
-use sea_query::{Alias, Expr, JoinType, PostgresQueryBuilder, Query, SelectStatement, SimpleExpr};
 use pl_core::sqlbind::SqlxBinder;
+use sea_query::{Alias, Expr, JoinType, PostgresQueryBuilder, Query, SelectStatement, SimpleExpr};
 use sqlx::PgConnection;
 
 use crate::error::ApiError;
@@ -18,24 +18,16 @@ fn a(s: &str) -> Alias {
 
 /// `authorizing_owner` for table alias `d` with LEFT JOIN `r` (root).
 fn authorizing_owner() -> SimpleExpr {
-    Expr::case(
-        Expr::col((a("d"), a("root_document_id"))).is_null(),
-        Expr::col((a("d"), a("owner_id"))),
-    )
-    .finally(Expr::col((a("r"), a("owner_id"))))
-    .into()
+    Expr::case(Expr::col((a("d"), a("root_document_id"))).is_null(), Expr::col((a("d"), a("owner_id"))))
+        .finally(Expr::col((a("r"), a("owner_id"))))
+        .into()
 }
 
 /// `FROM documents_document d LEFT JOIN documents_document r ON r.id = d.root_document_id`
 fn base_select() -> SelectStatement {
     Query::select()
         .from_as(a("documents_document"), a("d"))
-        .join_as(
-            JoinType::LeftJoin,
-            a("documents_document"),
-            a("r"),
-            Expr::col((a("r"), a("id"))).equals((a("d"), a("root_document_id"))),
-        )
+        .join_as(JoinType::LeftJoin, a("documents_document"), a("r"), Expr::col((a("r"), a("id"))).equals((a("d"), a("root_document_id"))))
         .to_owned()
 }
 
@@ -100,8 +92,7 @@ pub async fn has_document_permissions(
         // would not be logged in at all.
         return Ok(true);
     }
-    let mut ok = has_perm(user, "change_document")
-        && !any_not_permitted(conn, user, documents, "change_document", false).await?;
+    let mut ok = has_perm(user, "change_document") && !any_not_permitted(conn, user, documents, "change_document", false).await?;
     if ok && needs.ownership {
         ok = owns_all_roots(conn, user, documents).await?;
     }
@@ -128,11 +119,7 @@ async fn existing_ids(conn: &mut PgConnection, table: &str, ids: &[i64]) -> Resu
     if ids.is_empty() {
         return Ok(Vec::new());
     }
-    let q = Query::select()
-        .column(a("id"))
-        .from(a(table))
-        .and_where(Expr::col(a("id")).is_in(ids.iter().copied()))
-        .to_owned();
+    let q = Query::select().column(a("id")).from(a(table)).and_where(Expr::col(a("id")).is_in(ids.iter().copied())).to_owned();
     let (sql, values) = q.build_sqlx(PostgresQueryBuilder);
     let rows: Vec<(i32,)> = sqlx::query_as_with(&sql, values).fetch_all(&mut *conn).await?;
     Ok(rows.into_iter().map(|(i,)| i64::from(i)).collect())
@@ -186,18 +173,13 @@ pub async fn set_permissions_for_documents(
 
     for (action, entry) in permissions {
         let codename = format!("{action}_document");
-        let permission_objs = perms_by_action
-            .iter()
-            .find(|(a, _)| a == action)
-            .map(|(_, p)| p.clone())
-            .unwrap_or_default();
+        let permission_objs = perms_by_action.iter().find(|(a, _)| a == action).map(|(_, p)| p.clone()).unwrap_or_default();
         for (ids, table, identity, identity_table) in [
             (&entry.users, "guardian_userobjectpermission", "user_id", "auth_user"),
             (&entry.groups, "guardian_groupobjectpermission", "group_id", "auth_group"),
         ] {
             let Some(ids) = ids else { continue };
-            apply_entry(conn, table, identity, identity_table, ids, &codename, &permission_objs, ctype, &object_pks, merge)
-                .await?;
+            apply_entry(conn, table, identity, identity_table, ids, &codename, &permission_objs, ctype, &object_pks, merge).await?;
         }
     }
     Ok(())
@@ -219,11 +201,8 @@ async fn apply_entry(
     let add_ids = existing_ids(conn, identity_table, ids).await?;
 
     if !merge {
-        let perm_with_codename = Query::select()
-            .column(a("id"))
-            .from(a("auth_permission"))
-            .and_where(Expr::col(a("codename")).eq(codename))
-            .to_owned();
+        let perm_with_codename =
+            Query::select().column(a("id")).from(a("auth_permission")).and_where(Expr::col(a("codename")).eq(codename)).to_owned();
         let mut del = Query::delete();
         del.from_table(a(table))
             .and_where(Expr::col(a("content_type_id")).eq(ctype))
@@ -251,11 +230,9 @@ async fn apply_entry(
     // bulk_create(rows, ignore_conflicts=True, batch_size=1000)
     for chunk in rows.chunks(1000) {
         let mut ins = Query::insert();
-        ins.into_table(a(table))
-            .columns([a("content_type_id"), a("object_pk"), a("permission_id"), a(identity_field)]);
+        ins.into_table(a(table)).columns([a("content_type_id"), a("object_pk"), a("permission_id"), a(identity_field)]);
         for row in chunk {
-            ins.values(row.clone())
-                .map_err(|e| ApiError::Uncaught(format!("sea-query: {e}")))?;
+            ins.values(row.clone()).map_err(|e| ApiError::Uncaught(format!("sea-query: {e}")))?;
         }
         ins.on_conflict(sea_query::OnConflict::new().do_nothing().to_owned());
         let (sql, values) = ins.build_sqlx(PostgresQueryBuilder);

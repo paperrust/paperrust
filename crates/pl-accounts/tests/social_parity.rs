@@ -143,7 +143,8 @@ async fn send(side: Side<'_>, method: &str, path: &str, jar: &Jar, form: Option<
     match side {
         Side::Django => {
             let client = reqwest::Client::builder().redirect(reqwest::redirect::Policy::none()).build().unwrap();
-            let mut rb = client.request(reqwest::Method::from_bytes(method.as_bytes()).unwrap(), format!("{DJANGO}{path}")).header("Host", HOST);
+            let mut rb =
+                client.request(reqwest::Method::from_bytes(method.as_bytes()).unwrap(), format!("{DJANGO}{path}")).header("Host", HOST);
             if !cookie.is_empty() {
                 rb = rb.header("Cookie", cookie);
             }
@@ -333,8 +334,19 @@ async fn db_summary(db: &sqlx::PgPool) -> String {
     .unwrap();
     let mut out = String::new();
     for (id, u, f, l, e, st, su, ac, unusable, logged) in users {
-        let groups: Vec<(String,)> = sqlx::query_as("SELECT g.name FROM auth_user_groups ug JOIN auth_group g ON g.id = ug.group_id WHERE ug.user_id = $1 ORDER BY g.name").bind(id).fetch_all(db).await.unwrap();
-        let mails: Vec<(String, bool, bool)> = sqlx::query_as("SELECT email, verified, \"primary\" FROM account_emailaddress WHERE user_id = $1 ORDER BY id").bind(id).fetch_all(db).await.unwrap();
+        let groups: Vec<(String,)> = sqlx::query_as(
+            "SELECT g.name FROM auth_user_groups ug JOIN auth_group g ON g.id = ug.group_id WHERE ug.user_id = $1 ORDER BY g.name",
+        )
+        .bind(id)
+        .fetch_all(db)
+        .await
+        .unwrap();
+        let mails: Vec<(String, bool, bool)> =
+            sqlx::query_as("SELECT email, verified, \"primary\" FROM account_emailaddress WHERE user_id = $1 ORDER BY id")
+                .bind(id)
+                .fetch_all(db)
+                .await
+                .unwrap();
         out.push_str(&format!(
             "user {u}|{f}|{l}|{e} staff={st} su={su} active={ac} unusable={unusable} logged={logged} groups={:?} mails={mails:?}\n",
             groups.into_iter().map(|g| g.0).collect::<Vec<_>>()
@@ -354,21 +366,30 @@ async fn db_summary(db: &sqlx::PgPool) -> String {
         out.push_str(&format!("account {p}|{uid}|{u}|{extra}\n"));
     }
     let (tokens,): (i64,) = sqlx::query_as("SELECT count(*) FROM socialaccount_socialtoken").fetch_one(db).await.unwrap();
-    let base: Vec<(String, bool, bool)> = sqlx::query_as("SELECT u.username, u.is_staff, u.is_superuser FROM auth_user u WHERE u.id BETWEEN 2 AND 6 ORDER BY u.id").fetch_all(db).await.unwrap();
+    let base: Vec<(String, bool, bool)> =
+        sqlx::query_as("SELECT u.username, u.is_staff, u.is_superuser FROM auth_user u WHERE u.id BETWEEN 2 AND 6 ORDER BY u.id")
+            .fetch_all(db)
+            .await
+            .unwrap();
     out.push_str(&format!("tokens={tokens} base={base:?}\n"));
     out
 }
 
 /// Sent mails (Date/Message-ID/confirmation key normalized).
 fn mails() -> Vec<String> {
-    let mut files: Vec<_> = std::fs::read_dir(format!("{WORK}/mail")).map(|d| d.filter_map(|e| e.ok()).map(|e| e.path()).collect()).unwrap_or_default();
+    let mut files: Vec<_> =
+        std::fs::read_dir(format!("{WORK}/mail")).map(|d| d.filter_map(|e| e.ok()).map(|e| e.path()).collect()).unwrap_or_default();
     files.sort();
     let re_key = regex::Regex::new(r"confirm-email/[^/\s]+/").unwrap();
     files
         .iter()
         .map(|p| {
             let s = std::fs::read_to_string(p).unwrap_or_default();
-            let s: String = s.lines().filter(|l| !l.starts_with("Date:") && !l.starts_with("Message-ID:") && !l.starts_with(" <")).collect::<Vec<_>>().join("\n");
+            let s: String = s
+                .lines()
+                .filter(|l| !l.starts_with("Date:") && !l.starts_with("Message-ID:") && !l.starts_with(" <"))
+                .collect::<Vec<_>>()
+                .join("\n");
             re_key.replace_all(&s, "confirm-email/KEY/").into_owned()
         })
         .collect()
@@ -480,11 +501,23 @@ macro_rules! both {
         let rsum = db_summary(&$db).await;
         let rmail = mails();
         if std::env::var("W12_VERBOSE").is_ok() {
-            eprintln!("db {}:
-{dsum}mails={}", $case, dmail.len());
+            eprintln!(
+                "db {}:
+{dsum}mails={}",
+                $case,
+                dmail.len()
+            );
         }
         $n += 1;
-        eprintln!("case {}: {}", $case, d.steps.iter().map(|(n, r, _)| format!("{n}={} {}", r.status, r.header("location").map(|l| &l[..l.len().min(60)]).unwrap_or(""))).collect::<Vec<_>>().join(" | "));
+        eprintln!(
+            "case {}: {}",
+            $case,
+            d.steps
+                .iter()
+                .map(|(n, r, _)| format!("{n}={} {}", r.status, r.header("location").map(|l| &l[..l.len().min(60)]).unwrap_or("")))
+                .collect::<Vec<_>>()
+                .join(" | ")
+        );
         let v = compare($case, &d, &r);
         if !v.is_empty() {
             eprintln!("FAIL {}", $case);
@@ -612,7 +645,14 @@ async fn social_parity_a() {
             follow(side, &mut run, "signup_page").await;
             let tok = csrf_from(&run.last().body);
             let before = run.jar.clone();
-            let p = send(side, "POST", "/accounts/3rdparty/signup/", &run.jar, Some(&[("csrfmiddlewaretoken", &tok), ("username", "newbie"), ("email", email)])).await;
+            let p = send(
+                side,
+                "POST",
+                "/accounts/3rdparty/signup/",
+                &run.jar,
+                Some(&[("csrfmiddlewaretoken", &tok), ("username", "newbie"), ("email", email)]),
+            )
+            .await;
             run.jar.update(&p);
             run.steps.push(("submit".into(), p, before));
             follow(side, &mut run, "after").await;
@@ -631,7 +671,14 @@ async fn social_parity_a() {
         // signup form on the start side, submit on the other
         follow(sides[s1], &mut run, "signup_page").await;
         let tok = csrf_from(&run.last().body);
-        let p = send(sides[s2], "POST", "/accounts/3rdparty/signup/", &run.jar, Some(&[("csrfmiddlewaretoken", &tok), ("username", "crossy"), ("email", "")])).await;
+        let p = send(
+            sides[s2],
+            "POST",
+            "/accounts/3rdparty/signup/",
+            &run.jar,
+            Some(&[("csrfmiddlewaretoken", &tok), ("username", "crossy"), ("email", "")]),
+        )
+        .await;
         run.jar.update(&p);
         n += 1;
         let cb = &run.steps[1].1;
@@ -643,7 +690,12 @@ async fn social_parity_a() {
         }
         let api = send(Side::Django, "GET", "/api/ui_settings/", &run.jar, None).await;
         if api.status == 401 {
-            fails.push(format!("{case}: session not accepted by django: {} {} jar={:?}", api.status, &api.body[..api.body.len().min(200)], run.jar));
+            fails.push(format!(
+                "{case}: session not accepted by django: {} {} jar={:?}",
+                api.status,
+                &api.body[..api.body.len().min(200)],
+                run.jar
+            ));
         }
         let back = send(sides[s1], "GET", "/accounts/login/", &run.jar, None).await;
         if back.status != 302 {
@@ -682,7 +734,8 @@ async fn social_parity_a() {
             j.update(&p);
             (j, csrf_from(&p.body))
         };
-        let l = send(side, "POST", "/accounts/login/", &jar, Some(&[("csrfmiddlewaretoken", &tok), ("login", "bob"), ("password", "bob")])).await;
+        let l = send(side, "POST", "/accounts/login/", &jar, Some(&[("csrfmiddlewaretoken", &tok), ("login", "bob"), ("password", "bob")]))
+            .await;
         jar.update(&l);
         oidc_run(side, side, "alice", None, jar).await
     });
@@ -690,7 +743,12 @@ async fn social_parity_a() {
     // MFA: carol with TOTP; without amr → 2FA page, with amr=mfa → logged in directly
     let mfa_setup = |db: sqlx::PgPool| async move {
         sqlx::query("DELETE FROM mfa_authenticator WHERE user_id = 5").execute(&db).await.unwrap();
-        sqlx::query("INSERT INTO mfa_authenticator(user_id,type,data,created_at) VALUES (5,'totp','{\"secret\":\"JBSWY3DPEHPK3PXP\"}',now())").execute(&db).await.unwrap();
+        sqlx::query(
+            "INSERT INTO mfa_authenticator(user_id,type,data,created_at) VALUES (5,'totp','{\"secret\":\"JBSWY3DPEHPK3PXP\"}',now())",
+        )
+        .execute(&db)
+        .await
+        .unwrap();
         sqlx::query("INSERT INTO socialaccount_socialaccount (provider, uid, last_login, date_joined, extra_data, user_id) VALUES ('fakeidp', 'sub-carol', now(), now(), '{}', 5)").execute(&db).await.unwrap();
     };
     both!(fails, n, db, "mfa.required", |side| {
@@ -723,7 +781,8 @@ async fn social_parity_a() {
         let tok = csrf_from(&run.last().body);
         let code = totp_now();
         redis_del("w12:1:allauth.mfa*").await;
-        let p = send(sides[s2], "POST", "/accounts/2fa/authenticate/", &run.jar, Some(&[("csrfmiddlewaretoken", &tok), ("code", &code)])).await;
+        let p =
+            send(sides[s2], "POST", "/accounts/2fa/authenticate/", &run.jar, Some(&[("csrfmiddlewaretoken", &tok), ("code", &code)])).await;
         run.jar.update(&p);
         n += 1;
         if p.status != 302 || p.header("location") != Some("/dashboard") {
@@ -781,7 +840,14 @@ async fn social_parity_a() {
         let page = send(side, "GET", "/accounts/login/", &jar, None).await;
         jar.update(&page);
         let tok = csrf_from(&page.body);
-        let r = send(side, "POST", "/accounts/oidc/fakeidp/login/?process=&auth_params=login_hint%3Dold", &jar, Some(&[("csrfmiddlewaretoken", &tok)])).await;
+        let r = send(
+            side,
+            "POST",
+            "/accounts/oidc/fakeidp/login/?process=&auth_params=login_hint%3Dold",
+            &jar,
+            Some(&[("csrfmiddlewaretoken", &tok)]),
+        )
+        .await;
         jar.update(&r);
         let key = jar.0.get("sessionid").cloned().unwrap_or_default();
         age_session_states(&db, &key, 700.0).await;
@@ -801,12 +867,20 @@ async fn social_parity_a() {
         let p = send(side, "GET", "/accounts/login/", &jar, None).await;
         jar.update(&p);
         let tok = csrf_from(&p.body);
-        let l = send(side, "POST", "/accounts/login/", &jar, Some(&[("csrfmiddlewaretoken", &tok), ("login", "bob"), ("password", "bob")])).await;
+        let l = send(side, "POST", "/accounts/login/", &jar, Some(&[("csrfmiddlewaretoken", &tok), ("login", "bob"), ("password", "bob")]))
+            .await;
         jar.update(&l);
         let p = send(side, "GET", "/accounts/password/reset/", &jar, None).await;
         jar.update(&p);
         let tok = csrf_from(&p.body);
-        let r = send(side, "POST", "/accounts/oidc/fakeidp/login/?process=connect&auth_params=login_hint%3Dbobby", &jar, Some(&[("csrfmiddlewaretoken", &tok)])).await;
+        let r = send(
+            side,
+            "POST",
+            "/accounts/oidc/fakeidp/login/?process=connect&auth_params=login_hint%3Dbobby",
+            &jar,
+            Some(&[("csrfmiddlewaretoken", &tok)]),
+        )
+        .await;
         jar.update(&r);
         let loc = r.header("location").unwrap_or("").to_string();
         let client = reqwest::Client::builder().redirect(reqwest::redirect::Policy::none()).build().unwrap();
@@ -834,7 +908,20 @@ async fn social_parity_a() {
             let tok = csrf_from(&p.body);
             let before = jar.clone();
             let path = format!("/accounts/signup/{next}");
-            let r = send(side, "POST", &path, &jar, Some(&[("csrfmiddlewaretoken", &tok), ("username", "quinn"), ("email", email), ("password1", "Vexing-Quartz-77"), ("password2", "Vexing-Quartz-77")])).await;
+            let r = send(
+                side,
+                "POST",
+                &path,
+                &jar,
+                Some(&[
+                    ("csrfmiddlewaretoken", &tok),
+                    ("username", "quinn"),
+                    ("email", email),
+                    ("password1", "Vexing-Quartz-77"),
+                    ("password2", "Vexing-Quartz-77"),
+                ]),
+            )
+            .await;
             jar.update(&r);
             let mut run = Run { steps: vec![("signup".into(), r, before)], jar };
             // Confirmation link from the mail: view anonymously, view logged in, confirm
@@ -867,7 +954,20 @@ async fn social_parity_a() {
         let p = send(side, "GET", "/accounts/signup/", &jar, None).await;
         jar.update(&p);
         let tok = csrf_from(&p.body);
-        let r = send(side, "POST", "/accounts/signup/", &jar, Some(&[("csrfmiddlewaretoken", &tok), ("username", "rita"), ("email", "rita@example.invalid"), ("password1", "Vexing-Quartz-77"), ("password2", "Vexing-Quartz-77")])).await;
+        let r = send(
+            side,
+            "POST",
+            "/accounts/signup/",
+            &jar,
+            Some(&[
+                ("csrfmiddlewaretoken", &tok),
+                ("username", "rita"),
+                ("email", "rita@example.invalid"),
+                ("password1", "Vexing-Quartz-77"),
+                ("password2", "Vexing-Quartz-77"),
+            ]),
+        )
+        .await;
         let key = last_confirm_key().unwrap_or_default();
         let url = format!("/accounts/confirm-email/{key}/");
         // bob logged in
@@ -875,14 +975,20 @@ async fn social_parity_a() {
         let p = send(side, "GET", "/accounts/login/", &bj, None).await;
         bj.update(&p);
         let t = csrf_from(&p.body);
-        let l = send(side, "POST", "/accounts/login/", &bj, Some(&[("csrfmiddlewaretoken", &t), ("login", "bob"), ("password", "bob")])).await;
+        let l =
+            send(side, "POST", "/accounts/login/", &bj, Some(&[("csrfmiddlewaretoken", &t), ("login", "bob"), ("password", "bob")])).await;
         bj.update(&l);
         let before = bj.clone();
         let page = send(side, "GET", &url, &bj, None).await;
         bj.update(&page);
         let mut run = Run { steps: vec![("signup".into(), r, Jar::default()), ("other_user_page".into(), page, before)], jar: bj };
         // Conflict: the same address confirmed at alice
-        sqlx::query("INSERT INTO account_emailaddress (email, verified, \"primary\", user_id) VALUES ('rita@example.invalid', true, false, 3)").execute(&db).await.unwrap();
+        sqlx::query(
+            "INSERT INTO account_emailaddress (email, verified, \"primary\", user_id) VALUES ('rita@example.invalid', true, false, 3)",
+        )
+        .execute(&db)
+        .await
+        .unwrap();
         let before = run.jar.clone();
         let c = send(side, "GET", &url, &run.jar, None).await;
         run.jar.update(&c);
@@ -907,7 +1013,8 @@ async fn social_parity_a() {
     {
         reset_state(&db).await;
         link(db.clone(), 3, "sub-alice").await;
-        let (aid,): (i64,) = sqlx::query_as("SELECT id::int8 FROM socialaccount_socialaccount WHERE uid='sub-alice'").fetch_one(&db).await.unwrap();
+        let (aid,): (i64,) =
+            sqlx::query_as("SELECT id::int8 FROM socialaccount_socialaccount WHERE uid='sub-alice'").fetch_one(&db).await.unwrap();
         let client = reqwest::Client::new();
         let r = client
             .post(format!("{DJANGO}/api/profile/disconnect_social_account/"))
@@ -929,7 +1036,8 @@ async fn social_parity_a() {
 
 /// Set back the timestamps of all `socialaccount_states` of a session by `secs` (DB + cache).
 async fn age_session_states(db: &sqlx::PgPool, key: &str, secs: f64) {
-    let (data,): (String,) = sqlx::query_as("SELECT session_data FROM django_session WHERE session_key = $1").bind(key).fetch_one(db).await.unwrap();
+    let (data,): (String,) =
+        sqlx::query_as("SELECT session_data FROM django_session WHERE session_key = $1").bind(key).fetch_one(db).await.unwrap();
     let mut m = pl_authz::signing::decode_session(&data, SECRET);
     if let Some(serde_json::Value::Object(states)) = m.get_mut("socialaccount_states") {
         for (_, v) in states.iter_mut() {
@@ -986,7 +1094,12 @@ async fn social_parity_b() {
     for (case, hint) in [("mfa.amr_trusted", "carol~mfa"), ("mfa.amr_missing", "carol")] {
         both!(fails, n, db, case, |side| {
             sqlx::query("DELETE FROM mfa_authenticator WHERE user_id = 5").execute(&db).await.unwrap();
-            sqlx::query("INSERT INTO mfa_authenticator(user_id,type,data,created_at) VALUES (5,'totp','{\"secret\":\"JBSWY3DPEHPK3PXP\"}',now())").execute(&db).await.unwrap();
+            sqlx::query(
+                "INSERT INTO mfa_authenticator(user_id,type,data,created_at) VALUES (5,'totp','{\"secret\":\"JBSWY3DPEHPK3PXP\"}',now())",
+            )
+            .execute(&db)
+            .await
+            .unwrap();
             sqlx::query("INSERT INTO socialaccount_socialaccount (provider, uid, last_login, date_joined, extra_data, user_id) VALUES ('fakeidp', 'sub-carol', now(), now(), '{}', 5)").execute(&db).await.unwrap();
             oidc_run(side, side, hint, None, Jar::default()).await
         });
@@ -1001,7 +1114,11 @@ async fn social_parity_b() {
         sqlx::query("DELETE FROM auth_user_groups WHERE user_id = 3").execute(&db).await.unwrap();
         sqlx::query("INSERT INTO auth_user_groups (user_id, group_id) VALUES (3, 1)").execute(&db).await.unwrap();
         let mut run = run;
-        run.steps.push(("summary".into(), Resp { status: 0, headers: vec![], body: after, authenticated: false, delegated: false }, Jar::default()));
+        run.steps.push((
+            "summary".into(),
+            Resp { status: 0, headers: vec![], body: after, authenticated: false, delegated: false },
+            Jar::default(),
+        ));
         run
     });
     reset_state(&db).await;
@@ -1051,7 +1168,13 @@ async fn social_parity_d() {
     reset_state(&db).await;
     let d = oidc_run(Side::Django, Side::Django, "mona", None, Jar::default()).await;
     n += 1;
-    eprintln!("mandatory: rust {} {:?} / django {} {:?}", run.last().status, run.last().header("location"), d.last().status, d.last().header("location"));
+    eprintln!(
+        "mandatory: rust {} {:?} / django {} {:?}",
+        run.last().status,
+        run.last().header("location"),
+        d.last().status,
+        d.last().header("location")
+    );
     if (run.last().status, run.last().header("location")) != (d.last().status, d.last().header("location")) {
         fails.push("mandatory: callback result differs from django".into());
     }

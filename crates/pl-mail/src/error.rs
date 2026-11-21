@@ -37,10 +37,7 @@ impl ApiError {
         Self::detail(StatusCode::FORBIDDEN, MSG_NO_PERMISSION)
     }
     pub fn not_found_model(model: &str) -> Self {
-        Self::detail(
-            StatusCode::NOT_FOUND,
-            format!("No {model} matches the given query."),
-        )
+        Self::detail(StatusCode::NOT_FOUND, format!("No {model} matches the given query."))
     }
     pub fn not_found() -> Self {
         Self::detail(StatusCode::NOT_FOUND, MSG_NOT_FOUND)
@@ -78,21 +75,14 @@ pub fn json_response(status: StatusCode, value: &Value) -> Response {
         body = body.replace('\u{2028}', "\\u2028").replace('\u{2029}', "\\u2029");
     }
     let mut resp = (status, body).into_response();
-    resp.headers_mut().insert(
-        header::CONTENT_TYPE,
-        HeaderValue::from_static("application/json"),
-    );
-    resp.headers_mut()
-        .insert(header::VARY, HeaderValue::from_static("Accept"));
+    resp.headers_mut().insert(header::CONTENT_TYPE, HeaderValue::from_static("application/json"));
+    resp.headers_mut().insert(header::VARY, HeaderValue::from_static("Accept"));
     resp
 }
 
 pub fn html_response(status: StatusCode, body: &'static str) -> Response {
     let mut resp = (status, body).into_response();
-    resp.headers_mut().insert(
-        header::CONTENT_TYPE,
-        HeaderValue::from_static("text/html; charset=utf-8"),
-    );
+    resp.headers_mut().insert(header::CONTENT_TYPE, HeaderValue::from_static("text/html; charset=utf-8"));
     resp
 }
 
@@ -102,14 +92,8 @@ impl IntoResponse for ApiError {
             ApiError::Json(status, v) => json_response(status, &v),
             ApiError::Html(status, body) => html_response(status, body),
             ApiError::NotAuthenticated => {
-                let mut r = json_response(
-                    StatusCode::UNAUTHORIZED,
-                    &serde_json::json!({ "detail": MSG_NOT_AUTHENTICATED }),
-                );
-                r.headers_mut().insert(
-                    header::WWW_AUTHENTICATE,
-                    HeaderValue::from_static("Basic realm=\"api\""),
-                );
+                let mut r = json_response(StatusCode::UNAUTHORIZED, &serde_json::json!({ "detail": MSG_NOT_AUTHENTICATED }));
+                r.headers_mut().insert(header::WWW_AUTHENTICATE, HeaderValue::from_static("Basic realm=\"api\""));
                 r
             }
             ApiError::Raw(r) => *r,

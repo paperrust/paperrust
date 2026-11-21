@@ -188,10 +188,7 @@ pub fn routes() -> Vec<ApiRoute> {
         },
     ];
     // Bodies go through `shim::parse_body` (JSON + form-urlencoded; multipart -> Django).
-    routes
-        .into_iter()
-        .map(|r| r.accepts_form())
-        .collect()
+    routes.into_iter().map(|r| r.accepts_form()).collect()
 }
 
 #[cfg(test)]

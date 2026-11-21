@@ -75,12 +75,7 @@ async fn autocomplete(State(state): State<AppState>, auth: AuthUser, params: Que
 }
 
 /// GET /api/search/ – `GlobalSearchView.get`
-async fn global_search(
-    State(state): State<AppState>,
-    auth: AuthUser,
-    rc: RequestContext,
-    params: QueryParams,
-) -> Response {
+async fn global_search(State(state): State<AppState>, auth: AuthUser, rc: RequestContext, params: QueryParams) -> Response {
     let user = request_user(auth.user());
     // Registered providers win (tests / other crates); otherwise the built-in sections.
     let builtin;

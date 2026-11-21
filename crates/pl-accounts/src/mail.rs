@@ -26,11 +26,7 @@ pub struct Mail {
 }
 
 fn encode_header(v: &str) -> String {
-    if v.is_ascii() {
-        v.to_string()
-    } else {
-        format!("=?utf-8?b?{}?=", base64::engine::general_purpose::STANDARD.encode(v.as_bytes()))
-    }
+    if v.is_ascii() { v.to_string() } else { format!("=?utf-8?b?{}?=", base64::engine::general_purpose::STANDARD.encode(v.as_bytes())) }
 }
 
 /// RFC 5322 message like `EmailMessage.message().as_bytes(linesep="\r\n")`.
@@ -38,7 +34,8 @@ pub fn render(m: &Mail, date: chrono::DateTime<chrono::Utc>, msgid: &str) -> Str
     let (cte, body) = if m.body.is_ascii() { ("7bit", m.body.clone()) } else { ("8bit", m.body.clone()) };
     let body = body.replace("\r\n", "\n").replace('\n', "\r\n");
     // SMTP dot-stuffing
-    let body = body.split("\r\n").map(|l| if l.starts_with('.') { format!(".{l}") } else { l.to_string() }).collect::<Vec<_>>().join("\r\n");
+    let body =
+        body.split("\r\n").map(|l| if l.starts_with('.') { format!(".{l}") } else { l.to_string() }).collect::<Vec<_>>().join("\r\n");
     format!(
         "Content-Type: text/plain; charset=\"utf-8\"\r\nMIME-Version: 1.0\r\nContent-Transfer-Encoding: {cte}\r\nSubject: {}\r\nFrom: {}\r\nTo: {}\r\nDate: {}\r\nMessage-ID: \r\n <{msgid}>\r\n\r\n{body}\r\n",
         encode_header(&m.subject),
@@ -105,10 +102,17 @@ async fn session_after_tls<S: Io>(stream: S, s: &Settings, m: &Mail, data: &str)
     finish(&mut r, s, m, data, &caps).await
 }
 
-async fn finish<S: AsyncRead + AsyncWrite + Unpin>(r: &mut BufReader<S>, s: &Settings, m: &Mail, data: &str, caps: &str) -> Result<(), String> {
+async fn finish<S: AsyncRead + AsyncWrite + Unpin>(
+    r: &mut BufReader<S>,
+    s: &Settings,
+    m: &Mail,
+    data: &str,
+    caps: &str,
+) -> Result<(), String> {
     if !s.email_host_user.is_empty() {
         let b64 = |v: &str| base64::engine::general_purpose::STANDARD.encode(v.as_bytes());
-        let auth_line = caps.lines().find(|l| l[4.min(l.len())..].to_ascii_uppercase().starts_with("AUTH")).unwrap_or("").to_ascii_uppercase();
+        let auth_line =
+            caps.lines().find(|l| l[4.min(l.len())..].to_ascii_uppercase().starts_with("AUTH")).unwrap_or("").to_ascii_uppercase();
         if auth_line.contains("PLAIN") || !auth_line.contains("LOGIN") {
             let token = b64(&format!("\0{}\0{}", s.email_host_user, s.email_host_password));
             cmd(r, &format!("AUTH PLAIN {token}"), &[235]).await?;

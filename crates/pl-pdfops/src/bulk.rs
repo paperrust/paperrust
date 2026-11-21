@@ -150,7 +150,8 @@ pub struct MergeDoc {
 
 /// Input file for `merger.add`: archive only with `archive_fallback` and a non-PDF source.
 pub fn merge_input_path(doc: &MergeDoc, archive_fallback: bool) -> &Path {
-    if archive_fallback && doc.source_mime_type != "application/pdf"
+    if archive_fallback
+        && doc.source_mime_type != "application/pdf"
         && let Some(a) = &doc.source_archive_path
     {
         return a;

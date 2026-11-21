@@ -84,8 +84,22 @@ fn action_forbidden(doc: &Document, part: u8, a: &Object) -> bool {
 }
 
 const ANNOTS_P1: &[&[u8]] = &[
-    b"Text", b"Link", b"FreeText", b"Line", b"Square", b"Circle", b"Highlight", b"Underline", b"Squiggly",
-    b"StrikeOut", b"Stamp", b"Ink", b"Popup", b"Widget", b"PrinterMark", b"TrapNet",
+    b"Text",
+    b"Link",
+    b"FreeText",
+    b"Line",
+    b"Square",
+    b"Circle",
+    b"Highlight",
+    b"Underline",
+    b"Squiggly",
+    b"StrikeOut",
+    b"Stamp",
+    b"Ink",
+    b"Popup",
+    b"Widget",
+    b"PrinterMark",
+    b"TrapNet",
 ];
 
 fn annot_allowed(part: u8, subtype: &[u8]) -> bool {
@@ -96,8 +110,23 @@ fn annot_allowed(part: u8, subtype: &[u8]) -> bool {
 }
 
 const BLEND_MODES: &[&[u8]] = &[
-    b"Normal", b"Compatible", b"Multiply", b"Screen", b"Overlay", b"Darken", b"Lighten", b"ColorDodge", b"ColorBurn",
-    b"HardLight", b"SoftLight", b"Difference", b"Exclusion", b"Hue", b"Saturation", b"Color", b"Luminosity",
+    b"Normal",
+    b"Compatible",
+    b"Multiply",
+    b"Screen",
+    b"Overlay",
+    b"Darken",
+    b"Lighten",
+    b"ColorDodge",
+    b"ColorBurn",
+    b"HardLight",
+    b"SoftLight",
+    b"Difference",
+    b"Exclusion",
+    b"Hue",
+    b"Saturation",
+    b"Color",
+    b"Luminosity",
 ];
 
 const INTENTS: &[&[u8]] = &[b"RelativeColorimetric", b"AbsoluteColorimetric", b"Perceptual", b"Saturation"];
@@ -243,12 +272,7 @@ fn catalog_fixes(doc: &mut Document, part: u8, r: &mut NormalizeReport) {
 
 fn remove_forbidden_actions(doc: &mut Document, part: u8, r: &mut NormalizeReport) {
     // 1. collect action objects with a forbidden type
-    let bad: HashSet<ObjectId> = doc
-        .objects
-        .iter()
-        .filter(|(_, o)| action_forbidden(doc, part, o))
-        .map(|(id, _)| *id)
-        .collect();
+    let bad: HashSet<ObjectId> = doc.objects.iter().filter(|(_, o)| action_forbidden(doc, part, o)).map(|(id, _)| *id).collect();
     // 2. remove references to them and direct forbidden actions, AA everywhere gone
     let bad_ref = bad.clone();
     let check = move |o: &Object| -> bool {
@@ -1064,7 +1088,12 @@ pub fn check(data: &[u8], part: u8) -> Vec<Violation> {
                     Some(p) => match icc_header_ok(&p, part) {
                         Ok((n, _)) => {
                             intent_n = Some(n);
-                            let dn = doc.get_object(*pid).ok().and_then(|o| o.as_stream().ok()).and_then(|s| s.dict.get(b"N").ok()).and_then(|o| o.as_i64().ok());
+                            let dn = doc
+                                .get_object(*pid)
+                                .ok()
+                                .and_then(|o| o.as_stream().ok())
+                                .and_then(|s| s.dict.get(b"N").ok())
+                                .and_then(|o| o.as_i64().ok());
                             if dn != Some(i64::from(n)) {
                                 add("6.2.3", "ICC profile /N does not match profile colour space".into());
                             }
@@ -1086,7 +1115,12 @@ pub fn check(data: &[u8], part: u8) -> Vec<Violation> {
         let res = page_res(&doc, *pid);
         scan_ops(&doc, &doc.get_page_content(*pid), res, &mut u);
         if let Ok(pd) = doc.get_dictionary(*pid) {
-            if part == 1 && matches!(pd.get(b"Group").ok().and_then(|o| dict_of(&doc, o)).and_then(|g| g.get(b"S").ok()).and_then(name), Some(b"Transparency")) {
+            if part == 1
+                && matches!(
+                    pd.get(b"Group").ok().and_then(|o| dict_of(&doc, o)).and_then(|g| g.get(b"S").ok()).and_then(name),
+                    Some(b"Transparency")
+                )
+            {
                 add("6.4", "page transparency group not allowed in PDF/A-1".into());
             }
             if pd.has(b"AA") {
@@ -1166,7 +1200,9 @@ pub fn check(data: &[u8], part: u8) -> Vec<Violation> {
             cs_usage(&doc, c, &mut u, 0);
         }
         // Fonts
-        if matches!(d.get(b"Type").ok().and_then(name), Some(b"Font")) && !matches!(d.get(b"Subtype").ok().and_then(name), Some(b"CIDFontType0" | b"CIDFontType2")) {
+        if matches!(d.get(b"Type").ok().and_then(name), Some(b"Font"))
+            && !matches!(d.get(b"Subtype").ok().and_then(name), Some(b"CIDFontType0" | b"CIDFontType2"))
+        {
             if !font_embedded(&doc, d) {
                 let bf = d.get(b"BaseFont").ok().and_then(name).map(|n| String::from_utf8_lossy(n).into_owned()).unwrap_or_default();
                 unembedded.push((*oid, bf));
@@ -1184,7 +1220,12 @@ pub fn check(data: &[u8], part: u8) -> Vec<Violation> {
                     add("6.2.11.3.2", "CIDFontType2 without CIDToGIDMap".into());
                 }
                 // width matching for the own GlyphLessFont
-                if let Some(ff) = desc.get(b"FontDescriptor").ok().and_then(|o| dict_of(&doc, o)).and_then(|fd| fd.get(b"FontFile2").ok()).and_then(|o| deref(&doc, o).as_stream().ok())
+                if let Some(ff) = desc
+                    .get(b"FontDescriptor")
+                    .ok()
+                    .and_then(|o| dict_of(&doc, o))
+                    .and_then(|fd| fd.get(b"FontFile2").ok())
+                    .and_then(|o| deref(&doc, o).as_stream().ok())
                     && let Ok(ttf) = ff.decompressed_content()
                     && crate::glyphless::read::table(&ttf, b"head").is_some()
                     && crate::glyphless::read::num_glyphs(&ttf) == Some(2)
@@ -1228,10 +1269,19 @@ pub fn check(data: &[u8], part: u8) -> Vec<Violation> {
                     }
                 }
                 Some(b"Form") => {
-                    if s.dict.has(b"OPI") || s.dict.has(b"Ref") || s.dict.has(b"PS") || matches!(s.dict.get(b"Subtype2").ok().and_then(name), Some(b"PS")) {
+                    if s.dict.has(b"OPI")
+                        || s.dict.has(b"Ref")
+                        || s.dict.has(b"PS")
+                        || matches!(s.dict.get(b"Subtype2").ok().and_then(name), Some(b"PS"))
+                    {
                         add("6.2.10", "form XObject with OPI/Ref/PostScript".into());
                     }
-                    if part == 1 && matches!(s.dict.get(b"Group").ok().and_then(|o| dict_of(&doc, o)).and_then(|g| g.get(b"S").ok()).and_then(name), Some(b"Transparency")) {
+                    if part == 1
+                        && matches!(
+                            s.dict.get(b"Group").ok().and_then(|o| dict_of(&doc, o)).and_then(|g| g.get(b"S").ok()).and_then(name),
+                            Some(b"Transparency")
+                        )
+                    {
                         add("6.4", "form transparency group not allowed in PDF/A-1".into());
                     }
                     let res = res_dict(&doc, s.dict.get(b"Resources").ok());
@@ -1342,7 +1392,9 @@ fn limits_p1(doc: &Document, v: &mut Vec<Violation>) {
     let mut bad: HashMap<&'static str, usize> = HashMap::new();
     fn walk(o: &Object, bad: &mut HashMap<&'static str, usize>) {
         match o {
-            Object::Integer(i) if *i > i64::from(i32::MAX) || *i < i64::from(i32::MIN) => *bad.entry("integer out of range").or_default() += 1,
+            Object::Integer(i) if *i > i64::from(i32::MAX) || *i < i64::from(i32::MIN) => {
+                *bad.entry("integer out of range").or_default() += 1
+            }
             Object::Real(r) if r.abs() > 32767.0 => *bad.entry("real out of range").or_default() += 1,
             Object::String(s, _) if s.len() > 65535 => *bad.entry("string longer than 65535 bytes").or_default() += 1,
             Object::Name(n) if n.len() > 127 => *bad.entry("name longer than 127 bytes").or_default() += 1,

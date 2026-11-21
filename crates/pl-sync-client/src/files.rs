@@ -24,7 +24,14 @@ pub enum Source<'a> {
 }
 
 impl Source<'_> {
-    async fn file(&self, doc: &Value, key: &str, variant: &str, inm: Option<&str>, resume: Option<(u64, &str)>) -> Result<reqwest::Response> {
+    async fn file(
+        &self,
+        doc: &Value,
+        key: &str,
+        variant: &str,
+        inm: Option<&str>,
+        resume: Option<(u64, &str)>,
+    ) -> Result<reqwest::Response> {
         match self {
             Source::PaperRust(r) => r.file(key, server_variant(variant), inm, resume).await,
             Source::Ngx(n) => {
@@ -319,7 +326,12 @@ mod tests {
                 pinned,
             };
             r.put_file(&row).await.unwrap();
-            sqlx::query("UPDATE file SET last_access = ? WHERE doc = ?").bind(at.to_string()).bind(doc.to_string()).execute(r.pool()).await.unwrap();
+            sqlx::query("UPDATE file SET last_access = ? WHERE doc = ?")
+                .bind(at.to_string())
+                .bind(doc.to_string())
+                .execute(r.pool())
+                .await
+                .unwrap();
         }
         // 90 used, 30 needed → b (oldest, not selected) is evicted
         c.ensure_space(&r, 30).await.unwrap();

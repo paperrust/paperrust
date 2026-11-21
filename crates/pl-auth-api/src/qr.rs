@@ -123,10 +123,7 @@ fn rs_blocks(version: usize) -> Vec<RsBlock> {
     let mut blocks = Vec::new();
     for chunk in row.chunks(3) {
         for _ in 0..chunk[0] {
-            blocks.push(RsBlock {
-                total_count: chunk[1],
-                data_count: chunk[2],
-            });
+            blocks.push(RsBlock { total_count: chunk[1], data_count: chunk[2] });
         }
     }
     blocks
@@ -209,11 +206,7 @@ fn poly_mod(gf: &Gf, a: Vec<u8>, b: &[u8]) -> Vec<u8> {
         }
         let difference = a.len() - b.len();
         let ratio = gf.glog(a[0]) - gf.glog(b[0]);
-        let mut num: Vec<u8> = a
-            .iter()
-            .zip(b.iter())
-            .map(|(item, other)| item ^ gf.gexp(gf.glog(*other) + ratio))
-            .collect();
+        let mut num: Vec<u8> = a.iter().zip(b.iter()).map(|(item, other)| item ^ gf.gexp(gf.glog(*other) + ratio)).collect();
         if difference > 0 {
             num.extend_from_slice(&a[a.len() - difference..]);
         }
@@ -331,11 +324,7 @@ fn optimal_split(data: &[u8], class: fn(u8) -> bool, min: usize, whole: bool) ->
     let mut rest = data;
     while !rest.is_empty() {
         let found = if whole {
-            if rest.iter().all(|c| class(*c)) {
-                Some((0, rest.len()))
-            } else {
-                None
-            }
+            if rest.iter().all(|c| class(*c)) { Some((0, rest.len())) } else { None }
         } else {
             let mut found = None;
             let mut i = 0;
@@ -374,16 +363,10 @@ fn optimal_data_chunks(data: &[u8], minimum: usize) -> Vec<QrData> {
     let mut out = Vec::new();
     for (is_num, chunk) in optimal_split(data, |c| c.is_ascii_digit(), minimum, whole) {
         if is_num {
-            out.push(QrData {
-                mode: MODE_NUMBER,
-                data: chunk,
-            });
+            out.push(QrData { mode: MODE_NUMBER, data: chunk });
         } else {
             for (is_alpha, sub) in optimal_split(&chunk, is_alnum_byte, minimum, whole) {
-                out.push(QrData {
-                    mode: if is_alpha { MODE_ALPHA_NUM } else { MODE_8BIT_BYTE },
-                    data: sub,
-                });
+                out.push(QrData { mode: if is_alpha { MODE_ALPHA_NUM } else { MODE_8BIT_BYTE }, data: sub });
             }
         }
     }
@@ -443,9 +426,7 @@ fn create_bytes(gf: &Gf, buffer: &BitBuffer, blocks: &[RsBlock]) -> Vec<u8> {
         let ec_count = b.total_count - dc_count;
         max_dc = max_dc.max(dc_count);
         max_ec = max_ec.max(ec_count);
-        let current_dc: Vec<u8> = (0..dc_count)
-            .map(|i| buffer.buffer.get(i + offset).copied().unwrap_or(0))
-            .collect();
+        let current_dc: Vec<u8> = (0..dc_count).map(|i| buffer.buffer.get(i + offset).copied().unwrap_or(0)).collect();
         offset += dc_count;
 
         let mut rs_poly = vec![1u8];
@@ -458,11 +439,7 @@ fn create_bytes(gf: &Gf, buffer: &BitBuffer, blocks: &[RsBlock]) -> Vec<u8> {
         let current_ec: Vec<u8> = (0..ec_count)
             .map(|i| {
                 let idx = i as i64 + mod_offset;
-                if idx >= 0 {
-                    modp[idx as usize]
-                } else {
-                    0
-                }
+                if idx >= 0 { modp[idx as usize] } else { 0 }
             })
             .collect();
         dcdata.push(current_dc);
@@ -817,12 +794,7 @@ pub fn make_matrix(data: &[u8]) -> Result<Vec<Vec<bool>>, DataOverflow> {
     };
 
     let count = version * 4 + 17;
-    let mut qr = QrCode {
-        version,
-        count,
-        modules: vec![vec![None; count]; count],
-        data_cache: Vec::new(),
-    };
+    let mut qr = QrCode { version, count, modules: vec![vec![None; count]; count], data_cache: Vec::new() };
     qr.setup_position_probe_pattern(0, 0);
     qr.setup_position_probe_pattern(count as i64 - 7, 0);
     qr.setup_position_probe_pattern(0, count as i64 - 7);

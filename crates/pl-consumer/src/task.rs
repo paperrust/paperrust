@@ -50,10 +50,7 @@ pub async fn enqueue_consume(
     overrides: &DocumentMetadataOverrides,
 ) -> Result<uuid::Uuid, String> {
     let kwargs = consume_kwargs(doc, overrides)?;
-    let opts = pl_queue::EnqueueOptions {
-        trigger_source: Some(trigger_source_for(doc.source()).to_string()),
-        ..Default::default()
-    };
+    let opts = pl_queue::EnqueueOptions { trigger_source: Some(trigger_source_for(doc.source()).to_string()), ..Default::default() };
     queue.enqueue(TASK_NAME, kwargs, opts).await.map_err(|e| e.to_string())
 }
 

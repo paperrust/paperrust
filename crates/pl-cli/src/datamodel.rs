@@ -40,8 +40,7 @@ pub async fn applied(conn: &mut PgConnection) -> CliResult<BTreeSet<String>> {
 
 /// Is the automatic backup disabled (`PAPERRUST_DATAMODEL_BACKUP=off|no|false|0`)?
 pub fn backup_disabled(env: &pl_core::config::Env) -> bool {
-    env.get("PAPERRUST_DATAMODEL_BACKUP")
-        .is_some_and(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "off" | "no" | "false" | "0"))
+    env.get("PAPERRUST_DATAMODEL_BACKUP").is_some_and(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "off" | "no" | "false" | "0"))
 }
 
 /// Find `pg_dump`: `PAPERRUST_PG_BIN`, next to the own executable, `PATH` (like
@@ -66,8 +65,7 @@ pub fn find_pg_dump(env: &pl_core::config::Env) -> Option<PathBuf> {
 
 /// `PAPERRUST_MIGRATE_WITHOUT_BACKUP` (bool, default false): conversion stages even without `pg_dump`.
 pub fn migrate_without_backup(env: &pl_core::config::Env) -> CliResult<bool> {
-    env.bool("PAPERRUST_MIGRATE_WITHOUT_BACKUP", "false")
-        .map_err(|e| CliError::Command(format!("configuration error: {e}")))
+    env.bool("PAPERRUST_MIGRATE_WITHOUT_BACKUP", "false").map_err(|e| CliError::Command(format!("configuration error: {e}")))
 }
 
 /// Abort message when no `pg_dump` is available before a conversion stage (D-073).
@@ -94,18 +92,12 @@ pub enum Backup {
 }
 
 /// Backup before applying stage `stage`, if necessary (see module header).
-pub async fn backup_before(
-    cfg: &pl_core::config::Config,
-    conn: &mut PgConnection,
-    stage: &str,
-    no_backup: bool,
-) -> CliResult<Backup> {
-    let docs: bool = sqlx::query_scalar(
-        "SELECT to_regclass('public.documents_document') IS NOT NULL AND EXISTS (SELECT 1 FROM documents_document)",
-    )
-    .fetch_one(&mut *conn)
-    .await
-    .unwrap_or(false);
+pub async fn backup_before(cfg: &pl_core::config::Config, conn: &mut PgConnection, stage: &str, no_backup: bool) -> CliResult<Backup> {
+    let docs: bool =
+        sqlx::query_scalar("SELECT to_regclass('public.documents_document') IS NOT NULL AND EXISTS (SELECT 1 FROM documents_document)")
+            .fetch_one(&mut *conn)
+            .await
+            .unwrap_or(false);
     if !docs {
         return Ok(Backup::NotNeeded);
     }
@@ -315,7 +307,9 @@ pub async fn command(argv: Vec<String>) -> CliResult {
             Ok(())
         }
         "counts" => counts(&mut conn, a.positionals.get(1).map(String::as_str).unwrap_or("check")).await,
-        other => Err(CliError::Usage(format!("unknown subcommand '{other}' (status | check | rollback --to <n> | counts check|rebuild|fold)"))),
+        other => {
+            Err(CliError::Usage(format!("unknown subcommand '{other}' (status | check | rollback --to <n> | counts check|rebuild|fold)")))
+        }
     }
 }
 

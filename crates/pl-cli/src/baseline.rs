@@ -27,10 +27,7 @@ pub fn installed_apps() -> std::collections::BTreeSet<String> {
 
 /// TSV without comment lines (`#`) and blank lines.
 pub fn rows(tsv: &str) -> Vec<Vec<&str>> {
-    tsv.lines()
-        .filter(|l| !l.starts_with('#') && !l.trim().is_empty())
-        .map(|l| l.split('\t').collect())
-        .collect()
+    tsv.lines().filter(|l| !l.starts_with('#') && !l.trim().is_empty()).map(|l| l.split('\t').collect()).collect()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -73,10 +70,7 @@ pub fn permissions() -> Vec<Permission> {
 
 /// `(app, name)` in application order.
 pub fn migrations_applied() -> Vec<(String, String)> {
-    rows(MIGRATIONS_APPLIED_TSV)
-        .into_iter()
-        .filter_map(|r| Some(((*r.first()?).to_string(), (*r.get(1)?).to_string())))
-        .collect()
+    rows(MIGRATIONS_APPLIED_TSV).into_iter().filter_map(|r| Some(((*r.first()?).to_string(), (*r.get(1)?).to_string()))).collect()
 }
 
 #[cfg(test)]
@@ -98,8 +92,7 @@ mod tests {
         // application order = same set as pl-dbmigrate
         let mut a: Vec<(String, String)> = migs.clone();
         a.sort();
-        let mut b: Vec<(String, String)> =
-            rows(MIGRATIONS_TSV).into_iter().map(|r| (r[0].to_string(), r[1].to_string())).collect();
+        let mut b: Vec<(String, String)> = rows(MIGRATIONS_TSV).into_iter().map(|r| (r[0].to_string(), r[1].to_string())).collect();
         b.sort();
         assert_eq!(a, b);
         assert!(SCHEMA_PRE.contains("CREATE TABLE public.documents_document"));

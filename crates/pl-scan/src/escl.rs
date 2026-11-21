@@ -263,12 +263,7 @@ pub fn parse_capabilities(data: &[u8]) -> Result<Capabilities, ScanError> {
             }
         }
     }
-    Ok(Capabilities {
-        make_and_model: root.text_of("MakeAndModel"),
-        uuid: root.text_of("UUID"),
-        version: root.text_of("Version"),
-        sources,
-    })
+    Ok(Capabilities { make_and_model: root.text_of("MakeAndModel"), uuid: root.text_of("UUID"), version: root.text_of("Version"), sources })
 }
 
 /// `ScannerStatus` (excerpt).
@@ -332,7 +327,12 @@ pub const A4_300: (u32, u32) = (2480, 3508);
 
 impl ScanSettings {
     /// Check the settings against the capabilities and complete them.
-    pub fn resolve(caps: &Capabilities, source: Source, color: Option<ColorMode>, resolution: Option<u32>) -> Result<ScanSettings, ScanError> {
+    pub fn resolve(
+        caps: &Capabilities,
+        source: Source,
+        color: Option<ColorMode>,
+        resolution: Option<u32>,
+    ) -> Result<ScanSettings, ScanError> {
         let sc = caps.source(source).ok_or_else(|| ScanError::Unsupported(format!("source {}", source.as_str())))?;
         let color = match color {
             Some(c) if sc.color_modes.is_empty() || sc.color_modes.contains(&c) => c,
@@ -548,7 +548,10 @@ impl Client {
             .and_then(|v| v.to_str().ok())
             .ok_or_else(|| ScanError::Protocol("create job: no Location header".into()))?;
         let job = self.base.join(loc.trim()).map_err(|e| ScanError::Protocol(format!("create job: bad Location ({e})")))?;
-        if job.scheme() != self.base.scheme() || job.host_str() != self.base.host_str() || job.port_or_known_default() != self.base.port_or_known_default() {
+        if job.scheme() != self.base.scheme()
+            || job.host_str() != self.base.host_str()
+            || job.port_or_known_default() != self.base.port_or_known_default()
+        {
             return Err(ScanError::Protocol("create job: Location points to another host".into()));
         }
         Ok(job)

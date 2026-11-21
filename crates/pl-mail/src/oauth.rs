@@ -49,11 +49,7 @@ pub async fn refresh_account_oauth_token(db: &PgPool, account: &StoredAccount, c
     };
     let (url, client_id, client_secret) = match account.account_type {
         ACCOUNT_TYPE_GMAIL => (&cfg.gmail_token_url, &cfg.gmail_client_id, &cfg.gmail_client_secret),
-        ACCOUNT_TYPE_OUTLOOK => (
-            &cfg.outlook_token_url,
-            &cfg.outlook_client_id,
-            &cfg.outlook_client_secret,
-        ),
+        ACCOUNT_TYPE_OUTLOOK => (&cfg.outlook_token_url, &cfg.outlook_client_id, &cfg.outlook_client_secret),
         _ => {
             tracing::error!(target: "pl_mail", "Account {} does not use OAuth", account.id);
             return Ok(None);
@@ -66,12 +62,7 @@ pub async fn refresh_account_oauth_token(db: &PgPool, account: &StoredAccount, c
         ("client_id", client_id.as_deref().unwrap_or("")),
         ("client_secret", client_secret.as_deref().unwrap_or("")),
     ];
-    let resp = oauth_client()
-        .post(url)
-        .header("Accept", "application/json")
-        .form(&form)
-        .send()
-        .await;
+    let resp = oauth_client().post(url).header("Accept", "application/json").form(&form).send().await;
     let resp = match resp {
         Ok(r) if r.status().is_client_error() || r.status().is_server_error() => {
             tracing::error!(target: "pl_mail", "Failed to refresh oauth token for account {}: HTTP {}", account.id, r.status());

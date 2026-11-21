@@ -111,7 +111,8 @@ pub fn parse_args<I: IntoIterator<Item = String>>(args: I) -> Result<Cli, String
 fn usage() -> String {
     "usage: paperrust [serve] [--worker | --worker-only | --no-worker]
        paperrust manage <command> [args...]
-       paperrust migrate --from <paperless-ngx data> [options]   (switch from paperless-ngx)".into()
+       paperrust migrate --from <paperless-ngx data> [options]   (switch from paperless-ngx)"
+        .into()
 }
 
 /// `paperrust migrate [switch|verify|detect] <args…>` → arguments for `paperrust-migrate-db`
@@ -177,9 +178,7 @@ fn init_tracing() {
     use tracing_subscriber::Layer as _;
     use tracing_subscriber::layer::SubscriberExt as _;
     use tracing_subscriber::util::SubscriberInitExt as _;
-    let filter = pl_core::config::var("PAPERRUST_LOG")
-        .and_then(|f| EnvFilter::try_new(f).ok())
-        .unwrap_or_else(|| EnvFilter::new("info"));
+    let filter = pl_core::config::var("PAPERRUST_LOG").and_then(|f| EnvFilter::try_new(f).ok()).unwrap_or_else(|| EnvFilter::new("info"));
     let files = crate::logfile::from_env().map(|l| l.with_filter(crate::logfile::filter()));
     // PAPERRUST_LOG live from the web UI (docs/SETTINGS.md §1.13, WP4c).
     let (filter, reload) = tracing_subscriber::reload::Layer::new(filter);
@@ -188,11 +187,7 @@ fn init_tracing() {
         reload.reload(new).map_err(|e| e.to_string())
     }));
     tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::fmt::layer()
-                .event_format(crate::logfile::ConsoleFormat)
-                .with_filter(filter),
-        )
+        .with(tracing_subscriber::fmt::layer().event_format(crate::logfile::ConsoleFormat).with_filter(filter))
         .with(files)
         .init();
 }
@@ -218,7 +213,9 @@ pub fn local_cache_warning(local: bool, mode: WorkerMode) -> Option<String> {
 /// Shared state from pl-core (lazy pool). PaperRust needs PostgreSQL.
 fn build_state(core: pl_core::Config) -> Result<AppState, String> {
     AppState::new(core).map_err(|e| match e {
-        StateError::UnsupportedEngine(engine) => format!("database engine {engine:?} is not supported: PaperRust needs PostgreSQL (PAPERRUST_DBENGINE=postgresql)"),
+        StateError::UnsupportedEngine(engine) => {
+            format!("database engine {engine:?} is not supported: PaperRust needs PostgreSQL (PAPERRUST_DBENGINE=postgresql)")
+        }
         e => e.to_string(),
     })
 }
@@ -329,11 +326,8 @@ async fn run(cli: Cli) -> Result<(), String> {
         }
         Ok::<(), String>(())
     };
-    let (setup, ai, cache) = tokio::join!(
-        worker::setup_queue(&state, queue_cfg),
-        worker::apply_ai_migration(&state, &plan),
-        cache_migration
-    );
+    let (setup, ai, cache) =
+        tokio::join!(worker::setup_queue(&state, queue_cfg), worker::apply_ai_migration(&state, &plan), cache_migration);
     let setup = setup?;
     ai?;
     cache?;
@@ -361,9 +355,7 @@ async fn run(cli: Cli) -> Result<(), String> {
         if !cfg.bind.ip().is_loopback() {
             tracing::warn!(bind = %cfg.bind, "listening on a non-loopback address (PAPERRUST_BIND)");
         }
-        let listener = tokio::net::TcpListener::bind(cfg.bind)
-            .await
-            .map_err(|e| format!("cannot bind {}: {e}", cfg.bind))?;
+        let listener = tokio::net::TcpListener::bind(cfg.bind).await.map_err(|e| format!("cannot bind {}: {e}", cfg.bind))?;
         tracing::info!(bind = %cfg.bind, stop_on_stdin_eof = cfg.stop_on_stdin_eof, "PaperRust listening");
         let stop = cfg.stop_on_stdin_eof;
         crate::serve::serve(listener, app, async move {

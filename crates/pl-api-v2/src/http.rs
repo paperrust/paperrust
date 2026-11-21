@@ -9,8 +9,8 @@ use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use pl_authz::{AuthError, MaybeUser};
 use pl_domain::{DomainError, Principal};
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 use crate::error::V2Error;
 
@@ -66,15 +66,11 @@ impl<S: Send + Sync, T: DeserializeOwned> FromRequest<S> for V2Json<T> {
         if !(main == "application/json" || main.ends_with("+json")) {
             return Err(V2Error(DomainError::invalid("Content-Type must be application/json.")));
         }
-        let body = Bytes::from_request(req, state)
-            .await
-            .map_err(|_| V2Error(DomainError::invalid("Could not read the request body.")))?;
+        let body = Bytes::from_request(req, state).await.map_err(|_| V2Error(DomainError::invalid("Could not read the request body.")))?;
         if body.len() > MAX_JSON {
             return Err(V2Error(DomainError::invalid("Request body too large.")));
         }
-        serde_json::from_slice(&body)
-            .map(V2Json)
-            .map_err(|e| V2Error(DomainError::invalid(format!("Invalid JSON: {e}"))))
+        serde_json::from_slice(&body).map(V2Json).map_err(|e| V2Error(DomainError::invalid(format!("Invalid JSON: {e}"))))
     }
 }
 
@@ -86,9 +82,7 @@ pub fn if_match(h: &HeaderMap) -> Result<Option<i64>, V2Error> {
         return Ok(None);
     }
     let s = s.strip_prefix("W/").unwrap_or(s).trim_matches('"');
-    s.parse::<i64>()
-        .map(Some)
-        .map_err(|_| V2Error(DomainError::field("If-Match", "Expected the object's rev, e.g. \"7\".")))
+    s.parse::<i64>().map(Some).map_err(|_| V2Error(DomainError::field("If-Match", "Expected the object's rev, e.g. \"7\".")))
 }
 
 /// JSON response with optional ETag (`"<rev>"`).

@@ -19,7 +19,7 @@ use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
 
 use futures::future::BoxFuture;
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 
 use super::backend::*;
 use crate::alias::MemoryAliasStore;
@@ -325,7 +325,9 @@ impl ApiBackend {
             match v.get("next").and_then(Value::as_str) {
                 Some(next) => {
                     // absolute URL → path + query
-                    let p = reqwest::Url::parse(next).map(|u| format!("{}?{}", u.path(), u.query().unwrap_or(""))).map_err(|_| BackendError::Internal)?;
+                    let p = reqwest::Url::parse(next)
+                        .map(|u| format!("{}?{}", u.path(), u.query().unwrap_or("")))
+                        .map_err(|_| BackendError::Internal)?;
                     path = p;
                 }
                 None => break,
@@ -384,7 +386,11 @@ impl Backend for ApiBackend {
                 user_id: Some(id),
                 is_active: true, // DRF already rejects inactive users with 401/403
                 is_superuser: u.get("is_superuser").and_then(Value::as_bool).unwrap_or(false),
-                group_ids: u.get("groups").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_i64).collect()).unwrap_or_default(),
+                group_ids: u
+                    .get("groups")
+                    .and_then(Value::as_array)
+                    .map(|a| a.iter().filter_map(Value::as_i64).collect())
+                    .unwrap_or_default(),
             },
             username: u.get("username").and_then(Value::as_str).unwrap_or("").to_string(),
             perms,
@@ -456,11 +462,8 @@ impl Backend for ApiBackend {
     async fn search_documents(&self, actor: &Actor, p: &SearchParams) -> BResult<(i64, Vec<DocumentSummary>)> {
         let limit = p.limit.unwrap_or(25).clamp(1, 100);
         let page = p.offset.unwrap_or(0) / limit + 1;
-        let mut q: Vec<(String, String)> = vec![
-            ("page_size".into(), limit.to_string()),
-            ("page".into(), page.to_string()),
-            ("fields".into(), SUMMARY_FIELDS.into()),
-        ];
+        let mut q: Vec<(String, String)> =
+            vec![("page_size".into(), limit.to_string()), ("page".into(), page.to_string()), ("fields".into(), SUMMARY_FIELDS.into())];
         if let Some(s) = p.query.as_deref().filter(|s| !s.trim().is_empty()) {
             q.push(("query".into(), s.to_string()));
         } else {
@@ -492,17 +495,16 @@ impl Backend for ApiBackend {
             custom_fields: v
                 .get("custom_fields")
                 .and_then(Value::as_array)
-                .map(|a| a.iter().filter_map(|c| Some((c.get("field")?.as_i64()?, c.get("value").cloned().unwrap_or(Value::Null)))).collect())
+                .map(|a| {
+                    a.iter().filter_map(|c| Some((c.get("field")?.as_i64()?, c.get("value").cloned().unwrap_or(Value::Null)))).collect()
+                })
                 .unwrap_or_default(),
             notes_count: v.get("notes").and_then(Value::as_array).map(|a| a.len() as i64).unwrap_or(0),
         }))
     }
 
     async fn can_change_document(&self, actor: &Actor, id: i64) -> BResult<bool> {
-        Ok(self
-            .document_raw(actor, id)
-            .await?
-            .is_some_and(|v| v.get("user_can_change").and_then(Value::as_bool).unwrap_or(false)))
+        Ok(self.document_raw(actor, id).await?.is_some_and(|v| v.get("user_can_change").and_then(Value::as_bool).unwrap_or(false)))
     }
 
     async fn update_document(&self, actor: &Actor, id: i64, p: &DocumentPatch) -> BResult<(Value, Value)> {
@@ -521,7 +523,8 @@ impl Backend for ApiBackend {
             }
         }
         if !p.add_tag_ids.is_empty() || !p.remove_tag_ids.is_empty() {
-            let mut tags: Vec<i64> = cur.get("tags").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_i64).collect()).unwrap_or_default();
+            let mut tags: Vec<i64> =
+                cur.get("tags").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_i64).collect()).unwrap_or_default();
             for t in &p.add_tag_ids {
                 if !tags.contains(t) {
                     tags.push(*t);
@@ -535,7 +538,9 @@ impl Backend for ApiBackend {
             let mut list: Vec<(i64, Value)> = cur
                 .get("custom_fields")
                 .and_then(Value::as_array)
-                .map(|a| a.iter().filter_map(|c| Some((c.get("field")?.as_i64()?, c.get("value").cloned().unwrap_or(Value::Null)))).collect())
+                .map(|a| {
+                    a.iter().filter_map(|c| Some((c.get("field")?.as_i64()?, c.get("value").cloned().unwrap_or(Value::Null)))).collect()
+                })
                 .unwrap_or_default();
             for (f, v) in &p.custom_fields {
                 list.retain(|(x, _)| x != f);
@@ -581,10 +586,8 @@ impl Backend for ApiBackend {
         let boundary = format!("paperrust-mcp-{}", uuid::Uuid::new_v4().simple());
         let body = multipart_body(&boundary, &fields, (&r.filename, &r.mime_type, &r.bytes));
         let ct = format!("multipart/form-data; boundary={boundary}");
-        let (status, raw) = self
-            .transport
-            .send(actor.credential.expose(), reqwest::Method::POST, "/api/documents/post_document/", Some(&ct), body)
-            .await?;
+        let (status, raw) =
+            self.transport.send(actor.credential.expose(), reqwest::Method::POST, "/api/documents/post_document/", Some(&ct), body).await?;
         let v: Value = serde_json::from_slice(&raw).unwrap_or(Value::Null);
         if status != 200 {
             return Err(client_error(status, &v));
@@ -607,7 +610,12 @@ impl Backend for ApiBackend {
 
     async fn add_note(&self, actor: &Actor, document_id: i64, note: &str) -> BResult<Vec<NoteEntry>> {
         let (s, v) = self
-            .send(actor.credential.expose(), reqwest::Method::POST, &format!("/api/documents/{document_id}/notes/"), Some(&json!({"note": note})))
+            .send(
+                actor.credential.expose(),
+                reqwest::Method::POST,
+                &format!("/api/documents/{document_id}/notes/"),
+                Some(&json!({"note": note})),
+            )
             .await?;
         if s != 200 && s != 201 {
             return Err(client_error(s, &v));
@@ -620,7 +628,13 @@ impl Backend for ApiBackend {
         Ok(rows.iter().filter_map(view_from).collect())
     }
 
-    async fn query_documents(&self, actor: &Actor, params: &[(String, String)], limit: u32, offset: u32) -> BResult<(i64, Vec<DocumentSummary>)> {
+    async fn query_documents(
+        &self,
+        actor: &Actor,
+        params: &[(String, String)],
+        limit: u32,
+        offset: u32,
+    ) -> BResult<(i64, Vec<DocumentSummary>)> {
         let limit = limit.clamp(1, 100);
         let mut q: Vec<(String, String)> =
             params.iter().filter(|(k, _)| !["page", "page_size", "fields", "format"].contains(&k.as_str())).cloned().collect();

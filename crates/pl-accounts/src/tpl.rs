@@ -172,7 +172,11 @@ mod tests {
         assert!(html.contains("basiert auf paperless-ngx, GPL-3.0"));
         assert!(!html.contains("<source"));
         let dark = with(base("en-us"), context! { APP_LOGO_DARK => "/__rs/brand/logo-inverse.svg" });
-        assert!(super::render("login.html", dark).unwrap().contains("<source media=\"(prefers-color-scheme: dark)\" srcset=\"/__rs/brand/logo-inverse.svg\">"));
+        assert!(
+            super::render("login.html", dark)
+                .unwrap()
+                .contains("<source media=\"(prefers-color-scheme: dark)\" srcset=\"/__rs/brand/logo-inverse.svg\">")
+        );
         // Without logo: title as text
         let ctx = with(base("en-us"), context! { APP_LOGO => (), APP_TITLE => "Archiv <A&B>" });
         let html = super::render("login.html", ctx).unwrap();
@@ -197,7 +201,10 @@ mod tests {
         }
         let first = with(base("en-us"), context! { FIRST_INSTALL => true });
         assert!(super::render("login.html", first).unwrap().contains("window.location.href = \"/accounts/signup/\""));
-        let sso = with(base("en-us"), context! { DISABLE_REGULAR_LOGIN => true, REDIRECT_LOGIN_TO_SSO => true, socialaccount_providers => vec![context! { id => "openid_connect", name => "Fake IdP", href => "/accounts/oidc/f/login/?process=" }] });
+        let sso = with(
+            base("en-us"),
+            context! { DISABLE_REGULAR_LOGIN => true, REDIRECT_LOGIN_TO_SSO => true, socialaccount_providers => vec![context! { id => "openid_connect", name => "Fake IdP", href => "/accounts/oidc/f/login/?process=" }] },
+        );
         let html = super::render("login.html", sso).unwrap();
         assert!(!html.contains("name=\"password\""));
         assert!(html.contains("<form id=\"social-login\" method=\"post\" action=\"/accounts/oidc/f/login/?process=\">"));
@@ -206,7 +213,10 @@ mod tests {
 
     #[test]
     fn errors_messages_and_share_links() {
-        let ctx = with(base("en-us"), context! { form_errors => vec![vec!["Wrong <b>"]], messages => vec![context! { level_tag => "success", text => "Signed in as a&b." }] });
+        let ctx = with(
+            base("en-us"),
+            context! { form_errors => vec![vec!["Wrong <b>"]], messages => vec![context! { level_tag => "success", text => "Signed in as a&b." }] },
+        );
         let html = super::render("login.html", ctx).unwrap();
         assert!(html.contains("Wrong &lt;b&gt;"));
         assert!(html.contains("class=\"note note-error\" role=\"alert\""));

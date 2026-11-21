@@ -14,14 +14,14 @@
 use std::io;
 use std::sync::OnceLock;
 
-use minijinja::machinery::{tokenize, Token, WhitespaceConfig};
+use minijinja::machinery::{Token, WhitespaceConfig, tokenize};
 use minijinja::syntax::SyntaxConfig;
 use minijinja::value::Value;
 use minijinja::{AutoEscape, Environment, Error, ErrorKind, State, UndefinedBehavior};
 
 use crate::error::TemplateError;
 use crate::filters as f;
-use crate::pyvalue::{py_add, py_concat, py_eq, py_mul, py_str, MAX_STRING_BYTES, SECURITY_PREFIX};
+use crate::pyvalue::{MAX_STRING_BYTES, SECURITY_PREFIX, py_add, py_concat, py_eq, py_mul, py_str};
 
 /// Upper limit of VM instructions per render operation (protection against infinite loops/DoS).
 pub const FUEL: u64 = 20_000_000;
@@ -187,8 +187,31 @@ struct Tk {
 }
 
 const KEYWORDS: &[&str] = &[
-    "and", "or", "in", "if", "elif", "else", "for", "recursive", "set", "with", "as", "import", "from", "include",
-    "extends", "block", "macro", "call", "filter", "ignore", "missing", "context", "without", "endif", "endfor",
+    "and",
+    "or",
+    "in",
+    "if",
+    "elif",
+    "else",
+    "for",
+    "recursive",
+    "set",
+    "with",
+    "as",
+    "import",
+    "from",
+    "include",
+    "extends",
+    "block",
+    "macro",
+    "call",
+    "filter",
+    "ignore",
+    "missing",
+    "context",
+    "without",
+    "endif",
+    "endfor",
 ];
 
 fn lex(src: &str) -> Option<Vec<Tk>> {
@@ -227,11 +250,7 @@ fn lex(src: &str) -> Option<Vec<Tk>> {
 }
 
 fn is_unary(toks: &[Tk], i: usize) -> bool {
-    i == 0
-        || matches!(
-            toks[i - 1].k,
-            K::Open | K::Bin(..) | K::Plus | K::Minus | K::Boundary | K::Not | K::Is
-        )
+    i == 0 || matches!(toks[i - 1].k, K::Open | K::Bin(..) | K::Plus | K::Minus | K::Boundary | K::Not | K::Is)
 }
 
 /// Does `k` at position `i` terminate the operand of an operator of strength `level`?
@@ -370,13 +389,9 @@ pub(crate) fn classify(e: &Error) -> TemplateError {
     let detail = e.detail().map(str::to_string).unwrap_or_else(|| e.kind().to_string());
     match e.kind() {
         ErrorKind::SyntaxError | ErrorKind::UnknownFilter | ErrorKind::UnknownTest => TemplateError::Syntax(detail),
-        ErrorKind::UndefinedError | ErrorKind::UnknownMethod | ErrorKind::UnknownFunction => {
-            TemplateError::Undefined(detail)
-        }
+        ErrorKind::UndefinedError | ErrorKind::UnknownMethod | ErrorKind::UnknownFunction => TemplateError::Undefined(detail),
         ErrorKind::OutOfFuel | ErrorKind::WriteFailure => TemplateError::Security(detail),
-        _ if detail.starts_with(SECURITY_PREFIX) => {
-            TemplateError::Security(detail.trim_start_matches(SECURITY_PREFIX).to_string())
-        }
+        _ if detail.starts_with(SECURITY_PREFIX) => TemplateError::Security(detail.trim_start_matches(SECURITY_PREFIX).to_string()),
         _ => TemplateError::Other(detail),
     }
 }
@@ -388,9 +403,7 @@ pub(crate) fn check_syntax(source: &str) -> Result<(), TemplateError> {
     }
     // Parse only: minijinja folds constants while compiling (e.g. `'a' * 10**11`) and would
     // request memory unchecked in doing so. Only the rewritten template is compiled.
-    minijinja::machinery::parse(source, "<string>", SyntaxConfig, whitespace())
-        .map(|_| ())
-        .map_err(|e| classify(&e))
+    minijinja::machinery::parse(source, "<string>", SyntaxConfig, whitespace()).map(|_| ()).map_err(|e| classify(&e))
 }
 
 /// Check and rewrite (the result may be compiled).
@@ -441,9 +454,11 @@ pub(crate) fn check_filter_and_test_names(source: &str) -> Option<String> {
             _ => None,
         };
         if let Some(name) = filter_name
-            && !f::JINJA2_FILTERS.contains(&name) && !f::PAPERLESS_FILTERS.contains(&name) {
-                return Some(format!("No filter named '{name}'.\n  File \"<introspection>\", line {line}"));
-            }
+            && !f::JINJA2_FILTERS.contains(&name)
+            && !f::PAPERLESS_FILTERS.contains(&name)
+        {
+            return Some(format!("No filter named '{name}'.\n  File \"<introspection>\", line {line}"));
+        }
         if ident(i) == Some("is") {
             let j = if ident(i + 1) == Some("not") { i + 2 } else { i + 1 };
             let name = match toks.get(j) {
@@ -457,9 +472,10 @@ pub(crate) fn check_filter_and_test_names(source: &str) -> Option<String> {
                 _ => None,
             };
             if let Some(name) = name
-                && !f::JINJA2_TESTS.contains(&name.as_str()) {
-                    return Some(format!("No test named '{name}'.\n  File \"<introspection>\", line {line}"));
-                }
+                && !f::JINJA2_TESTS.contains(&name.as_str())
+            {
+                return Some(format!("No test named '{name}'.\n  File \"<introspection>\", line {line}"));
+            }
         }
     }
     None
@@ -514,10 +530,7 @@ mod tests {
 
     #[test]
     fn rewrite_simple() {
-        assert_eq!(
-            rewrite_operators("{% if a == 'none' %}x{% endif %}").unwrap(),
-            "{% if (__pl_eq((a ),( 'none'))) %}x{% endif %}"
-        );
+        assert_eq!(rewrite_operators("{% if a == 'none' %}x{% endif %}").unwrap(), "{% if (__pl_eq((a ),( 'none'))) %}x{% endif %}");
         let r = rewrite_operators("{{ a ~ b == c }}").unwrap();
         assert!(!r.contains("==") && !r.contains('~'), "{r}");
         let r = rewrite_operators("{{ -a * b + c|f(1 == 2) }}").unwrap();

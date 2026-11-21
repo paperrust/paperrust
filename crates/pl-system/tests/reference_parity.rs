@@ -68,10 +68,8 @@ fn app() -> Router {
 }
 
 async fn rust(app: &Router, path: &str, token: &str, accept: &str, lang: Option<&str>) -> (u16, Value) {
-    let mut b = Request::get(path)
-        .header("host", "127.0.0.1:8000")
-        .header("authorization", format!("Token {token}"))
-        .header("accept", accept);
+    let mut b =
+        Request::get(path).header("host", "127.0.0.1:8000").header("authorization", format!("Token {token}")).header("accept", accept);
     if let Some(l) = lang {
         b = b.header("accept-language", l);
     }
@@ -146,7 +144,8 @@ const PATHS: &[&str] = &[
     "/api/tasks/1/?status=bogus",
 ];
 
-const GERMAN_OK: &[&str] = &["/api/tasks/", "/api/tasks/?name=consume", "/api/tasks/?name=Verarbeitung", "/api/tasks/1/", "/api/tasks/active/"];
+const GERMAN_OK: &[&str] =
+    &["/api/tasks/", "/api/tasks/?name=consume", "/api/tasks/?name=Verarbeitung", "/api/tasks/1/", "/api/tasks/active/"];
 
 /// Requests whose answer depends on "now" or the host and are compared loosely.
 fn normalise(path: &str, mut v: Value) -> Value {

@@ -4,9 +4,7 @@
 //! correlated subqueries refer to `"documents_document"."<column>"` and
 //! use their own aliases.
 
-use sea_query::{
-    Alias, Expr, ExprTrait, NullOrdering, Order, Query, SelectStatement, SimpleExpr,
-};
+use sea_query::{Alias, Expr, ExprTrait, NullOrdering, Order, Query, SelectStatement, SimpleExpr};
 
 /// Table name of the documents (outer query, without alias).
 pub const DOC: &str = "documents_document";
@@ -31,10 +29,7 @@ pub fn doc_col(column: &str) -> SimpleExpr {
 
 /// `SELECT 1 FROM <table> AS <alias>`
 pub fn select_one_from(table: &str, alias: &str) -> SelectStatement {
-    Query::select()
-        .expr(Expr::val(1))
-        .from_as(Alias::new(table), Alias::new(alias))
-        .to_owned()
+    Query::select().expr(Expr::val(1)).from_as(Alias::new(table), Alias::new(alias)).to_owned()
 }
 
 pub fn exists(sel: SelectStatement) -> SimpleExpr {
@@ -135,10 +130,7 @@ pub fn text_lookup(lhs: SimpleExpr, lookup: TextLookup, value: &str) -> SimpleEx
         TextLookup::IEndsWith => ("LIKE", format!("%{}", like_escape(value))),
         TextLookup::IExact => ("=", value.to_string()),
     };
-    Expr::cust_with_exprs(
-        format!("UPPER(($1)::text) {op} UPPER($2)"),
-        [lhs, Expr::val(pattern).into()],
-    )
+    Expr::cust_with_exprs(format!("UPPER(($1)::text) {op} UPPER($2)"), [lhs, Expr::val(pattern).into()])
 }
 
 /// `effective_content` like `documents.versioning.annotate_effective_content`:
@@ -149,18 +141,11 @@ pub fn effective_content() -> SimpleExpr {
         .from_as(Alias::new(DOC), Alias::new("ec_v"))
         .and_where(col("ec_v", "root_document_id").eq(doc_col("id")))
         .and_where(col("ec_v", "deleted_at").is_null())
-        .order_by_with_nulls(
-            (Alias::new("ec_v"), Alias::new("version_index")),
-            Order::Desc,
-            NullOrdering::Last,
-        )
+        .order_by_with_nulls((Alias::new("ec_v"), Alias::new("version_index")), Order::Desc, NullOrdering::Last)
         .order_by((Alias::new("ec_v"), Alias::new("id")), Order::Desc)
         .limit(1)
         .to_owned();
-    Expr::cust_with_exprs(
-        "COALESCE(($1), $2)",
-        [SimpleExpr::SubQuery(None, Box::new(sub.into_sub_query_statement())), doc_col("content")],
-    )
+    Expr::cust_with_exprs("COALESCE(($1), $2)", [SimpleExpr::SubQuery(None, Box::new(sub.into_sub_query_statement())), doc_col("content")])
 }
 
 /// Scalar subquery as expression.

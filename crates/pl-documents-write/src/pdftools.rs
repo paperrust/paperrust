@@ -214,7 +214,12 @@ fn hit_json(h: &Hit) -> Value {
 
 /// Search: first in the original; if nothing is found there and there is an archive PDF (OCR text layer
 /// of a scan), then there. Page geometry of original and archive is the same (OCRmyPDF).
-async fn search_both(src: &FsPath, archive: Option<&FsPath>, terms: &[String], max_hits: usize) -> Result<(Vec<Hit>, bool, &'static str), RunError> {
+async fn search_both(
+    src: &FsPath,
+    archive: Option<&FsPath>,
+    terms: &[String],
+    max_hits: usize,
+) -> Result<(Vec<Hit>, bool, &'static str), RunError> {
     let r = pl_pdftools::runner::run(Op::Search { input: s(src), terms: terms.to_vec(), max_hits }).await?;
     let Reply::Hits { hits, truncated } = r else { return Err(RunError::Protocol("unexpected reply".into())) };
     if !hits.is_empty() || archive.is_none() {
@@ -234,9 +239,15 @@ pub(crate) async fn queue_version(state: &AppState, user_id: i64, root_id: i64, 
     let r: Result<uuid::Uuid, String> = async {
         let mut input = pl_consumer::ConsumableDocument::new(pl_consumer::DocumentSource::ApiUpload, file).map_err(|e| e.to_string())?;
         input.root_document_id = Some(root_id);
-        let overrides = pl_consumer::DocumentMetadataOverrides { version_label: label, owner_id: Some(user_id), actor_id: Some(user_id), ..Default::default() };
+        let overrides = pl_consumer::DocumentMetadataOverrides {
+            version_label: label,
+            owner_id: Some(user_id),
+            actor_id: Some(user_id),
+            ..Default::default()
+        };
         let kwargs = pl_consumer::task::consume_kwargs(&input, &overrides)?;
-        let opts = pl_queue::EnqueueOptions { trigger_source: Some(pl_core::tasks::trigger_source::WEB_UI.to_string()), ..Default::default() };
+        let opts =
+            pl_queue::EnqueueOptions { trigger_source: Some(pl_core::tasks::trigger_source::WEB_UI.to_string()), ..Default::default() };
         queue.enqueue(crate::pdf_edit::CONSUME_FILE, kwargs, opts).await.map_err(|e| e.to_string())
     }
     .await;
@@ -271,7 +282,13 @@ pub(crate) fn cleanup(p: &FsPath) {
 // ------------------------------------------------------------------ redact/search/
 
 /// POST /api/documents/{id}/redact/search/ `{"terms": [...]}`
-pub async fn redact_search_handler(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser, Path(pk): Path<String>, body: axum::body::Bytes) -> Response {
+pub async fn redact_search_handler(
+    State(state): State<AppState>,
+    ctx: RequestContext,
+    auth: AuthUser,
+    Path(pk): Path<String>,
+    body: axum::body::Bytes,
+) -> Response {
     match redact_search(&state, &ctx, &auth, &pk, &body).await {
         Ok(r) => r,
         Err(e) => e.into_response(),
@@ -296,7 +313,13 @@ async fn redact_search(state: &AppState, ctx: &RequestContext, auth: &AuthUser, 
 // ------------------------------------------------------------------ redact/
 
 /// POST /api/documents/{id}/redact/ `{"areas": [...], "terms": [...], "remove_metadata": bool, "version_label": str}`
-pub async fn redact_handler(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser, Path(pk): Path<String>, body: axum::body::Bytes) -> Response {
+pub async fn redact_handler(
+    State(state): State<AppState>,
+    ctx: RequestContext,
+    auth: AuthUser,
+    Path(pk): Path<String>,
+    body: axum::body::Bytes,
+) -> Response {
     match redact(&state, &ctx, &auth, &pk, &body).await {
         Ok(r) => r,
         Err(e) => e.into_response(),
@@ -357,7 +380,8 @@ async fn redact(state: &AppState, ctx: &RequestContext, auth: &AuthUser, pk: &st
     // Watch list (§4.1): checksum of the redacted file before it is ingested as a new version.
     // Errors here do not abort – without an entry the version counts as not redacted when sharing.
     let sum_path = out.clone();
-    match tokio::task::spawn_blocking(move || pl_consumer::compute_checksum(&sum_path)).await.map_err(std::io::Error::other).and_then(|r| r) {
+    match tokio::task::spawn_blocking(move || pl_consumer::compute_checksum(&sum_path)).await.map_err(std::io::Error::other).and_then(|r| r)
+    {
         Ok(sum) => {
             if let Err(e) = crate::redaction_marks::record(state.db(), t.root.id, t.source.id, &sum, auth.user().id).await {
                 tracing::warn!(target: LOG, "recording redaction mark for document {} failed: {e}", t.root.id);
@@ -379,7 +403,13 @@ async fn redact(state: &AppState, ctx: &RequestContext, auth: &AuthUser, pk: &st
 // ------------------------------------------------------------------ shrink/
 
 /// POST /api/documents/{id}/shrink/ `{"preset": "lossless"|"standard"|"strong", "version_label": str}`
-pub async fn shrink_handler(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser, Path(pk): Path<String>, body: axum::body::Bytes) -> Response {
+pub async fn shrink_handler(
+    State(state): State<AppState>,
+    ctx: RequestContext,
+    auth: AuthUser,
+    Path(pk): Path<String>,
+    body: axum::body::Bytes,
+) -> Response {
     match shrink(&state, &ctx, &auth, &pk, &body).await {
         Ok(r) => r,
         Err(e) => e.into_response(),

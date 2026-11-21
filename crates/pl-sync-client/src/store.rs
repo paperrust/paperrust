@@ -20,8 +20,7 @@ pub const MIGRATIONS: &[(&str, &str)] = &[
 ];
 
 /// Metadata kinds that are always mirrored completely (docs/SYNC.md §4.2).
-pub const META_KINDS: [&str; 8] =
-    ["tag", "correspondent", "document_type", "storage_path", "custom_field", "saved_view", "user", "group"];
+pub const META_KINDS: [&str; 8] = ["tag", "correspondent", "document_type", "storage_path", "custom_field", "saved_view", "user", "group"];
 
 /// Now as RFC 3339 UTC.
 pub fn now() -> String {
@@ -252,9 +251,7 @@ impl Replica {
             sqlx::query(&format!("DELETE FROM {t}")).execute(&mut *tx).await?;
         }
         sqlx::query("INSERT INTO fts (fts) VALUES ('rebuild')").execute(&mut *tx).await?;
-        sqlx::query("UPDATE remote SET cursor = NULL, perm_epoch = NULL, last_full_sync = NULL WHERE id = 1")
-            .execute(&mut *tx)
-            .await?;
+        sqlx::query("UPDATE remote SET cursor = NULL, perm_epoch = NULL, last_full_sync = NULL WHERE id = 1").execute(&mut *tx).await?;
         tx.commit().await?;
         Ok(())
     }
@@ -287,7 +284,11 @@ impl Replica {
 
     pub async fn delete_object(&self, kind: &str, key: &str) -> Result<bool> {
         let mut tx = self.pool.begin().await?;
-        let n = sqlx::query("DELETE FROM object WHERE kind = ? AND key = ?").bind(kind.to_string()).bind(key.to_string()).execute(&mut *tx).await?;
+        let n = sqlx::query("DELETE FROM object WHERE kind = ? AND key = ?")
+            .bind(kind.to_string())
+            .bind(key.to_string())
+            .execute(&mut *tx)
+            .await?;
         if kind == "tag" {
             let docs: Vec<String> =
                 sqlx::query_scalar("SELECT doc FROM document_tag WHERE tag = ?").bind(key.to_string()).fetch_all(&mut *tx).await?;
@@ -303,8 +304,11 @@ impl Replica {
     }
 
     pub async fn object(&self, kind: &str, key: &str) -> Result<Option<Value>> {
-        let j: Option<String> =
-            sqlx::query_scalar("SELECT json FROM object WHERE kind = ? AND key = ?").bind(kind.to_string()).bind(key.to_string()).fetch_optional(&self.pool).await?;
+        let j: Option<String> = sqlx::query_scalar("SELECT json FROM object WHERE kind = ? AND key = ?")
+            .bind(kind.to_string())
+            .bind(key.to_string())
+            .fetch_optional(&self.pool)
+            .await?;
         Ok(match j {
             Some(j) => Some(serde_json::from_str(&j)?),
             None => None,
@@ -313,7 +317,8 @@ impl Replica {
 
     /// `(key, rev)` of all objects of a kind.
     pub async fn object_revs(&self, kind: &str) -> Result<Vec<(String, i64)>> {
-        let rows = sqlx::query("SELECT key, coalesce(rev, 0) FROM object WHERE kind = ?").bind(kind.to_string()).fetch_all(&self.pool).await?;
+        let rows =
+            sqlx::query("SELECT key, coalesce(rev, 0) FROM object WHERE kind = ?").bind(kind.to_string()).fetch_all(&self.pool).await?;
         Ok(rows.into_iter().map(|r| (r.get(0), r.get(1))).collect())
     }
 
@@ -338,7 +343,8 @@ impl Replica {
     /// Delete a document (row, tags, file rows). Returns: paths of the cache files.
     pub async fn delete_document(&self, key: &str) -> Result<Vec<String>> {
         let mut tx = self.pool.begin().await?;
-        let paths: Vec<String> = sqlx::query_scalar("SELECT path FROM file WHERE doc = ?").bind(key.to_string()).fetch_all(&mut *tx).await?;
+        let paths: Vec<String> =
+            sqlx::query_scalar("SELECT path FROM file WHERE doc = ?").bind(key.to_string()).fetch_all(&mut *tx).await?;
         sqlx::query("DELETE FROM file WHERE doc = ?").bind(key.to_string()).execute(&mut *tx).await?;
         sqlx::query("DELETE FROM document_tag WHERE doc = ?").bind(key.to_string()).execute(&mut *tx).await?;
         sqlx::query("DELETE FROM document WHERE key = ?").bind(key.to_string()).execute(&mut *tx).await?;
@@ -373,8 +379,10 @@ impl Replica {
 
     /// Remove documents no longer selected older than `before` (RFC 3339).
     pub async fn purge_unselected(&self, before: &str) -> Result<Vec<String>> {
-        let keys: Vec<String> =
-            sqlx::query_scalar("SELECT key FROM document WHERE in_selection = 0 AND left_selection < ?").bind(before.to_string()).fetch_all(&self.pool).await?;
+        let keys: Vec<String> = sqlx::query_scalar("SELECT key FROM document WHERE in_selection = 0 AND left_selection < ?")
+            .bind(before.to_string())
+            .fetch_all(&self.pool)
+            .await?;
         for k in &keys {
             self.delete_document(k).await?;
         }
@@ -382,7 +390,8 @@ impl Replica {
     }
 
     pub async fn document_json(&self, key: &str) -> Result<Option<Value>> {
-        let j: Option<String> = sqlx::query_scalar("SELECT json FROM document WHERE key = ?").bind(key.to_string()).fetch_optional(&self.pool).await?;
+        let j: Option<String> =
+            sqlx::query_scalar("SELECT json FROM document WHERE key = ?").bind(key.to_string()).fetch_optional(&self.pool).await?;
         Ok(match j {
             Some(j) => Some(serde_json::from_str(&j)?),
             None => None,
@@ -439,7 +448,11 @@ impl Replica {
 
     /// Fingerabdruck (paperless-ngx, SYNC.md §7) eines Dokuments setzen.
     pub async fn set_fingerprint(&self, key: &str, fp: &str) -> Result<()> {
-        sqlx::query("UPDATE document SET fingerprint = ? WHERE key = ?").bind(fp.to_string()).bind(key.to_string()).execute(&self.pool).await?;
+        sqlx::query("UPDATE document SET fingerprint = ? WHERE key = ?")
+            .bind(fp.to_string())
+            .bind(key.to_string())
+            .execute(&self.pool)
+            .await?;
         Ok(())
     }
 
@@ -520,7 +533,11 @@ impl Replica {
     }
 
     pub async fn delete_file(&self, doc: &str, variant: &str) -> Result<()> {
-        sqlx::query("DELETE FROM file WHERE doc = ? AND variant = ?").bind(doc.to_string()).bind(variant.to_string()).execute(&self.pool).await?;
+        sqlx::query("DELETE FROM file WHERE doc = ? AND variant = ?")
+            .bind(doc.to_string())
+            .bind(variant.to_string())
+            .execute(&self.pool)
+            .await?;
         Ok(())
     }
 
@@ -572,8 +589,11 @@ fn file_row(r: sqlx::sqlite::SqliteRow) -> FileRow {
 async fn upsert_object_on(conn: &mut SqliteConnection, kind: &str, obj: &Value) -> Result<bool> {
     let key = s(obj, "uuid").ok_or_else(|| Error::Protocol(format!("{kind} without uuid")))?;
     let name = object_name(obj);
-    let old: Option<Option<String>> =
-        sqlx::query_scalar("SELECT name FROM object WHERE kind = ? AND key = ?").bind(kind.to_string()).bind(key.clone()).fetch_optional(&mut *conn).await?;
+    let old: Option<Option<String>> = sqlx::query_scalar("SELECT name FROM object WHERE kind = ? AND key = ?")
+        .bind(kind.to_string())
+        .bind(key.clone())
+        .fetch_optional(&mut *conn)
+        .await?;
     sqlx::query(
         "INSERT INTO object (kind, key, legacy_id, rev, json, name) VALUES (?, ?, ?, ?, ?, ?) \
          ON CONFLICT (kind, key) DO UPDATE SET legacy_id = excluded.legacy_id, rev = excluded.rev, \
@@ -678,7 +698,11 @@ async fn upsert_document_on(conn: &mut SqliteConnection, d: &Value, detail: bool
     sqlx::query("DELETE FROM document_tag WHERE doc = ?").bind(key.clone()).execute(&mut *conn).await?;
     if let Some(tags) = d.get("tags").and_then(Value::as_array) {
         for t in tags.iter().filter_map(Value::as_str) {
-            sqlx::query("INSERT OR IGNORE INTO document_tag (doc, tag) VALUES (?, ?)").bind(key.clone()).bind(t.to_string()).execute(&mut *conn).await?;
+            sqlx::query("INSERT OR IGNORE INTO document_tag (doc, tag) VALUES (?, ?)")
+                .bind(key.clone())
+                .bind(t.to_string())
+                .execute(&mut *conn)
+                .await?;
         }
     }
     refresh_names_where(conn, "key = ?", &key).await

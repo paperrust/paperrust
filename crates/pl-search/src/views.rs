@@ -35,11 +35,7 @@ pub type BoxFut<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 /// Django `QueryDict.__getitem__`/`.get`: the LAST value of a repeated key.
 pub fn param<'a>(params: &'a Params, key: &str) -> Option<&'a str> {
-    params
-        .iter()
-        .rev()
-        .find(|(k, _)| k == key)
-        .map(|(_, v)| v.as_str())
+    params.iter().rev().find(|(k, _)| k == key).map(|(_, v)| v.as_str())
 }
 
 pub fn has_param(params: &Params, key: &str) -> bool {
@@ -61,8 +57,7 @@ pub fn py_int(s: &str) -> Option<i128> {
         Some(b'+') => (false, &s[1..]),
         _ => (false, s),
     };
-    if digits.is_empty() || digits.starts_with('_') || digits.ends_with('_') || digits.contains("__")
-    {
+    if digits.is_empty() || digits.starts_with('_') || digits.ends_with('_') || digits.contains("__") {
         return None;
     }
     let mut v: i128 = 0;
@@ -90,12 +85,7 @@ impl IntoResponse for ViewResponse {
     fn into_response(self) -> Response {
         match self {
             ViewResponse::Json(status, v) => (status, axum::Json(v)).into_response(),
-            ViewResponse::Text(status, body) => (
-                status,
-                [(header::CONTENT_TYPE, "text/html; charset=utf-8")],
-                body,
-            )
-                .into_response(),
+            ViewResponse::Text(status, body) => (status, [(header::CONTENT_TYPE, "text/html; charset=utf-8")], body).into_response(),
         }
     }
 }
@@ -122,10 +112,7 @@ fn forbidden_text(msg: impl Into<String>) -> ViewResponse {
 /// DRF `ValidationError({"query": [...]})`.
 fn query_error_response(e: &SearchError) -> Option<ViewResponse> {
     e.messages().map(|m| {
-        ViewResponse::Json(
-            StatusCode::BAD_REQUEST,
-            json!({ "query": m.iter().map(|s| Value::String(s.clone())).collect::<Vec<_>>() }),
-        )
+        ViewResponse::Json(StatusCode::BAD_REQUEST, json!({ "query": m.iter().map(|s| Value::String(s.clone())).collect::<Vec<_>>() }))
     })
 }
 
@@ -146,11 +133,7 @@ pub fn validate_search_params(active: &[&str]) -> Result<(), ViewResponse> {
 
 /// Active search params in `_TANTIVY_SEARCH_PARAM_NAMES` order.
 pub fn active_search_params(params: &Params) -> Vec<&'static str> {
-    SEARCH_PARAM_NAMES
-        .iter()
-        .copied()
-        .filter(|p| has_param(params, p))
-        .collect()
+    SEARCH_PARAM_NAMES.iter().copied().filter(|p| has_param(params, p)).collect()
 }
 
 /// `UnifiedSearchViewSet._is_search_request`.
@@ -168,9 +151,7 @@ pub struct QueryAndMode {
 
 /// `_get_tantivy_query_and_mode(params)`; lookup by key returns the value as
 /// Python `str(...)` would. `QueryTooLongError` -> `SearchError::Query`.
-pub fn get_query_and_mode(
-    lookup: impl Fn(&str) -> Option<String>,
-) -> Result<Option<QueryAndMode>, SearchError> {
+pub fn get_query_and_mode(lookup: impl Fn(&str) -> Option<String>) -> Result<Option<QueryAndMode>, SearchError> {
     let (raw, mode) = if let Some(v) = lookup("text") {
         (v, SearchMode::Text)
     } else if let Some(v) = lookup("title_search") {
@@ -180,11 +161,7 @@ pub fn get_query_and_mode(
     } else {
         return Ok(None);
     };
-    let filter_query = if mode != SearchMode::Query {
-        lookup("query")
-    } else {
-        None
-    };
+    let filter_query = if mode != SearchMode::Query { lookup("query") } else { None };
     for value in [Some(&raw), filter_query.as_ref()].into_iter().flatten() {
         // Python len() counts code points
         let len = value.chars().count();
@@ -192,19 +169,13 @@ pub fn get_query_and_mode(
             return Err(SearchError::too_long(len, MAX_QUERY_LENGTH));
         }
     }
-    Ok(Some(QueryAndMode {
-        raw,
-        mode,
-        filter_query,
-    }))
+    Ok(Some(QueryAndMode { raw, mode, filter_query }))
 }
 
 async fn blocking<T: Send + 'static>(
     f: impl FnOnce() -> Result<T, SearchError> + Send + 'static,
 ) -> Result<Result<T, SearchError>, ViewError> {
-    tokio::task::spawn_blocking(f)
-        .await
-        .map_err(|e| ViewError::Internal(format!("search task failed: {e}")))
+    tokio::task::spawn_blocking(f).await.map_err(|e| ViewError::Internal(format!("search task failed: {e}")))
 }
 
 // ---------------------------------------------------------------------------
@@ -214,11 +185,7 @@ async fn blocking<T: Send + 'static>(
 /// GET /api/search/autocomplete/. Permission classes
 /// (IsAuthenticated, ViewDocumentsPermissions) are checked by the caller via
 /// [`autocomplete_permitted`].
-pub async fn autocomplete_view(
-    backend: Arc<SearchBackend>,
-    user: &RequestUser,
-    params: &Params,
-) -> Result<ViewResponse, ViewError> {
+pub async fn autocomplete_view(backend: Arc<SearchBackend>, user: &RequestUser, params: &Params) -> Result<ViewResponse, ViewError> {
     let Some(term) = param(params, "term") else {
         return Ok(bad_request_text("Term required"));
     };
@@ -227,9 +194,7 @@ pub async fn autocomplete_view(
         Some(raw) => match py_int(raw) {
             // int() ValueError is unhandled upstream -> 500
             None => {
-                return Err(ViewError::Internal(format!(
-                    "invalid literal for int() with base 10: {raw:?}"
-                )));
+                return Err(ViewError::Internal(format!("invalid literal for int() with base 10: {raw:?}")));
             }
             Some(l) if l <= 0 => return Ok(bad_request_text("Invalid limit")),
             Some(l) => usize::try_from(l).unwrap_or(usize::MAX),
@@ -237,21 +202,9 @@ pub async fn autocomplete_view(
         None => 10,
     };
     // backend.autocomplete filters unless user.is_superuser
-    let search_user = if user.is_superuser {
-        None
-    } else {
-        Some(crate::SearchUser {
-            id: user.id,
-            group_ids: user.group_ids.clone(),
-        })
-    };
-    let words = blocking(move || backend.autocomplete(&term, limit, search_user.as_ref()))
-        .await?
-        .map_err(ViewError::Search)?;
-    Ok(ViewResponse::Json(
-        StatusCode::OK,
-        Value::Array(words.into_iter().map(Value::String).collect()),
-    ))
+    let search_user = if user.is_superuser { None } else { Some(crate::SearchUser { id: user.id, group_ids: user.group_ids.clone() }) };
+    let words = blocking(move || backend.autocomplete(&term, limit, search_user.as_ref())).await?.map_err(ViewError::Search)?;
+    Ok(ViewResponse::Json(StatusCode::OK, Value::Array(words.into_iter().map(Value::String).collect())))
 }
 
 /// `ViewDocumentsPermissions` (+ IsAuthenticated, done by the caller).
@@ -269,12 +222,7 @@ pub fn autocomplete_permitted(user: &RequestUser) -> bool {
 /// restricted to what the user may see and the section's model permission,
 /// and limited to `limit` rows. Sections without provider are empty lists.
 pub trait ObjectSearchProvider: Send + Sync {
-    fn search<'a>(
-        &'a self,
-        user: &'a RequestUser,
-        query: &'a str,
-        limit: usize,
-    ) -> BoxFut<'a, Result<Vec<Value>, ViewError>>;
+    fn search<'a>(&'a self, user: &'a RequestUser, query: &'a str, limit: usize) -> BoxFut<'a, Result<Vec<Value>, ViewError>>;
 }
 
 /// Sections in response order after `documents`.
@@ -316,9 +264,7 @@ pub async fn global_search_view(
         return Ok(bad_request_text("Query must be at least 3 characters"));
     }
     if qlen > MAX_QUERY_LENGTH {
-        return Ok(bad_request_text(format!(
-            "Query must be at most {MAX_QUERY_LENGTH} characters"
-        )));
+        return Ok(bad_request_text(format!("Query must be at most {MAX_QUERY_LENGTH} characters")));
     }
     // request.query_params.get("db_only", False): any non-empty string is truthy
     let db_only = param(params, "db_only").is_some_and(|v| !v.is_empty());
@@ -330,27 +276,13 @@ pub async fn global_search_view(
         } else {
             let search_user = user.search_user();
             let q = query.to_string();
-            let matching_ids = blocking(move || {
-                backend.search_ids(
-                    &q,
-                    search_user.as_ref(),
-                    None,
-                    false,
-                    SearchMode::Text,
-                    None,
-                    Some(OBJECT_LIMIT * 3),
-                )
-            })
-            .await?
-            .map_err(ViewError::Search)?;
+            let matching_ids =
+                blocking(move || backend.search_ids(&q, search_user.as_ref(), None, false, SearchMode::Text, None, Some(OBJECT_LIMIT * 3)))
+                    .await?
+                    .map_err(ViewError::Search)?;
             let rows = db::docs_in_bulk(db, user, &matching_ids).await?;
-            let by_id: std::collections::HashMap<i64, db::DocTitleRow> =
-                rows.into_iter().map(|r| (r.id, r)).collect();
-            docs = matching_ids
-                .iter()
-                .filter_map(|id| by_id.get(id).cloned())
-                .take(OBJECT_LIMIT)
-                .collect();
+            let by_id: std::collections::HashMap<i64, db::DocTitleRow> = rows.into_iter().map(|r| (r.id, r)).collect();
+            docs = matching_ids.iter().filter_map(|id| by_id.get(id).cloned()).take(OBJECT_LIMIT).collect();
         }
     }
 
@@ -442,11 +374,7 @@ impl SearchResultPage {
         if start >= end {
             return Vec::new();
         }
-        self.ordered_ids[start..end]
-            .iter()
-            .enumerate()
-            .map(|(i, id)| SearchHit::stub(*id, start + i + 1))
-            .collect()
+        self.ordered_ids[start..end].iter().enumerate().map(|(i, id)| SearchHit::stub(*id, start + i + 1)).collect()
     }
 }
 
@@ -468,9 +396,7 @@ pub fn page_num_param(params: &Params) -> usize {
     match param(params, "page") {
         None => 1,
         // page <= 0 -> 0 (DRF answers 404 "Invalid page." for it anyway)
-        Some(raw) => py_int(raw)
-            .map(|v| usize::try_from(v).unwrap_or(0))
-            .unwrap_or(1),
+        Some(raw) => py_int(raw).map(|v| usize::try_from(v).unwrap_or(0)).unwrap_or(1),
     }
 }
 
@@ -626,9 +552,7 @@ pub async fn document_search_with(
                 return Ok(DocumentSearchOutcome::Response(forbidden_text("Invalid more_like_id")));
             }
             MoreLikeLookup::Forbidden => {
-                return Ok(DocumentSearchOutcome::Response(forbidden_text(
-                    "Insufficient permissions.",
-                )));
+                return Ok(DocumentSearchOutcome::Response(forbidden_text("Insufficient permissions.")));
             }
         };
         let kind = NativeKind::MoreLike { backend: backend.clone(), doc_id };
@@ -638,12 +562,7 @@ pub async fn document_search_with(
             Err(NativeError::View(e)) => return Err(e),
         };
         if let Some(fast) = fast {
-            let hits = fast
-                .page_ids
-                .iter()
-                .enumerate()
-                .map(|(i, id)| SearchHit::stub(*id, page_offset + i + 1))
-                .collect();
+            let hits = fast.page_ids.iter().enumerate().map(|(i, id)| SearchHit::stub(*id, page_offset + i + 1)).collect();
             return Ok(DocumentSearchOutcome::Page(SearchResultPage {
                 ordered_ids: fast.window.ids,
                 hits,
@@ -653,22 +572,11 @@ pub async fn document_search_with(
         }
         let b = backend.clone();
         let su = search_user.clone();
-        let all_ids = blocking(move || b.more_like_this_ids(doc_id, su.as_ref(), None))
-            .await?
-            .map_err(ViewError::Search)?;
+        let all_ids = blocking(move || b.more_like_this_ids(doc_id, su.as_ref(), None)).await?.map_err(ViewError::Search)?;
         let ordered_ids = intersect_and_order(&all_ids, filtered, true).await?;
         let page_ids: Vec<i64> = ordered_ids.iter().skip(page_offset).take(page_size).copied().collect();
-        let hits = page_ids
-            .iter()
-            .enumerate()
-            .map(|(i, id)| SearchHit::stub(*id, page_offset + i + 1))
-            .collect();
-        SearchResultPage {
-            ordered_ids,
-            hits,
-            page_offset,
-            total: None,
-        }
+        let hits = page_ids.iter().enumerate().map(|(i, id)| SearchHit::stub(*id, page_offset + i + 1)).collect();
+        SearchResultPage { ordered_ids, hits, page_offset, total: None }
     } else {
         // run_text_search
         let qm = match get_query_and_mode(|k| param(params, k).map(str::to_string)) {
@@ -684,21 +592,12 @@ pub async fn document_search_with(
             }
         };
         let is_score_sort = sort_field_name.as_deref() == Some("score");
-        let sort_field = if !use_tantivy_sort || is_score_sort {
-            None
-        } else {
-            sort_field_name.clone()
-        };
+        let sort_field = if !use_tantivy_sort || is_score_sort { None } else { sort_field_name.clone() };
         let fast = if is_score_sort && !sort_reverse {
             // ordering=score: relevance reversed → page 1 = weakest hits, exact path
             None
         } else if use_tantivy_sort {
-            let kind = NativeKind::Text {
-                backend: backend.clone(),
-                qm: qm.clone(),
-                sort_field: sort_field.clone(),
-                sort_reverse,
-            };
+            let kind = NativeKind::Text { backend: backend.clone(), qm: qm.clone(), sort_field: sort_field.clone(), sort_reverse };
             match native_window(db, user, params, page_offset, page_size, &opts, filtered, kind).await {
                 Ok(f) => f,
                 Err(NativeError::Query(e)) => {
@@ -735,15 +634,7 @@ pub async fn document_search_with(
         let su = search_user.clone();
         let qm2 = qm.clone();
         let all_ids = match blocking(move || {
-            b.search_ids(
-                &qm2.raw,
-                su.as_ref(),
-                sort_field.as_deref(),
-                sort_reverse,
-                qm2.mode,
-                qm2.filter_query.as_deref(),
-                None,
-            )
+            b.search_ids(&qm2.raw, su.as_ref(), sort_field.as_deref(), sort_reverse, qm2.mode, qm2.filter_query.as_deref(), None)
         })
         .await?
         {
@@ -770,28 +661,15 @@ pub async fn document_search_with(
                 };
             }
         };
-        SearchResultPage {
-            ordered_ids,
-            hits,
-            page_offset,
-            total: None,
-        }
+        SearchResultPage { ordered_ids, hits, page_offset, total: None }
     };
     Ok(DocumentSearchOutcome::Page(result))
 }
 
 /// What the L3 path is to rank.
 enum NativeKind {
-    Text {
-        backend: Arc<SearchBackend>,
-        qm: QueryAndMode,
-        sort_field: Option<String>,
-        sort_reverse: bool,
-    },
-    MoreLike {
-        backend: Arc<SearchBackend>,
-        doc_id: i64,
-    },
+    Text { backend: Arc<SearchBackend>, qm: QueryAndMode, sort_field: Option<String>, sort_reverse: bool },
+    MoreLike { backend: Arc<SearchBackend>, doc_id: i64 },
 }
 
 enum NativeError {
@@ -849,23 +727,11 @@ async fn native_window(
     if !db::search_index_clean(db).await {
         return Ok(None);
     }
-    let window = if opts.need_all_ids || !page_param_is_number(params) {
-        None
-    } else {
-        Some(page_offset.saturating_add(page_size))
-    };
+    let window = if opts.need_all_ids || !page_param_is_number(params) { None } else { Some(page_offset.saturating_add(page_size)) };
     let su = user.search_user();
     let res = match kind {
         NativeKind::Text { backend, qm, sort_field, sort_reverse } => blocking(move || {
-            backend.search_window(
-                &qm.raw,
-                su.as_ref(),
-                sort_field.as_deref(),
-                sort_reverse,
-                qm.mode,
-                qm.filter_query.as_deref(),
-                window,
-            )
+            backend.search_window(&qm.raw, su.as_ref(), sort_field.as_deref(), sort_reverse, qm.mode, qm.filter_query.as_deref(), window)
         })
         .await?
         .map_err(NativeError::Query)?,
@@ -889,11 +755,7 @@ async fn native_window(
 }
 
 /// `intersect_and_order`.
-async fn intersect_and_order(
-    all_ids: &[i64],
-    filtered: &dyn FilteredDocuments,
-    use_tantivy_sort: bool,
-) -> Result<Vec<i64>, ViewError> {
+async fn intersect_and_order(all_ids: &[i64], filtered: &dyn FilteredDocuments, use_tantivy_sort: bool) -> Result<Vec<i64>, ViewError> {
     if all_ids.is_empty() {
         return Ok(Vec::new());
     }
@@ -942,11 +804,7 @@ pub async fn selection_search_ids(
     user: &RequestUser,
     filters: &Map<String, Value>,
 ) -> Result<Option<Vec<i64>>, SelectionError> {
-    let active: Vec<&str> = SEARCH_PARAM_NAMES
-        .iter()
-        .copied()
-        .filter(|k| filters.contains_key(*k))
-        .collect();
+    let active: Vec<&str> = SEARCH_PARAM_NAMES.iter().copied().filter(|k| filters.contains_key(*k)).collect();
     let Some(first) = active.first().copied() else {
         return Ok(None);
     };
@@ -957,18 +815,14 @@ pub async fn selection_search_ids(
     if first == "more_like_id" {
         // int(value): int, bool and float (truncated) and numeric strings work
         let id = match filters.get("more_like_id") {
-            Some(Value::Number(n)) => n
-                .as_i64()
-                .or_else(|| n.as_f64().filter(|f| f.is_finite()).map(|f| f.trunc() as i64)),
+            Some(Value::Number(n)) => n.as_i64().or_else(|| n.as_f64().filter(|f| f.is_finite()).map(|f| f.trunc() as i64)),
             Some(Value::Bool(b)) => Some(i64::from(*b)),
             Some(Value::String(s)) => py_int(s).and_then(|v| i64::try_from(v).ok()),
             _ => None,
         };
         let lookup = match id {
             None => MoreLikeLookup::Invalid,
-            Some(id) => db::more_like_lookup(db, id, Some(user))
-                .await
-                .map_err(|e| SelectionError::Other(e.into()))?,
+            Some(id) => db::more_like_lookup(db, id, Some(user)).await.map_err(|e| SelectionError::Other(e.into()))?,
         };
         let doc_id = match lookup {
             MoreLikeLookup::Ok(id) => id,
@@ -988,20 +842,10 @@ pub async fn selection_search_ids(
         Ok(None) => return Ok(None),
         Err(e) => return Err(selection_query_error(e)),
     };
-    let ids = blocking(move || {
-        backend.search_ids(
-            &qm.raw,
-            search_user.as_ref(),
-            None,
-            false,
-            qm.mode,
-            qm.filter_query.as_deref(),
-            None,
-        )
-    })
-    .await
-    .map_err(SelectionError::Other)?
-    .map_err(selection_query_error)?;
+    let ids = blocking(move || backend.search_ids(&qm.raw, search_user.as_ref(), None, false, qm.mode, qm.filter_query.as_deref(), None))
+        .await
+        .map_err(SelectionError::Other)?
+        .map_err(selection_query_error)?;
     Ok(Some(ids))
 }
 
@@ -1051,9 +895,7 @@ mod tests {
     #[test]
     fn query_and_mode() {
         let params = p(&[("text", "bank"), ("query", "created:[-1 week to now]")]);
-        let qm = get_query_and_mode(|k| param(&params, k).map(str::to_string))
-            .unwrap()
-            .unwrap();
+        let qm = get_query_and_mode(|k| param(&params, k).map(str::to_string)).unwrap().unwrap();
         assert_eq!(qm.mode, SearchMode::Text);
         assert_eq!(qm.filter_query.as_deref(), Some("created:[-1 week to now]"));
         let long = "a".repeat(4097);
@@ -1075,10 +917,7 @@ mod tests {
     fn relevance_list_slicing() {
         let page = SearchResultPage {
             ordered_ids: vec![5, 6, 7, 8],
-            hits: vec![SearchHit {
-                score: 1.5,
-                ..SearchHit::stub(7, 3)
-            }],
+            hits: vec![SearchHit { score: 1.5, ..SearchHit::stub(7, 3) }],
             page_offset: 2,
             total: None,
         };

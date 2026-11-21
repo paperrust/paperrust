@@ -12,9 +12,7 @@ use std::time::Instant;
 
 use pl_classifier::metrics::{self, SingleMetrics, TagMetrics};
 use pl_classifier::vectorizer::CountVectorizer;
-use pl_classifier::{
-    DocumentClassifier, Language, ModelKind, TrainOptions, TrainingDoc, preprocess_content,
-};
+use pl_classifier::{DocumentClassifier, Language, ModelKind, TrainOptions, TrainingDoc, preprocess_content};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
@@ -27,44 +25,25 @@ fn root() -> PathBuf {
 
 fn load(name: &str) -> Value {
     let p = root().join("tests/parity/pl-classifier").join(name);
-    serde_json::from_slice(&std::fs::read(&p).unwrap_or_else(|e| panic!("{}: {e}", p.display())))
-        .unwrap()
+    serde_json::from_slice(&std::fs::read(&p).unwrap_or_else(|e| panic!("{}: {e}", p.display()))).unwrap()
 }
 
 fn lang_of(s: &str) -> Option<Language> {
-    if s == "None" {
-        None
-    } else {
-        Some(Language::from_name(s).unwrap_or_else(|| panic!("language {s}")))
-    }
+    if s == "None" { None } else { Some(Language::from_name(s).unwrap_or_else(|| panic!("language {s}"))) }
 }
 
 fn sha16(s: &str) -> String {
-    Sha256::digest(s.as_bytes())
-        .iter()
-        .take(8)
-        .map(|b| format!("{b:02x}"))
-        .collect()
+    Sha256::digest(s.as_bytes()).iter().take(8).map(|b| format!("{b:02x}")).collect()
 }
 
 #[test]
 fn upstream_sample_files() {
     // upstream test_classifier.py::TestPreprocessContent (Python read_text(): universal newlines)
     let dir = root().join("upstream/src/documents/tests/samples");
-    let read = |n: &str| {
-        std::fs::read_to_string(dir.join(n))
-            .unwrap()
-            .replace("\r\n", "\n")
-    };
+    let read = |n: &str| std::fs::read_to_string(dir.join(n)).unwrap().replace("\r\n", "\n");
     let content = read("content.txt");
-    assert_eq!(
-        preprocess_content(&content, Some(Language::English)),
-        read("preprocessed_content_advanced.txt").trim_end()
-    );
-    assert_eq!(
-        preprocess_content(&content, None),
-        read("preprocessed_content.txt").trim_end()
-    );
+    assert_eq!(preprocess_content(&content, Some(Language::English)), read("preprocessed_content_advanced.txt").trim_end());
+    assert_eq!(preprocess_content(&content, None), read("preprocessed_content.txt").trim_end());
 }
 
 #[test]
@@ -98,12 +77,7 @@ fn preprocessing_corpus_exact_all_languages() {
             }
         }
     }
-    assert!(
-        bad.is_empty(),
-        "{} mismatches: {:?}",
-        bad.len(),
-        &bad[..bad.len().min(20)]
-    );
+    assert!(bad.is_empty(), "{} mismatches: {:?}", bad.len(), &bad[..bad.len().min(20)]);
 }
 
 struct Corpus {
@@ -125,13 +99,7 @@ struct Truth {
 fn corpus() -> Corpus {
     let c = load("corpus.json");
     let ids = |k: &str, f: &str| -> Vec<i64> {
-        c["objects"][k]
-            .as_array()
-            .unwrap()
-            .iter()
-            .filter(|o| o[f].as_bool().unwrap())
-            .map(|o| o["id"].as_i64().unwrap())
-            .collect()
+        c["objects"][k].as_array().unwrap().iter().filter(|o| o[f].as_bool().unwrap()).map(|o| o["id"].as_i64().unwrap()).collect()
     };
     let (auto_c, auto_t, auto_s, auto_tag, inbox) = (
         ids("correspondents", "auto"),
@@ -141,24 +109,11 @@ fn corpus() -> Corpus {
         ids("tags", "inbox"),
     );
     let pick = |v: &Value, auto: &[i64]| v.as_i64().filter(|x| auto.contains(x));
-    let mut out = Corpus {
-        train: vec![],
-        contents: HashMap::new(),
-        test: vec![],
-    };
+    let mut out = Corpus { train: vec![], contents: HashMap::new(), test: vec![] };
     for d in c["documents"].as_array().unwrap() {
         let pk = d["pk"].as_i64().unwrap();
-        let tags: Vec<i64> = d["tags"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|t| t.as_i64().unwrap())
-            .collect();
-        let mut auto_tags: Vec<i64> = tags
-            .iter()
-            .copied()
-            .filter(|t| auto_tag.contains(t))
-            .collect();
+        let tags: Vec<i64> = d["tags"].as_array().unwrap().iter().map(|t| t.as_i64().unwrap()).collect();
+        let mut auto_tags: Vec<i64> = tags.iter().copied().filter(|t| auto_tag.contains(t)).collect();
         auto_tags.sort_unstable();
         let truth = Truth {
             correspondent: pick(&d["correspondent"], &auto_c),
@@ -194,41 +149,19 @@ fn vectorizer_and_hash_exact() {
     for (lang, q) in r["quality"].as_object().unwrap() {
         let l = lang_of(lang);
         let mut v = CountVectorizer::default();
-        let x = v
-            .fit_transform(
-                c.train
-                    .iter()
-                    .map(|d| preprocess_content(&c.contents[&d.pk], l)),
-            )
-            .unwrap();
-        let vocab: Vec<&str> = q["vocabulary"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|t| t.as_str().unwrap())
-            .collect();
+        let x = v.fit_transform(c.train.iter().map(|d| preprocess_content(&c.contents[&d.pk], l))).unwrap();
+        let vocab: Vec<&str> = q["vocabulary"].as_array().unwrap().iter().map(|t| t.as_str().unwrap()).collect();
         assert_eq!(v.vocabulary, vocab, "vocabulary {lang}");
         assert_eq!(x.n_rows(), q["n_train_docs"].as_u64().unwrap() as usize);
         for i in 0..x.n_rows() {
             let (cols, vals) = x.row(i);
-            assert_eq!(
-                cols.len() as u64,
-                q["row_nnz"][i].as_u64().unwrap(),
-                "nnz {lang} row {i}"
-            );
-            assert_eq!(
-                vals.iter().sum::<f32>() as u64,
-                q["row_sum"][i].as_u64().unwrap(),
-                "sum {lang} row {i}"
-            );
+            assert_eq!(cols.len() as u64, q["row_nnz"][i].as_u64().unwrap(), "nnz {lang} row {i}");
+            assert_eq!(vals.iter().sum::<f32>() as u64, q["row_sum"][i].as_u64().unwrap(), "sum {lang} row {i}");
         }
         let h = pl_classifier::training_hash(&c.train).unwrap();
         let hex: String = h.iter().map(|b| format!("{b:02x}")).collect();
         assert_eq!(hex, q["train_hash_hex"].as_str().unwrap());
-        assert_eq!(
-            c.train.iter().map(|d| d.modified_us).max().unwrap(),
-            q["last_doc_change_us"].as_i64().unwrap()
-        );
+        assert_eq!(c.train.iter().map(|d| d.modified_us).max().unwrap(), q["last_doc_change_us"].as_i64().unwrap());
     }
 }
 
@@ -236,10 +169,7 @@ fn vectorizer_and_hash_exact() {
 type AllMetrics = (SingleMetrics, SingleMetrics, SingleMetrics, TagMetrics);
 
 fn sk_metrics(v: &Value) -> AllMetrics {
-    let s = |k: &str| SingleMetrics {
-        accuracy: v[k]["accuracy"].as_f64().unwrap(),
-        macro_f1: v[k]["macro_f1"].as_f64().unwrap(),
-    };
+    let s = |k: &str| SingleMetrics { accuracy: v[k]["accuracy"].as_f64().unwrap(), macro_f1: v[k]["macro_f1"].as_f64().unwrap() };
     (
         s("correspondent"),
         s("document_type"),
@@ -256,71 +186,23 @@ fn sk_metrics(v: &Value) -> AllMetrics {
 fn quality_against_sklearn() {
     // default model (MLP like upstream), default language (english); the other configuration
     // and model kinds run in the ignored `model_comparison` (slow in debug builds)
-    run_quality(
-        &["english"],
-        &[("Mlp", ModelKind::Mlp, TrainOptions::default())],
-    );
+    run_quality(&["english"], &[("Mlp", ModelKind::Mlp, TrainOptions::default())]);
 }
 
 #[test]
 #[ignore = "slow in debug builds (~12 min); run with --ignored to reproduce the model decision table"]
 fn model_comparison() {
     use pl_classifier::mlp::MlpParams;
-    let tuned = MlpParams {
-        learning_rate_init: 0.01,
-        tol: 1e-4,
-        ..Default::default()
-    };
+    let tuned = MlpParams { learning_rate_init: 0.01, tol: 1e-4, ..Default::default() };
     run_quality(
         &["english", "None"],
         &[
             ("Mlp", ModelKind::Mlp, TrainOptions::default()),
-            (
-                "Mlp seed 1",
-                ModelKind::Mlp,
-                TrainOptions {
-                    mlp: MlpParams {
-                        seed: 1,
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                },
-            ),
-            (
-                "Mlp seed 2",
-                ModelKind::Mlp,
-                TrainOptions {
-                    mlp: MlpParams {
-                        seed: 2,
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                },
-            ),
-            (
-                "Linear",
-                ModelKind::Linear,
-                TrainOptions {
-                    kind: ModelKind::Linear,
-                    ..Default::default()
-                },
-            ),
-            (
-                "Linear lr0.01 tol1e-4",
-                ModelKind::Linear,
-                TrainOptions {
-                    kind: ModelKind::Linear,
-                    mlp: tuned,
-                },
-            ),
-            (
-                "NaiveBayes",
-                ModelKind::NaiveBayes,
-                TrainOptions {
-                    kind: ModelKind::NaiveBayes,
-                    ..Default::default()
-                },
-            ),
+            ("Mlp seed 1", ModelKind::Mlp, TrainOptions { mlp: MlpParams { seed: 1, ..Default::default() }, ..Default::default() }),
+            ("Mlp seed 2", ModelKind::Mlp, TrainOptions { mlp: MlpParams { seed: 2, ..Default::default() }, ..Default::default() }),
+            ("Linear", ModelKind::Linear, TrainOptions { kind: ModelKind::Linear, ..Default::default() }),
+            ("Linear lr0.01 tol1e-4", ModelKind::Linear, TrainOptions { kind: ModelKind::Linear, mlp: tuned }),
+            ("NaiveBayes", ModelKind::NaiveBayes, TrainOptions { kind: ModelKind::NaiveBayes, ..Default::default() }),
         ],
     );
 }
@@ -331,11 +213,7 @@ fn run_quality(langs: &[&str], variants: &[(&str, ModelKind, TrainOptions)]) {
     let c = corpus();
     let truth: Vec<Truth> = c.test.iter().map(|t| t.1.clone()).collect();
     let tc = |f: &dyn Fn(&Truth) -> Option<i64>| truth.iter().map(f).collect::<Vec<_>>();
-    let (t_c, t_t, t_s) = (
-        tc(&|t| t.correspondent),
-        tc(&|t| t.document_type),
-        tc(&|t| t.storage_path),
-    );
+    let (t_c, t_t, t_s) = (tc(&|t| t.correspondent), tc(&|t| t.document_type), tc(&|t| t.storage_path));
     let t_tags: Vec<Vec<i64>> = truth.iter().map(|t| t.tags.clone()).collect();
     let mut failures = Vec::new();
     for (lang, q) in r["quality"].as_object().unwrap() {
@@ -346,28 +224,14 @@ fn run_quality(langs: &[&str], variants: &[(&str, ModelKind, TrainOptions)]) {
         // the metric code must reproduce the Python numbers from sklearn's predictions
         let sp = q["predictions"].as_array().unwrap();
         let col = |k: &str| sp.iter().map(|p| p[k].as_i64()).collect::<Vec<_>>();
-        let sk_tags: Vec<Vec<i64>> = sp
-            .iter()
-            .map(|p| {
-                p["tags"]
-                    .as_array()
-                    .unwrap()
-                    .iter()
-                    .map(|x| x.as_i64().unwrap())
-                    .collect()
-            })
-            .collect();
+        let sk_tags: Vec<Vec<i64>> =
+            sp.iter().map(|p| p["tags"].as_array().unwrap().iter().map(|x| x.as_i64().unwrap()).collect()).collect();
         let sk = sk_metrics(&q["metrics"]);
-        assert!(
-            (metrics::single(&col("correspondent"), &t_c).accuracy - sk.0.accuracy).abs() < 1e-12
-        );
+        assert!((metrics::single(&col("correspondent"), &t_c).accuracy - sk.0.accuracy).abs() < 1e-12);
         assert!((metrics::tags(&sk_tags, &t_tags).micro_f1 - sk.3.micro_f1).abs() < 1e-12);
         // quality bar: mean of the sklearn runs (random_state 0 plus the seed-spread runs, if any)
         let mut runs = vec![sk];
-        if let (true, Some(o)) = (
-            lang == "english",
-            r["sklearn_seed_spread_english"].as_object(),
-        ) {
+        if let (true, Some(o)) = (lang == "english", r["sklearn_seed_spread_english"].as_object()) {
             runs.extend(o.values().map(sk_metrics));
         }
         let n = runs.len() as f64;
@@ -382,11 +246,7 @@ fn run_quality(langs: &[&str], variants: &[(&str, ModelKind, TrainOptions)]) {
             mean(&|m| m.3.micro_f1),
             mean(&|m| m.3.macro_f1),
         ];
-        println!(
-            "[{lang}] sklearn mean of {} run(s): {:.3?}",
-            runs.len(),
-            bar
-        );
+        println!("[{lang}] sklearn mean of {} run(s): {:.3?}", runs.len(), bar);
         println!(
             "[{lang}] sklearn MLP: corr acc {:.3} f1 {:.3} | type acc {:.3} f1 {:.3} | path acc {:.3} f1 {:.3} | tags micro {:.3} macro {:.3} exact {:.3} | train {}s, {} ms/doc",
             sk.0.accuracy,
@@ -404,40 +264,20 @@ fn run_quality(langs: &[&str], variants: &[(&str, ModelKind, TrainOptions)]) {
         for (name, kind, opts) in variants {
             let mut clf = DocumentClassifier::new();
             let t0 = Instant::now();
-            let trained = clf
-                .train(
-                    c.train.clone(),
-                    l,
-                    |pks| pks.iter().map(|pk| c.contents.get(pk).cloned()).collect(),
-                    opts,
-                    None,
-                )
-                .unwrap();
+            let trained =
+                clf.train(c.train.clone(), l, |pks| pks.iter().map(|pk| c.contents.get(pk).cloned()).collect(), opts, None).unwrap();
             assert!(trained);
             let train_s = t0.elapsed().as_secs_f64();
             let t0 = Instant::now();
-            let preds: Vec<_> = c
-                .test
-                .iter()
-                .map(|(content, _)| clf.predict_all(content, threshold))
-                .collect();
+            let preds: Vec<_> = c.test.iter().map(|(content, _)| clf.predict_all(content, threshold)).collect();
             let pred_ms = t0.elapsed().as_secs_f64() * 1000.0 / preds.len() as f64;
             let p_c: Vec<_> = preds.iter().map(|p| p.correspondent).collect();
             let p_t: Vec<_> = preds.iter().map(|p| p.document_type).collect();
             let p_s: Vec<_> = preds.iter().map(|p| p.storage_path).collect();
             let p_tags: Vec<Vec<i64>> = preds.iter().map(|p| p.tags.clone()).collect();
-            let m = (
-                metrics::single(&p_c, &t_c),
-                metrics::single(&p_t, &t_t),
-                metrics::single(&p_s, &t_s),
-                metrics::tags(&p_tags, &t_tags),
-            );
-            let agree = p_c
-                .iter()
-                .zip(col("correspondent"))
-                .filter(|(a, b)| **a == *b)
-                .count() as f64
-                / p_c.len() as f64;
+            let m =
+                (metrics::single(&p_c, &t_c), metrics::single(&p_t, &t_t), metrics::single(&p_s, &t_s), metrics::tags(&p_tags, &t_tags));
+            let agree = p_c.iter().zip(col("correspondent")).filter(|(a, b)| **a == *b).count() as f64 / p_c.len() as f64;
             let size = clf.to_bytes(b"k").unwrap().len();
             println!(
                 "[{lang}] rust {name}: corr acc {:.3} f1 {:.3} | type acc {:.3} f1 {:.3} | path acc {:.3} f1 {:.3} | tags micro {:.3} macro {:.3} exact {:.3} | corr agreement w/ sklearn {:.3} | train {:.2}s (debug), {:.3} ms/doc, model {} KiB",
@@ -466,21 +306,8 @@ fn run_quality(langs: &[&str], variants: &[(&str, ModelKind, TrainOptions)]) {
                     "tags micro_f1",
                     "tags macro_f1",
                 ];
-                let ours = [
-                    m.0.accuracy,
-                    m.0.macro_f1,
-                    m.1.accuracy,
-                    m.1.macro_f1,
-                    m.2.accuracy,
-                    m.2.macro_f1,
-                    m.3.micro_f1,
-                    m.3.macro_f1,
-                ];
-                let pairs = names
-                    .iter()
-                    .zip(ours)
-                    .zip(bar)
-                    .map(|((n, a), b)| (*n, a, b));
+                let ours = [m.0.accuracy, m.0.macro_f1, m.1.accuracy, m.1.macro_f1, m.2.accuracy, m.2.macro_f1, m.3.micro_f1, m.3.macro_f1];
+                let pairs = names.iter().zip(ours).zip(bar).map(|((n, a), b)| (*n, a, b));
                 for (name, rust, skl) in pairs {
                     if rust < skl - QUALITY_TOLERANCE {
                         failures.push(format!("[{lang}] {name}: rust {rust:.3} < sklearn {skl:.3} - {QUALITY_TOLERANCE}"));

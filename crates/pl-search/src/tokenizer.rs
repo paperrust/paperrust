@@ -15,8 +15,8 @@ use std::sync::OnceLock;
 
 use tantivy::Index;
 use tantivy::tokenizer::{
-    AsciiFoldingFilter, Language, LowerCaser, NgramTokenizer, RawTokenizer, RegexTokenizer,
-    RemoveLongFilter, SimpleTokenizer, Stemmer, TextAnalyzer, TokenStream,
+    AsciiFoldingFilter, Language, LowerCaser, NgramTokenizer, RawTokenizer, RegexTokenizer, RemoveLongFilter, SimpleTokenizer, Stemmer,
+    TextAnalyzer, TokenStream,
 };
 
 /// Document.title is max_length=128, so 129 is the limit for remove_long.
@@ -78,9 +78,7 @@ pub fn paperless_text_analyzer(language: Option<&str>) -> TextAnalyzer {
     let lang = language.filter(|l| !l.is_empty()).and_then(|l| {
         let found = language_for(l);
         if found.is_none() {
-            tracing::warn!(
-                "Unsupported search language '{l}' - stemming disabled."
-            );
+            tracing::warn!("Unsupported search language '{l}' - stemming disabled.");
         }
         found
     });
@@ -116,10 +114,7 @@ pub fn stem_pattern_text(text: &str, language: Option<&str>) -> String {
 
 /// `_simple_analyzer`: simple -> lowercase -> ascii_fold (sort shadow fields).
 pub fn simple_analyzer() -> TextAnalyzer {
-    TextAnalyzer::builder(SimpleTokenizer::default())
-        .filter(LowerCaser)
-        .filter(AsciiFoldingFilter)
-        .build()
+    TextAnalyzer::builder(SimpleTokenizer::default()).filter(LowerCaser).filter(AsciiFoldingFilter).build()
 }
 
 /// `_bigram_analyzer`: ngram(2,2,prefix_only=False) -> lowercase.
@@ -128,9 +123,7 @@ pub fn bigram_analyzer() -> TextAnalyzer {
     // (2, 2) is always valid; the fallback only keeps this function total.
     match NgramTokenizer::new(2, 2, false) {
         Ok(t) => TextAnalyzer::builder(t).filter(LowerCaser).build(),
-        Err(_) => TextAnalyzer::builder(RawTokenizer::default())
-            .filter(LowerCaser)
-            .build(),
+        Err(_) => TextAnalyzer::builder(RawTokenizer::default()).filter(LowerCaser).build(),
     }
 }
 
@@ -150,17 +143,11 @@ pub fn simple_search_analyzer() -> TextAnalyzer {
 
 /// `register_tokenizers`: must be called on every opened Index.
 pub fn register_tokenizers(index: &Index, language: Option<&str>) {
-    index
-        .tokenizers()
-        .register(PAPERLESS_TEXT, paperless_text_analyzer(language));
+    index.tokenizers().register(PAPERLESS_TEXT, paperless_text_analyzer(language));
     index.tokenizers().register(SIMPLE_ANALYZER, simple_analyzer());
     index.tokenizers().register(BIGRAM_ANALYZER, bigram_analyzer());
-    index
-        .tokenizers()
-        .register(SIMPLE_SEARCH_ANALYZER, simple_search_analyzer());
-    index
-        .fast_field_tokenizer()
-        .register(SIMPLE_ANALYZER, simple_analyzer());
+    index.tokenizers().register(SIMPLE_SEARCH_ANALYZER, simple_search_analyzer());
+    index.fast_field_tokenizer().register(SIMPLE_ANALYZER, simple_analyzer());
 }
 
 fn simple_search_shared() -> &'static TextAnalyzer {
@@ -170,11 +157,7 @@ fn simple_search_shared() -> &'static TextAnalyzer {
 
 fn ascii_fold_shared() -> &'static TextAnalyzer {
     static A: OnceLock<TextAnalyzer> = OnceLock::new();
-    A.get_or_init(|| {
-        TextAnalyzer::builder(RawTokenizer::default())
-            .filter(AsciiFoldingFilter)
-            .build()
-    })
+    A.get_or_init(|| TextAnalyzer::builder(RawTokenizer::default()).filter(AsciiFoldingFilter).build())
 }
 
 fn autocomplete_shared() -> &'static TextAnalyzer {
@@ -194,10 +177,7 @@ pub fn autocomplete_tokens(text: &str) -> Vec<String> {
 
 /// `ascii_fold`: fold to ASCII like the content tokenizers (raw -> ascii_fold).
 pub fn ascii_fold(text: &str) -> String {
-    analyze(ascii_fold_shared(), text)
-        .into_iter()
-        .next()
-        .unwrap_or_default()
+    analyze(ascii_fold_shared(), text).into_iter().next().unwrap_or_default()
 }
 
 /// Python's `str.lower()` (full Unicode lowercase mapping), used before `ascii_fold`.
@@ -228,10 +208,7 @@ mod tests {
 
     #[test]
     fn simple_search_keeps_punctuation() {
-        assert_eq!(
-            simple_search_tokens("Medical-History  2024/01"),
-            vec!["medical-history", "2024/01"]
-        );
+        assert_eq!(simple_search_tokens("Medical-History  2024/01"), vec!["medical-history", "2024/01"]);
     }
 
     #[test]

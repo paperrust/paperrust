@@ -20,8 +20,8 @@ use std::collections::{BTreeMap, HashMap};
 use futures::future::BoxFuture;
 use serde::Serialize;
 
-use super::backend::{Actor, Backend, DocumentDetail, SearchParams};
 use super::McpService;
+use super::backend::{Actor, Backend, DocumentDetail, SearchParams};
 
 /// State of the LLM index.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -103,11 +103,7 @@ pub fn snippet(content: &str, query: &str, max: usize) -> (String, usize) {
 /// Short form for sources (at most 300 characters, whitespace collapsed).
 pub fn short(s: &str, max: usize) -> String {
     let flat = s.split_whitespace().collect::<Vec<_>>().join(" ");
-    if flat.chars().count() <= max {
-        flat
-    } else {
-        format!("{}…", flat.chars().take(max).collect::<String>())
-    }
+    if flat.chars().count() <= max { flat } else { format!("{}…", flat.chars().take(max).collect::<String>()) }
 }
 
 /// Part `index` of a content: by pages (if page breaks) or fixed sections.
@@ -170,7 +166,13 @@ pub struct Retrieved {
 /// Retrieval of `ask_documents` (also `/rs/api/v2/ask`): full text via the backend (with the
 /// user's permissions), index hits additionally checked against the user's `get_document`,
 /// merged via Reciprocal Rank Fusion.
-pub async fn retrieve<B: Backend>(svc: &McpService<B>, actor: &Actor, question: &str, max_passages: usize, restrict: Option<&[i64]>) -> Retrieved {
+pub async fn retrieve<B: Backend>(
+    svc: &McpService<B>,
+    actor: &Actor,
+    question: &str,
+    max_passages: usize,
+    restrict: Option<&[i64]>,
+) -> Retrieved {
     let mut notes = Vec::new();
     let state = match &svc.knowledge {
         Some(k) => k.state().await,
@@ -186,15 +188,18 @@ pub async fn retrieve<B: Backend>(svc: &McpService<B>, actor: &Actor, question: 
     // 2. LLM index (only if built)
     let mut sem: Vec<Passage> = Vec::new();
     match (state, &svc.knowledge) {
-        (IndexState::Ready, Some(k)) => match k.semantic(actor, question, max_passages.max(crate::chat::CHAT_RETRIEVER_TOP_K), restrict).await {
-            Ok(v) => sem = v,
-            Err(e) => {
-                tracing::warn!(target: "pl_ai::mcp", error = %e, "LLM index query failed");
-                notes.push("The LLM index could not be queried; using full-text search only.".into());
+        (IndexState::Ready, Some(k)) => {
+            match k.semantic(actor, question, max_passages.max(crate::chat::CHAT_RETRIEVER_TOP_K), restrict).await {
+                Ok(v) => sem = v,
+                Err(e) => {
+                    tracing::warn!(target: "pl_ai::mcp", error = %e, "LLM index query failed");
+                    notes.push("The LLM index could not be queried; using full-text search only.".into());
+                }
             }
-        },
+        }
         (IndexState::NotBuilt, _) => notes.push(
-            "AI is enabled but the LLM index has not been built yet (its build has been queued); answering from full-text search only.".into(),
+            "AI is enabled but the LLM index has not been built yet (its build has been queued); answering from full-text search only."
+                .into(),
         ),
         _ => notes.push("AI/LLM index is not enabled on this server; returning full-text passages only.".into()),
     }
@@ -316,7 +321,8 @@ pub async fn ask<B: Backend>(
     restrict: Option<&[i64]>,
     want_answer: bool,
 ) -> AskResult {
-    let Retrieved { index_state: state, retrieval, citations: cands, mut notes } = retrieve(svc, actor, question, max_passages, restrict).await;
+    let Retrieved { index_state: state, retrieval, citations: cands, mut notes } =
+        retrieve(svc, actor, question, max_passages, restrict).await;
     // 4. Answer with the configured LLM (chat templates)
     let (mut answer, mut answer_error) = (None, None);
     if want_answer && !cands.is_empty() {

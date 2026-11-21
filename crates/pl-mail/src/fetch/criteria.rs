@@ -50,7 +50,11 @@ pub enum MailAction {
     MarkRead,
     Flag,
     /// `TagMailAction`: Apple colour or keyword (Gmail label, if supported).
-    Tag { color: Option<String>, keyword: Option<String>, gmail: bool },
+    Tag {
+        color: Option<String>,
+        keyword: Option<String>,
+        gmail: bool,
+    },
 }
 
 /// `get_rule_action(rule, supports_gmail_labels=…)`.
@@ -66,10 +70,7 @@ pub fn get_rule_action(action: i16, parameter: Option<&str>, supports_gmail_labe
             if p.to_lowercase().contains("apple:") {
                 let parts: Vec<&str> = p.split(':').collect();
                 if parts.len() != 2 {
-                    return Err(ActionError::Value(format!(
-                        "too many values to unpack (expected 2, got {})",
-                        parts.len()
-                    )));
+                    return Err(ActionError::Value(format!("too many values to unpack (expected 2, got {})", parts.len())));
                 }
                 let color = pl_parsers::pystr::py_strip(parts[1]).to_lowercase();
                 if !APPLE_MAIL_TAG_COLORS.iter().any(|(c, _)| *c == color) {
@@ -310,7 +311,8 @@ mod tests {
     #[test]
     fn criteria_like_imap_tools() {
         let today = d(2025, 3, 10);
-        let r = RuleFilter { maximum_age: 30, filter_from: Some("a@b".into()), filter_subject: Some("Inv \"x\"".into()), ..Default::default() };
+        let r =
+            RuleFilter { maximum_age: 30, filter_from: Some("a@b".into()), filter_subject: Some("Inv \"x\"".into()), ..Default::default() };
         let c = make_criterias(&r, &MailAction::MarkRead, today);
         assert_eq!(c, "(SINCE 8-Feb-2025 FROM \"a@b\" UNSEEN SUBJECT \"Inv \\\"x\\\"\")");
         let r0 = RuleFilter::default();

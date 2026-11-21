@@ -4,9 +4,9 @@
 //!
 //! Run: `cargo test -p pl-workflows -j 2 --test http -- --ignored`
 
+use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use axum::Router;
 use pl_core::config::Env;
 use pl_core::{AppState, Config};
 use serde_json::{Value, json};
@@ -32,10 +32,7 @@ async fn app() -> Router {
     ]);
     let config = Config::from_env_map(env).expect("config");
     let state = AppState::with_pool(config, pool.clone()).expect("state");
-    let authz = pl_authz::Authz::new(
-        pool,
-        pl_authz::AuthConfig::for_tests("paperless-rs-reference-secret-key-local-only-0123456789"),
-    );
+    let authz = pl_authz::Authz::new(pool, pl_authz::AuthConfig::for_tests("paperless-rs-reference-secret-key-local-only-0123456789"));
     let mut router: Router<AppState> = Router::new();
     for r in pl_workflows::routes() {
         router = router.route(r.path, r.handler);
@@ -101,7 +98,15 @@ async fn http_matches_django() {
         for tok in [Some(ADMIN), Some(ALICE), Some(BOB), Some(CAROL), Some(DAVE), None] {
             cases.push(("GET", base.to_string(), tok, None, "", v10));
         }
-        for q in ["?page=2&page_size=1", "?page_size=1&page=last", "?page=9", "?page=0", "?page=x", "?page_size=0", "?page_size=abc&b=%C3%A4&a=1"] {
+        for q in [
+            "?page=2&page_size=1",
+            "?page_size=1&page=last",
+            "?page=9",
+            "?page=0",
+            "?page=x",
+            "?page_size=0",
+            "?page_size=abc&b=%C3%A4&a=1",
+        ] {
             cases.push(("GET", format!("{base}{q}"), Some(ADMIN), None, "", v10));
         }
         cases.push(("GET", base.to_string(), Some(ADMIN), None, "", v9));
@@ -129,9 +134,30 @@ async fn http_matches_django() {
         cases.push(("PATCH", format!("{base}999999/"), Some(ADMIN), Some(r#"{"id": 5}"#.into()), "application/json", v10));
         cases.push(("PATCH", format!("{base}999999/"), Some(ADMIN), Some(r#"{"id": 999999}"#.into()), "application/json", v10));
     }
-    cases.push(("PATCH", "/api/workflow_triggers/1/".into(), Some(ADMIN), Some(r#"{"type": 1, "filter_filename": null}"#.into()), "application/json", v10));
-    cases.push(("PATCH", "/api/workflows/1/".into(), Some(ADMIN), Some(r#"{"name": "Invoice intake", "triggers": [{"type": 1}]}"#.into()), "application/json", v10));
-    cases.push(("PATCH", "/api/workflows/1/".into(), Some(ADMIN), Some(r#"{"name": "Invoice intake 9", "actions": [{"type": 8, "ai_suggestion_fields": ["nope"]}]}"#.into()), "application/json", v10));
+    cases.push((
+        "PATCH",
+        "/api/workflow_triggers/1/".into(),
+        Some(ADMIN),
+        Some(r#"{"type": 1, "filter_filename": null}"#.into()),
+        "application/json",
+        v10,
+    ));
+    cases.push((
+        "PATCH",
+        "/api/workflows/1/".into(),
+        Some(ADMIN),
+        Some(r#"{"name": "Invoice intake", "triggers": [{"type": 1}]}"#.into()),
+        "application/json",
+        v10,
+    ));
+    cases.push((
+        "PATCH",
+        "/api/workflows/1/".into(),
+        Some(ADMIN),
+        Some(r#"{"name": "Invoice intake 9", "actions": [{"type": 8, "ai_suggestion_fields": ["nope"]}]}"#.into()),
+        "application/json",
+        v10,
+    ));
 
     let mut failures = Vec::new();
     for (m, path, tok, body, ct, accept) in &cases {
@@ -142,8 +168,8 @@ async fn http_matches_django() {
             "Django hat einen Schreibzugriff ausgeführt: {m} {path} {body:?}"
         );
         // Django 500s: compare only the status
-        let same = a.status == b.status
-            && (a.status >= 500 || (a.body == b.body && a.content_type == b.content_type && a.allow == b.allow));
+        let same =
+            a.status == b.status && (a.status >= 500 || (a.body == b.body && a.content_type == b.content_type && a.allow == b.allow));
         if !same {
             failures.push(format!(
                 "{m} {path} tok={tok:?} body={body:?} accept={accept}\n  django {} {} [{}] {}\n  rust   {} {} [{}] {}",

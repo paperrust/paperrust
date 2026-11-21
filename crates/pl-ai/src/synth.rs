@@ -16,8 +16,8 @@
 
 use std::collections::VecDeque;
 
-use crate::llm::{LlmClient, LlmError, LLM_SYSTEM_PROMPT};
-use crate::tokenizer::{count_tokens, PromptHelper, SplitError};
+use crate::llm::{LLM_SYSTEM_PROMPT, LlmClient, LlmError};
+use crate::tokenizer::{PromptHelper, SplitError, count_tokens};
 
 /// llama_index `DEFAULT_RESPONSE_PADDING_SIZE`.
 pub const RESPONSE_PADDING_SIZE: usize = 500;

@@ -6,12 +6,8 @@ use crate::args::{self, flag, value};
 use crate::ctx::Ctx;
 use crate::{CliError, CliResult};
 
-const OPTS: &[args::Opt] = &[
-    args::PROGRESS,
-    flag(&["--recreate"], "recreate"),
-    flag(&["--if-needed"], "if_needed"),
-    value(&["--heap-size-mb"], "heap_size_mb"),
-];
+const OPTS: &[args::Opt] =
+    &[args::PROGRESS, flag(&["--recreate"], "recreate"), flag(&["--if-needed"], "if_needed"), value(&["--heap-size-mb"], "heap_size_mb")];
 
 #[derive(Debug, Clone, Default)]
 pub struct ReindexArgs {

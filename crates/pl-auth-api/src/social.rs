@@ -11,8 +11,8 @@
 
 use crate::db::a;
 use pl_core::Config;
-use sea_query::{Expr, Order, PostgresQueryBuilder, Query};
 use pl_core::sqlbind::SqlxBinder as _;
+use sea_query::{Expr, Order, PostgresQueryBuilder, Query};
 use serde_json::{Value, json};
 use sqlx::{PgPool, Row};
 
@@ -27,11 +27,7 @@ async fn apps_for(db: &PgPool, cfg: &Config, provider: &str) -> Result<Vec<App>,
     let (sql, values) = Query::select()
         .columns([a("provider"), a("name"), a("settings")])
         .from(a("socialaccount_socialapp"))
-        .cond_where(
-            sea_query::Cond::any()
-                .add(Expr::col(a("provider")).eq(provider))
-                .add(Expr::col(a("provider_id")).eq(provider)),
-        )
+        .cond_where(sea_query::Cond::any().add(Expr::col(a("provider")).eq(provider)).add(Expr::col(a("provider_id")).eq(provider)))
         .order_by(a("id"), Order::Asc)
         .build_sqlx(PostgresQueryBuilder);
     let rows = sqlx::query_with(&sql, values).fetch_all(db).await?;
@@ -42,15 +38,8 @@ async fn apps_for(db: &PgPool, cfg: &Config, provider: &str) -> Result<Vec<App>,
         None => grouped.push((app.provider.clone(), vec![app])),
     };
     for r in &rows {
-        let settings: Value = r
-            .try_get::<sqlx::types::Json<Value>, _>("settings")
-            .map(|j| j.0)
-            .unwrap_or(Value::Null);
-        push(App {
-            provider: r.try_get("provider")?,
-            name: r.try_get("name")?,
-            hidden: settings.get("hidden").is_some_and(truthy),
-        });
+        let settings: Value = r.try_get::<sqlx::types::Json<Value>, _>("settings").map(|j| j.0).unwrap_or(Value::Null);
+        push(App { provider: r.try_get("provider")?, name: r.try_get("name")?, hidden: settings.get("hidden").is_some_and(truthy) });
     }
     // settings.SOCIALACCOUNT_PROVIDERS (PAPERLESS_SOCIALACCOUNT_PROVIDERS)
     if let Ok(Some(Value::Object(providers))) = cfg.env.json("PAPERLESS_SOCIALACCOUNT_PROVIDERS") {
@@ -98,32 +87,30 @@ pub fn base_to_str(user_data: Option<&Value>, brand_name: &str) -> String {
         (None, &["name", "display_name", "displayName", "displayname", "Display_Name", "nickname"]),
         (None, &["full_name", "fullName"]),
         (Some("first_name"), &["first_name", "firstname", "firstName", "First_Name", "given_name", "givenName"]),
-        (
-            Some("last_name"),
-            &["last_name", "lastname", "lastName", "Last_Name", "family_name", "familyName", "surname"],
-        ),
+        (Some("last_name"), &["last_name", "lastname", "lastName", "Last_Name", "family_name", "familyName", "surname"]),
     ];
     if let Some(Value::Object(data)) = user_data
-        && !data.is_empty() {
-            let mut first = String::new();
-            let mut last = String::new();
-            for (store_as, variants) in TBL {
-                for key in *variants {
-                    if let Some(Value::String(v)) = data.get(*key) {
-                        let v = v.trim();
-                        match store_as {
-                            None if !v.is_empty() => return v.to_string(),
-                            None => {}
-                            Some("first_name") => first = v.to_string(),
-                            Some(_) => last = v.to_string(),
-                        }
+        && !data.is_empty()
+    {
+        let mut first = String::new();
+        let mut last = String::new();
+        for (store_as, variants) in TBL {
+            for key in *variants {
+                if let Some(Value::String(v)) = data.get(*key) {
+                    let v = v.trim();
+                    match store_as {
+                        None if !v.is_empty() => return v.to_string(),
+                        None => {}
+                        Some("first_name") => first = v.to_string(),
+                        Some(_) => last = v.to_string(),
                     }
                 }
             }
-            if !first.is_empty() || !last.is_empty() {
-                return format!("{first} {last}").trim().to_string();
-            }
         }
+        if !first.is_empty() || !last.is_empty() {
+            return format!("{first} {last}").trim().to_string();
+        }
+    }
     brand_name.to_string()
 }
 
@@ -153,10 +140,7 @@ pub async fn social_accounts(db: &PgPool, cfg: &Config, user_id: i64) -> Result<
     for r in &rows {
         let id: i64 = r.try_get("id")?;
         let provider: String = r.try_get("provider")?;
-        let extra: Value = r
-            .try_get::<sqlx::types::Json<Value>, _>("extra_data")
-            .map(|j| j.0)
-            .unwrap_or(Value::Null);
+        let extra: Value = r.try_get::<sqlx::types::Json<Value>, _>("extra_data").map(|j| j.0).unwrap_or(Value::Null);
         let mut apps = apps_for(db, cfg, &provider).await?;
         if apps.len() > 1 {
             apps.retain(|a| !a.hidden);

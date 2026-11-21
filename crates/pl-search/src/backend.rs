@@ -16,20 +16,17 @@ use std::time::{Duration, Instant};
 use chrono::{DateTime, Utc};
 use tantivy::collector::{Collector, Count, SegmentCollector, TopDocs};
 use tantivy::query::{
-    AllQuery, BooleanQuery, ConstScoreQuery, DisjunctionMaxQuery, ExistsQuery,
-    MoreLikeThisQuery, Occur, Query, TermQuery,
+    AllQuery, BooleanQuery, ConstScoreQuery, DisjunctionMaxQuery, ExistsQuery, MoreLikeThisQuery, Occur, Query, TermQuery,
 };
 use tantivy::schema::{Field, FieldType, IndexRecordOption, Value};
 use tantivy::snippet::SnippetGenerator;
 use tantivy::{
-    DocAddress, DocId, Index, IndexReader, Order, ReloadPolicy, Score, Searcher, SegmentOrdinal,
-    SegmentReader, TantivyDocument, Term,
+    DocAddress, DocId, Index, IndexReader, Order, ReloadPolicy, Score, Searcher, SegmentOrdinal, SegmentReader, TantivyDocument, Term,
 };
 
 use crate::error::SearchError;
 use crate::query_simple::{
-    normalize_search_text, parse_simple_text_highlight_query, parse_simple_text_query,
-    parse_simple_title_query, tantivy_parse_query,
+    normalize_search_text, parse_simple_text_highlight_query, parse_simple_text_query, parse_simple_title_query, tantivy_parse_query,
 };
 use crate::schema::{IndexState, build_schema, check_index_dir, schema_matches};
 use crate::tokenizer::{ascii_fold, py_lower, register_tokenizers};
@@ -74,14 +71,9 @@ impl SearchSettings {
     /// `routes` feature (no pl-core); the server uses `routes::settings_from_core`.
     pub fn from_env() -> Self {
         let get = |k: &str| std::env::var(k).ok();
-        let data_dir = get("PAPERLESS_DATA_DIR")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| PathBuf::from("../data"));
-        let fuzzy_threshold = get("PAPERLESS_ADVANCED_FUZZY_SEARCH_THRESHOLD")
-            .and_then(|v| v.trim().parse::<f64>().ok());
-        let time_zone = get("PAPERLESS_TIME_ZONE")
-            .and_then(|tz| tz.parse::<chrono_tz::Tz>().ok())
-            .unwrap_or(chrono_tz::UTC);
+        let data_dir = get("PAPERLESS_DATA_DIR").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("../data"));
+        let fuzzy_threshold = get("PAPERLESS_ADVANCED_FUZZY_SEARCH_THRESHOLD").and_then(|v| v.trim().parse::<f64>().ok());
+        let time_zone = get("PAPERLESS_TIME_ZONE").and_then(|tz| tz.parse::<chrono_tz::Tz>().ok()).unwrap_or(chrono_tz::UTC);
         Self {
             index_dir: data_dir.join("index"),
             language: search_language_setting(
@@ -105,15 +97,8 @@ pub fn search_language_setting(explicit: Option<&str>, ocr_lang: &str) -> Option
         tracing::error!("PAPERRUST_SEARCH_LANGUAGE {explicit:?} is not supported");
         return None;
     }
-    let primary = ocr_lang
-        .split('+')
-        .next()
-        .unwrap_or_default()
-        .to_lowercase();
-    OCR_TO_SEARCH
-        .iter()
-        .find(|(k, _)| *k == primary)
-        .map(|(_, v)| v.to_string())
+    let primary = ocr_lang.split('+').next().unwrap_or_default().to_lowercase();
+    OCR_TO_SEARCH.iter().find(|(k, _)| *k == primary).map(|(_, v)| v.to_string())
 }
 
 /// `SearchMode`.
@@ -149,23 +134,14 @@ pub struct SearchHit {
 
 impl SearchHit {
     pub fn stub(id: i64, rank: usize) -> Self {
-        Self {
-            id,
-            score: 0.0,
-            rank,
-            content_highlight: None,
-            notes_highlight: None,
-        }
+        Self { id, score: 0.0, rank, content_highlight: None, notes_highlight: None }
     }
 
     /// `SearchResultSerializer.to_representation`: the `__search_hit__` object.
     pub fn to_json(&self) -> serde_json::Value {
         let mut m = serde_json::Map::new();
         m.insert("score".into(), serde_json::json!(self.score));
-        m.insert(
-            "highlights".into(),
-            serde_json::Value::String(self.content_highlight.clone().unwrap_or_default()),
-        );
+        m.insert("highlights".into(), serde_json::Value::String(self.content_highlight.clone().unwrap_or_default()));
         m.insert(
             "note_highlights".into(),
             match self.notes_highlight.as_deref() {
@@ -196,10 +172,7 @@ pub fn sort_field_map(name: &str) -> Option<&'static str> {
 
 /// `TantivyBackend.SORTABLE_FIELDS`.
 pub fn is_sortable_field(name: &str) -> bool {
-    matches!(
-        name,
-        "created" | "added" | "modified" | "archive_serial_number" | "page_count" | "num_notes"
-    )
+    matches!(name, "created" | "added" | "modified" | "archive_serial_number" | "page_count" | "num_notes")
 }
 
 struct Opened {
@@ -227,11 +200,7 @@ const RETRY_INTERVAL: Duration = Duration::from_secs(5);
 
 impl SearchBackend {
     pub fn new(settings: SearchSettings) -> Self {
-        Self {
-            settings,
-            opened: RwLock::new(None),
-            last_attempt: Mutex::new(None),
-        }
+        Self { settings, opened: RwLock::new(None), last_attempt: Mutex::new(None) }
     }
 
     pub fn settings(&self) -> &SearchSettings {
@@ -265,29 +234,15 @@ impl SearchBackend {
             return Ok(None);
         }
         register_tokenizers(&index, self.language());
-        let reader = index
-            .reader_builder()
-            .reload_policy(ReloadPolicy::OnCommitWithDelay)
-            .try_into()?;
-        Ok(Some(Opened {
-            index,
-            reader,
-            on_disk: true,
-        }))
+        let reader = index.reader_builder().reload_policy(ReloadPolicy::OnCommitWithDelay).try_into()?;
+        Ok(Some(Opened { index, reader, on_disk: true }))
     }
 
     fn open_empty(&self) -> Result<Opened, SearchError> {
         let index = Index::create_in_ram(build_schema());
         register_tokenizers(&index, self.language());
-        let reader = index
-            .reader_builder()
-            .reload_policy(ReloadPolicy::Manual)
-            .try_into()?;
-        Ok(Opened {
-            index,
-            reader,
-            on_disk: false,
-        })
+        let reader = index.reader_builder().reload_policy(ReloadPolicy::Manual).try_into()?;
+        Ok(Opened { index, reader, on_disk: false })
     }
 
     fn current(&self) -> Result<Arc<Opened>, SearchError> {
@@ -298,19 +253,12 @@ impl SearchBackend {
                 return Ok(o.clone());
             }
             // in-RAM stand-in: retry the real index now and then
-            let due = self
-                .last_attempt
-                .lock()
-                .map(|t| t.is_none_or(|t| t.elapsed() >= RETRY_INTERVAL))
-                .unwrap_or(true);
+            let due = self.last_attempt.lock().map(|t| t.is_none_or(|t| t.elapsed() >= RETRY_INTERVAL)).unwrap_or(true);
             if !due {
                 return Ok(o.clone());
             }
         }
-        let mut guard = self
-            .opened
-            .write()
-            .map_err(|_| SearchError::Internal("search backend lock poisoned".into()))?;
+        let mut guard = self.opened.write().map_err(|_| SearchError::Internal("search backend lock poisoned".into()))?;
         if let Some(o) = guard.as_ref()
             && o.on_disk
         {
@@ -339,13 +287,7 @@ impl SearchBackend {
     }
 
     /// `_parse_query`.
-    fn parse_query(
-        &self,
-        index: &Index,
-        query: &str,
-        mode: SearchMode,
-        now: DateTime<Utc>,
-    ) -> Result<Box<dyn Query>, SearchError> {
+    fn parse_query(&self, index: &Index, query: &str, mode: SearchMode, now: DateTime<Utc>) -> Result<Box<dyn Query>, SearchError> {
         let query = normalize_search_text(query);
         match mode {
             SearchMode::Text => parse_simple_text_query(index, &query),
@@ -363,17 +305,10 @@ impl SearchBackend {
     }
 
     /// `_apply_permission_filter`.
-    fn apply_permission_filter(
-        index: &Index,
-        query: Box<dyn Query>,
-        user: Option<&SearchUser>,
-    ) -> Result<Box<dyn Query>, SearchError> {
+    fn apply_permission_filter(index: &Index, query: Box<dyn Query>, user: Option<&SearchUser>) -> Result<Box<dyn Query>, SearchError> {
         match user {
             None => Ok(query),
-            Some(user) => Ok(Box::new(BooleanQuery::new(vec![
-                (Occur::Must, query),
-                (Occur::Must, build_permission_filter(index, user)?),
-            ]))),
+            Some(user) => Ok(Box::new(BooleanQuery::new(vec![(Occur::Must, query), (Occur::Must, build_permission_filter(index, user)?)]))),
         }
     }
 
@@ -391,10 +326,8 @@ impl SearchBackend {
         if let Some(fq) = filter_query {
             let filter = self.parse_query(index, fq, SearchMode::Query, now)?;
             // Query.and_must_match(const_score_query(filter, 0.0))
-            user_query = Box::new(BooleanQuery::new(vec![
-                (Occur::Must, user_query),
-                (Occur::Must, Box::new(ConstScoreQuery::new(filter, 0.0))),
-            ]));
+            user_query =
+                Box::new(BooleanQuery::new(vec![(Occur::Must, user_query), (Occur::Must, Box::new(ConstScoreQuery::new(filter, 0.0)))]));
         }
         Self::apply_permission_filter(index, user_query, user)
     }
@@ -429,8 +362,7 @@ impl SearchBackend {
             sorted_search(&searcher, &*final_query, mapped, order, effective_limit)?
         } else {
             let hits = searcher.search(&*final_query, &TopDocs::with_limit(effective_limit).order_by_score())?;
-            let mut all: Vec<(DocAddress, f64)> =
-                hits.into_iter().map(|(s, a)| (a, f64::from(s))).collect();
+            let mut all: Vec<(DocAddress, f64)> = hits.into_iter().map(|(s, a)| (a, f64::from(s))).collect();
             if !all.is_empty() {
                 let mut max_score = all.iter().map(|h| h.1).fold(f64::NEG_INFINITY, f64::max);
                 if max_score == 0.0 {
@@ -496,11 +428,7 @@ impl SearchBackend {
             let order = if sort_reverse { Order::Desc } else { Order::Asc };
             sorted_search(&searcher, &*final_query, mapped, order, limit)?
         } else {
-            searcher
-                .search(&*final_query, &TopDocs::with_limit(limit).order_by_score())?
-                .into_iter()
-                .map(|(_, a)| a)
-                .collect()
+            searcher.search(&*final_query, &TopDocs::with_limit(limit).order_by_score())?.into_iter().map(|(_, a)| a).collect()
         };
         Ok(RankedWindow { total, ids: fast_field_ids(&searcher, &addrs)? })
     }
@@ -561,10 +489,7 @@ impl SearchBackend {
                 return Ok(RankedWindow { total: 0, ids: Vec::new() });
             }
         };
-        let mut ids: Vec<i64> = fast_field_ids(&searcher, &addrs)?
-            .into_iter()
-            .filter(|id| *id != doc_id)
-            .collect();
+        let mut ids: Vec<i64> = fast_field_ids(&searcher, &addrs)?.into_iter().filter(|id| *id != doc_id).collect();
         if let Some(w) = window {
             ids.truncate(w);
         }
@@ -572,13 +497,7 @@ impl SearchBackend {
     }
 
     /// `highlight_hits`.
-    pub fn highlight_hits(
-        &self,
-        query: &str,
-        doc_ids: &[i64],
-        mode: SearchMode,
-        rank_start: usize,
-    ) -> Result<Vec<SearchHit>, SearchError> {
+    pub fn highlight_hits(&self, query: &str, doc_ids: &[i64], mode: SearchMode, rank_start: usize) -> Result<Vec<SearchHit>, SearchError> {
         if doc_ids.is_empty() {
             return Ok(Vec::new());
         }
@@ -592,21 +511,17 @@ impl SearchBackend {
         if mode == SearchMode::Text {
             match parse_simple_text_highlight_query(index, &query) {
                 Ok(q) => highlight_query = Some(q),
-                Err(_) => tracing::debug!(
-                    "Skipping simple text highlight query: token string is not valid tantivy query syntax: {query:?}"
-                ),
+                Err(_) => {
+                    tracing::debug!("Skipping simple text highlight query: token string is not valid tantivy query syntax: {query:?}")
+                }
             }
         }
 
         // re.sub(r"\w[\w.]*:", "", query).strip()
-        let bare_query = bare_query_re()
-            .map(|re| re.replace_all(&query, "").trim().to_string())
-            .unwrap_or_else(|| query.trim().to_string());
-        let notes_text_query: Option<Box<dyn Query>> = if bare_query.is_empty() {
-            None
-        } else {
-            tantivy_parse_query(index, &bare_query, &["notes_text"]).ok()
-        };
+        let bare_query =
+            bare_query_re().map(|re| re.replace_all(&query, "").trim().to_string()).unwrap_or_else(|| query.trim().to_string());
+        let notes_text_query: Option<Box<dyn Query>> =
+            if bare_query.is_empty() { None } else { tantivy_parse_query(index, &bare_query, &["notes_text"]).ok() };
 
         let searcher = o.reader.searcher();
         let id_field = field(&schema, "id")?;
@@ -614,18 +529,13 @@ impl SearchBackend {
             doc_ids
                 .iter()
                 .map(|did| {
-                    let q: Box<dyn Query> = Box::new(TermQuery::new(
-                        Term::from_field_u64(id_field, *did as u64),
-                        IndexRecordOption::WithFreqsAndPositions,
-                    ));
+                    let q: Box<dyn Query> =
+                        Box::new(TermQuery::new(Term::from_field_u64(id_field, *did as u64), IndexRecordOption::WithFreqsAndPositions));
                     (Occur::Should, q)
                 })
                 .collect(),
         );
-        let batch_query = BooleanQuery::new(vec![
-            (Occur::Must, user_query.box_clone()),
-            (Occur::Must, Box::new(id_filter)),
-        ]);
+        let batch_query = BooleanQuery::new(vec![(Occur::Must, user_query.box_clone()), (Occur::Must, Box::new(id_filter))]);
         let batch_results = searcher.search(&batch_query, &TopDocs::with_limit(doc_ids.len()).order_by_score())?;
         let addrs: Vec<DocAddress> = batch_results.iter().map(|(_, a)| *a).collect();
         let ids = fast_field_ids(&searcher, &addrs)?;
@@ -653,8 +563,7 @@ impl SearchBackend {
             // try: ... except Exception: pass (partial highlights are kept)
             let _ = (|| -> Result<(), tantivy::TantivyError> {
                 if snippet_generator.is_none() {
-                    snippet_generator =
-                        Some(SnippetGenerator::create(&searcher, hl_query, content_field)?);
+                    snippet_generator = Some(SnippetGenerator::create(&searcher, hl_query, content_field)?);
                 }
                 if let Some(g) = &snippet_generator {
                     let html = g.snippet_from_doc(&doc).to_html();
@@ -664,11 +573,7 @@ impl SearchBackend {
                 }
                 if mode == SearchMode::Query && doc.get_first(notes_text_field).is_some() {
                     if notes_snippet_generator.is_none() {
-                        notes_snippet_generator = Some(SnippetGenerator::create(
-                            &searcher,
-                            notes_query,
-                            notes_text_field,
-                        )?);
+                        notes_snippet_generator = Some(SnippetGenerator::create(&searcher, notes_query, notes_text_field)?);
                     }
                     if let Some(g) = &notes_snippet_generator {
                         let html = g.snippet_from_doc(&doc).to_html();
@@ -686,12 +591,7 @@ impl SearchBackend {
     }
 
     /// `autocomplete(term, limit, user)`; `user` is `None` for superusers.
-    pub fn autocomplete(
-        &self,
-        term: &str,
-        limit: usize,
-        user: Option<&SearchUser>,
-    ) -> Result<Vec<String>, SearchError> {
+    pub fn autocomplete(&self, term: &str, limit: usize, user: Option<&SearchUser>) -> Result<Vec<String>, SearchError> {
         let normalized = ascii_fold(&py_lower(term));
         if normalized.is_empty() {
             return Ok(Vec::new());
@@ -702,31 +602,17 @@ impl SearchBackend {
             Some(u) => Some(build_permission_filter(&o.index, u)?),
             None => None,
         };
-        terms_with_prefix(
-            &searcher,
-            "autocomplete_word",
-            &normalized,
-            permission_query.as_deref(),
-            Some(limit),
-        )
+        terms_with_prefix(&searcher, "autocomplete_word", &normalized, permission_query.as_deref(), Some(limit))
     }
 
     /// `more_like_this_ids`. `doc_id` must already be the root document id
     /// (`root_document_ids([doc_id])`, resolved by the caller from the DB).
-    pub fn more_like_this_ids(
-        &self,
-        doc_id: i64,
-        user: Option<&SearchUser>,
-        limit: Option<usize>,
-    ) -> Result<Vec<i64>, SearchError> {
+    pub fn more_like_this_ids(&self, doc_id: i64, user: Option<&SearchUser>, limit: Option<usize>) -> Result<Vec<i64>, SearchError> {
         let o = self.current()?;
         let searcher = o.reader.searcher();
         let schema = o.index.schema();
         let id_field = field(&schema, "id")?;
-        let id_query = TermQuery::new(
-            Term::from_field_u64(id_field, doc_id as u64),
-            IndexRecordOption::WithFreqsAndPositions,
-        );
+        let id_query = TermQuery::new(Term::from_field_u64(id_field, doc_id as u64), IndexRecordOption::WithFreqsAndPositions);
         let results = searcher.search(&id_query, &TopDocs::with_limit(1).order_by_score())?;
         let Some((_, doc_address)) = results.first().copied() else {
             return Ok(Vec::new());
@@ -760,10 +646,7 @@ impl SearchBackend {
             }
         };
         let addrs: Vec<DocAddress> = hits.iter().map(|(_, a)| *a).collect();
-        let mut ids: Vec<i64> = fast_field_ids(&searcher, &addrs)?
-            .into_iter()
-            .filter(|id| *id != doc_id)
-            .collect();
+        let mut ids: Vec<i64> = fast_field_ids(&searcher, &addrs)?.into_iter().filter(|id| *id != doc_id).collect();
         if let Some(l) = limit {
             ids.truncate(l);
         }
@@ -798,25 +681,17 @@ fn bare_query_re() -> Option<&'static regex::Regex> {
 }
 
 fn field(schema: &tantivy::schema::Schema, name: &str) -> Result<Field, SearchError> {
-    schema
-        .get_field(name)
-        .map_err(|e| SearchError::Internal(e.to_string()))
+    schema.get_field(name).map_err(|e| SearchError::Internal(e.to_string()))
 }
 
 /// `build_permission_filter`.
 pub fn build_permission_filter(index: &Index, user: &SearchUser) -> Result<Box<dyn Query>, SearchError> {
     let schema = index.schema();
     let term = |name: &str, v: i64| -> Result<Box<dyn Query>, SearchError> {
-        Ok(Box::new(TermQuery::new(
-            Term::from_field_u64(field(&schema, name)?, v as u64),
-            IndexRecordOption::WithFreqsAndPositions,
-        )))
+        Ok(Box::new(TermQuery::new(Term::from_field_u64(field(&schema, name)?, v as u64), IndexRecordOption::WithFreqsAndPositions)))
     };
     let owner_any: Box<dyn Query> = Box::new(ExistsQuery::new("owner_id".to_string(), false));
-    let no_owner: Box<dyn Query> = Box::new(BooleanQuery::new(vec![
-        (Occur::Must, Box::new(AllQuery)),
-        (Occur::MustNot, owner_any),
-    ]));
+    let no_owner: Box<dyn Query> = Box::new(BooleanQuery::new(vec![(Occur::Must, Box::new(AllQuery)), (Occur::MustNot, owner_any)]));
     let mut disjuncts = vec![no_owner, term("owner_id", user.id)?, term("viewer_id", user.id)?];
     for g in &user.group_ids {
         disjuncts.push(term("viewer_group_id", *g)?);
@@ -839,9 +714,7 @@ fn fast_field_ids(searcher: &Searcher, addrs: &[DocAddress]) -> Result<Vec<i64>,
         match col.first(addr.doc_id) {
             Some(v) => out.push(v as i64),
             None => {
-                return Err(SearchError::Index(format!(
-                    "document without id at {addr:?}"
-                )));
+                return Err(SearchError::Index(format!("document without id at {addr:?}")));
             }
         }
     }
@@ -860,28 +733,17 @@ fn sorted_search(
     let f = field(schema, field_name)?;
     let top = TopDocs::with_limit(limit);
     let addrs = match schema.get_field_entry(f).field_type() {
-        FieldType::U64(_) => searcher
-            .search(query, &top.order_by_fast_field::<u64>(field_name, order))?
-            .into_iter()
-            .map(|(_, a)| a)
-            .collect(),
-        FieldType::Date(_) => searcher
-            .search(
-                query,
-                &top.order_by_fast_field::<tantivy::DateTime>(field_name, order),
-            )?
-            .into_iter()
-            .map(|(_, a)| a)
-            .collect(),
-        FieldType::Str(_) => searcher
-            .search(query, &top.order_by_string_fast_field(field_name, order))?
-            .into_iter()
-            .map(|(_, a)| a)
-            .collect(),
+        FieldType::U64(_) => {
+            searcher.search(query, &top.order_by_fast_field::<u64>(field_name, order))?.into_iter().map(|(_, a)| a).collect()
+        }
+        FieldType::Date(_) => {
+            searcher.search(query, &top.order_by_fast_field::<tantivy::DateTime>(field_name, order))?.into_iter().map(|(_, a)| a).collect()
+        }
+        FieldType::Str(_) => {
+            searcher.search(query, &top.order_by_string_fast_field(field_name, order))?.into_iter().map(|(_, a)| a).collect()
+        }
         _ => {
-            return Err(SearchError::Internal(format!(
-                "cannot order by field {field_name}"
-            )));
+            return Err(SearchError::Internal(format!("cannot order by field {field_name}")));
         }
     };
     Ok(addrs)
@@ -908,16 +770,8 @@ impl Collector for BitSetCollector {
     type Fruit = Vec<SegmentBits>;
     type Child = SegmentBits;
 
-    fn for_segment(
-        &self,
-        ord: SegmentOrdinal,
-        segment: &SegmentReader,
-    ) -> tantivy::Result<Self::Child> {
-        Ok(SegmentBits {
-            ord,
-            words: vec![0; (segment.max_doc() as usize).div_ceil(64)],
-            any: false,
-        })
+    fn for_segment(&self, ord: SegmentOrdinal, segment: &SegmentReader) -> tantivy::Result<Self::Child> {
+        Ok(SegmentBits { ord, words: vec![0; (segment.max_doc() as usize).div_ceil(64)], any: false })
     }
 
     fn requires_scoring(&self) -> bool {
@@ -1018,8 +872,7 @@ pub fn terms_with_prefix(
             let count: u64 = match filter_set {
                 None => u64::from(stream.value().doc_freq),
                 Some(set) => {
-                    let mut postings =
-                        inv.read_postings_from_terminfo(stream.value(), IndexRecordOption::Basic)?;
+                    let mut postings = inv.read_postings_from_terminfo(stream.value(), IndexRecordOption::Basic)?;
                     let mut c = 0u64;
                     use tantivy::DocSet;
                     let mut doc = postings.doc();
@@ -1064,9 +917,5 @@ fn count_scored(searcher: &tantivy::Searcher, query: &dyn Query) -> tantivy::Res
 /// `bm25::idf` (panic → previously an empty list). Such terms appear in practically every
 /// document (idf ≈ 0) and contribute nothing to similarity; we leave them out.
 fn mlt_max_doc_frequency(searcher: &tantivy::Searcher) -> u64 {
-    searcher
-        .segment_readers()
-        .iter()
-        .map(|r| u64::from(r.num_docs()))
-        .sum()
+    searcher.segment_readers().iter().map(|r| u64::from(r.num_docs())).sum()
 }

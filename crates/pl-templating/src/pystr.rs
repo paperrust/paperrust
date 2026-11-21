@@ -97,10 +97,7 @@ pub fn django_slugify(value: &str) -> String {
     let ascii: String = value.nfkd().filter(|c| c.is_ascii()).collect();
     let lowered = ascii.to_lowercase();
     // re.sub(r"[^\w\s-]", "", value)
-    let kept: String = lowered
-        .chars()
-        .filter(|c| c.is_ascii_alphanumeric() || *c == '_' || py_isspace(*c) || *c == '-')
-        .collect();
+    let kept: String = lowered.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '_' || py_isspace(*c) || *c == '-').collect();
     // re.sub(r"[-\s]+", "-", value)
     let mut out = String::with_capacity(kept.len());
     let mut in_run = false;
@@ -145,11 +142,7 @@ pub fn path_str(p: &str) -> String {
         ""
     };
     let joined = parts.join("/");
-    if joined.is_empty() && prefix.is_empty() {
-        ".".into()
-    } else {
-        format!("{prefix}{joined}")
-    }
+    if joined.is_empty() && prefix.is_empty() { ".".into() } else { format!("{prefix}{joined}") }
 }
 
 /// `PurePosixPath(p).name`.
@@ -173,11 +166,7 @@ pub fn path_parent(p: &str) -> String {
     } else {
         ""
     };
-    if parent.is_empty() && prefix.is_empty() {
-        ".".into()
-    } else {
-        format!("{prefix}{parent}")
-    }
+    if parent.is_empty() && prefix.is_empty() { ".".into() } else { format!("{prefix}{parent}") }
 }
 
 /// `PurePosixPath(name).suffix` (Python 3.12: no suffix for a trailing/leading dot).
@@ -203,11 +192,7 @@ pub fn path_stem(p: &str) -> &str {
 
 /// Join a path with `/` like `PurePosixPath(a) / b` (b relative).
 pub fn path_join(dir: &str, name: &str) -> String {
-    if dir == "." || dir.is_empty() {
-        path_str(name)
-    } else {
-        path_str(&format!("{dir}/{name}"))
-    }
+    if dir == "." || dir.is_empty() { path_str(name) } else { path_str(&format!("{dir}/{name}")) }
 }
 
 // ---------------------------------------------------------------------------
@@ -352,8 +337,7 @@ fn django_datetime_re(s: &str) -> Result<Option<ParsedDateTime>, String> {
     match parse() {
         None => Ok(None),
         Some((v, off)) => {
-            let dt = NaiveDate::from_ymd_opt(v[0] as i32, v[1], v[2])
-                .and_then(|d| d.and_hms_micro_opt(v[3], v[4], v[5], v[6]));
+            let dt = NaiveDate::from_ymd_opt(v[0] as i32, v[1], v[2]).and_then(|d| d.and_hms_micro_opt(v[3], v[4], v[5], v[6]));
             match dt {
                 Some(naive) => Ok(Some(ParsedDateTime { naive, offset: off })),
                 None => Err("month must be in 1..12".into()),
@@ -373,9 +357,10 @@ pub fn parse_datetime(s: &str) -> Result<Option<ParsedDateTime>, String> {
 /// `django.utils.dateparse.parse_date`.
 pub fn parse_date(s: &str) -> Result<Option<NaiveDate>, String> {
     if let Some((d, rest)) = parse_iso_date(s)
-        && rest.is_empty() {
-            return Ok(Some(d));
-        }
+        && rest.is_empty()
+    {
+        return Ok(Some(d));
+    }
     // date_re = r"(?P<year>\d{4})-(?P<month>\d{1,2})-(?P<day>\d{1,2})$"
     let mut it = s.splitn(3, '-');
     let (y, m, d) = match (it.next(), it.next(), it.next()) {

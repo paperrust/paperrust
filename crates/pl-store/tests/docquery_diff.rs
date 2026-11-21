@@ -21,11 +21,11 @@ use std::time::Instant;
 
 use pl_authz::models::DOCUMENT;
 use pl_authz::objects::{FilterOpts, permitted_objects_filter};
+use pl_core::sqlbind::SqlxBinder;
 use pl_docfilter::{FilterContext, FilterError, QueryParams};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use sea_query::{Alias, Expr, Order, PostgresQueryBuilder, Query, SelectStatement};
-use pl_core::sqlbind::SqlxBinder;
 use serde_json::Value;
 use sqlx::Row;
 
@@ -54,7 +54,12 @@ async fn count(pool: &sqlx::PgPool, q: &SelectStatement) -> i64 {
 }
 
 /// `pl_documents::listing::filtered_documents_legacy` (previous path).
-async fn legacy_list(pool: &sqlx::PgPool, ctx: &FilterContext, user: &pl_authz::User, p: &QueryParams) -> Result<SelectStatement, FilterError> {
+async fn legacy_list(
+    pool: &sqlx::PgPool,
+    ctx: &FilterContext,
+    user: &pl_authz::User,
+    p: &QueryParams,
+) -> Result<SelectStatement, FilterError> {
     let mut q = Query::select();
     q.column((Alias::new(DOC), Alias::new("id")))
         .from(Alias::new(DOC))
@@ -67,16 +72,22 @@ async fn legacy_list(pool: &sqlx::PgPool, ctx: &FilterContext, user: &pl_authz::
 }
 
 /// `pl_documents::selection_filter::resolve_all` without Tantivy (previous path).
-async fn legacy_selection(pool: &sqlx::PgPool, ctx: &FilterContext, user: &pl_authz::User, p: &QueryParams) -> Result<SelectStatement, FilterError> {
+async fn legacy_selection(
+    pool: &sqlx::PgPool,
+    ctx: &FilterContext,
+    user: &pl_authz::User,
+    p: &QueryParams,
+) -> Result<SelectStatement, FilterError> {
     let mut q = Query::select();
     q.column((Alias::new(DOC), Alias::new("id")))
         .from(Alias::new(DOC))
         .and_where(Expr::col((Alias::new(DOC), Alias::new("root_document_id"))).is_null())
         .and_where(Expr::col((Alias::new(DOC), Alias::new("deleted_at"))).is_null())
-        .and_where(
-            Expr::col((Alias::new(DOC), Alias::new("id")))
-                .in_subquery(pl_authz::objects::permitted_document_ids(Some(user), "view_document", false)),
-        );
+        .and_where(Expr::col((Alias::new(DOC), Alias::new("id"))).in_subquery(pl_authz::objects::permitted_document_ids(
+            Some(user),
+            "view_document",
+            false,
+        )));
     pl_docfilter::filterset::apply_filterset_lenient(&mut q, p, user, ctx, pool).await?;
     Ok(q)
 }
@@ -89,8 +100,7 @@ fn with_tiebreak(q: &SelectStatement) -> SelectStatement {
 
 fn ordered(q: &SelectStatement) -> SelectStatement {
     let mut q = q.clone();
-    q.order_by((Alias::new(DOC), Alias::new("created")), Order::Desc)
-        .order_by((Alias::new(DOC), Alias::new("id")), Order::Desc);
+    q.order_by((Alias::new(DOC), Alias::new("created")), Order::Desc).order_by((Alias::new(DOC), Alias::new("id")), Order::Desc);
     q
 }
 
@@ -180,13 +190,7 @@ async fn compare_list(
     }
 }
 
-async fn compare_selection(
-    pool: &sqlx::PgPool,
-    ctx: &FilterContext,
-    user: &pl_authz::User,
-    pairs: &[(String, String)],
-    st: &mut Stats,
-) {
+async fn compare_selection(pool: &sqlx::PgPool, ctx: &FilterContext, user: &pl_authz::User, pairs: &[(String, String)], st: &mut Stats) {
     st.cases += 1;
     let p = QueryParams::from_pairs(pairs.iter().cloned());
     let legacy = legacy_selection(pool, ctx, user, &p).await;
@@ -233,34 +237,108 @@ fn cfq(json: &str) -> String {
 /// The requests from `crates/pl-docfilter/tests/parity.rs` (Django parity run).
 fn parity_queries() -> Vec<String> {
     let mut q: Vec<String> = [
-        "", "ordering=title", "ordering=-title", "ordering=-created", "ordering=archive_serial_number",
-        "ordering=-num_notes", "ordering=owner", "ordering=correspondent__name",
-        "ordering=-document_type__name", "ordering=storage_path__name", "ordering=page_count",
-        "ordering=added", "ordering=-modified", "ordering=id", "ordering=bogus", "ordering=title,-id",
-        "ordering=custom_field_999", "ordering=-num_notes,id",
-        "title__icontains=tax", "title__istartswith=a", "title__iendswith=e", "title__iexact=x",
-        "content__icontains=quarterly", "content__istartswith=d", "title_content=steuer",
-        "title_content=strasse", "title_content=fi", "title_content=%C3%9F", "title_content=a_b%25",
-        "content__iexact=x", "content__iendswith=n", "content__icontains=SS", "search=ss",
-        "archive_serial_number__gt=1100", "archive_serial_number__lte=1050", "archive_serial_number=1005",
-        "archive_serial_number__isnull=1", "archive_serial_number__gt=-1",
-        "created__year=2024", "created__month=3", "created__day=15", "created__gt=2024-06-01",
-        "created__date__lte=2024-12-31", "created__lt=10/25/2024",
-        "added__date__gt=2025-01-10", "added__date__lte=2025-01-08", "added__gt=2025-01-10T00:00:00Z",
-        "added__lt=2025-01-09", "modified__year=2025", "added__month=1", "added__day=7",
-        "correspondent__isnull=1", "correspondent__isnull=0", "correspondent__id=1",
-        "correspondent__id__in=1,2", "correspondent__id__none=1", "correspondent__name__icontains=a",
-        "document_type__id__none=1", "document_type__name__istartswith=in", "storage_path__id__none=1",
-        "storage_path__isnull=1", "tags__id__all=2,3", "tags__id__in=1,2", "tags__id__none=1", "tags__id=6",
-        "tags__name__iexact=paid", "tags__name__icontains=tax", "is_tagged=0", "is_tagged=1",
-        "is_in_inbox=true", "is_in_inbox=false", "owner__id=3", "owner__id__in=3,4", "owner__id__none=2",
-        "owner__isnull=1", "shared_by__id=2", "shared_by__id=3", "shared_by__id=4", "mime_type=pdf",
-        "mime_type=text", "has_custom_fields=1", "has_custom_fields=0", "custom_fields__id__all=1,3",
-        "custom_fields__id__none=1", "custom_fields__id__in=1,2", "custom_fields__icontains=a",
-        "custom_fields__icontains=medium", "custom_fields__icontains=CHF", "has_duplicates=1", "has_duplicates=0",
-        "search=tax", "search=%22quarterly-tax%22", "search=steuer,rechnung", "id__in=1,2,3,500", "id=5",
-        "id__in=,", "tags__id__all=1,x", "page_count=1",
-        "archive_serial_number=abc", "created__gt=bad", "added__gt=bad", "id__in=1,x&title__icontains=a%00",
+        "",
+        "ordering=title",
+        "ordering=-title",
+        "ordering=-created",
+        "ordering=archive_serial_number",
+        "ordering=-num_notes",
+        "ordering=owner",
+        "ordering=correspondent__name",
+        "ordering=-document_type__name",
+        "ordering=storage_path__name",
+        "ordering=page_count",
+        "ordering=added",
+        "ordering=-modified",
+        "ordering=id",
+        "ordering=bogus",
+        "ordering=title,-id",
+        "ordering=custom_field_999",
+        "ordering=-num_notes,id",
+        "title__icontains=tax",
+        "title__istartswith=a",
+        "title__iendswith=e",
+        "title__iexact=x",
+        "content__icontains=quarterly",
+        "content__istartswith=d",
+        "title_content=steuer",
+        "title_content=strasse",
+        "title_content=fi",
+        "title_content=%C3%9F",
+        "title_content=a_b%25",
+        "content__iexact=x",
+        "content__iendswith=n",
+        "content__icontains=SS",
+        "search=ss",
+        "archive_serial_number__gt=1100",
+        "archive_serial_number__lte=1050",
+        "archive_serial_number=1005",
+        "archive_serial_number__isnull=1",
+        "archive_serial_number__gt=-1",
+        "created__year=2024",
+        "created__month=3",
+        "created__day=15",
+        "created__gt=2024-06-01",
+        "created__date__lte=2024-12-31",
+        "created__lt=10/25/2024",
+        "added__date__gt=2025-01-10",
+        "added__date__lte=2025-01-08",
+        "added__gt=2025-01-10T00:00:00Z",
+        "added__lt=2025-01-09",
+        "modified__year=2025",
+        "added__month=1",
+        "added__day=7",
+        "correspondent__isnull=1",
+        "correspondent__isnull=0",
+        "correspondent__id=1",
+        "correspondent__id__in=1,2",
+        "correspondent__id__none=1",
+        "correspondent__name__icontains=a",
+        "document_type__id__none=1",
+        "document_type__name__istartswith=in",
+        "storage_path__id__none=1",
+        "storage_path__isnull=1",
+        "tags__id__all=2,3",
+        "tags__id__in=1,2",
+        "tags__id__none=1",
+        "tags__id=6",
+        "tags__name__iexact=paid",
+        "tags__name__icontains=tax",
+        "is_tagged=0",
+        "is_tagged=1",
+        "is_in_inbox=true",
+        "is_in_inbox=false",
+        "owner__id=3",
+        "owner__id__in=3,4",
+        "owner__id__none=2",
+        "owner__isnull=1",
+        "shared_by__id=2",
+        "shared_by__id=3",
+        "shared_by__id=4",
+        "mime_type=pdf",
+        "mime_type=text",
+        "has_custom_fields=1",
+        "has_custom_fields=0",
+        "custom_fields__id__all=1,3",
+        "custom_fields__id__none=1",
+        "custom_fields__id__in=1,2",
+        "custom_fields__icontains=a",
+        "custom_fields__icontains=medium",
+        "custom_fields__icontains=CHF",
+        "has_duplicates=1",
+        "has_duplicates=0",
+        "search=tax",
+        "search=%22quarterly-tax%22",
+        "search=steuer,rechnung",
+        "id__in=1,2,3,500",
+        "id=5",
+        "id__in=,",
+        "tags__id__all=1,x",
+        "page_count=1",
+        "archive_serial_number=abc",
+        "created__gt=bad",
+        "added__gt=bad",
+        "id__in=1,x&title__icontains=a%00",
         "search=a%00",
     ]
     .iter()
@@ -387,9 +465,31 @@ fn rand_ids(r: &mut StdRng, max: i64) -> String {
     ids.join(",")
 }
 
-const TEXTS: &[&str] = &["a", "e", "tax", "TAX", "steuer", "rechnung", "ss", "ß", "fi", "a_b", "%", "\\", "quarterly", "invoice", " x ", "Ü", "ı", "2024", "pdf"];
-const DATES: &[&str] = &["2024-01-01", "2024-06-15", "2025-01-08", "2025-01-10", "2023-12-31", "9999-12-31", "0001-01-01", "10/25/2024", "bad", ""];
-const DTS: &[&str] = &["2025-01-10T00:00:00Z", "2025-01-09", "2024-03-31T02:30:00", "2024-10-27 02:30", "2025-01-08T12:00:00+05:00", "bad", ""];
+const TEXTS: &[&str] = &[
+    "a",
+    "e",
+    "tax",
+    "TAX",
+    "steuer",
+    "rechnung",
+    "ss",
+    "ß",
+    "fi",
+    "a_b",
+    "%",
+    "\\",
+    "quarterly",
+    "invoice",
+    " x ",
+    "Ü",
+    "ı",
+    "2024",
+    "pdf",
+];
+const DATES: &[&str] =
+    &["2024-01-01", "2024-06-15", "2025-01-08", "2025-01-10", "2023-12-31", "9999-12-31", "0001-01-01", "10/25/2024", "bad", ""];
+const DTS: &[&str] =
+    &["2025-01-10T00:00:00Z", "2025-01-09", "2024-03-31T02:30:00", "2024-10-27 02:30", "2025-01-08T12:00:00+05:00", "bad", ""];
 const NUMS: &[&str] = &["1", "3", "5", "1000", "1050", "1100", "-1", "0", "2147483648", "-2147483649", "1e3", "1.9", "abc", "", "1e51"];
 const BOOLS: &[&str] = &["1", "0", "true", "false", "True", "x", ""];
 
@@ -400,16 +500,82 @@ fn rand_param(r: &mut StdRng) -> (String, String) {
         0 => ("id__in".into(), rand_ids(r, 220)),
         1 => ("id".into(), pick(r, NUMS).to_string()),
         2 => (format!("title__{}", pick(r, &lookups)), t(r)),
-        3 => (pick(r, &["archive_serial_number", "archive_serial_number__gt", "archive_serial_number__gte", "archive_serial_number__lt", "archive_serial_number__lte"]).to_string(), pick(r, NUMS).to_string()),
+        3 => (
+            pick(
+                r,
+                &[
+                    "archive_serial_number",
+                    "archive_serial_number__gt",
+                    "archive_serial_number__gte",
+                    "archive_serial_number__lt",
+                    "archive_serial_number__lte",
+                ],
+            )
+            .to_string(),
+            pick(r, NUMS).to_string(),
+        ),
         4 => ("archive_serial_number__isnull".into(), pick(r, BOOLS).to_string()),
-        5 => (pick(r, &["created__year", "created__month", "created__day", "added__year", "added__month", "added__day", "modified__year", "modified__month", "modified__day"]).to_string(), pick(r, &["2024", "2025", "3", "1", "15", "7", "13", "0", "10000", "x"]).to_string()),
-        6 => (pick(r, &["created__gt", "created__gte", "created__lt", "created__lte", "created__date__gt", "created__date__gte", "created__date__lt", "created__date__lte"]).to_string(), pick(r, DATES).to_string()),
-        7 => (pick(r, &["added__date__gt", "added__date__gte", "added__date__lt", "added__date__lte", "modified__date__gt", "modified__date__lte"]).to_string(), pick(r, DATES).to_string()),
-        8 => (pick(r, &["added__gt", "added__gte", "added__lt", "added__lte", "modified__gt", "modified__lt"]).to_string(), pick(r, DTS).to_string()),
+        5 => (
+            pick(
+                r,
+                &[
+                    "created__year",
+                    "created__month",
+                    "created__day",
+                    "added__year",
+                    "added__month",
+                    "added__day",
+                    "modified__year",
+                    "modified__month",
+                    "modified__day",
+                ],
+            )
+            .to_string(),
+            pick(r, &["2024", "2025", "3", "1", "15", "7", "13", "0", "10000", "x"]).to_string(),
+        ),
+        6 => (
+            pick(
+                r,
+                &[
+                    "created__gt",
+                    "created__gte",
+                    "created__lt",
+                    "created__lte",
+                    "created__date__gt",
+                    "created__date__gte",
+                    "created__date__lt",
+                    "created__date__lte",
+                ],
+            )
+            .to_string(),
+            pick(r, DATES).to_string(),
+        ),
+        7 => (
+            pick(
+                r,
+                &[
+                    "added__date__gt",
+                    "added__date__gte",
+                    "added__date__lt",
+                    "added__date__lte",
+                    "modified__date__gt",
+                    "modified__date__lte",
+                ],
+            )
+            .to_string(),
+            pick(r, DATES).to_string(),
+        ),
+        8 => (
+            pick(r, &["added__gt", "added__gte", "added__lt", "added__lte", "modified__gt", "modified__lt"]).to_string(),
+            pick(r, DTS).to_string(),
+        ),
         9 => (format!("{}__{}", pick(r, &["original_filename", "checksum"]), pick(r, &lookups)), t(r)),
         10 => (format!("{}__isnull", pick(r, &["correspondent", "document_type", "storage_path", "owner"])), pick(r, BOOLS).to_string()),
         11 => (format!("{}__id__in", pick(r, &["correspondent", "document_type", "storage_path", "owner"])), rand_ids(r, 8)),
-        12 => (format!("{}__id", pick(r, &["correspondent", "document_type", "storage_path", "owner"])), pick(r, &["1", "2", "3", "4", "0", "x"]).to_string()),
+        12 => (
+            format!("{}__id", pick(r, &["correspondent", "document_type", "storage_path", "owner"])),
+            pick(r, &["1", "2", "3", "4", "0", "x"]).to_string(),
+        ),
         13 => (format!("{}__name__{}", pick(r, &["correspondent", "document_type", "storage_path", "tags"]), pick(r, &lookups)), t(r)),
         14 => ("tags__id__in".into(), rand_ids(r, 12)),
         15 => ("tags__id".into(), pick(r, &["1", "2", "6", "x", ""]).to_string()),
@@ -434,16 +600,27 @@ fn rand_param(r: &mut StdRng) -> (String, String) {
 }
 
 fn rand_ordering(r: &mut StdRng) -> String {
-    let fields = ["id", "title", "correspondent__name", "document_type__name", "storage_path__name", "created", "modified", "added", "archive_serial_number", "num_notes", "owner", "page_count", "bogus"];
+    let fields = [
+        "id",
+        "title",
+        "correspondent__name",
+        "document_type__name",
+        "storage_path__name",
+        "created",
+        "modified",
+        "added",
+        "archive_serial_number",
+        "num_notes",
+        "owner",
+        "page_count",
+        "bogus",
+    ];
     if r.gen_bool(0.25) {
         let id = r.gen_range(1..=12);
         return format!("{}custom_field_{id}", if r.gen_bool(0.5) { "-" } else { "" });
     }
     let n = r.gen_range(1..=3);
-    (0..n)
-        .map(|_| format!("{}{}", if r.gen_bool(0.5) { "-" } else { "" }, pick(r, &fields)))
-        .collect::<Vec<_>>()
-        .join(",")
+    (0..n).map(|_| format!("{}{}", if r.gen_bool(0.5) { "-" } else { "" }, pick(r, &fields))).collect::<Vec<_>>().join(",")
 }
 
 fn rand_cfq(r: &mut StdRng, depth: usize) -> String {
@@ -458,8 +635,17 @@ fn rand_cfq(r: &mut StdRng, depth: usize) -> String {
     }
     // atom: field (ID or name), operator, value matching or deliberately wrong
     let fields: [(&str, &str); 11] = [
-        ("Text", "s"), ("Website", "s"), ("Due date", "d"), ("Paid?", "b"), ("Count", "i"), ("Score", "f"),
-        ("Amount", "m"), ("Amount (no default)", "m"), ("Related docs", "l"), ("Priority", "sel"), ("Notes (long)", "s"),
+        ("Text", "s"),
+        ("Website", "s"),
+        ("Due date", "d"),
+        ("Paid?", "b"),
+        ("Count", "i"),
+        ("Score", "f"),
+        ("Amount", "m"),
+        ("Amount (no default)", "m"),
+        ("Related docs", "l"),
+        ("Priority", "sel"),
+        ("Notes (long)", "s"),
     ];
     let idx = r.gen_range(0..fields.len());
     let (name, kind) = fields[idx];
@@ -495,7 +681,9 @@ fn rand_cfq(r: &mut StdRng, depth: usize) -> String {
                 (base, v)
             }
         }
-        "b" => (pick(r, &["exact", "isnull", "exists", "in"]).to_string(), pick(r, &["true", "false", "\"false\"", "1", "[true]"]).to_string()),
+        "b" => {
+            (pick(r, &["exact", "isnull", "exists", "in"]).to_string(), pick(r, &["true", "false", "\"false\"", "1", "[true]"]).to_string())
+        }
         "i" | "f" => {
             let op = pick(r, &["exact", "gt", "gte", "lt", "lte", "range", "in", "isnull"]).to_string();
             let v = match op.as_str() {
@@ -507,7 +695,8 @@ fn rand_cfq(r: &mut StdRng, depth: usize) -> String {
             (op, v)
         }
         "m" => {
-            let op = pick(r, &["exact", "gt", "gte", "lt", "lte", "range", "in", "icontains", "istartswith", "isnull", "exists"]).to_string();
+            let op =
+                pick(r, &["exact", "gt", "gte", "lt", "lte", "range", "in", "icontains", "istartswith", "isnull", "exists"]).to_string();
             let v = match op.as_str() {
                 "range" => "[\"10\", \"CHF100.00\"]".into(),
                 "in" => "[\"CHF100.00\", \"EUR50\"]".into(),
@@ -547,7 +736,9 @@ async fn ast_equals_legacy() {
     assert!(!db.trim_end_matches('/').ends_with("/paperless"), "nie gegen die Referenz-DB `paperless`");
     let pool = sqlx::postgres::PgPoolOptions::new().max_connections(2).connect(&db).await.expect("db");
     let n_random: usize = std::env::var("PL_L1_RANDOM").ok().and_then(|s| s.parse().ok()).unwrap_or(3000);
-    let mut timing = std::env::var("PL_L1_TIMING").ok().map(|_| vec!["case,user,query,legacy_page_ms,ast_page_ms,legacy_count_ms,ast_count_ms".to_string()]);
+    let mut timing = std::env::var("PL_L1_TIMING")
+        .ok()
+        .map(|_| vec!["case,user,query,legacy_page_ms,ast_page_ms,legacy_count_ms,ast_count_ms".to_string()]);
     let user_ids: Vec<i64> = std::env::var("PL_L1_USERS")
         .ok()
         .map(|s| s.split(',').filter_map(|x| x.trim().parse().ok()).collect())

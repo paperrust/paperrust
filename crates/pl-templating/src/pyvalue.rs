@@ -13,7 +13,7 @@ use minijinja::value::{DynObject, Object, ObjectRepr, Value, ValueKind};
 use minijinja::{Error, ErrorKind};
 
 use crate::pystr::{py_float_repr, py_str_repr};
-use crate::strftime::{strftime, TzInfo};
+use crate::strftime::{TzInfo, strftime};
 
 /// Maximum length (bytes) of a string that an operation in the template may produce.
 /// Protection against memory exhaustion (Python would raise `MemoryError`, Rust aborts).
@@ -36,11 +36,7 @@ pub(crate) fn too_large() -> Error {
 }
 
 pub(crate) fn check_len(n: usize) -> Result<(), Error> {
-    if n > MAX_STRING_BYTES {
-        Err(too_large())
-    } else {
-        Ok(())
-    }
+    if n > MAX_STRING_BYTES { Err(too_large()) } else { Ok(()) }
 }
 
 // ---------------------------------------------------------------------------
@@ -147,14 +143,7 @@ impl PyDateTime {
     }
     pub fn isoformat(&self, sep: &str) -> String {
         let n = self.naive;
-        let mut s = format!(
-            "{}{}{:02}:{:02}:{:02}",
-            date_iso(n.date()),
-            sep,
-            n.hour(),
-            n.minute(),
-            n.second()
-        );
+        let mut s = format!("{}{}{:02}:{:02}:{:02}", date_iso(n.date()), sep, n.hour(), n.minute(), n.second());
         let us = n.nanosecond() / 1000;
         if us != 0 {
             s.push_str(&format!(".{us:06}"));
@@ -279,14 +268,7 @@ pub fn py_repr(v: &Value) -> Result<String, Error> {
     }
     if let Some(d) = v.downcast_object_ref::<PyDateTime>() {
         let n = d.naive;
-        let mut s = format!(
-            "datetime.datetime({}, {}, {}, {}, {}",
-            n.year(),
-            n.month(),
-            n.day(),
-            n.hour(),
-            n.minute()
-        );
+        let mut s = format!("datetime.datetime({}, {}, {}, {}, {}", n.year(), n.month(), n.day(), n.hour(), n.minute());
         let us = n.nanosecond() / 1000;
         if n.second() != 0 || us != 0 {
             s.push_str(&format!(", {}", n.second()));
@@ -298,10 +280,7 @@ pub fn py_repr(v: &Value) -> Result<String, Error> {
             if o.local_minus_utc() == 0 {
                 s.push_str(", tzinfo=datetime.timezone.utc");
             } else {
-                s.push_str(&format!(
-                    ", tzinfo=datetime.timezone(datetime.timedelta(seconds={}))",
-                    o.local_minus_utc()
-                ));
+                s.push_str(&format!(", tzinfo=datetime.timezone(datetime.timedelta(seconds={}))", o.local_minus_utc()));
             }
         }
         s.push(')');
@@ -400,11 +379,7 @@ fn num_f(n: Num) -> f64 {
 // ---------------------------------------------------------------------------
 
 fn check_defined(a: &Value, b: &Value) -> Result<(), Error> {
-    if a.is_undefined() || b.is_undefined() {
-        Err(undefined_error())
-    } else {
-        Ok(())
-    }
+    if a.is_undefined() || b.is_undefined() { Err(undefined_error()) } else { Ok(()) }
 }
 
 /// Python `a == b` (incl. `PlaceholderString.__eq__`).
@@ -461,9 +436,7 @@ pub fn py_add(a: &Value, b: &Value) -> Result<Value, Error> {
     }
     if let (Some(x), Some(y)) = (as_num(a), as_num(b)) {
         return match (x, y) {
-            (Num::Int(x), Num::Int(y)) => {
-                x.checked_add(y).map(|r| num_value(Num::Int(r))).ok_or_else(|| invalid("integer overflow"))
-            }
+            (Num::Int(x), Num::Int(y)) => x.checked_add(y).map(|r| num_value(Num::Int(r))).ok_or_else(|| invalid("integer overflow")),
             _ => Ok(num_value(Num::Float(num_f(x) + num_f(y)))),
         };
     }
@@ -476,11 +449,7 @@ pub fn py_add(a: &Value, b: &Value) -> Result<Value, Error> {
         items.extend(b.try_iter()?);
         return Ok(Value::from(items));
     }
-    Err(invalid(format!(
-        "unsupported operand type(s) for +: '{}' and '{}'",
-        short_type(a),
-        short_type(b)
-    )))
+    Err(invalid(format!("unsupported operand type(s) for +: '{}' and '{}'", short_type(a), short_type(b))))
 }
 
 /// Jinja2 `a ~ b` = `str(a) + str(b)`.
@@ -529,17 +498,11 @@ pub fn py_mul(a: &Value, b: &Value) -> Result<Value, Error> {
     }
     if let (Some(x), Some(y)) = (as_num(a), as_num(b)) {
         return match (x, y) {
-            (Num::Int(x), Num::Int(y)) => {
-                x.checked_mul(y).map(|r| num_value(Num::Int(r))).ok_or_else(|| invalid("integer overflow"))
-            }
+            (Num::Int(x), Num::Int(y)) => x.checked_mul(y).map(|r| num_value(Num::Int(r))).ok_or_else(|| invalid("integer overflow")),
             _ => Ok(num_value(Num::Float(num_f(x) * num_f(y)))),
         };
     }
-    Err(invalid(format!(
-        "unsupported operand type(s) for *: '{}' and '{}'",
-        short_type(a),
-        short_type(b)
-    )))
+    Err(invalid(format!("unsupported operand type(s) for *: '{}' and '{}'", short_type(a), short_type(b))))
 }
 
 /// Python `a ** b` (int ** negative -> float).
@@ -557,11 +520,7 @@ pub fn py_pow(a: &Value, b: &Value) -> Result<Value, Error> {
             }
             Ok(num_value(Num::Float(x.powf(y))))
         }
-        _ => Err(invalid(format!(
-            "unsupported operand type(s) for ** or pow(): '{}' and '{}'",
-            short_type(a),
-            short_type(b)
-        ))),
+        _ => Err(invalid(format!("unsupported operand type(s) for ** or pow(): '{}' and '{}'", short_type(a), short_type(b)))),
     }
 }
 
@@ -616,11 +575,7 @@ pub fn py_mod(a: &Value, b: &Value) -> Result<Value, Error> {
             }
             Ok(num_value(Num::Float(r)))
         }
-        _ => Err(invalid(format!(
-            "unsupported operand type(s) for %: '{}' and '{}'",
-            short_type(a),
-            short_type(b)
-        ))),
+        _ => Err(invalid(format!("unsupported operand type(s) for %: '{}' and '{}'", short_type(a), short_type(b)))),
     }
 }
 

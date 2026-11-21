@@ -11,12 +11,12 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
+use pl_core::sqlbind::SqlxBinder as _;
 use pl_matching::workflow::{
-    CustomFieldQueryEvaluator, ExistingDocument, InvalidCustomFieldQuery, ObjRef, TRIGGER_CONSUMPTION, WorkflowDocument,
-    WorkflowTrigger, document_matches_workflow,
+    CustomFieldQueryEvaluator, ExistingDocument, InvalidCustomFieldQuery, ObjRef, TRIGGER_CONSUMPTION, WorkflowDocument, WorkflowTrigger,
+    document_matches_workflow,
 };
 use sea_query::{Expr, Order, PostgresQueryBuilder, Query};
-use pl_core::sqlbind::SqlxBinder as _;
 use serde_json::Value;
 use sqlx::{PgConnection, Row};
 
@@ -92,11 +92,7 @@ impl ActionDef {
     }
     /// `assign_custom_fields_values.get(str(field.pk), None)`
     fn cf_value(&self, field: i64) -> Value {
-        self.assign_custom_fields_values
-            .as_ref()
-            .and_then(|v| v.get(field.to_string()))
-            .cloned()
-            .unwrap_or(Value::Null)
+        self.assign_custom_fields_values.as_ref().and_then(|v| v.get(field.to_string())).cloned().unwrap_or(Value::Null)
     }
 }
 
@@ -268,11 +264,8 @@ async fn load_triggers(conn: &mut PgConnection, wf_ids: &[i64]) -> Result<HashMa
         }
         Ok(v)
     };
-    let (c_ids, d_ids, s_ids) = (
-        fk_ids("filter_has_correspondent_id")?,
-        fk_ids("filter_has_document_type_id")?,
-        fk_ids("filter_has_storage_path_id")?,
-    );
+    let (c_ids, d_ids, s_ids) =
+        (fk_ids("filter_has_correspondent_id")?, fk_ids("filter_has_document_type_id")?, fk_ids("filter_has_storage_path_id")?);
     let corr = names_many(conn, "documents_correspondent", &c_ids).await?;
     let dtypes = names_many(conn, "documents_documenttype", &d_ids).await?;
     let spaths = names_many(conn, "documents_storagepath", &s_ids).await?;
@@ -319,7 +312,11 @@ async fn load_actions(conn: &mut PgConnection, wf_ids: &[i64]) -> Result<HashMap
 
 /// Like [`load_actions`] over another link table (`workflow_id`, `workflowaction_id`):
 /// `documents_workflow_actions` (main actions) or `paperrust_workflow_else_action` (else branch).
-async fn load_actions_via(conn: &mut PgConnection, link: &'static str, wf_ids: &[i64]) -> Result<HashMap<i64, Vec<ActionDef>>, sqlx::Error> {
+async fn load_actions_via(
+    conn: &mut PgConnection,
+    link: &'static str,
+    wf_ids: &[i64],
+) -> Result<HashMap<i64, Vec<ActionDef>>, sqlx::Error> {
     let aq = Query::select()
         .column((a(link), a("workflow_id")))
         .expr(Expr::col((a("x"), sea_query::Asterisk)))
@@ -403,10 +400,8 @@ pub async fn workflows_for_trigger(conn: &mut PgConnection, trigger_type: i64) -
         .order_by((a("w"), a("id")), Order::Asc)
         .to_owned();
     let rows = db::fetch_all(conn, &q).await?;
-    let heads: Vec<(i64, String)> = rows
-        .iter()
-        .map(|r| Ok((i64::from(r.try_get::<i32, _>(0)?), r.try_get(1)?)))
-        .collect::<Result<_, sqlx::Error>>()?;
+    let heads: Vec<(i64, String)> =
+        rows.iter().map(|r| Ok((i64::from(r.try_get::<i32, _>(0)?), r.try_get(1)?))).collect::<Result<_, sqlx::Error>>()?;
     if heads.is_empty() {
         return Ok(Vec::new());
     }
@@ -439,10 +434,8 @@ async fn load_defs(conn: &mut PgConnection, heads: Vec<(i64, String)>, wf_ids: &
 /// when enqueueing. `None` if the workflow does not (or no longer) exist.
 pub async fn workflow_by_id(conn: &mut PgConnection, workflow_id: i64) -> Result<Option<WorkflowDef>, sqlx::Error> {
     let Ok(id32) = i32::try_from(workflow_id) else { return Ok(None) };
-    let name: Option<String> = sqlx::query_scalar("SELECT name FROM documents_workflow WHERE id = $1")
-        .bind(id32)
-        .fetch_optional(&mut *conn)
-        .await?;
+    let name: Option<String> =
+        sqlx::query_scalar("SELECT name FROM documents_workflow WHERE id = $1").bind(id32).fetch_optional(&mut *conn).await?;
     match name {
         Some(name) => Ok(Some(load_workflow_def(conn, workflow_id, name).await?)),
         None => Ok(None),
@@ -571,11 +564,12 @@ pub async fn apply_removal_to_overrides(
     if action.remove_all_custom_fields {
         o.custom_fields = None;
     } else if !action.remove_custom_fields.is_empty()
-        && let Some(m) = o.custom_fields.as_mut() {
-            for f in &action.remove_custom_fields {
-                m.remove(f);
-            }
+        && let Some(m) = o.custom_fields.as_mut()
+    {
+        for f in &action.remove_custom_fields {
+            m.remove(f);
         }
+    }
     Ok(())
 }
 
@@ -707,11 +701,8 @@ pub fn existing_from_parts(
     tags: Vec<ObjRef>,
     effective_content: String,
 ) -> ExistingDocument {
-    let display = crate::audit::document_repr(
-        &crate::audit::CreatedAttr::Date(r.created),
-        correspondent.as_ref().map(|c| c.name.as_str()),
-        &r.title,
-    );
+    let display =
+        crate::audit::document_repr(&crate::audit::CreatedAttr::Date(r.created), correspondent.as_ref().map(|c| c.name.as_str()), &r.title);
     ExistingDocument {
         id: r.id,
         effective_content: Some(effective_content),
@@ -912,9 +903,7 @@ pub async fn enqueue_ai_suggestions(queue: Option<&dyn pl_queue::TaskQueue>, out
             );
             continue;
         };
-        if let Err(e) = q
-            .enqueue(crate::manual::RUN_WORKFLOWS_FOR_DOCUMENTS, deferred_kwargs(d), pl_queue::EnqueueOptions::default())
-            .await
+        if let Err(e) = q.enqueue(crate::manual::RUN_WORKFLOWS_FOR_DOCUMENTS, deferred_kwargs(d), pl_queue::EnqueueOptions::default()).await
         {
             tracing::error!(target: "paperless.handlers", "Could not queue deferred workflow {} for document {}: {e}", d.workflow_id, d.document_id);
         }
@@ -927,9 +916,8 @@ pub async fn enqueue_ai_suggestions(queue: Option<&dyn pl_queue::TaskQueue>, out
             );
             continue;
         };
-        if let Err(e) = q
-            .enqueue(APPLY_AI_SUGGESTIONS_TASK, ai_suggestions_kwargs(*action_id, *document_id), pl_queue::EnqueueOptions::default())
-            .await
+        if let Err(e) =
+            q.enqueue(APPLY_AI_SUGGESTIONS_TASK, ai_suggestions_kwargs(*action_id, *document_id), pl_queue::EnqueueOptions::default()).await
         {
             tracing::error!(target: "paperless.handlers", "Could not queue apply_ai_suggestions for document {document_id}: {e}");
         }
@@ -1239,13 +1227,7 @@ async fn run_one_workflow(
         }
     }
     doc.row.title = doc.row.title.chars().take(128).collect();
-    docops::save(
-        conn,
-        env.audit,
-        doc,
-        Some(&["title", "correspondent", "document_type", "storage_path", "owner", "modified"]),
-    )
-    .await?;
+    docops::save(conn, env.audit, doc, Some(&["title", "correspondent", "document_type", "storage_path", "owner", "modified"])).await?;
     // post_save → update_filename_and_move_files
     if let Some(s) = env.settings {
         crate::files::update_filename_and_move_files(conn, s, doc.row.id).await?;
@@ -1298,38 +1280,35 @@ async fn apply_assignment_to_document(
             match existing {
                 Some(inst_id) if !empty => {
                     if let Some(col_name) = db::value_field_name(&f.data_type)
-                        && let Ok(expr) = db::custom_value_expr(&f.data_type, &value) {
-                            // W7: `instance.save()` → auditlog `log_update` (old value from the DB)
-                            let old: Option<Value> = sqlx::query_scalar(&format!(
-                                "SELECT to_jsonb({col_name}) FROM documents_customfieldinstance WHERE id = $1"
-                            ))
-                            .bind(inst_id)
-                            .fetch_optional(&mut *conn)
-                            .await?
-                            .flatten();
-                            let q = Query::update()
-                                .table(a("documents_customfieldinstance"))
-                                .value(a(col_name), expr)
-                                .and_where(Expr::col(a("id")).eq(inst_id))
-                                .to_owned();
-                            let (sql, v) = q.build_sqlx(PostgresQueryBuilder);
-                            sqlx::query_with(&sql, v).execute(&mut *conn).await?;
-                            let repr = format!(
-                                "{} : {}",
-                                f.name,
-                                crate::audit::custom_value_for_search(&f.data_type, &value, f.extra_data.as_ref())
-                            );
-                            audit
-                                .custom_field_instance_updated(
-                                    conn,
-                                    inst_id,
-                                    col_name,
-                                    old.and_then(|o| crate::audit::custom_value_smart_str(&f.data_type, &o)),
-                                    crate::audit::custom_value_smart_str(&f.data_type, &value),
-                                    &repr,
-                                )
-                                .await?;
-                        }
+                        && let Ok(expr) = db::custom_value_expr(&f.data_type, &value)
+                    {
+                        // W7: `instance.save()` → auditlog `log_update` (old value from the DB)
+                        let old: Option<Value> =
+                            sqlx::query_scalar(&format!("SELECT to_jsonb({col_name}) FROM documents_customfieldinstance WHERE id = $1"))
+                                .bind(inst_id)
+                                .fetch_optional(&mut *conn)
+                                .await?
+                                .flatten();
+                        let q = Query::update()
+                            .table(a("documents_customfieldinstance"))
+                            .value(a(col_name), expr)
+                            .and_where(Expr::col(a("id")).eq(inst_id))
+                            .to_owned();
+                        let (sql, v) = q.build_sqlx(PostgresQueryBuilder);
+                        sqlx::query_with(&sql, v).execute(&mut *conn).await?;
+                        let repr =
+                            format!("{} : {}", f.name, crate::audit::custom_value_for_search(&f.data_type, &value, f.extra_data.as_ref()));
+                        audit
+                            .custom_field_instance_updated(
+                                conn,
+                                inst_id,
+                                col_name,
+                                old.and_then(|o| crate::audit::custom_value_smart_str(&f.data_type, &o)),
+                                crate::audit::custom_value_smart_str(&f.data_type, &value),
+                                &repr,
+                            )
+                            .await?;
+                    }
                 }
                 Some(_) => {}
                 None => {
@@ -1406,9 +1385,7 @@ async fn existing_cf_instance(conn: &mut PgConnection, doc_id: i64, field_id: i6
 pub fn is_simple_action(action: &ActionDef) -> bool {
     match action.action_type {
         ACTION_ASSIGNMENT => {
-            action.assign_custom_fields.is_empty()
-                && action.assign_title.as_deref().is_none_or(str::is_empty)
-                && !action.has_assign_perms()
+            action.assign_custom_fields.is_empty() && action.assign_title.as_deref().is_none_or(str::is_empty) && !action.has_assign_perms()
         }
         ACTION_REMOVAL => {
             !action.remove_all_permissions
@@ -1486,7 +1463,12 @@ pub(crate) async fn apply_simple_action(
 }
 
 /// `apply_removal_to_document`.
-async fn apply_removal_to_document(conn: &mut PgConnection, audit: &AuditLog, action: &ActionDef, doc: &mut DocInstance) -> Result<(), sqlx::Error> {
+async fn apply_removal_to_document(
+    conn: &mut PgConnection,
+    audit: &AuditLog,
+    action: &ActionDef,
+    doc: &mut DocInstance,
+) -> Result<(), sqlx::Error> {
     if action.remove_all_tags {
         if let Some(fresh) = db::load_document(conn, doc.row.id).await? {
             docops::clear_tags(conn, audit, &DocInstance::from_db(fresh)).await?;
@@ -1500,9 +1482,10 @@ async fn apply_removal_to_document(conn: &mut PgConnection, audit: &AuditLog, ac
         remove.sort_unstable();
         remove.dedup();
         if !remove.is_empty()
-            && let Some(fresh) = db::load_document(conn, doc.row.id).await? {
-                docops::remove_tags(conn, audit, &DocInstance::from_db(fresh), &remove).await?;
-            }
+            && let Some(fresh) = db::load_document(conn, doc.row.id).await?
+        {
+            docops::remove_tags(conn, audit, &DocInstance::from_db(fresh), &remove).await?;
+        }
     }
     let r = &mut doc.row;
     if action.remove_all_correspondents || r.correspondent_id.is_some_and(|c| action.remove_correspondents.contains(&c)) {
@@ -1537,11 +1520,8 @@ async fn apply_removal_to_document(conn: &mut PgConnection, audit: &AuditLog, ac
             if ids.is_empty() {
                 continue;
             }
-            let perm = Query::select()
-                .column(a("id"))
-                .from(a("auth_permission"))
-                .and_where(Expr::col(a("codename")).eq(codename))
-                .to_owned();
+            let perm =
+                Query::select().column(a("id")).from(a("auth_permission")).and_where(Expr::col(a("codename")).eq(codename)).to_owned();
             let ct = Query::select()
                 .column(a("id"))
                 .from(a("django_content_type"))
@@ -1581,7 +1561,8 @@ mod tests {
     fn custom_field_query_evaluator_matches() {
         use pl_matching::workflow::{TRIGGER_DOCUMENT_UPDATED, existing_document_matches_workflow, prefilter_matches};
         let q = r#"["AND", [["f", "exact", "x"]]]"#;
-        let trig = WorkflowTrigger { trigger_type: TRIGGER_DOCUMENT_UPDATED, filter_custom_field_query: Some(q.into()), ..Default::default() };
+        let trig =
+            WorkflowTrigger { trigger_type: TRIGGER_DOCUMENT_UPDATED, filter_custom_field_query: Some(q.into()), ..Default::default() };
         let doc = |id| ExistingDocument { id, ..Default::default() };
         let ev = CustomFieldQueries::from_parts(vec![(q, Some(vec![1]))]);
         assert_eq!(existing_document_matches_workflow(&doc(1), &trig, Some(&ev)).unwrap(), (true, None));

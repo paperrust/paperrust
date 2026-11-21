@@ -32,5 +32,5 @@ pub mod office;
 #[cfg(feature = "heif")]
 pub mod heif;
 
-pub use job::{Area, ConvertReport, Hit, Op, RedactReport, Reply, RepairReport, ShrinkPreset, ShrinkReport};
+pub use job::{Area, ConvertReport, Hit, Op, RedactReport, RepairReport, Reply, ShrinkPreset, ShrinkReport};
 pub use runner::{Limits, RunError};
