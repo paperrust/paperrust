@@ -484,6 +484,12 @@ ITU-R 601.
 20. **Tesseract-Instanzen werden nach Leerlauf entladen** (`PAPERRUST_OCR_ENGINE_IDLE_SECS`, Standard
     180 s). Kein upstream-Gegenstück (OCRmyPDF startet je Seite einen Prozess).
 
+21. **Bilddateien in Graustufen erkennen** (2026-11-21): PNG/JPEG/TIFF … gehen wie PDF-Seiten als eigenes
+   Graustufenbild (ITU-R-601-Helligkeit) an die Texterkennung, nicht farbig (OCRmyPDF/Tesseract wandeln selbst um).
+   Anlass: Jetson-Prüfung, geradegerichtetes Handyfoto `c_photo_00.png` – farbig verlor ein Wort die Umlaut-Punkte
+   (Wortquote 97,4 %, paperless-ngx 100 %), in Graustufen bei allen Winkeln 2,5–4,5° richtig. Archiv-/Anzeigebild
+   bleibt farbig. Test: `tests/image_ocr_gray.rs`.
+
 ## 12. Was läuft ohne externe Programme / was braucht Werkzeuge
 
 Ohne externe Programme (reines Rust): Einstellungen, Argumente, komplette `parse()`-Steuerlogik,
