@@ -112,7 +112,7 @@ libloading = "=0.8.9"
 tiff = "=0.11.3"
 rust-stemmers = "=1.2.0"
 # pl-pdfops: zxing-cpp-Ersatz (ohne Funktion `image`, die pinnt image =0.25.8) und Text-Vorschau
-rxing = { version = "=0.9.3", default-features = false, features = ["full_barcode_format_support", "multi_barcode_readers", "decoders", "encoding_rs"] }
+rxing = { version = "=0.9.4", default-features = false, features = ["full_barcode_format_support", "multi_barcode_readers", "decoders", "encoding_rs"] }
 ab_glyph = "=0.2.32"
 # pl-cli: Passphrase-Verschluesselung des Exports (wie upstream cryptography AES)
 aes = "=0.9.4"
@@ -128,7 +128,7 @@ bzip2 = "=0.6.1"
 xz2 = { version = "=0.1.7", features = ["static"] }
 zstd = { version = "=0.13.4", default-features = false }
 # pl-guard, pl-consumer: Dateisystem-Ereignisse (inotify/ReadDirectoryChangesW/kqueue), CC0-1.0
-notify = { version = "=8.2.0", default-features = false }
+notify = { version = "=8.2.2", default-features = false }
 # pl-pdftools: WordCraft (MIT OR Apache-2.0) und craft-heif (MIT OR Apache-2.0, nutzt heic-rs =0.1.4),
 # feste Revisionen, siehe NOTICE. Nur im isolierten Kindprozess benutzt.
 wordcraft-doc = { git = "https://github.com/storytold/wordcraft", rev = "a4b898f820eb28626865292fd037a155e4a07aef" }
