@@ -330,6 +330,8 @@ KI-Vektorindex.
    bei `value_monetary_amount` wegen anderer Regex-/Cast-Semantik abweichende Werte gespeichert
    haben – auf PostgreSQL gilt dann der PostgreSQL-Wert, wie bei upstream).
 
+6. **Suchindex nach dem Umstieg neu aufbauen** (2026-11-21): nach erfolgreichem `switch` (Ergebnis nicht FAIL) legt das Werkzeug die Rebuild-Markierung `.rebuilding` in den Indexordner (`PAPERRUST_/PAPERLESS_INDEX_DIR`, sonst `<DATA_DIR>/index`, sonst Docker-Standard), sofern er auf diesem Rechner existiert; der nächste Start baut den Index aus der neuen Datenbank auf.
+
 ## CORE-REQUEST
 
 - Keine Änderung an pl-core/pl-authz/pl-server nötig.

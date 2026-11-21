@@ -171,6 +171,8 @@ ix.optimize()                                                       // no-op wie
    upstream schwankt die Treffermenge; der Test akzeptiert eine Rust-Menge nur, wenn eine
    Wiederholung auf dem upstream-Index genau sie liefert.
 
+2. **`reindex --if-needed` prüft auch den Inhalt** (2026-11-21): upstream baut nur bei abweichenden Einstellungen (Schema/Sprache) oder liegengebliebener Markierung neu. PaperRust zusätzlich, wenn der Index leer ist, die Datenbank aber Dokumente hat, oder wenn er weniger als die Hälfte der Dokumente enthält (`writer::index_incomplete`, `db::count_root_docs`). Anlass: NAS-Paralleltest, Index als „aktuell“ gestempelt aber leer → 0 Suchtreffer bis zum manuellen Reindex.
+
 ## Ergebnis Paritätslauf (2026-11-08, Referenz-DB, 195 Dokumente)
 
 - Neuaufbau: 0 Unterschiede in Settings-Datei, 195 gespeicherten Dokumenten, 4324 Termen mit

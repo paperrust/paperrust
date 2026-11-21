@@ -288,6 +288,11 @@ impl Indexer {
         .await
     }
 
+    /// Number of documents in the index (alive, without deletions); `None` if it cannot be opened.
+    pub fn document_count(&self) -> Option<u64> {
+        indexed_document_count(&self.cfg.index_dir, self.cfg.lang())
+    }
+
     /// `index_optimize` / `document_index optimize`: a no-op upstream.
     pub fn optimize(&self) {
         tracing::info!("index_optimize is a no-op — Tantivy manages segment merging automatically.");
@@ -297,8 +302,16 @@ impl Indexer {
     pub async fn rebuild(&self, pool: &PgPool, opts: &RebuildOptions) -> Result<RebuildStats> {
         let dir = self.cfg.index_dir.clone();
         if opts.if_needed && dir.exists() && !crate::settings::needs_rebuild(&dir, self.cfg.lang()) {
-            tracing::info!("Search index is up to date.");
-            return Ok(RebuildStats { documents: 0, skipped_up_to_date: true });
+            // PaperRust: settings match, but is the content there? An index stamped "current" can still
+            // be empty or far behind the database (restored backup, switch from paperless-ngx after a
+            // start on an empty database – NAS check 2026-11-21: 0 search hits until a manual reindex).
+            let in_db = db::count_root_docs(pool).await.unwrap_or(0);
+            let in_index = indexed_document_count(&dir, self.cfg.lang()).unwrap_or(0);
+            if !index_incomplete(in_index, in_db) {
+                tracing::info!("Search index is up to date.");
+                return Ok(RebuildStats { documents: 0, skipped_up_to_date: true });
+            }
+            tracing::warn!("Search index incomplete ({in_index} of {in_db} documents) - rebuilding.");
         }
         // upstream assumes INDEX_DIR exists (paperless creates it at startup).
         std::fs::create_dir_all(&dir)?;
@@ -472,6 +485,21 @@ impl Drop for WriteBatch {
     }
 }
 
+/// Documents in the index at `dir` (`None` if it cannot be opened).
+pub fn indexed_document_count(dir: &Path, language: Option<&str>) -> Option<u64> {
+    let index = Index::open_in_dir(dir).ok()?;
+    pl_search::tokenizer::register_tokenizers(&index, language);
+    Some(index.reader().ok()?.searcher().num_docs())
+}
+
+/// PaperRust: the index counts as incomplete if it is empty while the database has documents, or if
+/// it holds less than half of them. Small differences are left to the incremental updates (L3
+/// dirty list); a full rebuild for each stray document would slow down every start.
+pub fn index_incomplete(in_index: u64, in_db: i64) -> bool {
+    let in_db = u64::try_from(in_db).unwrap_or(0);
+    in_db > 0 && (in_index == 0 || in_index.saturating_mul(2) < in_db)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -484,6 +512,26 @@ mod tests {
         r.id = id;
         r.title = title.into();
         r
+    }
+
+    #[test]
+    fn incomplete_index_detection() {
+        assert!(index_incomplete(0, 1383), "empty index with documents in the DB");
+        assert!(index_incomplete(500, 1383), "less than half");
+        assert!(!index_incomplete(1380, 1383), "small difference: incremental updates");
+        assert!(!index_incomplete(0, 0), "empty archive");
+        assert!(!index_incomplete(10, 0));
+    }
+
+    #[test]
+    fn indexed_count_of_built_index() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join("index");
+        let ix = Indexer::new(IndexerConfig { index_dir: dir.clone(), language: Some("en".into()) });
+        assert_eq!(indexed_document_count(&dir, Some("en")), None, "no index yet");
+        ix.rebuild_from_records(&[record(1, "one"), record(2, "two"), record(3, "three")], 128_000_000).unwrap();
+        assert_eq!(indexed_document_count(&dir, Some("en")), Some(3));
+        assert_eq!(ix.document_count(), Some(3));
     }
 
     fn count(dir: &Path) -> usize {

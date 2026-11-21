@@ -59,6 +59,14 @@ fn ids_i32(ids: &[i64]) -> Vec<i32> {
     ids.iter().filter_map(|i| i32::try_from(*i).ok()).collect()
 }
 
+/// Number of documents a full rebuild would index (same filter as [`rebuild_root_ids`]).
+pub async fn count_root_docs(pool: &PgPool) -> Result<i64> {
+    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM documents_document d WHERE d.root_document_id IS NULL AND d.deleted_at IS NULL")
+        .fetch_one(pool)
+        .await?;
+    Ok(n)
+}
+
 /// Root ids of the reindex queryset: `Document.objects.filter(root_document__isnull=True)`
 /// in model order (`-created`).
 pub async fn rebuild_root_ids(pool: &PgPool) -> Result<Vec<i64>> {

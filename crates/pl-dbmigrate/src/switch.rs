@@ -454,7 +454,27 @@ pub async fn run(o: &SwitchOptions) -> Report {
     rep.finished = chrono::Utc::now().to_rfc3339();
     rep.duration_s = t0.elapsed().as_secs_f64();
     rep.finish();
+    if matches!(o.cmd, Cmd::Switch) && rep.verdict() != Level::Fail {
+        mark_search_index_for_rebuild();
+    }
     rep
+}
+
+/// After a successful switch the search index must be rebuilt from the new database: leave the
+/// rebuild marker (`pl_search::schema::REBUILD_MARKER`, ".rebuilding") in the index folder, the next
+/// PaperRust start then rebuilds (`document_index reindex --if-needed`). Only if the folder exists
+/// on this machine (`PAPERLESS_INDEX_DIR`, else `<PAPERLESS_DATA_DIR>/index`, else the Docker default).
+fn mark_search_index_for_rebuild() {
+    let var = |k: &str| std::env::var(k).ok().filter(|v| !v.trim().is_empty());
+    let dir = var("PAPERRUST_INDEX_DIR")
+        .or_else(|| var("PAPERLESS_INDEX_DIR"))
+        .map(PathBuf::from)
+        .or_else(|| var("PAPERRUST_DATA_DIR").or_else(|| var("PAPERLESS_DATA_DIR")).map(|d| PathBuf::from(d).join("index")))
+        .unwrap_or_else(|| PathBuf::from("/usr/src/paperless/data/index"));
+    if dir.is_dir() {
+        // Best effort: without the marker the start-up check (empty/incomplete index) still applies.
+        let _ = std::fs::write(dir.join(".rebuilding"), b"");
+    }
 }
 
 async fn run_inner(o: &SwitchOptions, rep: &mut Report) -> Result<()> {
