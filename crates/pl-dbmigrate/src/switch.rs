@@ -466,8 +466,7 @@ pub async fn run(o: &SwitchOptions) -> Report {
 /// on this machine (`PAPERLESS_INDEX_DIR`, else `<PAPERLESS_DATA_DIR>/index`, else the Docker default).
 fn mark_search_index_for_rebuild() {
     let var = |k: &str| std::env::var(k).ok().filter(|v| !v.trim().is_empty());
-    let dir = var("PAPERRUST_INDEX_DIR")
-        .or_else(|| var("PAPERLESS_INDEX_DIR"))
+    let dir = var("PAPERLESS_INDEX_DIR")
         .map(PathBuf::from)
         .or_else(|| var("PAPERRUST_DATA_DIR").or_else(|| var("PAPERLESS_DATA_DIR")).map(|d| PathBuf::from(d).join("index")))
         .unwrap_or_else(|| PathBuf::from("/usr/src/paperless/data/index"));

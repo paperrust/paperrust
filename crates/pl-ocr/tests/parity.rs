@@ -60,6 +60,8 @@ fn cfg_from(over: &Value, threads: i64) -> OcrConfig {
     let mut c = OcrConfig::defaults();
     c.threads_per_worker = threads;
     c.max_image_pixels_setting = None;
+    // upstream default OCR_LANGUAGE (PaperRust default is deu+eng, Known difference 22)
+    c.language = "eng".into();
     let Value::Object(m) = over else { return c };
     for (k, v) in m {
         match k.as_str() {
