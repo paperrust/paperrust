@@ -16,6 +16,10 @@ export const KEYS = {
   maxNew: 'PAPERRUST_AI_AUTO_MAX_NEW_OBJECTS',
   maxDocs: 'PAPERRUST_AI_AUTO_MAX_DOCUMENTS_PER_RUN',
   createMissing: 'PAPERRUST_AI_AUTO_CREATE_MISSING',
+  embBackend: 'PAPERLESS_AI_LLM_EMBEDDING_BACKEND',
+  embEndpoint: 'PAPERLESS_AI_LLM_EMBEDDING_ENDPOINT',
+  embModel: 'PAPERLESS_AI_LLM_EMBEDDING_MODEL',
+  embApiKey: 'PAPERLESS_AI_LLM_EMBEDDING_API_KEY',
 } as const
 export type FormKey = keyof typeof KEYS
 
@@ -32,7 +36,25 @@ export interface AiForm {
   maxNew: number
   maxDocs: number
   createMissing: boolean
+  /** '' = no embeddings configured (AI index off) */
+  embBackend: EmbeddingBackend | ''
+  embEndpoint: string
+  embModel: string
+  embApiKey: string
 }
+
+export type EmbeddingBackend = 'huggingface' | 'openai-like' | 'ollama'
+export const EMBEDDING_BACKENDS: EmbeddingBackend[] = ['ollama', 'openai-like', 'huggingface']
+
+/** Model suggestion per embedding backend (placeholder only) */
+export const DEFAULT_EMBEDDING_MODEL: Record<EmbeddingBackend, string> = {
+  ollama: 'all-minilm',
+  'openai-like': 'text-embedding-3-small',
+  huggingface: 'sentence-transformers/all-MiniLM-L6-v2',
+}
+
+/** Secret fields: never displayed, empty = unchanged */
+const SECRETS: FormKey[] = ['apiKey', 'embApiKey']
 
 export const DEFAULT_ENDPOINT: Record<AiForm['backend'], string> = {
   ollama: 'http://localhost:11434',
@@ -70,6 +92,10 @@ export function formFrom(items: SettingItem[]): AiForm {
     maxNew: num(v('maxNew'), 3),
     maxDocs: num(v('maxDocs'), 50),
     createMissing: truthy(v('createMissing')),
+    embBackend: (EMBEDDING_BACKENDS as string[]).includes(str(v('embBackend'))) ? (str(v('embBackend')) as EmbeddingBackend) : '',
+    embEndpoint: str(v('embEndpoint')),
+    embModel: str(v('embModel')),
+    embApiKey: '',
   }
 }
 
@@ -86,18 +112,21 @@ export function secretStored(items: SettingItem[], k: FormKey): boolean {
 
 /**
  * Changes as PATCH values (registry key → JSON). Only changed ones, nothing locked; empty texts → null
- * (reset); API key only if entered.
+ * (reset); API keys only if entered.
  */
 export function patchValues(before: AiForm, after: AiForm, items: SettingItem[]): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   for (const k of Object.keys(KEYS) as FormKey[]) {
-    if (k === 'apiKey') continue
+    if (SECRETS.includes(k)) continue
     if (before[k] === after[k] || locked(items, k)) continue
     const key = findItem(items, KEYS[k])?.key ?? KEYS[k]
     const val = after[k]
     out[key] = typeof val === 'string' ? (val.trim() === '' ? null : val.trim()) : val
   }
-  if (after.apiKey.trim() && !locked(items, 'apiKey')) out[findItem(items, KEYS.apiKey)?.key ?? KEYS.apiKey] = after.apiKey.trim()
+  for (const k of SECRETS) {
+    const val = String(after[k] ?? '').trim()
+    if (val && !locked(items, k)) out[findItem(items, KEYS[k])?.key ?? KEYS[k]] = val
+  }
   return out
 }
 
@@ -130,4 +159,21 @@ export function checkErrorKey(code: string | null): string {
 /** Known image models (for AI text recognition) – suggestion when the provider reports them. */
 export function visionCandidates(models: string[]): string[] {
   return models.filter((m) => /(llava|minicpm-v|qwen2(\.5)?-?vl|qwen3-vl|llama3\.2-vision|gemma3|bakllava|moondream|gpt-4o|gpt-4\.1|gpt-5|pixtral|mistral-small3)/i.test(m))
+}
+
+/** State of the AI index (semantic search) from the system status (`GET /api/status/`, `tasks.llmindex_*`) */
+export type IndexState = 'ok' | 'warning' | 'error' | 'disabled' | 'unknown'
+export interface IndexInfo {
+  state: IndexState
+  /** end of the last index task (ISO) */
+  lastRun: string | null
+  error: string | null
+}
+
+export function indexInfo(status: any): IndexInfo | null {
+  const tasks = status?.tasks
+  if (!tasks || typeof tasks !== 'object' || !('llmindex_status' in tasks)) return null
+  const s = String(tasks.llmindex_status ?? '').toUpperCase()
+  const state: IndexState = s === 'OK' ? 'ok' : s === 'WARNING' ? 'warning' : s === 'ERROR' ? 'error' : s === 'DISABLED' ? 'disabled' : 'unknown'
+  return { state, lastRun: str(tasks.llmindex_last_modified) || null, error: str(tasks.llmindex_error) || null }
 }

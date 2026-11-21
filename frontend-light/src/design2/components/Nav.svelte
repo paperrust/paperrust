@@ -1,12 +1,13 @@
-<!-- Fixed navigation (docs/DESIGN2-ENTWIRREN.md §6): home, inbox, all documents, saved views
-     ("in sidebar"), at the bottom administration and settings. No assistant (it lives in the search), no quick filters.
-     ≥ 1100 px with labels, 768–1099 px as icon bar, < 768 px as drawer. -->
+<!-- Fixed navigation (docs/DESIGN2-ENTWIRREN.md §6): home, inbox, all documents, AI assistant (only with AI on),
+     automation, saved views ("in sidebar"), at the bottom administration and settings. No quick filters.
+     ≥ 1100 px with labels (the user can collapse it to the icon bar, stored per browser), 768–1099 px as icon bar,
+     < 768 px as drawer. -->
 <script lang="ts">
   import { onMount } from 'svelte'
   import { t } from '../../lib/i18n'
   import { router } from '../../router.svelte'
   import { data } from '../../stores/data.svelte'
-  import { session } from '../../stores/settings.svelte'
+  import { session, SETTINGS_KEYS } from '../../stores/settings.svelte'
   import { consumerStatus } from '../../stores/uploads.svelte'
   import { ui } from '../stores/ui.svelte'
   import { counts } from '../stores/counts.svelte'
@@ -15,7 +16,7 @@
   import Icon from './Icon.svelte'
   import { SYMBOL } from '../lib/icons'
 
-  const rail = $derived(ui.compact && !ui.mobile)
+  const rail = $derived(ui.rail)
   const isActive = (p: string) => router.path === p || router.path.startsWith(p + '/')
   const inList = $derived(router.path === 'documents' || /^documents\/\d+/.test(router.path))
   const listRules = $derived(inList ? stateFromQuery(router.query).rules : null)
@@ -23,6 +24,7 @@
   // same permissions as the areas in manage/sections.ts (administrators always see something)
   const MANAGE_TYPES = ['tag', 'correspondent', 'documenttype', 'storagepath', 'customfield', 'savedview', 'document', 'workflow', 'mailaccount', 'paperlesstask']
   const canAutomation = $derived(session.can('view', 'workflow') || (aiStatus.enabled && session.can('view', 'document')))
+  const aiOn = $derived(aiStatus.enabled || !!session.get(SETTINGS_KEYS.AI_ENABLED))
   const canManage = $derived(session.isAdmin || MANAGE_TYPES.some((p) => session.can('view', p)))
 
   onMount(() => {
@@ -56,6 +58,7 @@
       <li>{@render item(router.href('dashboard'), 'grid-1x2', t('common.dashboard'), router.path === 'dashboard', null, 'd2-nav-overview')}</li>
       <li>{@render item(router.href('inbox'), 'inbox', t('common.inbox'), router.path === 'inbox', counts.inbox, 'd2-nav-inbox')}</li>
       <li>{@render item(router.href('documents'), 'files', t('common.all_documents'), inList && (!listRules || listRules.length === 0), counts.all, 'd2-nav-documents')}</li>
+      {#if aiOn}<li>{@render item(router.href('assistant'), 'stars', t('m.ui.ai_assistant'), router.path === 'assistant', null, 'd2-nav-assistant')}</li>{/if}
       <!-- "Automation" area (workflows, email fetching, AI review list – docs/WORKFLOWS-NEU.md topic 10 B); counter = open AI suggestions -->
       {#if canAutomation}<li>{@render item(router.href('automation/workflows'), SYMBOL.workflow, t('m.auto.title'), isActive('automation'), aiStatus.enabled ? aiStatus.pending : null, 'd2-nav-automation')}</li>{/if}
     </ul>
@@ -74,6 +77,14 @@
       <li>{@render item(router.href('attributes/tags'), SYMBOL.management, t('common.management'), manageActive, null, 'd2-nav-manage')}</li>
     {/if}
     <li>{@render item(router.href('settings'), 'gear', t('common.settings'), isActive('settings'), null, 'd2-nav-settings')}</li>
+    {#if !ui.mobile && !ui.compact}
+      <li>
+        <button class="it toggle" type="button" id="d2-nav-toggle" aria-expanded={!ui.navCollapsed} aria-label={ui.navCollapsed ? t('m.ui.expand_sidebar') : t('m.ui.collapse_sidebar')} title={ui.navCollapsed ? t('m.ui.expand_sidebar') : t('m.ui.collapse_sidebar')} onclick={() => ui.toggleNav()}>
+          <Icon name={ui.navCollapsed ? 'chevron-right' : 'chevron-left'} size="1.05rem" />
+          {#if !rail}<span class="lbl">{t('m.ui.collapse_sidebar')}</span>{/if}
+        </button>
+      </li>
+    {/if}
   </ul>
 </nav>
 
@@ -124,6 +135,15 @@
     color: var(--d2-text-2);
     font-weight: 500;
     text-decoration: none;
+  }
+  .toggle {
+    width: 100%;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    font: inherit;
+    color: var(--d2-text-3);
+    text-align: left;
   }
   .it:hover {
     background: var(--d2-surface-2);

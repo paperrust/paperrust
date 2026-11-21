@@ -86,6 +86,11 @@ export const FILTER_CUSTOM_FIELDS_QUERY = 42
 
 export const FILTER_MIME_TYPE = 47
 
+// PaperRust addition (not in paperless-ngx): exactly these document ids (`id__in`, e.g. the sources of an assistant
+// answer). Only used as a temporary URL filter, never stored in saved views; kept far above the upstream ids so
+// future upstream rule types cannot collide.
+export const FILTER_ID_IN = 1000
+
 export const SIMPLE_TEXT_PARAMETER = 'text'
 export const SIMPLE_TITLE_PARAMETER = 'title_search'
 
@@ -406,6 +411,13 @@ export const FILTER_RULE_TYPES: FilterRuleType[] = [
     datatype: 'boolean',
     multi: false,
     default: true,
+  },
+  // PaperRust addition, see FILTER_ID_IN
+  {
+    id: FILTER_ID_IN,
+    filtervar: 'id__in',
+    datatype: 'number',
+    multi: true,
   },
 ]
 

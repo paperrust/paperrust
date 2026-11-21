@@ -1,5 +1,6 @@
-// UI state of the frame (palette, help, mobile navigation, theme).
+// UI state of the frame (palette, help, mobile navigation, sidebar rail, theme).
 import { session, SETTINGS_KEYS } from '../../stores/settings.svelte'
+import { isRail, readNavCollapsed, writeNavCollapsed } from '../lib/navrail'
 import { applyDensity, applyTheme, densityOf, DENSITY_KEY, nextTheme, themeMode, type Density, type ThemeMode } from '../lib/theme'
 
 class UiState {
@@ -11,6 +12,12 @@ class UiState {
   mobile = $state(typeof matchMedia !== 'undefined' && matchMedia('(max-width: 767.98px)').matches)
   /** < 1100 px: sidebar as icon bar */
   compact = $state(typeof matchMedia !== 'undefined' && matchMedia('(max-width: 1099.98px)').matches)
+  /** sidebar collapsed to the icon rail by the user (stored per browser) */
+  navCollapsed = $state(readNavCollapsed())
+  /** sidebar shown as icon rail (tablet width or collapsed by the user; not on the phone) */
+  get rail() {
+    return isRail(this.mobile, this.compact, this.navCollapsed)
+  }
   theme = $state<ThemeMode>('auto')
   density = $state<Density>('normal')
 
@@ -49,6 +56,11 @@ class UiState {
 
   cycleTheme() {
     return this.setTheme(nextTheme(this.theme))
+  }
+
+  toggleNav() {
+    this.navCollapsed = !this.navCollapsed
+    writeNavCollapsed(this.navCollapsed)
   }
 
   openPalette(q = '') {

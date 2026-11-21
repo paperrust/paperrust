@@ -1,6 +1,6 @@
 // Vitest: Settings → AI (design2/settings/ai/model.ts)
 import { describe, expect, it } from 'vitest'
-import { checkErrorKey, findItem, formFrom, patchValues, visionCandidates } from './model'
+import { checkErrorKey, findItem, formFrom, indexInfo, patchValues, visionCandidates } from './model'
 
 const item = (key: string, value: unknown, extra: Record<string, unknown> = {}) => ({ key, name: key.replace('PAPERLESS_', 'PAPERRUST_'), aliases: [], value, locked: false, is_set: value !== null, ...extra }) as any
 
@@ -36,5 +36,24 @@ describe('Einstellungen KI', () => {
     expect(checkErrorKey('unauthorized')).toBe('m.ai_settings.err_unauthorized')
     expect(checkErrorKey('whatever')).toBe('m.ai_settings.err_other')
     expect(visionCandidates(['llama3.1', 'llava:13b', 'qwen2.5vl:7b', 'minicpm-v', 'gpt-4o'])).toEqual(['llava:13b', 'qwen2.5vl:7b', 'minicpm-v', 'gpt-4o'])
+  })
+  it('Embeddings: Register-Schlüssel, aus = leer, Schlüssel geheim', () => {
+    const emb = [...items, item('PAPERLESS_AI_LLM_EMBEDDING_BACKEND', 'ollama'), item('PAPERLESS_AI_LLM_EMBEDDING_MODEL', 'all-minilm'), item('PAPERLESS_AI_LLM_EMBEDDING_API_KEY', '********', { is_set: true })]
+    const a = formFrom(emb)
+    expect(a.embBackend).toBe('ollama')
+    expect(a.embModel).toBe('all-minilm')
+    expect(a.embApiKey).toBe('')
+    expect(formFrom(items).embBackend).toBe('')
+    expect(formFrom([item('PAPERLESS_AI_LLM_EMBEDDING_BACKEND', 'bogus')]).embBackend).toBe('')
+    expect(patchValues(a, { ...a, embBackend: 'openai-like', embEndpoint: ' http://e ' }, emb)).toEqual({ PAPERLESS_AI_LLM_EMBEDDING_BACKEND: 'openai-like', PAPERLESS_AI_LLM_EMBEDDING_ENDPOINT: 'http://e' })
+    expect(patchValues(a, { ...a, embBackend: '' }, emb)).toEqual({ PAPERLESS_AI_LLM_EMBEDDING_BACKEND: null })
+    expect(patchValues(a, { ...a, embApiKey: 'k2' }, emb)).toEqual({ PAPERLESS_AI_LLM_EMBEDDING_API_KEY: 'k2' })
+  })
+  it('Zustand des KI-Index aus dem Systemstatus', () => {
+    expect(indexInfo({ tasks: { llmindex_status: 'OK', llmindex_last_modified: '2026-11-20T10:00:00Z', llmindex_error: null } })).toEqual({ state: 'ok', lastRun: '2026-11-20T10:00:00Z', error: null })
+    expect(indexInfo({ tasks: { llmindex_status: 'WARNING', llmindex_error: 'No LLM index update tasks found' } })?.state).toBe('warning')
+    expect(indexInfo({ tasks: { llmindex_status: 'DISABLED' } })?.state).toBe('disabled')
+    expect(indexInfo({ tasks: {} })).toBeNull()
+    expect(indexInfo(null)).toBeNull()
   })
 })

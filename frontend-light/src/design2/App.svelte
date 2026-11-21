@@ -176,7 +176,7 @@
 <svelte:window {onkeydown} />
 
 <a class="d2-skip" href="#d2-main">{t('m.app.skip_content')}</a>
-<div class="d2-app" class:mobile={ui.mobile} class:compact={ui.compact && !ui.mobile}>
+<div class="d2-app" class:mobile={ui.mobile} class:compact={ui.rail}>
   <Header />
   <div class="d2-body">
     <Nav />

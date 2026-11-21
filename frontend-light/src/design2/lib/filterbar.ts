@@ -9,7 +9,7 @@ import {
   FILTER_OWNER_ISNULL,
   FILTER_SHARED_BY_USER,
 } from '../../lib/filter-rule-type'
-import { getDate, getObjects, otherRules, type ObjKind } from './filters'
+import { getDate, getIdSelection, getObjects, otherRules, type ObjKind } from './filters'
 
 // ---- Fields ------------------------------------------------------------------------------------
 // Like the classic UI (lib/query-params transformLegacyFilterRules): "has field" as
@@ -106,6 +106,7 @@ export function activeFilterCount(rules: FilterRule[], me: number | null | undef
   if (getDate(rules, 'from') || getDate(rules, 'to')) n++
   if (getOwnerMode(rules, me) !== 'all') n++
   if (remainingRules(rules).length) n++
+  if (getIdSelection(rules).length) n++
   return n
 }
 

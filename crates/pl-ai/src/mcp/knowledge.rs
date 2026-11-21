@@ -180,7 +180,9 @@ pub async fn retrieve<B: Backend>(
     };
     // 1. Full text (search index of the server)
     let mut full: Vec<i64> = Vec::new();
-    let p = SearchParams { query: Some(question.to_string()), limit: Some((max_passages * 2).min(50) as u32), ..Default::default() };
+    // Keywords joined with OR instead of the whole sentence: the full-text search requires every word,
+    // and no document contains "suche mir alle dokumente bez …" (NAS check 2026-11-21: 0 passages).
+    let p = SearchParams { query: Some(fulltext_query(question)), limit: Some((max_passages * 2).min(50) as u32), ..Default::default() };
     match svc.backend.search_documents(actor, &p).await {
         Ok((_, docs)) => full = docs.into_iter().map(|d| d.id).filter(|id| restrict.is_none_or(|r| r.contains(id))).collect(),
         Err(e) => notes.push(format!("full-text search failed: {e}")),
@@ -357,8 +359,188 @@ pub async fn ask<B: Backend>(
     AskResult { question: question.to_string(), index_state: state, retrieval, answer, answer_error, citations: cands, notes }
 }
 
+/// Question words, fillers and request verbs (German/English) that say nothing about the content.
+const QUESTION_STOPWORDS: &[&str] = &[
+    // German
+    "aber",
+    "alle",
+    "allen",
+    "aller",
+    "alles",
+    "als",
+    "am",
+    "an",
+    "auf",
+    "aus",
+    "bei",
+    "betreffend",
+    "bez",
+    "bezgl",
+    "bezüglich",
+    "bis",
+    "bitte",
+    "bzgl",
+    "dann",
+    "das",
+    "dass",
+    "dem",
+    "den",
+    "der",
+    "des",
+    "die",
+    "dies",
+    "diese",
+    "diesem",
+    "diesen",
+    "dieser",
+    "dieses",
+    "dokument",
+    "dokumente",
+    "dokumenten",
+    "du",
+    "durch",
+    "ein",
+    "eine",
+    "einem",
+    "einen",
+    "einer",
+    "eines",
+    "es",
+    "etwas",
+    "finde",
+    "finden",
+    "für",
+    "gib",
+    "gibt",
+    "habe",
+    "haben",
+    "hat",
+    "ich",
+    "ihr",
+    "im",
+    "in",
+    "ist",
+    "kann",
+    "kannst",
+    "mein",
+    "meine",
+    "meinem",
+    "meinen",
+    "meiner",
+    "meines",
+    "mich",
+    "mir",
+    "mit",
+    "nach",
+    "nicht",
+    "noch",
+    "nur",
+    "oder",
+    "sind",
+    "such",
+    "suche",
+    "suchen",
+    "über",
+    "um",
+    "und",
+    "uns",
+    "unser",
+    "unsere",
+    "vom",
+    "von",
+    "vor",
+    "war",
+    "was",
+    "welche",
+    "welchem",
+    "welchen",
+    "welcher",
+    "welches",
+    "wer",
+    "wie",
+    "wann",
+    "wo",
+    "zeig",
+    "zeige",
+    "zeigen",
+    "zu",
+    "zum",
+    "zur",
+    "gerne",
+    "liste",
+    "auflisten",
+    "alle",
+    // English
+    "a",
+    "about",
+    "all",
+    "an",
+    "and",
+    "any",
+    "are",
+    "can",
+    "do",
+    "does",
+    "document",
+    "documents",
+    "find",
+    "for",
+    "from",
+    "give",
+    "have",
+    "i",
+    "in",
+    "is",
+    "list",
+    "me",
+    "my",
+    "of",
+    "on",
+    "or",
+    "please",
+    "regarding",
+    "search",
+    "show",
+    "the",
+    "to",
+    "what",
+    "when",
+    "where",
+    "which",
+    "who",
+    "with",
+    "you",
+];
+
+/// Full-text query for a natural-language question: the content words joined with `OR`
+/// (stop words and words shorter than 3 characters dropped; numbers such as years kept).
+/// Falls back to the question itself if nothing is left.
+pub fn fulltext_query(question: &str) -> String {
+    let mut words: Vec<String> = Vec::new();
+    for w in question.split(|c: char| !c.is_alphanumeric()).map(str::to_lowercase) {
+        let keep =
+            (w.chars().count() >= 3 || w.chars().all(|c| c.is_ascii_digit()) && !w.is_empty()) && !QUESTION_STOPWORDS.contains(&w.as_str());
+        if keep && !words.contains(&w) {
+            words.push(w);
+        }
+    }
+    if words.is_empty() { question.to_string() } else { words.join(" OR ") }
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn question_becomes_keyword_query() {
+        use super::fulltext_query;
+        assert_eq!(fulltext_query("suche mir alle dokumente bez strassenverkehrsamt"), "strassenverkehrsamt");
+        assert_eq!(fulltext_query("Welche Rechnungen sind diesen Monat fällig?"), "rechnungen OR monat OR fällig");
+        assert_eq!(fulltext_query("Wann endet mein Versicherungsvertrag?"), "endet OR versicherungsvertrag");
+        assert_eq!(fulltext_query("Steuer 2025"), "steuer OR 2025");
+        assert_eq!(fulltext_query("Which invoices are due this month?"), "invoices OR due OR this OR month");
+        assert_eq!(fulltext_query("hey"), "hey");
+        assert_eq!(fulltext_query("was ist das?"), "was ist das?", "nothing left → question unchanged");
+    }
+
     use super::*;
 
     #[test]

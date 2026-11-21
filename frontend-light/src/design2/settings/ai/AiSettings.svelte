@@ -1,5 +1,5 @@
-<!-- Settings → AI (PaperRust design): one main switch, provider with connection test and model list, what
-     may happen automatically, custom fields via AI, AI text recognition, "Advanced", custom prompts and "Reprocess
+<!-- Settings → AI (PaperRust design): one main switch, provider with connection test and model list, embeddings
+     and the state of the AI index (system status, update via task "llm_index"), what may happen automatically, custom fields via AI, AI text recognition, "Advanced", custom prompts and "Reprocess
      archive". Everything is optional and off by default. Saving: settings registry (/rs/api/v2/settings)
      + AI options (/api/x-ai/options/). Administrators (superusers) only. -->
 <script lang="ts">
@@ -11,7 +11,9 @@
   import { listSettings, patchSettings, v2Error, type SettingItem } from '../../../components/admin/settings/system/api'
   import { checkProvider, getOptions, patchOptions, type AiOptions, type ConnectionCheck, type FieldInfo } from '../../ai/api'
   import { aiStatus } from '../../ai/status.svelte'
-  import { checkErrorKey, CONFIDENCE_STEPS, DEFAULT_ENDPOINT, formFrom, locked, patchValues, secretStored, visionCandidates, type AiForm } from './model'
+  import { systemStatus } from '../../../api/objects'
+  import { runTask } from '../../../api/admin'
+  import { checkErrorKey, CONFIDENCE_STEPS, DEFAULT_EMBEDDING_MODEL, DEFAULT_ENDPOINT, EMBEDDING_BACKENDS, formFrom, indexInfo, locked, patchValues, secretStored, visionCandidates, type AiForm, type IndexInfo } from './model'
 
   let items = $state<SettingItem[]>([])
   let rev = 0
@@ -29,6 +31,18 @@
   let Backfill = $state<Component<any> | null>(null)
   let showPrompts = $state(false)
   let showBackfill = $state(false)
+  // AI index (semantic search): state from the system status, update via the task "llm_index" (superusers)
+  let index = $state<IndexInfo | null>(null)
+  let indexing = $state(false)
+  const EMB_ENDPOINT: Record<string, string> = { ollama: 'http://localhost:11434', 'openai-like': 'https://api.openai.com/v1', huggingface: 'http://localhost:8080' }
+  const EMB_LABEL: Record<string, string> = { ollama: 'm.ai_settings.ollama', 'openai-like': 'm.ai_settings.openai', huggingface: 'm.ai_settings.emb_huggingface' }
+  const INDEX_LABEL: Record<IndexInfo['state'], string> = {
+    ok: 'm.ai_settings.index_ok',
+    warning: 'm.ai_settings.index_never',
+    error: 'm.ai_settings.index_error',
+    disabled: 'm.ai_settings.index_disabled',
+    unknown: 'm.ai_settings.index_unknown',
+  }
 
   const isAdmin = $derived(!!aiStatus.data?.can_configure)
 
@@ -48,9 +62,27 @@
       loadError = true
     }
   }
+  function loadIndex() {
+    systemStatus()
+      .then((s) => (index = indexInfo(s)))
+      .catch(() => (index = null))
+  }
+  async function updateIndex() {
+    indexing = true
+    try {
+      await runTask('llm_index')
+      toastService.showInfo(t('m.ai_settings.index_started'))
+      loadIndex()
+    } catch (e) {
+      toastService.showError(t('m.ai_settings.index_start_failed'), e)
+    } finally {
+      indexing = false
+    }
+  }
   onMount(() => {
     if (!aiStatus.data) aiStatus.refresh()
     load()
+    loadIndex()
   })
   $effect(() => {
     if (showPrompts && !Prompts) import('./PromptEditor.svelte').then((m) => (Prompts = m.default))
@@ -161,6 +193,42 @@
               <Icon name="x-circle" />{t(checkErrorKey(check.error))}
             {/if}
           </p>
+        {/if}
+      </section>
+
+      <section class="card" aria-labelledby="d2-ai-h-emb" id="d2-ai-embeddings">
+        <h2 id="d2-ai-h-emb">{t('m.ai_settings.embeddings')}</h2>
+        <p class="d2-muted">{t('m.ai_settings.embeddings_hint')}</p>
+        <div class="grid2">
+          <label class="d2-label" for="d2-ai-emb-backend">{t('m.ai_settings.emb_backend')}</label>
+          <select class="d2-select" id="d2-ai-emb-backend" bind:value={form.embBackend} disabled={!!lock('embBackend')}>
+            <option value="">{t('m.ai_settings.emb_off')}</option>
+            {#each EMBEDDING_BACKENDS as b (b)}<option value={b}>{t(EMB_LABEL[b])}</option>{/each}
+          </select>
+          {#if form.embBackend}
+            <label class="d2-label" for="d2-ai-emb-endpoint">{t('m.ai_settings.address')}</label>
+            <input class="d2-input" id="d2-ai-emb-endpoint" bind:value={form.embEndpoint} placeholder={EMB_ENDPOINT[form.embBackend]} disabled={!!lock('embEndpoint')} />
+            {#if form.embBackend !== 'ollama'}
+              <label class="d2-label" for="d2-ai-emb-key">{t('m.ai_settings.api_key')}</label>
+              <input class="d2-input" id="d2-ai-emb-key" type="password" autocomplete="off" bind:value={form.embApiKey} placeholder={secretStored(items, 'embApiKey') ? t('m.ai_settings.key_stored') : ''} disabled={!!lock('embApiKey')} />
+            {/if}
+            <label class="d2-label" for="d2-ai-emb-model">{t('m.ai_settings.model')}</label>
+            <input class="d2-input" id="d2-ai-emb-model" bind:value={form.embModel} placeholder={DEFAULT_EMBEDDING_MODEL[form.embBackend]} disabled={!!lock('embModel')} />
+          {/if}
+        </div>
+        {#if lock('embBackend') || lock('embEndpoint') || lock('embModel') || lock('embApiKey')}<p class="d2-muted small">{t('m.ai_settings.locked')}</p>{/if}
+        {#if index}
+          <div class="index" id="d2-ai-index">
+            <span class="d2-label">{t('m.ai_settings.index')}</span>
+            <span class="istate {index.state}" role="status">
+              {t(INDEX_LABEL[index.state])}{#if index.lastRun && index.state !== 'disabled'} · {t('m.ai_settings.index_last_run', { PH: new Date(index.lastRun).toLocaleString() })}{/if}
+            </span>
+            {#if index.state === 'error' && index.error}<span class="d2-muted small">{index.error}</span>{/if}
+            <div class="row">
+              <button class="d2-btn" onclick={updateIndex} disabled={indexing || index.state === 'disabled'} id="d2-ai-index-run"><Icon name="arrow-repeat" />{t('m.ai_settings.index_update')}</button>
+              <span class="d2-muted small">{t('m.ai_settings.index_update_hint')}</span>
+            </div>
+          </div>
         {/if}
       </section>
 
@@ -416,6 +484,22 @@
   }
   .warn {
     color: var(--d2-warn);
+  }
+  .index {
+    display: flex;
+    flex-direction: column;
+    gap: var(--d2-s2);
+    padding-top: var(--d2-s3);
+    border-top: 1px solid var(--d2-border);
+  }
+  .istate.ok {
+    color: var(--d2-ok);
+  }
+  .istate.warning {
+    color: var(--d2-warn);
+  }
+  .istate.error {
+    color: var(--d2-danger);
   }
   .fields {
     list-style: none;

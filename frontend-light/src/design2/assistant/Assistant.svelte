@@ -1,5 +1,6 @@
 <!-- Assistant (concept E): questions to one's own archive, answer streamed, sources as chips ([n] in the text jumps to the
-     source), actions (open documents, create reminder). API: POST /rs/api/v2/ask (SSE). -->
+     source), actions (open documents, create reminder). API: POST /rs/api/v2/ask (SSE). The conversation lives in
+     chat.svelte.ts, so a running answer continues while the user looks at a source. -->
 <script lang="ts">
   import { onMount, tick } from 'svelte'
   import { t, msg } from '../../lib/i18n'
@@ -7,40 +8,44 @@
   import { session, SETTINGS_KEYS } from '../../stores/settings.svelte'
   import { toastService } from '../../stores/toasts.svelte'
   import { ui } from '../stores/ui.svelte'
-  import { ask, conversation as loadConversation, conversations as listConversations, mockEnabled, runRequest, Unavailable, type AskAction, type Citation, type Conversation } from '../api/assist'
+  import { mockEnabled, runRequest, type AskAction } from '../api/assist'
+  import { assistant as chat, type Msg } from './chat.svelte'
+  import { idSelectionQuery } from '../lib/filters'
   import Icon from '../components/Icon.svelte'
 
-  interface Msg {
-    role: 'user' | 'assistant'
-    text: string
-    citations: Citation[]
-    actions: AskAction[]
-    notes: string[]
-    error?: string | null
-    streaming?: boolean
-    /** AI off / no LLM: only weighted hits (contract: answer null, notes) */
-    sourcesOnly?: boolean
-  }
-  let msgs = $state<Msg[]>([])
   let q = $state(new URLSearchParams(router.query).get('q') ?? '')
-  let busy = $state(false)
-  let conversation = $state<string | null>(null)
-  let convs = $state<Conversation[]>([])
-  let unavailable = $state(false)
   let scroller: HTMLDivElement
   let input: HTMLTextAreaElement
-  let ctrl: AbortController | null = null
+  // ticks once per second while an answer runs (elapsed seconds in the progress line)
+  let now = $state(Date.now())
+  $effect(() => {
+    if (!chat.busy) return
+    now = Date.now()
+    const id = setInterval(() => (now = Date.now()), 1000)
+    return () => clearInterval(id)
+  })
+  const secs = $derived(chat.busy ? Math.max(0, Math.floor((now - chat.startedAt) / 1000)) : 0)
+  const lastCites = $derived(chat.msgs.at(-1)?.citations.length ?? 0)
 
   const aiOn = $derived(!!session.get(SETTINGS_KEYS.AI_ENABLED))
   const SUGGEST = [msg('m.assistant.invoices_due_month'), msg('m.assistant.insurance_contract_end'), msg('m.assistant.summarize_last_letter_bank')]
 
   onMount(() => {
-    listConversations()
-      .then((c) => (convs = c))
-      .catch((e) => e instanceof Unavailable && (unavailable = !mockEnabled()))
-    if (q) send()
-    else input?.focus()
-    return () => ctrl?.abort()
+    chat.refreshConvs()
+    // the question from the URL (search field "Ask question: …") is sent once: the URL loses `q`, so going back
+    // to this page later does not ask again (while an answer still runs, the question stays in the input field)
+    if (q) {
+      router.navigate('assistant', true)
+      if (!chat.busy) send()
+    } else scrollDown()
+    input?.focus()
+    // the stream keeps running when the view is left (state lives in chat.svelte.ts)
+    return chat.listen((e, i) => {
+      // finished answer: jump to its start (hints/sources visible at the top), otherwise follow along
+      if (e === null) input?.focus()
+      else if (e.type === 'done') tick().then(() => scroller?.querySelectorAll('.msg.assistant')[i >> 1]?.scrollIntoView({ block: 'start' }))
+      else scrollDown()
+    })
   })
 
   async function scrollDown() {
@@ -48,61 +53,12 @@
     scroller?.scrollTo({ top: scroller.scrollHeight })
   }
 
-  async function send(text = q) {
-    const question = text.trim()
-    if (!question || busy) return
+  function send(text = q) {
+    if (!text.trim() || chat.busy) return
     q = ''
-    msgs = [...msgs, { role: 'user', text: question, citations: [], actions: [], notes: [] }, { role: 'assistant', text: '', citations: [], actions: [], notes: [], streaming: true }]
-    const i = msgs.length - 1
-    const upd = (f: (m: Msg) => void) => {
-      const m = { ...msgs[i] }
-      f(m)
-      msgs[i] = m
-    }
-    busy = true
-    ctrl = new AbortController()
+    const p = chat.send(text)
     scrollDown()
-    try {
-      await ask(
-        question,
-        conversation,
-        (e) => {
-          if (e.type === 'meta') {
-            if (e.conversation) conversation = e.conversation
-            if (e.notes?.length) upd((m) => (m.notes = e.notes!))
-          } else if (e.type === 'delta') upd((m) => (m.text += e.text))
-          else if (e.type === 'citations') upd((m) => (m.citations = e.citations))
-          else if (e.type === 'actions') upd((m) => (m.actions = e.actions))
-          else if (e.type === 'error') upd((m) => (m.error = e.message))
-          else if (e.type === 'done')
-            upd((m) => {
-              if (!m.text && e.answer) m.text = e.answer
-              if (e.answerError) m.error = e.answerError
-              if (e.notes?.length) m.notes = e.notes
-              if (!m.text && !e.answer && !e.answerError && !m.error) m.sourcesOnly = true
-            })
-          // finished answer: jump to its start (hints/sources visible at the top), otherwise follow along
-          if (e.type === 'done') tick().then(() => scroller?.querySelectorAll('.msg.assistant')[i >> 1]?.scrollIntoView({ block: 'start' }))
-          else scrollDown()
-        },
-        ctrl.signal,
-      )
-    } catch (e: any) {
-      if (e instanceof Unavailable) {
-        unavailable = true
-        upd((m) => (m.error = t('m.assistant.assistant_not_available_server')))
-      } else if (e?.name !== 'AbortError') upd((m) => (m.error = e?.message ?? String(e)))
-    } finally {
-      upd((m) => (m.streaming = false))
-      busy = false
-      ctrl = null
-      refreshConvs()
-      input?.focus()
-    }
-  }
-
-  function stop() {
-    ctrl?.abort()
+    return p
   }
 
   /** Split answer text into text and [n] references */
@@ -114,7 +70,11 @@
   }
   const openDoc = (id: number) => router.navigate('documents/' + id)
   async function act(a: AskAction) {
-    if (a.type === 'open_documents' && a.legacyIds?.length) return openDoc(a.legacyIds[0])
+    if (a.type === 'open_documents' && a.legacyIds?.length) {
+      // one source: open it directly; several: document list filtered to exactly these (temporary filter)
+      if (a.legacyIds.length === 1) return openDoc(a.legacyIds[0])
+      return router.navigate('documents' + idSelectionQuery(a.legacyIds))
+    }
     if (a.request) {
       try {
         await runRequest(a.request)
@@ -125,29 +85,15 @@
     }
   }
   async function openConversation(uuid: string) {
-    ctrl?.abort()
     try {
-      const ms = await loadConversation(uuid)
-      conversation = uuid
-      msgs = ms.map((m) => ({
-        role: m.role,
-        text: m.content,
-        citations: m.citations,
-        actions: m.actions,
-        notes: m.notes,
-        error: m.answerError,
-        sourcesOnly: m.role === 'assistant' && !m.content && !m.answerError,
-      }))
+      await chat.openConversation(uuid)
       scrollDown()
     } catch (e) {
       toastService.showError(t('m.assistant.could_not_load_conversation'), e)
     }
   }
-  const refreshConvs = () => listConversations().then((c) => (convs = c)).catch(() => {})
   function newChat() {
-    ctrl?.abort()
-    msgs = []
-    conversation = null
+    chat.newChat()
     input?.focus()
   }
   function onkey(e: KeyboardEvent) {
@@ -164,8 +110,8 @@
       <div class="d2-pane-head"><h2>{t('m.assistant.conversations')}</h2></div>
       <div class="d2-scroll list">
         <button class="d2-btn primary new" onclick={newChat}><Icon name="plus-lg" />{t('m.assistant.new_conversation')}</button>
-        {#each convs as c (c.uuid)}
-          <button class="conv" class:on={c.uuid === conversation} title={c.title} onclick={() => openConversation(c.uuid)}><Icon name="chat-left-text" /><span>{c.title}</span></button>
+        {#each chat.convs as c (c.uuid)}
+          <button class="conv" class:on={c.uuid === chat.conversation} title={c.title} onclick={() => openConversation(c.uuid)}><Icon name="chat-left-text" /><span>{c.title}</span></button>
         {:else}
           <p class="d2-muted small">{t('m.assistant.earlier_conversations_appear_here')}</p>
         {/each}
@@ -179,20 +125,20 @@
       <span class="grow"></span>
       {#if ui.mobile}<button class="d2-btn ghost sm" onclick={newChat}><Icon name="plus-lg" />{t('m.assistant.new')}</button>{/if}
     </header>
-    <div class="msgs d2-scroll" bind:this={scroller} aria-live="polite" aria-busy={busy} id="d2-chat-log">
-      {#if msgs.length === 0}
+    <div class="msgs d2-scroll" bind:this={scroller} aria-live="polite" aria-busy={chat.busy} id="d2-chat-log">
+      {#if chat.msgs.length === 0}
         <div class="intro">
           <Icon name="stars" size="2.5rem" />
           <h2>{t('m.assistant.ask_archive')}</h2>
           <p class="d2-muted">{t('m.assistant.answers_come_only_documents')}</p>
-          {#if !aiOn && !unavailable}<p class="hint" role="note" id="d2-ai-off-intro"><Icon name="info-circle" /> {t('m.assistant.ai_switched_off_server')}</p>{/if}
-          {#if unavailable}<p class="warn" role="note">{t('m.assistant.assistant_not_available_server')}</p>{/if}
+          {#if !aiOn && !chat.unavailable}<p class="hint" role="note" id="d2-ai-off-intro"><Icon name="info-circle" /> {t('m.assistant.ai_switched_off_server')}</p>{/if}
+          {#if chat.unavailable}<p class="warn" role="note">{t('m.assistant.assistant_not_available_server')}</p>{/if}
           <div class="sugg">
             {#each SUGGEST as s (s)}<button class="d2-btn" onclick={() => send(t(s))}>{t(s)}</button>{/each}
           </div>
         </div>
       {/if}
-      {#each msgs as m, i (i)}
+      {#each chat.msgs as m, i (i)}
         <div class="msg {m.role}">
           {#if m.role === 'user'}
             <p class="bubble">{m.text}</p>
@@ -209,7 +155,16 @@
                   {#if m.streaming}<span class="caret" aria-hidden="true"></span>{/if}
                 </p>
               {:else if m.streaming}
-                <p class="d2-muted">{t('m.assistant.searching_documents')}</p>
+                <p class="progress" role="status" id="d2-ask-progress">
+                  <span class="spin" aria-hidden="true"></span>
+                  {#if chat.phase === 'writing' && i === chat.msgs.length - 1}
+                    <span>{aiOn ? t('m.assistant.passages_found_writing', { PH: lastCites }) : t('m.assistant.passages_found', { PH: lastCites })}</span>
+                  {:else}
+                    <span>{t('m.assistant.searching_documents')}</span>
+                  {/if}
+                  {#if secs > 0}<span class="secs">{t('m.assistant.seconds', { PH: secs })}</span>{/if}
+                </p>
+                {#if secs >= 60}<p class="d2-muted small">{t('m.assistant.still_working')}</p>{/if}
               {/if}
               {#if m.error}<p class="err" role="alert"><Icon name="exclamation-triangle" /> {m.error}</p>{/if}
               {#if m.sourcesOnly && !m.citations.length}
@@ -255,8 +210,8 @@
     <form class="composer" onsubmit={(e) => (e.preventDefault(), send())}>
       <label class="d2-sr" for="d2-ask">{t('m.assistant.question')}</label>
       <textarea id="d2-ask" bind:this={input} bind:value={q} rows="1" placeholder={t('m.assistant.ask_question_about_documents')} onkeydown={onkey} maxlength="2000"></textarea>
-      {#if busy}
-        <button type="button" class="d2-btn" onclick={stop}><Icon name="x-circle" />{t('m.assistant.stop')}</button>
+      {#if chat.busy}
+        <button type="button" class="d2-btn" onclick={() => chat.stop()}><Icon name="x-circle" />{t('m.assistant.stop')}</button>
       {:else}
         <button class="d2-btn primary" disabled={!q.trim()} aria-label={t('common.send')}><Icon name="send" /></button>
       {/if}
@@ -271,7 +226,7 @@
     height: 100%;
     min-height: 0;
   }
-  .as.mobile {
+  .chat.mobile {
     grid-template-columns: minmax(0, 1fr);
   }
   .side {
@@ -433,6 +388,35 @@
   @keyframes blink {
     50% {
       opacity: 0;
+    }
+  }
+  .progress {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--d2-s2);
+    color: var(--d2-text-2);
+  }
+  .secs {
+    color: var(--d2-text-3);
+    font-variant-numeric: tabular-nums;
+  }
+  .spin {
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--d2-accent-soft);
+    border-top-color: var(--d2-accent);
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .spin {
+      animation: none;
     }
   }
   .err {

@@ -13,6 +13,7 @@ import {
   FILTER_HAS_DOCUMENT_TYPE_ANY,
   FILTER_HAS_STORAGE_PATH_ANY,
   FILTER_HAS_TAGS_ALL,
+  FILTER_ID_IN,
   FILTER_IS_IN_INBOX,
   FILTER_SIMPLE_TEXT,
   FILTER_STORAGE_PATH,
@@ -116,7 +117,25 @@ export function setDate(rules: FilterRule[], which: 'from' | 'to', value: string
   return value ? [...rest, { rule_type: t, value }] : rest
 }
 
+// ---- Selection of single documents (PaperRust addition FILTER_ID_IN, e.g. "open sources" of the assistant) ----
+
+/** ids of the temporary selection `id__in` (empty = none) */
+export function getIdSelection(rules: FilterRule[]): number[] {
+  return rules.filter((r) => r.rule_type === FILTER_ID_IN && r.value != null && /^\d+$/.test(String(r.value).trim())).map((r) => +r.value)
+}
+
+export function clearIdSelection(rules: FilterRule[]): FilterRule[] {
+  return rules.filter((r) => r.rule_type !== FILTER_ID_IN)
+}
+
+/** List URL query for exactly these documents (temporary filter, not a saved view) */
+export function idSelectionQuery(ids: number[], sortField = 'created', sortReverse = true): string {
+  const uniq = [...new Set(ids.filter((id) => Number.isInteger(id) && id > 0))]
+  return queryFromState({ rules: uniq.map((id) => ({ rule_type: FILTER_ID_IN, value: String(id) })), sortField, sortReverse })
+}
+
 const HANDLED = new Set([
+  FILTER_ID_IN,
   ...TEXT_RULES,
   FILTER_CREATED_FROM,
   FILTER_CREATED_TO,

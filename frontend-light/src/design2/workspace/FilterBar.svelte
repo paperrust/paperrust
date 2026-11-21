@@ -9,7 +9,7 @@
   import { router } from '../../router.svelte'
   import { ui } from '../stores/ui.svelte'
   import { ws } from '../stores/workspace.svelte'
-  import { OBJ_RULES, clearObjects, getDate, getObjects, getText, noneRule, setDate, setText, type ObjKind } from '../lib/filters'
+  import { OBJ_RULES, clearIdSelection, clearObjects, getDate, getIdSelection, getObjects, getText, noneRule, setDate, setText, type ObjKind } from '../lib/filters'
   import { OWNER_MODES, activeFilterCount, getFieldFilter, getOwnerMode, remainingRules, setFields, setOwnerMode, type OwnerMode } from '../lib/filterbar'
   import { askPath } from '../lib/palette'
   import ObjectPicker from '../components/ObjectPicker.svelte'
@@ -55,6 +55,8 @@
   const from = $derived(getDate(ws.state.rules, 'from'))
   const to = $derived(getDate(ws.state.rules, 'to'))
   const others = $derived(remainingRules(ws.state.rules))
+  // temporary selection of single documents ("open sources" in the assistant)
+  const selection = $derived(getIdSelection(ws.state.rules))
   const active = $derived(ws.state.rules.length > 0)
   const sortName = $derived(t(DOCUMENT_SORT_FIELDS.find((f) => f.field === ws.state.sortField)?.name ?? ws.state.sortField))
   const me = $derived<number | null>(session.data?.user?.id ?? null)
@@ -135,6 +137,11 @@
   </div>
   {#if !ui.mobile || filtersOpen}
     <div class="chips" id="d2-filter-chips" role="group" aria-label={t('common.filter')}>
+      {#if selection.length}
+        <button class="chipbtn on" id="d2-filter-selection" title={t('m.workspace.selection_remove')} aria-label={`${t('m.workspace.selection_from_assistant', { PH: selection.length })} – ${t('m.workspace.selection_remove')}`} onclick={() => ws.apply({ rules: clearIdSelection(ws.state.rules) })}>
+          <Icon name="stars" /><span>{t('m.workspace.selection_from_assistant', { PH: selection.length })}</span><Icon name="x-lg" />
+        </button>
+      {/if}
       {#each KINDS as k (k.kind)}
         <ObjectPicker variant="chip" label={k.label} icon={k.icon} multi allowNone={k.none} options={opts(k.src())} selected={getObjects(ws.state.rules, k.kind)} onchange={(next) => setObjects(k.kind, next)} id={'d2-filter-' + k.kind} />
       {/each}
