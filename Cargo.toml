@@ -76,7 +76,7 @@ uuid = { version = "1", features = ["v4", "serde"] }
 base64 = "0.22"
 hmac = "0.12"
 sha2 = "0.10"
-pbkdf2 = "0.12"
+pbkdf2 = "0.13"
 flate2 = "1"
 rand = "0.8"
 redis = { version = "0.27", features = ["tokio-comp", "connection-manager"] }
