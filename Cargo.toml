@@ -119,7 +119,7 @@ aes = "=0.9.4"
 # pl-server: optionaler Allokator (Feature `mimalloc`, O1-Messung)
 mimalloc = { version = "=0.1.52", default-features = false }
 # pl-authz: Django-Standard-Hasher Argon2/BCryptSHA256/Scrypt (Lücke S5)
-argon2 = { version = "=0.5.3", default-features = false, features = ["alloc"] }
+argon2 = { version = "=0.6.0", default-features = false, features = ["alloc"] }
 bcrypt = "=0.17.1"
 scrypt = { version = "=0.11.0", default-features = false }
 # pl-cli: ZIP-Kompression bzip2/lzma/zstd wie CPython zipfile (Lücke B6). bzip2 reine Rust-Fassung
