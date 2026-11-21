@@ -88,7 +88,7 @@ url = "2"
 # =0.26.2: dieselbe Version, die tantivy-py 0.26.2 (upstream uv.lock) einbettet.
 tantivy = "=0.26.2"
 minijinja = { version = "=2.19.0", default-features = false, features = ["builtins", "macros", "multi_template", "adjacent_loop_items", "std_collections", "serde", "loop_controls", "fuel", "preserve_order", "json", "urlencode", "unstable_machinery"] }
-fancy-regex = "=0.14.0"
+fancy-regex = "=0.19.2"
 unicode-normalization = "=0.1.26"
 sha1 = "=0.10.6"
 imap-proto = "0.16"
