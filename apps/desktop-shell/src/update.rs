@@ -736,19 +736,20 @@ mod tests {
         Version::parse(s).unwrap()
     }
 
+    // The platform of the machine running the tests (CI runs on Linux and Windows).
     fn keys() -> Vec<String> {
-        vec!["windows-x86_64-nsis".into(), "windows-x86_64".into()]
+        platform_keys()
     }
 
     fn manifest(version: &str, url: &str, sig: &str) -> serde_json::Value {
+        let mut platforms = serde_json::Map::new();
+        platforms.insert("other-os-unknown".into(), serde_json::json!({ "url": "https://x.invalid/a.tar.gz", "signature": "x" }));
+        platforms.insert(keys()[1].clone(), serde_json::json!({ "url": url, "signature": sig }));
         serde_json::json!({
             "version": version,
             "notes": "Neu: Updates",
             "pub_date": "2026-11-09T12:00:00Z",
-            "platforms": {
-                "windows-x86_64": { "url": url, "signature": sig },
-                "darwin-aarch64": { "url": "https://x.invalid/a.tar.gz", "signature": "x" }
-            }
+            "platforms": platforms
         })
     }
 
@@ -874,7 +875,7 @@ mod tests {
         assert!(bad(serde_json::json!({"version": "1.0.0"})).contains("platforms"));
         assert!(
             bad(serde_json::json!({"version": "1.0.0", "platforms": {
-            "darwin-aarch64": {"url": "https://a/b", "signature": "s"}}}))
+            "other-os-unknown": {"url": "https://a/b", "signature": "s"}}}))
             .contains("Plattform")
         );
         assert!(bad(manifest("1.0.0", "https://a/b", " ")).contains("signature"));

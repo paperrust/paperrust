@@ -16,6 +16,11 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Publish as this release version (e.g. 0.1.0) instead of edge; builds the selected branch"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -54,9 +59,12 @@ jobs:
           password: ${{ startsWith(vars.PAPERRUST_IMAGE, 'ghcr.io/') && secrets.GITHUB_TOKEN || secrets.REGISTRY_TOKEN }}
       - name: Version
         id: v
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
           v="${GITHUB_REF_NAME#v}"
           [[ "$GITHUB_REF_TYPE" == tag ]] || v="0.0.0-edge"
+          [[ -z "$INPUT_VERSION" ]] || v="$INPUT_VERSION"
           echo "version=$v" >>"$GITHUB_OUTPUT"
       - name: Build + push (digest only)
         id: build
@@ -110,10 +118,10 @@ jobs:
         with:
           images: ${{ vars.PAPERRUST_IMAGE }}
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable=${{ github.ref_type == 'tag' && !contains(github.ref_name, '-') }}
-            type=raw,value=edge,enable=${{ github.ref_type != 'tag' }}
+            type=semver,pattern={{version}},value=${{ inputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ inputs.version }}
+            type=raw,value=latest,enable=${{ (github.ref_type == 'tag' && !contains(github.ref_name, '-')) || (inputs.version != '' && !contains(inputs.version, '-')) }}
+            type=raw,value=edge,enable=${{ github.ref_type != 'tag' && inputs.version == '' }}
       - name: Create manifest
         working-directory: ${{ runner.temp }}/digests
         run: |

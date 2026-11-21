@@ -1,0 +1,3 @@
+# Project formatting: the code base was written with wide lines; 140 keeps reformatting minimal.
+max_width = 140
+use_small_heuristics = "Max"

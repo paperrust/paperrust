@@ -168,7 +168,7 @@ struct VersionRow {
 
 /// `sort_versions_newest_first`: key `(version_index or 0, id)` descending.
 fn sort_newest_first(v: &mut [VersionRow]) {
-    v.sort_by(|x, y| (y.version_index.unwrap_or(0), y.id).cmp(&(x.version_index.unwrap_or(0), x.id)));
+    v.sort_by_key(|x| std::cmp::Reverse((x.version_index.unwrap_or(0), x.id)));
 }
 
 fn doc_columns(with_content: bool) -> Vec<&'static str> {
