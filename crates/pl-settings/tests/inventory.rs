@@ -23,6 +23,9 @@ const EXCEPTIONS: &[(&str, &str)] = &[
     ("PAPERRUST_REDIS_CONNECT_TIMEOUT", "entfernt, nur Warnung"),
     ("PAPERRUST_REDIS_RETRY_AFTER", "entfernt, nur Warnung"),
     ("PAPERRUST_ASN_TEST_DATABASE_URL", "Test"),
+    // example names in the pl-system config.rs tests for the PAPERLESS_* startup mirror
+    ("PAPERRUST_FUTURE_SETTING", "Test (pl-system config.rs)"),
+    ("PAPERRUST_UPDATE_CHECK", "Test (pl-system config.rs)"),
     ("PAPERRUST_AUTOMATION_TEST_SERVER", "Test (pl-automation automation_db)"),
     ("PAPERRUST_CONSUMER_TEST_DATABASE_URL", "Test"),
     ("PAPERRUST_INDEXER_DB_URL", "Test"),

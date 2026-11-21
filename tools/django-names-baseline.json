@@ -4,10 +4,10 @@
  },
  "pl-ai": {
   "documents_correspondent": 2,
-  "documents_customfield": 2,
-  "documents_customfieldinstance": 1,
-  "documents_document": 14,
-  "documents_document_tags": 6,
+  "documents_customfield": 5,
+  "documents_customfieldinstance": 6,
+  "documents_document": 16,
+  "documents_document_tags": 9,
   "documents_documenttype": 2,
   "documents_note": 1,
   "documents_storagepath": 2,
@@ -34,31 +34,42 @@
   "guardian_groupobjectpermission": 5,
   "guardian_userobjectpermission": 5
  },
+ "pl-automation": {
+  "documents_correspondent": 1,
+  "documents_customfield": 1,
+  "documents_document": 6,
+  "documents_document_tags": 2,
+  "documents_documenttype": 1,
+  "documents_storagepath": 1,
+  "documents_tag": 2
+ },
  "pl-cli": {
-  "documents_correspondent": 3,
+  "documents_correspondent": 4,
   "documents_customfieldinstance": 1,
-  "documents_document": 19,
+  "documents_document": 23,
   "documents_document_tags": 5,
   "documents_documenttype": 2,
+  "documents_note": 1,
   "documents_storagepath": 2,
   "documents_tag": 14,
   "guardian_groupobjectpermission": 1,
   "guardian_userobjectpermission": 1
  },
  "pl-consumer": {
-  "documents_correspondent": 17,
+  "documents_correspondent": 18,
   "documents_customfield": 3,
-  "documents_customfieldinstance": 8,
-  "documents_document": 28,
-  "documents_document_tags": 7,
-  "documents_documenttype": 11,
+  "documents_customfieldinstance": 11,
+  "documents_document": 30,
+  "documents_document_tags": 9,
+  "documents_documenttype": 12,
   "documents_note": 1,
-  "documents_storagepath": 8,
-  "documents_tag": 22,
-  "guardian_groupobjectpermission": 4,
-  "guardian_userobjectpermission": 4
+  "documents_storagepath": 9,
+  "documents_tag": 23,
+  "guardian_groupobjectpermission": 5,
+  "guardian_userobjectpermission": 5
  },
  "pl-core": {
+  "documents_correspondent": 1,
   "documents_tag": 2
  },
  "pl-docfilter": {
@@ -78,7 +89,7 @@
   "documents_correspondent": 2,
   "documents_customfield": 3,
   "documents_customfieldinstance": 4,
-  "documents_document": 14,
+  "documents_document": 15,
   "documents_document_tags": 2,
   "documents_documenttype": 1,
   "documents_note": 2,
@@ -89,8 +100,8 @@
   "documents_correspondent": 6,
   "documents_customfield": 4,
   "documents_customfieldinstance": 18,
-  "documents_document": 71,
-  "documents_document_tags": 13,
+  "documents_document": 74,
+  "documents_document_tags": 12,
   "documents_documenttype": 4,
   "documents_note": 7,
   "documents_storagepath": 4,
@@ -125,7 +136,9 @@
   "guardian_userobjectpermission": 1
  },
  "pl-labels": {
-  "documents_document": 7
+  "documents_customfield": 2,
+  "documents_customfieldinstance": 1,
+  "documents_document": 9
  },
  "pl-mail": {
   "documents_correspondent": 7,

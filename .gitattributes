@@ -3,5 +3,7 @@
 *.pdf binary
 *.webp binary
 tests/parity/pl-mail-worker/mails/** -text
+# parser samples: some deliberately use CRLF (upstream expectations contain \r\n)
+tests/parity/pl-parsers/samples/** -text
 tests/parity/pl-mail-worker/expected/** -text
 *.db binary
