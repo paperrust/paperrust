@@ -1,3 +1,5 @@
+# PAUSED 2026-11-21 (owner): version updates for cargo/npm are off (open-pull-requests-limit: 0) until 0.1.x
+# is stable; security updates still arrive (repo setting "Dependabot security updates"). GitHub Actions stay on.
 # Weekly dependency updates. Minor and patch updates are grouped per ecosystem to keep the number of
 # pull requests small; major updates come one by one. The upstream/ submodule (paperless-ngx v3.4.2)
 # is pinned on purpose and is not updated by Dependabot.
@@ -7,7 +9,7 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 0
     groups:
       cargo-minor-patch:
         update-types: [minor, patch]
@@ -16,7 +18,7 @@ updates:
     directory: /apps/desktop-shell
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     groups:
       desktop-shell-minor-patch:
         update-types: [minor, patch]
@@ -25,7 +27,7 @@ updates:
     directory: /frontend-light
     schedule:
       interval: weekly
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 0
     groups:
       frontend-minor-patch:
         update-types: [minor, patch]

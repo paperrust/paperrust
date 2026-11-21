@@ -105,3 +105,27 @@ Nicht wiederholt mit diesem Stand: volle Installations-/Update-Tests unter Windo
 (zuletzt mit dem Stand vom 19./20.11. bestanden; seither nur kleine Änderungen in pl-system und Tests).
 Öffentlicher Baum: `tools/publish/make-public-tree.sh` → 1 Commit `PaperRust <contact@paperrust.org>`, 3 356 Dateien,
 Prüfung auf private Daten (Pfade, Hosts, E-Mail, Name) ohne Treffer.
+
+## Veröffentlichung (2026-11-21, Go des Besitzers „ja los veröffentliche“)
+
+| Was | Ergebnis |
+|---|---|
+| GitHub-Repo | `github.com/paperrust/paperrust` öffentlich, Startcommit `5110536` (aus `make-public-tree.sh`, Autor `PaperRust <contact@paperrust.org>`), Beschreibung korrigiert, Homepage paperrust.org |
+| Release v0.1.0 | https://github.com/paperrust/paperrust/releases/tag/v0.1.0 – Windows-Installer, Windows-ZIP, Linux-Tarball, `SHA256SUMS`; GitHub-Prüfsummen = lokale `SHA256SUMS` (alle drei Pakete geprüft) |
+| Docker-Image | `ghcr.io/paperrust/paperrust:0.1.0` (`0.1`, `latest`), Multi-Arch-Index `sha256:207ad95b7f5eb4c124d5b5b3529ded662e92f39e2cc43497367c4ef537b85010`, linux/amd64 + linux/arm64, gebaut von GitHub Actions (Workflow `Release-Image`, manuell mit Version 0.1.0, Stand `main` = Freigabe-Code + CI-Korrekturen), mit Provenance und SBOM. **Nicht** die lokal gebauten `prrel_*`-Images. Sichtbarkeit öffentlich (vom Besitzer umgestellt); anonymer `docker pull` + `paperrust --version` + Tesseract 6 Sprachen in WSL geprüft |
+| Website | https://paperrust.org (Hostpoint, `~/www/paperrust.org`), gebaut aus `site/` (Zweig `claude/reverent-lalande-2a5f0c`) mit Doku von `main` und echten Release-Daten |
+| GitHub-Einstellungen | Ruleset `main` (kein Löschen, kein Force-Push), Ruleset Tags `v*` (unveränderlich); Private Vulnerability Reporting, Secret Scanning + Push Protection, Dependabot Security Updates ein; Variable `PAPERRUST_IMAGE` |
+
+### Erster CI-Lauf auf GitHub und Korrekturen
+
+Der erste Lauf war rot – nicht wegen Programmfehlern, sondern weil GitHub strenger/anders prüft als lokal:
+Rust 1.100 statt 1.99 (neue Clippy-Regeln) → `rust-toolchain.toml` auf 1.99 fest; Code nie mit `cargo fmt` formatiert →
+einmalig formatiert (`rustfmt.toml`, `max_width = 140`); Dockerfile brach bei leerem `CARGO_BUILD_JOBS` ab; ein echter
+Clippy-Fund (`sort_by_key` in pl-documents); Updater-Tests nur unter Windows lauffähig; CRLF-Parser-Proben im Index als LF
+gespeichert (`-text`); Test-Variablen im Einstellungs-Inventar; Django-Namen-Baseline nachgeführt; Rechte-Test unter
+erhöhtem Windows-Prozess (SYSTEM/Administratoren). Danach CI und Extended grün (Linux, Windows, Docker amd64/arm64 mit
+Rauchtest). Die Desktop-Paket-Jobs im CI brauchten noch Tesseract bzw. `cargo fetch` (nachgezogen). Gitea-Commits
+`041b45d`…`99830096` und Folgecommit.
+
+Offen: Dependabot-Versions-PRs (18, Entscheid Besitzer), SignPath-Antrag (Besitzer),
+Desktop-Paket-Jobs im CI: grün (Lauf auf 1153953).

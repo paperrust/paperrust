@@ -47,12 +47,12 @@ jobs:
           - arch: arm64
             runner: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: true
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
       - name: Log in (ghcr.io with GITHUB_TOKEN, otherwise secrets)
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ${{ startsWith(vars.PAPERRUST_IMAGE, 'ghcr.io/') && 'ghcr.io' || 'docker.io' }}
           username: ${{ startsWith(vars.PAPERRUST_IMAGE, 'ghcr.io/') && github.actor || secrets.REGISTRY_USERNAME }}
@@ -68,7 +68,7 @@ jobs:
           echo "version=$v" >>"$GITHUB_OUTPUT"
       - name: Build + push (digest only)
         id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: docker/Dockerfile
@@ -86,7 +86,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/digests"
           d="${{ steps.build.outputs.digest }}"
           touch "$RUNNER_TEMP/digests/${d#sha256:}"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: digest-${{ matrix.arch }}
           path: ${{ runner.temp }}/digests/*
@@ -101,20 +101,20 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: digest-*
           merge-multiple: true
           path: ${{ runner.temp }}/digests
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
         with:
           registry: ${{ startsWith(vars.PAPERRUST_IMAGE, 'ghcr.io/') && 'ghcr.io' || 'docker.io' }}
           username: ${{ startsWith(vars.PAPERRUST_IMAGE, 'ghcr.io/') && github.actor || secrets.REGISTRY_USERNAME }}
           password: ${{ startsWith(vars.PAPERRUST_IMAGE, 'ghcr.io/') && secrets.GITHUB_TOKEN || secrets.REGISTRY_TOKEN }}
       - name: Tags
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ vars.PAPERRUST_IMAGE }}
           tags: |

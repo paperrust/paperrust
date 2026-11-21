@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Toolchain from rust-toolchain.toml
         run: rustup toolchain install --profile minimal
       - name: cargo fmt
@@ -71,7 +71,7 @@ jobs:
             packages: >-
               pl-server pl-cli pl-dbmigrate paperrust-desktop
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # upstream/ (paperless-ngx v3.4.2) is required: embedded files and test samples
           submodules: true
@@ -101,7 +101,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: WebKitGTK / AppIndicator
         run: |
           sudo apt-get update
@@ -128,12 +128,12 @@ jobs:
       run:
         working-directory: frontend-light
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: pnpm (version from packageManager in package.json)
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           package_json_file: frontend-light/package.json
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           # engines.node in package.json
           node-version-file: frontend-light/package.json

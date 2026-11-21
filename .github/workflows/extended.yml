@@ -35,7 +35,7 @@ jobs:
       CARGO_PROFILE_DEV_DEBUG: "0"
       CARGO_PROFILE_TEST_DEBUG: "0"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: true
       - run: rustup toolchain install --profile minimal
@@ -55,13 +55,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: true
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           package_json_file: frontend-light/package.json
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: frontend-light/package.json
           cache: pnpm
@@ -84,7 +84,7 @@ jobs:
           du -sh frontend-light/dist results/static
       - name: Archive
         run: tar -cf frontend-dist.tar frontend-light/dist results/static
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: frontend-dist
           path: frontend-dist.tar
@@ -104,7 +104,7 @@ jobs:
           - arch: arm64
             runner: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: true
       - name: Validate compose files (examples + NAS templates)
@@ -120,9 +120,9 @@ jobs:
           for f in docker/nas/unraid/*.xml; do
             python3 -c 'import sys, xml.dom.minidom as m; m.parse(sys.argv[1])' "$f" && echo "ok $f"
           done
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
       - name: Build (linux/${{ matrix.arch }})
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: docker/Dockerfile
@@ -147,7 +147,7 @@ jobs:
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}\target
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: true
       - name: Toolchain + llvm-tools (strip Tesseract DLLs)
@@ -160,7 +160,7 @@ jobs:
           workspaces: |
             . -> target
             apps/desktop-shell -> ../../target
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: frontend-dist
       - name: Unpack web UI + statics
@@ -183,7 +183,7 @@ jobs:
       - name: pack.ps1 -Zip
         shell: powershell
         run: .\apps\desktop\pack\pack.ps1 -Zip
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: paperrust-windows-x64
           path: |
@@ -199,7 +199,7 @@ jobs:
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/target
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: true
       - name: WebKitGTK / AppIndicator for the Tauri shell
@@ -215,7 +215,7 @@ jobs:
           workspaces: |
             . -> target
             apps/desktop-shell -> ../../target
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: frontend-dist
       - run: tar -xf frontend-dist.tar
@@ -232,7 +232,7 @@ jobs:
           (cd apps/desktop-shell && cargo fetch --locked)
       - name: pack.sh --tar
         run: bash apps/desktop/pack/pack.sh --tar
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: paperrust-linux-x86_64
           path: |
