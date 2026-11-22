@@ -5,7 +5,7 @@
 #
 # Follows packaging/freebsd/README.md: PostgreSQL 17 from pkg, empty database, pkg add, config file,
 # `service paperrust migrate`, `service paperrust start` (daemon(8) supervisor, user paperrust),
-# then: /__rs/health 200 (loopback), login page 200, /api/ 200/401/403, statics + web UI 200,
+# then: /__rs/health 200 (loopback), login page 200, /api/ 200/302/401/403, statics + web UI 200,
 # admin via manage_superuser, API token, upload + ingestion of a text document by the built-in
 # worker, `manage check` (Tesseract and PDFium found), orderly stop. Local addresses only.
 # Leaves PostgreSQL and the package installed (throw-away CI machine).
@@ -133,7 +133,7 @@ service paperrust status
 code="$(http "$BASE/accounts/login/")"
 [ "$code" = 200 ] || die "login page: HTTP $code"
 code="$(http "$BASE/api/")"
-case "$code" in 200 | 401 | 403) ;; *) die "/api/: HTTP $code" ;; esac
+case "$code" in 200 | 302 | 401 | 403) ;; # 302: unauthenticated browsers go to the login page (as in paperless-ngx) *) die "/api/: HTTP $code" ;; esac
 code="$(http "$BASE/static/base.css")"
 [ "$code" = 200 ] || die "/static/base.css: HTTP $code (PAPERRUST_STATICDIR)"
 code="$(http -L "$BASE/rs/app/")"
