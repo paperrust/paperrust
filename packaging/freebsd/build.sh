@@ -101,6 +101,9 @@ if [ -n "${LTO:-}" ]; then export CARGO_PROFILE_RELEASE_LTO="$LTO"; fi
 if [ -n "${CODEGEN_UNITS:-}" ]; then export CARGO_PROFILE_RELEASE_CODEGEN_UNITS="$CODEGEN_UNITS"; fi
 JOBS=""
 if [ -n "${BUILD_JOBS:-}" ]; then JOBS="-j $BUILD_JOBS"; fi
+# sqlite-vec 0.1.9 uses u_int8_t/u_int16_t/u_int64_t, which FreeBSD only declares in <sys/types.h>
+# (its #ifdef for Linux/macOS does not cover FreeBSD). Force-include the header for C builds (cc crate).
+export CFLAGS="${CFLAGS:-} -include sys/types.h"
 
 log "cargo build paperrust + paperrust-migrate-db"
 start=$(date +%s)

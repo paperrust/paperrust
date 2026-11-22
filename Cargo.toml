@@ -128,7 +128,7 @@ bzip2 = "=0.6.1"
 xz2 = { version = "=0.1.7", features = ["static"] }
 zstd = { version = "=0.13.4", default-features = false }
 # pl-guard, pl-consumer: Dateisystem-Ereignisse (inotify/ReadDirectoryChangesW/kqueue), CC0-1.0
-notify = { version = "=8.2.0", default-features = false }
+notify = { version = "=8.2.0", default-features = false, features = ["macos_kqueue"] } # macOS needs one backend; kqueue keeps the lock file unchanged (no fsevent-sys)
 # pl-pdftools: WordCraft (MIT OR Apache-2.0) und craft-heif (MIT OR Apache-2.0, nutzt heic-rs =0.1.4),
 # feste Revisionen, siehe NOTICE. Nur im isolierten Kindprozess benutzt.
 wordcraft-doc = { git = "https://github.com/storytold/wordcraft", rev = "a4b898f820eb28626865292fd037a155e4a07aef" }
