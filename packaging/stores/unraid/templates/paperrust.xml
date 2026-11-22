@@ -1,0 +1,59 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>paperrust</Name>
+  <Repository>ghcr.io/paperrust/paperrust:latest</Repository>
+  <Registry>https://github.com/paperrust/paperrust/pkgs/container/paperrust</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>bash</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/paperrust/paperrust/issues</Support>
+  <Project>https://paperrust.org</Project>
+  <ReadMe>https://github.com/paperrust/paperrust#readme</ReadMe>
+  <Overview>PaperRust scans, recognises (OCR) and files your documents and makes them searchable. It is a fast, lean re-implementation of paperless-ngx 3.4.2 in Rust: same database, same files, same REST API and the same volume layout, so apps written for paperless-ngx keep working and you can switch over from an existing paperless-ngx container.
+
+One container instead of five: web UI, worker, scheduler and consumption folder run in one process. No Redis, Celery, Tika or Gotenberg - only PostgreSQL 14 or newer is required (use the paperrust-postgres template or an existing PostgreSQL container).
+
+Before the first start: set a long random Secret key, the database host and password, and an admin password. When switching from paperless-ngx, reuse its PAPERLESS_SECRET_KEY and point PaperRust at the same database and folders - stop paperless-ngx first and take a backup.</Overview>
+  <Category>Productivity:</Category>
+  <ExtraSearchTerms>paperless paperless-ngx documents dms ocr scanner archive pdf</ExtraSearchTerms>
+  <WebUI>http://[IP]:[PORT:8000]/</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/paperrust/unraid-templates/main/templates/paperrust.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/paperrust/paperrust/main/docs/design/assets/png/icon-512.png</Icon>
+  <ExtraParams>--user 0:0 --stop-timeout 45</ExtraParams>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires>PostgreSQL 14 or newer (for example the paperrust-postgres template from this repository).</Requires>
+  <License>GPL-3.0</License>
+  <MinVer>6.12.0</MinVer>
+  <Changes>
+### 0.1.2
+- Mainly desktop-app changes; no database changes, update by pulling the new image.
+### 0.1.1
+- Multi-word search combines words with AND, as in paperless-ngx 3.4.2.
+Full release notes: https://github.com/paperrust/paperrust/releases
+  </Changes>
+  <Config Name="WebUI port" Target="8000" Default="8000" Mode="tcp" Description="Port of the web UI." Type="Port" Display="always" Required="true" Mask="false">8000</Config>
+  <Config Name="Data" Target="/usr/src/paperless/data" Default="/mnt/user/appdata/paperrust/data" Mode="rw" Description="Search index, classifier, logs and database backups taken before upgrades." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/paperrust/data</Config>
+  <Config Name="Media" Target="/usr/src/paperless/media" Default="/mnt/user/appdata/paperrust/media" Mode="rw" Description="Your documents (originals, archive PDFs, thumbnails). A share on the array is a good place for it." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/paperrust/media</Config>
+  <Config Name="Consume" Target="/usr/src/paperless/consume" Default="/mnt/user/appdata/paperrust/consume" Mode="rw" Description="Consumption folder: files dropped here (e.g. by a scanner) are imported automatically." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/paperrust/consume</Config>
+  <Config Name="Export" Target="/usr/src/paperless/export" Default="/mnt/user/appdata/paperrust/export" Mode="rw" Description="Target folder of the document exporter (full backup)." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/paperrust/export</Config>
+  <Config Name="Secret key" Target="PAPERRUST_SECRET_KEY" Default="" Mode="" Description="Required. Long random string, e.g. from 'openssl rand -base64 48'. When switching from paperless-ngx use the same value as before." Type="Variable" Display="always" Required="true" Mask="true"/>
+  <Config Name="DB host" Target="PAPERRUST_DBHOST" Default="" Mode="" Description="Required. IP address of your Unraid server (default bridge network) or the PostgreSQL container name (custom Docker network)." Type="Variable" Display="always" Required="true" Mask="false"/>
+  <Config Name="DB port" Target="PAPERRUST_DBPORT" Default="5432" Mode="" Description="PostgreSQL port." Type="Variable" Display="advanced" Required="true" Mask="false">5432</Config>
+  <Config Name="DB name" Target="PAPERRUST_DBNAME" Default="paperless" Mode="" Description="Database name." Type="Variable" Display="advanced" Required="true" Mask="false">paperless</Config>
+  <Config Name="DB user" Target="PAPERRUST_DBUSER" Default="paperless" Mode="" Description="Database user." Type="Variable" Display="advanced" Required="true" Mask="false">paperless</Config>
+  <Config Name="DB password" Target="PAPERRUST_DBPASS" Default="" Mode="" Description="Required. Same password as POSTGRES_PASSWORD of the PostgreSQL container." Type="Variable" Display="always" Required="true" Mask="true"/>
+  <Config Name="Admin user" Target="PAPERRUST_ADMIN_USER" Default="admin" Mode="" Description="First administrator, created on start if it does not exist yet." Type="Variable" Display="always" Required="false" Mask="false">admin</Config>
+  <Config Name="Admin password" Target="PAPERRUST_ADMIN_PASSWORD" Default="" Mode="" Description="Password of the first administrator (only used when the user is created)." Type="Variable" Display="always" Required="false" Mask="true"/>
+  <Config Name="Time zone" Target="PAPERRUST_TIME_ZONE" Default="Etc/UTC" Mode="" Description="Time zone, e.g. Europe/Berlin." Type="Variable" Display="advanced" Required="false" Mask="false">Etc/UTC</Config>
+  <Config Name="OCR language" Target="PAPERRUST_OCR_LANGUAGE" Default="eng" Mode="" Description="Tesseract languages used for OCR, e.g. deu+eng. Included in the image: eng deu fra ita spa." Type="Variable" Display="advanced" Required="false" Mask="false">eng</Config>
+  <Config Name="Extra OCR languages" Target="PAPERRUST_OCR_LANGUAGES" Default="" Mode="" Description="Additional Tesseract languages installed on start, separated by spaces (e.g. tur ces). Needs internet access." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Consumer polling" Target="PAPERRUST_CONSUMER_POLLING_INTERVAL" Default="10" Mode="" Description="Check the consumption folder every N seconds (Unraid user shares do not report file changes reliably)." Type="Variable" Display="advanced" Required="false" Mask="false">10</Config>
+  <Config Name="Public URL" Target="PAPERRUST_URL" Default="" Mode="" Description="Public address behind a reverse proxy, e.g. https://paperrust.example.com" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="PUID" Target="PUID" Default="99" Mode="" Description="Owner UID of created files (Unraid: 99 = nobody)." Type="Variable" Display="advanced" Required="true" Mask="false">99</Config>
+  <Config Name="PGID" Target="PGID" Default="100" Mode="" Description="Owner GID of created files (Unraid: 100 = users)." Type="Variable" Display="advanced" Required="true" Mask="false">100</Config>
+</Container>

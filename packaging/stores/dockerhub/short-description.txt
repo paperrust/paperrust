@@ -1,0 +1,1 @@
+Fast, lean document archive with OCR and search, compatible with paperless-ngx 3.4.2 data and API

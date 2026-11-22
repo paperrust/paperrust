@@ -1,0 +1,52 @@
+version: "3.7"
+
+services:
+  app_proxy:
+    environment:
+      APP_HOST: paperrust_web_1
+      APP_PORT: 8000
+      # Mobile apps and scripts use the paperless-ngx REST API with their own token login.
+      PROXY_AUTH_WHITELIST: "/api/*"
+
+  db:
+    image: docker.io/library/postgres:17@sha256:0000000000000000000000000000000000000000000000000000000000000000
+    restart: on-failure
+    stop_grace_period: 1m
+    volumes:
+      - ${APP_DATA_DIR}/data/pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: paperless
+      POSTGRES_USER: paperless
+      POSTGRES_PASSWORD: ${APP_PAPERRUST_DB_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paperless -d paperless"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  web:
+    image: ghcr.io/paperrust/paperrust:0.1.2@sha256:0000000000000000000000000000000000000000000000000000000000000000
+    restart: on-failure
+    # The image starts as root, applies PUID/PGID (1000 = Umbrel's app data owner) and then drops
+    # privileges; starting as root is also what installs extra OCR languages.
+    user: "0:0"
+    stop_grace_period: 45s
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ${APP_DATA_DIR}/data/data:/usr/src/paperless/data
+      - ${APP_DATA_DIR}/data/media:/usr/src/paperless/media
+      # Defaults for the consume and export folder settings in umbrel-app.yml.
+      - ${APP_DATA_DIR}/data/consume:/usr/src/paperless/consume
+      - ${APP_DATA_DIR}/data/export:/usr/src/paperless/export
+    environment:
+      PUID: 1000
+      PGID: 1000
+      PAPERRUST_DBHOST: paperrust_db_1
+      PAPERRUST_DBNAME: paperless
+      PAPERRUST_DBUSER: paperless
+      PAPERRUST_DBPASS: ${APP_PAPERRUST_DB_PASSWORD}
+      PAPERRUST_SECRET_KEY: ${APP_SEED}
+      PAPERRUST_ADMIN_USER: admin
+      PAPERRUST_ADMIN_PASSWORD: ${APP_PASSWORD}

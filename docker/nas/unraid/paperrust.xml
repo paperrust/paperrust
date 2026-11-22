@@ -30,7 +30,7 @@ Fast, lean drop-in replacement for paperless-ngx (v3.4.2 compatible: same UI, AP
   <DateInstalled/>
   <DonateText/>
   <DonateLink/>
-  <Requires>PostgreSQL 13 oder neuer (z. B. Vorlage paperrust-postgres). / PostgreSQL 13+ required.</Requires>
+  <Requires>PostgreSQL 14 oder neuer (z. B. Vorlage paperrust-postgres). / PostgreSQL 14+ required.</Requires>
   <Config Name="WebUI-Port" Target="8000" Default="8000" Mode="tcp" Description="Port der Weboberfläche / web UI port" Type="Port" Display="always" Required="true" Mask="false">8000</Config>
   <Config Name="Data" Target="/usr/src/paperless/data" Default="/mnt/user/appdata/paperrust/data" Mode="rw" Description="Suchindex, Klassifikator, Protokolle / index, classifier, logs" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/paperrust/data</Config>
   <Config Name="Media" Target="/usr/src/paperless/media" Default="/mnt/user/appdata/paperrust/media" Mode="rw" Description="Dokumente (Originale, Archiv, Vorschaubilder) / documents" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/paperrust/media</Config>

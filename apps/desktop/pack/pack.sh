@@ -407,7 +407,7 @@ if want tesseract && ((WITH_TESSERACT)); then
 	need patchelf
 	sys_tess="$(command -v tesseract || true)"
 	[[ -n "$sys_tess" ]] || die "tesseract fehlt auf dem Baurechner (apt install tesseract-ocr libtesseract-dev) – oder --no-tesseract"
-	tver="$(tesseract --version 2>&1 | head -1)"
+	tver="$(tesseract --version 2>&1 | sed -n 1p)"
 	step "Tesseract ($tver) mit Bibliotheken nach tesseract/ (RPATH \$ORIGIN)"
 	dst="$OUT/tesseract"
 	mkdir -p "$dst"

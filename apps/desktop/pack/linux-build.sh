@@ -53,14 +53,14 @@ apt-get install -y -qq --no-install-recommends \
 	build-essential pkg-config libssl-dev ca-certificates curl git python3 file patchelf xz-utils \
 	libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev \
 	tesseract-ocr tesseract-ocr-eng tesseract-ocr-deu tesseract-ocr-osd >/dev/null
-tesseract --version 2>&1 | head -1
+tesseract --version 2>&1 | sed -n 1p # sed reads all input: no SIGPIPE under pipefail
 echo "== rust"
 if ! command -v cargo >/dev/null; then
 	curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --no-modify-path >/dev/null
 fi
 rustup toolchain install stable --profile minimal >/dev/null
 rustc --version
-ldd --version | head -1
+ldd --version | sed -n 1p
 echo "== build"
 cd /src
 cargo build -q --release -p pl-server --bin paperrust

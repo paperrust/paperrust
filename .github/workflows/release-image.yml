@@ -4,7 +4,8 @@
 # is not set (Settings -> Secrets and variables -> Actions -> Variables), e.g.
 # "ghcr.io/<org>/paperrust". For ghcr.io in the same account GITHUB_TOKEN is enough
 # (packages: write). For Docker Hub additionally the secrets REGISTRY_USERNAME / REGISTRY_TOKEN and
-# PAPERRUST_IMAGE="docker.io/<org>/paperrust".
+# PAPERRUST_IMAGE="docker.io/<org>/paperrust". Mirror to Docker Hub besides ghcr.io: see the last steps
+# (variable DOCKERHUB_IMAGE, secrets DOCKERHUB_USERNAME / DOCKERHUB_TOKEN).
 #
 # Procedure ("push by digest"): one native runner per architecture builds and uploads only the layers
 # (without a tag); then one job combines both digests into a manifest with the tags x.y.z, x.y,
@@ -130,3 +131,24 @@ jobs:
             $(printf '${{ vars.PAPERRUST_IMAGE }}@sha256:%s ' *)
       - name: Verify
         run: docker buildx imagetools inspect "${{ vars.PAPERRUST_IMAGE }}:${{ steps.meta.outputs.version }}"
+      # Optional mirror to Docker Hub (same multi-arch manifest, copied registry to registry). Active only
+      # when the repository variable DOCKERHUB_IMAGE (e.g. "docker.io/paperrust/paperrust") and the secrets
+      # DOCKERHUB_USERNAME / DOCKERHUB_TOKEN (access token, read/write) are set.
+      - name: Log in to Docker Hub (mirror)
+        if: vars.DOCKERHUB_IMAGE != ''
+        uses: docker/login-action@v4
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Mirror tags to Docker Hub
+        if: vars.DOCKERHUB_IMAGE != ''
+        env:
+          SRC: ${{ vars.PAPERRUST_IMAGE }}
+          DST: ${{ vars.DOCKERHUB_IMAGE }}
+        run: |
+          for t in $(jq -r '.tags[]' <<<"$DOCKER_METADATA_OUTPUT_JSON"); do
+            tag="${t##*:}"
+            docker buildx imagetools create -t "$DST:$tag" "$SRC:$tag"
+          done
+          docker buildx imagetools inspect "$DST:${{ steps.meta.outputs.version }}"

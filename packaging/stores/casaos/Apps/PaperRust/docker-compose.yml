@@ -1,0 +1,197 @@
+name: paperrust
+services:
+  paperrust:
+    image: ghcr.io/paperrust/paperrust:0.1.2
+    container_name: paperrust
+    restart: unless-stopped
+    depends_on:
+      paperrust-db:
+        condition: service_healthy
+    # Starts as root, applies PUID/PGID, then drops privileges (setpriv in the image entrypoint).
+    user: "0:0"
+    # Generates a per-install secret key on first start (CasaOS has no secret generator), then
+    # runs the normal image entrypoint. $$ escapes Compose interpolation.
+    entrypoint:
+      - /usr/bin/tini
+      - --
+      - bash
+      - -c
+      - |
+        f=/usr/src/paperless/data/.paperrust_secret_key
+        if [ ! -s "$$f" ]; then
+          mkdir -p /usr/src/paperless/data
+          (umask 077; head -c 48 /dev/urandom | base64 -w0 > "$$f")
+          chown "$${PUID:-1000}:$${PGID:-1000}" "$$f"
+        fi
+        exec /usr/local/bin/paperrust-entrypoint "$$@"
+      - paperrust-entrypoint
+    command:
+      - serve
+      - --worker
+    ports:
+      - target: 8000
+        published: "8000"
+        protocol: tcp
+    volumes:
+      - type: bind
+        source: /DATA/AppData/$AppID/data
+        target: /usr/src/paperless/data
+      - type: bind
+        source: /DATA/AppData/$AppID/media
+        target: /usr/src/paperless/media
+      - type: bind
+        source: /DATA/AppData/$AppID/consume
+        target: /usr/src/paperless/consume
+      - type: bind
+        source: /DATA/AppData/$AppID/export
+        target: /usr/src/paperless/export
+    environment:
+      PUID: $PUID
+      PGID: $PGID
+      PAPERRUST_TIME_ZONE: $TZ
+      PAPERRUST_SECRET_KEY_FILE: /usr/src/paperless/data/.paperrust_secret_key
+      PAPERRUST_DBHOST: paperrust-db
+      PAPERRUST_DBNAME: paperless
+      PAPERRUST_DBUSER: paperless
+      PAPERRUST_DBPASS: paperrust
+      PAPERRUST_ADMIN_USER: admin
+      PAPERRUST_ADMIN_PASSWORD: casaos
+      PAPERRUST_OCR_LANGUAGE: eng
+      PAPERRUST_CONSUMER_POLLING_INTERVAL: "10"
+    stop_grace_period: 45s
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/paperrust-healthcheck"]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 5
+    x-casaos:
+      envs:
+        - container: PAPERRUST_ADMIN_USER
+          description:
+            en_US: First administrator (created on first start if missing)
+            de_DE: Erster Administrator (wird beim ersten Start angelegt, falls er fehlt)
+        - container: PAPERRUST_ADMIN_PASSWORD
+          description:
+            en_US: Password of the first administrator - change it after the first login
+            de_DE: Passwort des ersten Administrators - nach der ersten Anmeldung ändern
+        - container: PAPERRUST_DBPASS
+          description:
+            en_US: Database password (must match POSTGRES_PASSWORD of paperrust-db)
+            de_DE: Datenbank-Passwort (muss POSTGRES_PASSWORD von paperrust-db entsprechen)
+        - container: PAPERRUST_OCR_LANGUAGE
+          description:
+            en_US: OCR languages, e.g. deu+eng (included eng deu fra ita spa)
+            de_DE: OCR-Sprachen, z. B. deu+eng (enthalten eng deu fra ita spa)
+        - container: PAPERRUST_CONSUMER_POLLING_INTERVAL
+          description:
+            en_US: Check the consumption folder every N seconds
+            de_DE: Eingangsordner alle N Sekunden prüfen
+      ports:
+        - container: "8000"
+          description:
+            en_US: Web UI
+            de_DE: Weboberfläche
+      volumes:
+        - container: /usr/src/paperless/data
+          description:
+            en_US: Search index, classifier, logs, secret key
+            de_DE: Suchindex, Klassifikator, Protokolle, geheimer Schlüssel
+        - container: /usr/src/paperless/media
+          description:
+            en_US: Documents (originals, archive, thumbnails)
+            de_DE: Dokumente (Originale, Archiv, Vorschaubilder)
+        - container: /usr/src/paperless/consume
+          description:
+            en_US: Consumption folder - files dropped here are imported
+            de_DE: Eingangsordner - abgelegte Dateien werden eingelesen
+        - container: /usr/src/paperless/export
+          description:
+            en_US: Backup export (document exporter)
+            de_DE: Sicherungs-Export (document_exporter)
+
+  paperrust-db:
+    image: docker.io/library/postgres:17
+    container_name: paperrust-db
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: /DATA/AppData/$AppID/pgdata
+        target: /var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: paperless
+      POSTGRES_USER: paperless
+      POSTGRES_PASSWORD: paperrust
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paperless -d paperless"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    x-casaos:
+      envs:
+        - container: POSTGRES_PASSWORD
+          description:
+            en_US: Database password (must match PAPERRUST_DBPASS)
+            de_DE: Datenbank-Passwort (muss PAPERRUST_DBPASS entsprechen)
+
+x-casaos:
+  id: org.paperrust.paperrust
+  architectures:
+    - amd64
+    - arm64
+  main: paperrust
+  store_app_id: paperrust
+  category: Productivity
+  author: PaperRust
+  developer: PaperRust
+  icon: https://cdn.jsdelivr.net/gh/IceWhaleTech/CasaOS-AppStore@main/Apps/PaperRust/icon.svg
+  thumbnail: https://cdn.jsdelivr.net/gh/IceWhaleTech/CasaOS-AppStore@main/Apps/PaperRust/thumbnail.png
+  screenshot_link:
+    - https://cdn.jsdelivr.net/gh/IceWhaleTech/CasaOS-AppStore@main/Apps/PaperRust/screenshot-1.png
+    - https://cdn.jsdelivr.net/gh/IceWhaleTech/CasaOS-AppStore@main/Apps/PaperRust/screenshot-2.png
+    - https://cdn.jsdelivr.net/gh/IceWhaleTech/CasaOS-AppStore@main/Apps/PaperRust/screenshot-3.png
+  title:
+    en_US: PaperRust
+    de_DE: PaperRust
+  tagline:
+    en_US: Fast, lean document archive - works with your paperless-ngx data
+    de_DE: Schnelles, schlankes Dokumentenarchiv - arbeitet mit Ihren paperless-ngx-Daten
+  description:
+    en_US: |
+      PaperRust scans, recognises (OCR) and files your documents and makes them searchable: correspondents, document types, tags, custom fields, saved views, workflows, mail import and full-text search.
+
+      It is a re-implementation of paperless-ngx 3.4.2 in Rust with the same database, the same files and the same REST API, so apps written for paperless-ngx keep working. Web UI, worker, scheduler and consumption folder run in one container next to PostgreSQL - no Redis, Celery, Tika or Gotenberg. It starts in seconds and needs little memory.
+
+      Sign in with the admin user shown in the tips and change the password right away.
+    de_DE: |
+      PaperRust liest Ihre Dokumente ein, erkennt den Text (OCR), ordnet sie zu und macht sie durchsuchbar: Korrespondenten, Dokumenttypen, Tags, eigene Felder, gespeicherte Ansichten, Workflows, Mail-Abruf und Volltextsuche.
+
+      PaperRust ist eine Neuentwicklung von paperless-ngx 3.4.2 in Rust mit derselben Datenbank, denselben Dateien und derselben REST-API - Apps für paperless-ngx funktionieren weiter. Oberfläche, Worker, Zeitplaner und Eingangsordner laufen in einem Container neben PostgreSQL - ohne Redis, Celery, Tika oder Gotenberg. Startet in Sekunden und braucht wenig Speicher.
+
+      Melden Sie sich mit dem Administrator aus den Hinweisen an und ändern Sie das Passwort sofort.
+  tips:
+    before_install:
+      en_US: |
+        Default login: user `admin`, password `casaos` - change it in the web UI after the first login.
+        A random secret key is created on the first start in the data folder (`.paperrust_secret_key`); keep it with your backups.
+        To change the database password, set the same value in PAPERRUST_DBPASS and POSTGRES_PASSWORD before installing.
+      de_DE: |
+        Standard-Anmeldung: Benutzer `admin`, Passwort `casaos` - nach der ersten Anmeldung in der Oberfläche ändern.
+        Beim ersten Start wird ein zufälliger geheimer Schlüssel im Datenordner erzeugt (`.paperrust_secret_key`); mit den Sicherungen aufbewahren.
+        Für ein anderes Datenbank-Passwort vor der Installation denselben Wert in PAPERRUST_DBPASS und POSTGRES_PASSWORD eintragen.
+  port_map: "8000"
+  scheme: http
+  index: /
+  version: "0.1.2"
+  update_at: "2026-11-22"
+  release_notes:
+    en_US: |
+      - Mainly desktop-app changes; no database changes, the update only replaces the image.
+      - Full release notes: https://github.com/paperrust/paperrust/releases
+    de_DE: |
+      - Vor allem Änderungen an der Desktop-App; keine Datenbankänderungen, das Update ersetzt nur das Image.
+      - Alle Release-Notizen: https://github.com/paperrust/paperrust/releases
+  website: "https://paperrust.org"
+  repo: "https://github.com/paperrust/paperrust"
+  support: "https://github.com/paperrust/paperrust/issues"
+  docs: "https://github.com/paperrust/paperrust/tree/main/docs/user/en"

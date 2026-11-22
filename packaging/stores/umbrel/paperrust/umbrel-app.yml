@@ -1,0 +1,71 @@
+manifestVersion: 1.1
+id: paperrust
+storage:
+  dataRoot: data
+folderAccess:
+  - id: consume
+    name: Consume
+    note: >-
+      Drop files in this folder and PaperRust adds them to your documents. By default it's inside the app's own storage. To add files from a scanner or another device, choose a folder in Home, on a drive or on a network share.
+    mounts:
+      - service: web
+        targetPath: /usr/src/paperless/consume
+  - id: export
+    name: Export
+    note: >-
+      Where PaperRust saves a full copy of your documents when you run its document exporter. By default it's inside the app's own storage. Choose a folder in Home, on a drive or on a network share to open exports from another device.
+    mounts:
+      - service: web
+        targetPath: /usr/src/paperless/export
+environment:
+  - name: PAPERRUST_OCR_LANGUAGE
+    services:
+      - web
+    default: eng
+    note: >-
+      Languages PaperRust reads in your documents, joined with +, for example deu+eng. English, German, French, Italian and Spanish are included.
+  - name: PAPERRUST_OCR_LANGUAGES
+    services:
+      - web
+    note: >-
+      Extra languages to install, separated by spaces, for example: ces tur chi-sim. They download each time the app starts. Add them to the OCR language setting as well to use them.
+  - name: PAPERRUST_CONSUMER_POLLING_INTERVAL
+    services:
+      - web
+    note: >-
+      Only needed if the Consume folder is on a network share, because PaperRust can't notice new files there on its own. Enter how often to check for new files, in seconds, for example 60. Leave empty otherwise.
+category: files
+name: PaperRust
+version: "0.1.2"
+tagline: Fast, lean document archive that works with your paperless-ngx data
+description: >-
+  Sign in with the user "admin" and the password Umbrel shows for this app.
+
+
+  PaperRust scans, recognises and files your documents and makes them searchable. It is a re-implementation of paperless-ngx 3.4.2 in Rust: the same database, the same files and the same REST API, so mobile apps and scripts written for paperless-ngx keep working.
+
+
+  - One container next to PostgreSQL: web UI, worker, scheduler and consumption folder run in one process, without Redis, Celery, Tika or Gotenberg.
+
+  - Starts in seconds and needs little memory, which suits small devices such as a Raspberry Pi.
+
+  - OCR with Tesseract, built-in cleaning and deskewing of scans, PDF/A archive files next to the unaltered originals.
+
+  - Correspondents, document types, nested tags, storage paths, custom fields, saved views, workflows and full-text search.
+
+  - Adds documents from the consume folder, uploads, mailboxes, network scanners and the REST API.
+
+  - Optional AI suggestions (off by default; local with Ollama or an OpenAI-compatible service).
+releaseNotes: ""
+developer: PaperRust
+website: https://paperrust.org
+dependencies: []
+repo: https://github.com/paperrust/paperrust
+support: https://github.com/paperrust/paperrust/issues
+port: 2350
+gallery: []
+path: ""
+defaultUsername: "admin"
+deterministicPassword: true
+submitter: PaperRust
+submission: https://github.com/getumbrel/umbrel-apps/pull/TODO

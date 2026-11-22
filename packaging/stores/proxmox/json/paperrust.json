@@ -1,0 +1,45 @@
+{
+  "name": "PaperRust",
+  "slug": "paperrust",
+  "categories": [12],
+  "date_created": "2026-11-22",
+  "type": "ct",
+  "updateable": true,
+  "privileged": false,
+  "interface_port": 8000,
+  "documentation": "https://github.com/paperrust/paperrust/blob/main/docs/user/en/README.md",
+  "website": "https://paperrust.org",
+  "repository": "https://github.com/paperrust/paperrust",
+  "architectures": ["amd64"],
+  "platforms": ["pve"],
+  "logo": "https://raw.githubusercontent.com/paperrust/paperrust/main/docs/design/assets/png/icon-512.png",
+  "description": "PaperRust scans, recognises (OCR) and files your documents and makes them searchable. It re-implements paperless-ngx 3.4.2 in Rust with the same database, files and REST API, so paperless-ngx apps keep working, and runs as a single service next to PostgreSQL without Redis or Celery.",
+  "install_methods": [
+    {
+      "type": "default",
+      "script": "ct/paperrust.sh",
+      "config_path": "/etc/paperrust.conf",
+      "resources": {
+        "cpu": 2,
+        "ram": 2048,
+        "hdd": 10,
+        "os": "Debian",
+        "version": "13"
+      }
+    }
+  ],
+  "default_credentials": {
+    "username": "admin",
+    "password": null
+  },
+  "notes": [
+    {
+      "text": "Show the admin password: `cat ~/paperrust.creds`",
+      "type": "info"
+    },
+    {
+      "text": "Documents are stored in /opt/paperrust_data; drop files into /opt/paperrust_data/consume to import them.",
+      "type": "info"
+    }
+  ]
+}

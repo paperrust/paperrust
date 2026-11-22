@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<CommunityApplications>
+  <Profile>
+**PaperRust** is a fast, lean document archive that works with your paperless-ngx data: a re-implementation of paperless-ngx 3.4.2 in Rust with the same database, files and REST API, running as one container next to PostgreSQL (no Redis, Celery, Tika or Gotenberg).
+
+This repository holds the official Unraid templates maintained by the PaperRust project:
+
+- **paperrust** – the PaperRust server (web UI, worker, scheduler and consumption folder in one process)
+- **paperrust-postgres** – an optional PostgreSQL 17 container preconfigured for PaperRust (skip it if you already run PostgreSQL 14 or newer)
+
+Support: GitHub issues at https://github.com/paperrust/paperrust/issues. Documentation and switching from paperless-ngx: https://paperrust.org
+  </Profile>
+  <Icon>https://raw.githubusercontent.com/paperrust/unraid-templates/main/icon.png</Icon>
+  <WebPage>https://paperrust.org</WebPage>
+</CommunityApplications>

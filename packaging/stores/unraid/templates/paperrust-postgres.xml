@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>paperrust-postgres</Name>
+  <Repository>docker.io/library/postgres:17</Repository>
+  <Registry>https://hub.docker.com/_/postgres</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>bash</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/paperrust/paperrust/issues</Support>
+  <Project>https://www.postgresql.org/</Project>
+  <Overview>PostgreSQL 17 database preconfigured for PaperRust (database and user "paperless", like the paperless-ngx defaults). Install this first, then the paperrust template with the same password.
+
+Skip this template if you already run PostgreSQL 14 or newer: create a database and a user "paperless" there and point PaperRust at it.
+
+Keep the major version: moving to a newer PostgreSQL major version needs a dump and restore. PaperRust also writes a pg_dump backup into its data folder before database upgrades.</Overview>
+  <Category>Productivity: Tools:</Category>
+  <ExtraSearchTerms>paperrust postgresql database</ExtraSearchTerms>
+  <WebUI/>
+  <TemplateURL>https://raw.githubusercontent.com/paperrust/unraid-templates/main/templates/paperrust-postgres.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/docker-library/docs/master/postgres/logo.png</Icon>
+  <ExtraParams>--health-cmd "pg_isready -U paperless -d paperless" --health-interval 10s --health-timeout 5s --health-retries 10 --stop-timeout 60</ExtraParams>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+  <License>PostgreSQL</License>
+  <MinVer>6.12.0</MinVer>
+  <Config Name="Port" Target="5432" Default="5432" Mode="tcp" Description="PostgreSQL port on the Unraid server. Change the host side (e.g. 5433) if 5432 is taken. Not needed when both containers share a custom Docker network." Type="Port" Display="always" Required="true" Mask="false">5432</Config>
+  <Config Name="Data" Target="/var/lib/postgresql/data" Default="/mnt/user/appdata/paperrust/pgdata" Mode="rw" Description="Database files (a cache pool is recommended)." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/paperrust/pgdata</Config>
+  <Config Name="POSTGRES_DB" Target="POSTGRES_DB" Default="paperless" Mode="" Description="Database name." Type="Variable" Display="advanced" Required="true" Mask="false">paperless</Config>
+  <Config Name="POSTGRES_USER" Target="POSTGRES_USER" Default="paperless" Mode="" Description="Database user." Type="Variable" Display="advanced" Required="true" Mask="false">paperless</Config>
+  <Config Name="POSTGRES_PASSWORD" Target="POSTGRES_PASSWORD" Default="" Mode="" Description="Required. Database password; enter the same value as DB password in the paperrust template." Type="Variable" Display="always" Required="true" Mask="true"/>
+</Container>
