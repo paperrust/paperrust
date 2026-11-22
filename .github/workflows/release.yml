@@ -1,0 +1,102 @@
+# Creates a GitHub release from the packages of a green "Extended" run, as github-actions[bot]
+# (so no personal account appears as the release author).
+#
+# Start by hand (Actions → Release → Run workflow): version (e.g. 0.1.2) and the id of the Extended
+# run whose desktop packages to publish (its commit becomes the tag). Release notes come from
+# docs/RELEASE-NOTES-<version>.en.md. The Docker image is published separately (release-image.yml).
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version without v (e.g. 0.1.2)"
+        required: true
+      extended_run_id:
+        description: "Id of the green Extended run with the packages (URL …/actions/runs/<id>)"
+        required: true
+      draft:
+        description: "Create as draft"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ inputs.version }}
+      RUN_ID: ${{ inputs.extended_run_id }}
+    steps:
+      - name: Check inputs and the Extended run
+        id: run
+        run: |
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] || { echo "bad version: $VERSION"; exit 1; }
+          [[ "$RUN_ID" =~ ^[0-9]+$ ]] || { echo "bad run id: $RUN_ID"; exit 1; }
+          info=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" --jq '[.name, .conclusion, .head_sha] | @tsv')
+          IFS=$'\t' read -r name conclusion sha <<<"$info"
+          echo "run: $name / $conclusion / $sha"
+          [ "$name" = Extended ] && [ "$conclusion" = success ] || { echo "run $RUN_ID is not a green Extended run"; exit 1; }
+          if gh api "repos/$GITHUB_REPOSITORY/releases/tags/v$VERSION" >/dev/null 2>&1; then echo "release v$VERSION exists already"; exit 1; fi
+          echo "sha=$sha" >>"$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.run.outputs.sha }}
+      - name: Version in Cargo.toml matches
+        run: |
+          v=$(sed -n 's/^version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' Cargo.toml | head -1)
+          [ "$v" = "$VERSION" ] || { echo "Cargo.toml has $v, not $VERSION"; exit 1; }
+          test -f "docs/RELEASE-NOTES-$VERSION.en.md" || { echo "docs/RELEASE-NOTES-$VERSION.en.md missing"; exit 1; }
+      - uses: actions/download-artifact@v8
+        with:
+          run-id: ${{ inputs.extended_run_id }}
+          github-token: ${{ github.token }}
+          pattern: paperrust-*
+          path: dl
+      - name: Collect packages and write SHA256SUMS.txt
+        run: |
+          mkdir out
+          find dl -maxdepth 2 -type f \( -name "PaperRust-$VERSION-*.msi" -o -name "PaperRust-$VERSION-*-setup.exe" \
+            -o -name "PaperRust-$VERSION-*.zip" -o -name "PaperRust-$VERSION-*.tar.gz" -o -name "PaperRust-$VERSION-*.deb" \
+            -o -name "PaperRust-$VERSION-*.rpm" \) -exec cp {} out/ \;
+          cd out
+          for need in windows-x64-setup.exe windows-x64.msi windows-x64.zip linux-x86_64.tar.gz linux-x86_64.deb linux-x86_64.rpm; do
+            test -f "PaperRust-$VERSION-$need" || { echo "missing PaperRust-$VERSION-$need"; exit 1; }
+          done
+          sha256sum * >SHA256SUMS.txt
+          cat SHA256SUMS.txt
+      - name: Linux packages need at most glibc 2.36
+        run: |
+          mkdir chk && tar -xzf "out/PaperRust-$VERSION-linux-x86_64.tar.gz" -C chk
+          need=$(for f in chk/*/paperrust* chk/*/tesseract/tesseract; do [ -f "$f" ] && objdump -T "$f" | grep -oE 'GLIBC_[0-9.]+'; done | sort -uV | tail -1)
+          echo "glibc needed: $need"
+          [ "$(printf '%s\nGLIBC_2.36\n' "$need" | sort -V | tail -1)" = GLIBC_2.36 ]
+      - name: Release notes
+        run: |
+          # Drop the title line, make links to other docs absolute, add a download overview.
+          tail -n +2 "docs/RELEASE-NOTES-$VERSION.en.md" \
+            | sed -E "s#\]\((RELEASE-NOTES[^)]*)\)#](https://github.com/$GITHUB_REPOSITORY/blob/main/docs/\1)#g" >notes.md
+          cat >>notes.md <<EOF
+
+          ## Downloads
+
+          - Windows: \`PaperRust-$VERSION-windows-x64-setup.exe\` (installer, per user), \`.msi\` (per machine), \`.zip\` (portable)
+          - Linux x86_64: \`.deb\`, \`.rpm\`, \`.tar.gz\` (portable); glibc 2.36+ (Debian 12, Ubuntu 22.04 and newer)
+          - Docker: \`ghcr.io/paperrust/paperrust:$VERSION\` (amd64, arm64)
+          - Checksums: \`SHA256SUMS.txt\`. Packages are not code-signed yet.
+          EOF
+      - name: Create release (as github-actions[bot])
+        run: |
+          draft=()
+          if [ "${{ inputs.draft }}" = true ]; then draft=(--draft); fi
+          gh release create "v$VERSION" out/* --repo "$GITHUB_REPOSITORY" --target "${{ steps.run.outputs.sha }}" \
+            --title "PaperRust $VERSION" --notes-file notes.md --latest "${draft[@]}"

@@ -159,7 +159,9 @@ get_pinned() {
 	fi
 	echo "    lade $url ($((size / 1024 / 1024)) MB)" >&2
 	part="$file.part"
-	curl -fsSL --retry 3 --proto '=https' --tlsv1.2 -o "$part" "$url"
+	# --retry-all-errors: GitHub's release CDN sometimes answers 403/5xx for a moment (CI 2026-11-22); the
+	# SHA-256 check below still guards the content.
+	curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --proto '=https' --tlsv1.2 -o "$part" "$url" || die "$name: Download fehlgeschlagen ($url)"
 	got="$(sha256sum "$part" | cut -d' ' -f1)"
 	if [[ "$got" != "$sha" ]]; then
 		rm -f "$part"
