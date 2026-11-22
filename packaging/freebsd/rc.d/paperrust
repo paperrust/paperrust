@@ -1,0 +1,129 @@
+#!/bin/sh
+
+# PROVIDE: paperrust
+# REQUIRE: LOGIN postgresql
+# KEYWORD: shutdown
+#
+# PaperRust (web server + worker + scheduler + consumption folder in one process).
+# Installed as /usr/local/etc/rc.d/paperrust; details: /usr/local/share/doc/paperrust/README.md
+#
+# /etc/rc.conf(.local), e.g. with sysrc(8):
+#
+#   paperrust_enable="YES"
+#
+# Optional (defaults in brackets):
+#   paperrust_user      ["paperrust"]  account the server runs as
+#   paperrust_group     ["paperrust"]
+#   paperrust_config    ["/usr/local/etc/paperrust.conf"]  KEY=value file, exported into the
+#                       environment before start (paperrust also reads it itself)
+#   paperrust_basedir   ["/var/db/paperrust"]  PAPERRUST_BASE_DIR (data/, media/, consume/, export/)
+#   paperrust_args      ["--worker"]   arguments after `paperrust serve`
+#                       (--worker | --no-worker | --worker-only)
+#   paperrust_migrate   ["YES"]        run `paperrust manage migrate` before every start (like the
+#                       Docker image; creates the schema on an empty database, then a no-op)
+#   paperrust_logfile   ["/var/log/paperrust/console.log"]  stdout/stderr of the server
+#                       (SIGHUP reopens it, for newsyslog)
+#   paperrust_restart_delay ["5"]      seconds before daemon(8) restarts the server after it ended
+#                       (exit code 75 = restart requested from the web UI, or a crash)
+
+. /etc/rc.subr
+
+name=paperrust
+rcvar=paperrust_enable
+desc="PaperRust document management server"
+
+load_rc_config $name
+
+: ${paperrust_enable:="NO"}
+: ${paperrust_user:="paperrust"}
+: ${paperrust_group:="paperrust"}
+: ${paperrust_config:="/usr/local/etc/paperrust.conf"}
+: ${paperrust_basedir:="/var/db/paperrust"}
+: ${paperrust_args:="--worker"}
+: ${paperrust_migrate:="YES"}
+: ${paperrust_logfile:="/var/log/paperrust/console.log"}
+: ${paperrust_restart_delay:="5"}
+
+paperrust_bin="/usr/local/bin/paperrust"
+paperrust_rundir="/var/run/paperrust"
+paperrust_chdir="${paperrust_basedir}"
+
+# rc.subr starts the command as ${paperrust_user} (su -m, because paperrust_user is set), so the
+# daemon(8) supervisor and paperrust both run unprivileged. rc.subr tracks the supervisor: `stop`
+# sends it SIGTERM, it passes the signal on to paperrust, waits for it and does not restart it.
+pidfile="${paperrust_rundir}/daemon.pid"
+procname="/usr/sbin/daemon"
+command="/usr/sbin/daemon"
+command_args="-f -H -R ${paperrust_restart_delay} -P ${pidfile} -p ${paperrust_rundir}/paperrust.pid -o ${paperrust_logfile} ${paperrust_bin} serve ${paperrust_args}"
+required_files="${paperrust_bin}"
+
+start_precmd="paperrust_prestart"
+extra_commands="migrate"
+migrate_cmd="paperrust_migrate_cmd"
+
+# Exports the configuration file and the FreeBSD defaults into the environment.
+paperrust_env()
+{
+	if [ -r "${paperrust_config}" ]; then
+		set -a
+		# shellcheck disable=SC1090
+		. "${paperrust_config}"
+		set +a
+	else
+		warn "${paperrust_config} not found; copy ${paperrust_config}.sample and edit it"
+	fi
+	# Defaults for this package layout (values from the configuration file win).
+	: ${PAPERRUST_BASE_DIR:="${paperrust_basedir}"}
+	: ${PAPERRUST_STATICDIR:="/usr/local/share/paperrust/static"}
+	: ${PAPERRUST_ROUTES:="/usr/local/share/paperrust/routes.toml"}
+	if [ -z "${PAPERRUST_PDFIUM_PATH:-}" ] && [ -f /usr/local/lib/libpdfium.so ]; then
+		PAPERRUST_PDFIUM_PATH=/usr/local/lib/libpdfium.so
+	fi
+	if [ -z "${PAPERLESS_THUMBNAIL_FONT_NAME:-}" ] && [ -z "${PAPERRUST_THUMBNAIL_FONT_NAME:-}" ] &&
+		[ -f /usr/local/share/fonts/Liberation/LiberationSerif-Regular.ttf ]; then
+		PAPERLESS_THUMBNAIL_FONT_NAME=/usr/local/share/fonts/Liberation/LiberationSerif-Regular.ttf
+		export PAPERLESS_THUMBNAIL_FONT_NAME
+	fi
+	HOME="${paperrust_basedir}"
+	# Exit code 75 means "restart me" (settings page); daemon(8) restarts on any exit.
+	PAPERRUST_RESTART_SUPERVISED=1
+	NO_COLOR=1
+	export PAPERRUST_BASE_DIR PAPERRUST_STATICDIR PAPERRUST_ROUTES HOME PAPERRUST_RESTART_SUPERVISED NO_COLOR
+	if [ -n "${PAPERRUST_PDFIUM_PATH:-}" ]; then export PAPERRUST_PDFIUM_PATH; fi
+}
+
+paperrust_dirs()
+{
+	install -d -o "${paperrust_user}" -g "${paperrust_group}" -m 0755 "${paperrust_rundir}"
+	for d in "${paperrust_basedir}" "${paperrust_basedir}/data" "${paperrust_basedir}/media" \
+		"${paperrust_basedir}/consume" "${paperrust_basedir}/export" "$(dirname "${paperrust_logfile}")"; do
+		[ -d "$d" ] || install -d -o "${paperrust_user}" -g "${paperrust_group}" -m 0750 "$d"
+	done
+	if [ ! -e "${paperrust_logfile}" ]; then
+		touch "${paperrust_logfile}"
+		chown "${paperrust_user}:${paperrust_group}" "${paperrust_logfile}"
+		chmod 0640 "${paperrust_logfile}"
+	fi
+}
+
+paperrust_migrate_cmd()
+{
+	paperrust_env
+	echo "Running paperrust manage migrate as ${paperrust_user}."
+	(cd "${paperrust_basedir}" && su -m "${paperrust_user}" -c "${paperrust_bin} manage migrate")
+}
+
+paperrust_prestart()
+{
+	if ! pw usershow "${paperrust_user}" >/dev/null 2>&1; then
+		err 1 "user ${paperrust_user} does not exist (pw useradd ${paperrust_user} -d ${paperrust_basedir} -s /usr/sbin/nologin)"
+	fi
+	paperrust_dirs
+	paperrust_env
+	if checkyesno paperrust_migrate; then
+		paperrust_migrate_cmd || err 1 "paperrust manage migrate failed; not starting (see the messages above)"
+	fi
+	return 0
+}
+
+run_rc_command "$1"

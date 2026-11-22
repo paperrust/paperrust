@@ -77,7 +77,7 @@
   "tesseract": {
     "version": "5.4.0.20240606",
     "license": "Apache-2.0 (Tesseract), Leptonica BSD-2, weitere DLL-Lizenzen im Installer",
-    "note": "Windows: UB-Mannheim-Build (NSIS-Installer, wird mit 7-Zip entpackt, nie ausgeführt). sha256 gepinnt 2026-11-09 (D2): GitHub liefert für dieses Asset keinen digest; Größe 50175248 B stimmt mit dem Release überein, Authenticode-Signatur 'Universität Mannheim' (GEANT Code Signing CA 4, Zertifikat 2022-12-09..2023-12-10, Signatur intakt, nur abgelaufen). Der Spiegel digi.bib.uni-mannheim.de verweigert automatische Downloads (403), daher kein Zweitabgleich. macOS/Linux: eigener Build bzw. Paketabhängigkeit (docs/DESKTOP.md Abschnitt 9).",
+    "note": "Windows: UB-Mannheim-Build (NSIS-Installer, wird mit 7-Zip entpackt, nie ausgeführt). sha256 gepinnt 2026-11-09 (D2): GitHub liefert für dieses Asset keinen digest; Größe 50175248 B stimmt mit dem Release überein, Authenticode-Signatur 'Universität Mannheim' (GEANT Code Signing CA 4, Zertifikat 2022-12-09..2023-12-10, Signatur intakt, nur abgelaufen). Der Spiegel digi.bib.uni-mannheim.de verweigert automatische Downloads (403), daher kein Zweitabgleich. Linux: Tesseract des Baurechners gebündelt (pack.sh). macOS: Homebrew-Tesseract des Baurechners mit allen dylibs gebündelt (pack-macos.sh, macos-bundle-dylibs.py).",
     "targets": {
       "x86_64-pc-windows-msvc": {
         "url": "https://github.com/UB-Mannheim/tesseract/releases/download/v5.4.0.20240606/tesseract-ocr-w64-setup-5.4.0.20240606.exe",
@@ -134,7 +134,20 @@
       "note": "tauri-apps/tauri Release tauri-cli-v2.12.4 (2026-10-21), sha256 = GitHub digest. Vorgebautes cargo-tauri.exe (statt cargo install: ~600 Crates). Der Bundler lädt NSIS 3 + nsis_tauri_utils.dll selbst und prüft sie gegen fest eingebaute Prüfsummen.",
       "url": "https://github.com/tauri-apps/tauri/releases/download/tauri-cli-v2.12.4/cargo-tauri-x86_64-pc-windows-msvc.zip",
       "sha256": "3e8687fb184bd7f10ebd8642f7715f79f4a605c0694c142a21507e8a24dc0f8b",
-      "size": 7763590
+      "size": 7763590,
+      "targets": {
+        "_comment": "macOS builds of the same release for pack-macos.sh (sha256 = GitHub digest, checked 2026-11-22).",
+        "aarch64-apple-darwin": {
+          "url": "https://github.com/tauri-apps/tauri/releases/download/tauri-cli-v2.12.4/cargo-tauri-aarch64-apple-darwin.zip",
+          "sha256": "f71a34ada728ca2d1a51c28d6d21639e1e080898ec69ec8d49c5da3b7e8bc1be",
+          "size": 7795035
+        },
+        "x86_64-apple-darwin": {
+          "url": "https://github.com/tauri-apps/tauri/releases/download/tauri-cli-v2.12.4/cargo-tauri-x86_64-apple-darwin.zip",
+          "sha256": "164d184c0e50800dcae7bb31f0815066ebd27efc3e3bb73117974bcd2e982192",
+          "size": 8391002
+        }
+      }
     }
   }
 }

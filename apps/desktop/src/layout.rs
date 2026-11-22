@@ -16,8 +16,14 @@
 //!
 //! Every path can be overridden through the environment (development: programs from `target/debug`
 //! and a locally unpacked PostgreSQL).
+//!
+//! macOS app bundle (`apps/desktop/pack/pack-macos.sh`): the window program runs from
+//! `PaperRust.app/Contents/MacOS/paperrust-app`, while everything above lives in
+//! `PaperRust.app/Contents/Resources/` (where the Tauri bundler puts resources); see [`install_root`].
 
 use std::path::{Path, PathBuf};
+
+use crate::paths::Os;
 
 pub const EXE: &str = std::env::consts::EXE_SUFFIX;
 
@@ -51,6 +57,23 @@ pub fn pdfium_file_name() -> &'static str {
     }
 }
 
+/// Installation root for the program at `exe`: normally its directory. Inside a macOS app bundle
+/// (`<name>.app/Contents/MacOS/<exe>`) the bundled programs live in `Contents/Resources`, which is
+/// used when it contains the server program (`exists` injectable for tests).
+pub fn install_root(exe: &Path, os: Os, exists: impl Fn(&Path) -> bool) -> PathBuf {
+    let dir = exe.parent().map(Path::to_path_buf).unwrap_or_else(|| PathBuf::from("."));
+    if os == Os::MacOs
+        && dir.file_name().is_some_and(|n| n == "MacOS")
+        && let Some(contents) = dir.parent().filter(|c| c.file_name().is_some_and(|n| n == "Contents"))
+    {
+        let resources = contents.join("Resources");
+        if exists(&resources.join(format!("paperrust{EXE}"))) {
+            return resources;
+        }
+    }
+    dir
+}
+
 impl InstallLayout {
     /// Layout under `root`; `get` = environment, `exists` = file check (both injectable for tests).
     pub fn resolve(root: &Path, get: impl Fn(&str) -> Option<String>, exists: impl Fn(&Path) -> bool) -> Self {
@@ -74,7 +97,7 @@ impl InstallLayout {
     /// Layout next to the running program.
     pub fn from_current_exe() -> std::io::Result<Self> {
         let exe = std::env::current_exe()?;
-        let root = exe.parent().map(Path::to_path_buf).unwrap_or_else(|| PathBuf::from("."));
+        let root = install_root(&exe, Os::current(), Path::exists);
         Ok(Self::resolve(&root, |k| std::env::var(k).ok(), Path::exists))
     }
 
@@ -115,6 +138,24 @@ mod tests {
         assert_eq!(all.thumbnail_font, Some(root.join("fonts").join("LiberationSerif-Regular.ttf")));
         assert_eq!(all.missing(|_| true), Vec::<String>::new());
         assert_eq!(l.missing(|_| false).len(), 1 + crate::pg::REQUIRED_TOOLS.len());
+    }
+
+    #[test]
+    fn macos_app_bundle_root() {
+        let exe = Path::new("/Applications/PaperRust.app/Contents/MacOS/paperrust-app");
+        let res = Path::new("/Applications/PaperRust.app/Contents/Resources");
+        let has_server = |p: &Path| p == res.join(format!("paperrust{EXE}"));
+        assert_eq!(install_root(exe, Os::MacOs, has_server), res);
+        // Bundle without bundled server (e.g. a developer build copied into an .app): next to the program.
+        assert_eq!(install_root(exe, Os::MacOs, |_| false), exe.parent().unwrap_or(Path::new(".")));
+        // Only on macOS, only in Contents/MacOS.
+        assert_eq!(install_root(exe, Os::Unix, has_server), exe.parent().unwrap_or(Path::new(".")));
+        let plain = Path::new("/opt/paperrust/paperrust-desktop");
+        assert_eq!(install_root(plain, Os::MacOs, |_| true), Path::new("/opt/paperrust"));
+        let not_contents = Path::new("/x/MacOS/paperrust-app");
+        assert_eq!(install_root(not_contents, Os::MacOs, |_| true), Path::new("/x/MacOS"));
+        // Programs inside Contents/Resources (paperrust-desktop, server) resolve to their own directory.
+        assert_eq!(install_root(&res.join("paperrust-desktop"), Os::MacOs, |_| true), res);
     }
 
     #[test]

@@ -7,7 +7,10 @@
 >   `apps/desktop/pack/linux-build.sh`; bringt Tesseract (deu/eng/osd), PDFium und PostgreSQL 17 mit.
 >   Braucht glibc ≥ 2.36 (Debian 12, Ubuntu 24.04, Fedora 37 oder neuer). Eigenes Fenster nur mit
 >   WebKitGTK 4.1 und libayatana-appindicator, sonst im Browser. Nicht als root starten.
-> - **macOS:** geplant (braucht einen Mac und ein Apple-Entwicklerkonto).
+> - **macOS (Vorschau, 2026-11-22):** `.dmg` + portables `tar.gz` für Apple Silicon (und Intel als
+>   Zusatz), gebaut auf GitHub Actions (`.github/workflows/macos.yml`, `apps/desktop/pack/pack-macos.sh`),
+>   unsigniert (nur ad-hoc signiert, nicht notarisiert), macOS 15+. Noch nicht auf einem echten Mac
+>   geprüft – Abschnitt 27.
 >
 > Anleitung für Nutzer: [Installation → Desktop-App](user/installation.md#desktop)
 > ([English](user/en/installation.md#desktop)). Der Rest dieses Dokuments sind Entwicklernotizen
@@ -1300,3 +1303,64 @@ Tests: `uimode::tests::{tray_design_switch_per_server_kind, app_start_follows_de
 profile_ui_switch_checks, new_profile_ui, switch_plan_texts_and_targets,
 switching_keeps_profiles_and_preferences}`, `tray::tests::remote_menu_offers_server_ui_only_from_the_app_ui`
 (+ angepasste Menü-Tests), frontend-light `src/design2/api/v2docs.test.ts`.
+
+## 27. macOS-Paket (2026-11-22, Vorschau)
+
+**Bau:** `.github/workflows/macos.yml` (manuell oder bei Tags `v*`), nativ auf `macos-15` (aarch64) und
+`macos-15-intel` (x86_64, `continue-on-error`). Schritte wie `desktop-windows`: Web-UI + Statics,
+Release-Builds der vier Programme und der Tauri-Hülle, dann
+`apps/desktop/pack/pack-macos.sh --tar --dmg`, danach Rauchtest
+`apps/desktop/pack/macos-smoke.sh results/desktop/PaperRust.app/Contents/Resources`. Artefakte
+`paperrust-macos-<arch>`: `PaperRust-<ver>-macos-<arch>.dmg`, `…tar.gz`, `PACKAGE.json`.
+Mit der Eingabe `trace` läuft das Packskript mit `set -x` (`PAPERRUST_PACK_TRACE=1`).
+
+**Layout:** portabler Ordner wie unter Linux (`pgsql/`, `pdfium/libpdfium.dylib`, `tesseract/` +
+`tessdata/`, `fonts/`, `static/`, `light/`, Programme). In `PaperRust.app` liegt nur die Hülle in
+`Contents/MacOS/paperrust-app`; alles andere kopiert das Skript nach dem Tauri-Bundler
+(`cargo tauri bundle --bundles app`, tauri-cli 2.12.4 vorgebaut und gepinnt in `sources.json`
+`tools.tauri_cli.targets`) nach `Contents/Resources/`. `layout::install_root` erkennt
+`<x>.app/Contents/MacOS/<exe>` und nimmt dann `Contents/Resources` als Installationswurzel, sofern dort
+`paperrust` liegt (nur macOS; Test `layout::tests::macos_app_bundle_root`); dasselbe nutzt
+`sync::app_dir` der Hülle für `light/`. Programme in `Contents/Resources` (Supervisor, Server) finden
+ihre Nachbarn ohnehin direkt.
+
+**Tesseract:** Homebrew-Tesseract des Runners; `apps/desktop/pack/macos-bundle-dylibs.py` kopiert
+`tesseract` und `libtesseract.5.dylib` samt aller nicht-System-dylibs (rekursiv über `otool -L`,
+`@rpath`/`@loader_path` aufgelöst) nach `tesseract/` und schreibt alle Verweise auf
+`@loader_path/<datei>` um (Gegenstück zu RPATH `$ORIGIN` unter Linux). Danach prüft das Skript das ganze
+Paket: kein Mach-O darf auf einen absoluten Pfad außerhalb `/usr/lib`/`/System` verweisen; im Selbsttest
+lädt `tesseract` mit `DYLD_PRINT_LIBRARIES=1` keine Homebrew-Datei, `--list-langs` hat deu/eng und
+`simple.png` (upstream-Testbild) ergibt „test“. Lizenzdateien je Homebrew-Formel nach
+`THIRD-PARTY-LICENSES/tesseract/<formel>/`.
+
+**Signatur:** keine Developer ID, keine Notarisierung. Nach allen `install_name_tool`-Änderungen wird
+jede Mach-O-Datei ad-hoc signiert (`codesign --force --sign -`; Apple Silicon startet unsignierten Code
+nicht), zuletzt das ganze Bundle; `codesign --verify` muss bestehen. **Kein Hardened Runtime:** die
+Bibliotheksprüfung würde das per `dlopen` geladene `libpdfium.dylib`/`libtesseract.5.dylib` ablehnen.
+Erweiterte Attribute werden vorher entfernt (`xattr -cr`). Gatekeeper: Nutzer geben die App einmal frei
+(`xattr -dr com.apple.quarantine /Applications/PaperRust.app` oder Systemeinstellungen → Datenschutz &
+Sicherheit → „Dennoch öffnen“); mit gebrochener Signatur hieße es dagegen „beschädigt“.
+
+**DMG:** mit `hdiutil` (App, Verknüpfung auf `/Applications`, README), nicht mit Tauris `bundle_dmg.sh`,
+das den Finder per AppleScript steuert und auf CI-Rechnern ohne Sitzung unzuverlässig ist. Danach
+`hdiutil verify` und Prüfung der Signatur im eingehängten Abbild.
+
+**Mindestversion:** höchstes `minos` aller mitgelieferten Mach-O-Dateien (PostgreSQL von theseus-rs ist
+auf macOS 15 mit Homebrew-Bibliotheken gebaut, die Homebrew-Flaschen des Runners ebenso) → macOS 15;
+steht in `Info.plist` (`LSMinimumSystemVersion`) und `PACKAGE.json` (`minimum_macos`). Ältere Systeme
+gingen nur mit selbst gebautem Tesseract/PostgreSQL und `MACOSX_DEPLOYMENT_TARGET` (nicht gemacht).
+
+**PostgreSQL ausgedünnt:** wie Linux, zusätzlich `lib/Python` (Python-Laufzeit für plpython) und alle
+`*plpython*`-Module; `libLLVM.dylib` (124 MB, nur JIT) entfällt.
+
+**Selbsttests im Packskript:** Architektur aller Programme (`lipo`), `paperrust-desktop --version/--help`,
+`postgres --version`, PostgreSQL initdb (ICU) + Start + `SELECT 1` + Stopp, Tesseract (s. o.), in einer
+Kopie der App `Contents/MacOS/paperrust-desktop paths` (Wurzel = `Contents/Resources`, nichts fehlt).
+**Rauchtest** (`macos-smoke.sh`): `paperrust-desktop run --no-browser` mit frischem Datenordner und
+Admin aus `PAPERRUST_DESKTOP_ADMIN_*` (Zufallspasswort), Anmeldeseite 200, API-Token, Upload von
+`simple.png` mit OCR, Inhalt enthält „test“, `paperrust-desktop stop`, keine Prozesse übrig.
+
+**Offen / Risiken:** noch kein Lauf auf einem echten Mac (Fenster, Tray, WKWebView, Gatekeeper-Dialog,
+App Translocation beim Start direkt aus dem DMG); ob `codesign --verify --deep --strict` Mach-O-Dateien
+in `Contents/Resources` anmahnt (nur Warnung); Intel-Runner `macos-15-intel` ist der letzte x86_64-Typ
+bei GitHub; kein Updater für macOS (der Updater ist nur für Windows/NSIS umgesetzt).

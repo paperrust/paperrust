@@ -159,9 +159,12 @@ fn openmp_set_levels(lib_path: &Path) -> Option<SetLevels> {
     #[cfg(not(windows))]
     let gomp = {
         let _ = lib_path;
-        // Only if libtesseract has already loaded it along.
-        // SAFETY: RTLD_NOLOAD loads nothing new.
-        unsafe { libloading::os::unix::Library::open(Some("libgomp.so.1"), libc_rtld_noload() | 1) }.ok().map(libloading::Library::from)
+        // Only if libtesseract has already loaded it along (GCC libgomp; on FreeBSD the base
+        // system's LLVM libomp, which exports the same function).
+        OPENMP_RUNTIMES.iter().find_map(|name| {
+            // SAFETY: RTLD_NOLOAD loads nothing new.
+            unsafe { libloading::os::unix::Library::open(Some(*name), libc_rtld_noload() | 1) }.ok().map(libloading::Library::from)
+        })
     };
     let g = gomp?;
     let f = sym::<SetLevels>(&g, "omp_set_max_active_levels").ok();
@@ -170,11 +173,22 @@ fn openmp_set_levels(lib_path: &Path) -> Option<SetLevels> {
     f
 }
 
+/// OpenMP runtimes that libtesseract may have loaded (probed with `RTLD_NOLOAD`, in this order).
+#[cfg(all(not(windows), not(target_os = "freebsd")))]
+const OPENMP_RUNTIMES: &[&str] = &["libgomp.so.1"];
+#[cfg(target_os = "freebsd")]
+const OPENMP_RUNTIMES: &[&str] = &["libomp.so", "libgomp.so.1"];
+
 #[cfg(all(not(windows), target_os = "macos"))]
 fn libc_rtld_noload() -> c_int {
     0x10
 }
-#[cfg(all(not(windows), not(target_os = "macos")))]
+/// FreeBSD `<dlfcn.h>`: `RTLD_NOLOAD` is 0x2000 (0x4 is not a defined flag there).
+#[cfg(target_os = "freebsd")]
+fn libc_rtld_noload() -> c_int {
+    0x2000
+}
+#[cfg(all(not(windows), not(target_os = "macos"), not(target_os = "freebsd")))]
 fn libc_rtld_noload() -> c_int {
     0x4
 }

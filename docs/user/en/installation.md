@@ -10,7 +10,7 @@ one fits depends on whether a paperless-ngx installation already exists.
 | [Server without Django (standalone)](#standalone) | new installation or complete switch | works, gaps see [below](#standalone-limits) |
 | [Mixed operation in front of paperless-ngx](#mixed-operation) | – | **no longer exists** (only PaperRust up to v0.1.0) |
 | [Docker](#docker) | container operation | build the image from the repository (`docker/`); built, checked and measured for Linux arm64; amd64 built and smoke-tested (2026-11-20); **not published yet** |
-| [Desktop app](#desktop) | a single computer without server setup | Windows installer (**not signed** yet); Linux package (`tar.gz`, x86_64); macOS planned |
+| [Desktop app](#desktop) | a single computer without server setup | Windows installer (**not signed** yet); Linux package (`tar.gz`, x86_64); macOS preview (`.dmg`, unsigned, not yet tested) |
 
 <a id="requirements"></a>
 
@@ -331,7 +331,27 @@ Tesseract 5 (German, English, plus orientation detection) and PDFium.
 - The package is built in a Debian 12 container with `apps/desktop/pack/linux-build.sh`, so it also
   runs on newer distributions. So far it has only been smoke-tested.
 
-**macOS:** planned. Building and signing it needs a Mac and an Apple developer account.
+<a id="desktop-macos"></a>
+
+**macOS (preview):** `PaperRust-<version>-macos-aarch64.dmg` for Apple Silicon (M1 and newer), as an
+extra `…-macos-x86_64.dmg` for Intel Macs, plus a portable `tar.gz`. It ships PostgreSQL 17,
+Tesseract 5 (German, English) and PDFium. It is built automatically on GitHub Actions and has **not
+been tested on a real Mac yet**.
+
+- Needs **macOS 15 (Sequoia) or newer** (the bundled libraries are built for it; the exact minimum is
+  in `PACKAGE.json`).
+- Open the `.dmg` and drag **PaperRust** to **Applications**.
+- The app is **not notarized by Apple** (no developer account). macOS therefore blocks the first start.
+  Allow it once in Terminal:
+
+  ```sh
+  xattr -dr com.apple.quarantine /Applications/PaperRust.app
+  ```
+
+  Or: open the app, close the message, then **System Settings → Privacy & Security → "Open Anyway"**.
+  Only download the file from the official project page and compare the checksum (SHA-256).
+- Portable: unpack the `tar.gz`, run `xattr -dr com.apple.quarantine <folder>`, then `./PaperRust.sh`
+  (`--portable`, `--console` as on Linux).
 
 Start-up, data layout, ports, backup and import of an existing paperless-ngx installation:
 [docs/DESKTOP.md](../../DESKTOP.md) (German, developer notes).

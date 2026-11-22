@@ -10,7 +10,7 @@ passt, hängt davon ab, ob schon ein paperless-ngx läuft.
 | [Server ohne Django (Standalone)](#standalone) | neue Installation oder vollständiger Umstieg | lauffähig, Lücken siehe [unten](#standalone-limits) |
 | [Mischbetrieb vor paperless-ngx](#mixed-operation) | – | **gibt es nicht mehr** (nur PaperRust bis v0.1.0) |
 | [Docker](#docker) | Container-Betrieb | Image aus dem Repository bauen (`docker/`); für Linux arm64 gebaut, geprüft und gemessen; amd64 gebaut und im Rauchtest geprüft (2026-11-20); **noch nicht veröffentlicht** |
-| [Desktop-App](#desktop) | ein Rechner, ohne Server-Einrichtung | Windows-Installer (noch **nicht signiert**); Linux-Paket (`tar.gz`, x86_64); macOS geplant |
+| [Desktop-App](#desktop) | ein Rechner, ohne Server-Einrichtung | Windows-Installer (noch **nicht signiert**); Linux-Paket (`tar.gz`, x86_64); macOS-Vorschau (`.dmg`, unsigniert, noch ungeprüft) |
 
 <a id="requirements"></a>
 
@@ -338,7 +338,28 @@ Tesseract 5 (Deutsch, Englisch und Ausrichtungserkennung) und PDFium mit.
 - Das Paket wird mit `apps/desktop/pack/linux-build.sh` in einem Debian-12-Container gebaut und läuft
   deshalb auch auf neueren Distributionen. Bisher nur im Rauchtest geprüft.
 
-**macOS:** geplant. Bauen und Signieren braucht einen Mac und ein Apple-Entwicklerkonto.
+<a id="desktop-macos"></a>
+
+**macOS (Vorschau):** `PaperRust-<Version>-macos-aarch64.dmg` für Apple Silicon (M1 und neuer), als
+Zusatz `…-macos-x86_64.dmg` für Intel-Macs, außerdem ein portables `tar.gz`. Es bringt PostgreSQL 17,
+Tesseract 5 (Deutsch, Englisch) und PDFium mit. Gebaut wird es automatisch auf GitHub Actions; auf einem
+echten Mac ist es **noch nicht geprüft**.
+
+- Braucht **macOS 15 (Sequoia) oder neuer** (die mitgelieferten Bibliotheken sind dafür gebaut; das
+  genaue Minimum steht in `PACKAGE.json`).
+- `.dmg` öffnen und **PaperRust** auf **Programme** ziehen.
+- Die App ist **nicht von Apple beglaubigt** (keine Notarisierung, kein Entwicklerkonto). macOS blockiert
+  deshalb den ersten Start. Einmalig im Terminal freigeben:
+
+  ```sh
+  xattr -dr com.apple.quarantine /Applications/PaperRust.app
+  ```
+
+  Oder: App öffnen, Meldung schließen, dann **Systemeinstellungen → Datenschutz & Sicherheit → „Dennoch
+  öffnen“**. Laden Sie die Datei nur von der offiziellen Projektseite und vergleichen Sie die Prüfsumme
+  (SHA-256).
+- Portabel: `tar.gz` entpacken, `xattr -dr com.apple.quarantine <Ordner>`, dann `./PaperRust.sh`
+  (`--portable`, `--console` wie unter Linux).
 
 Ablauf, Datenablage, Ports, Backup und Import einer bestehenden paperless-ngx-Installation:
 [docs/DESKTOP.md](../DESKTOP.md) (Entwicklernotizen).

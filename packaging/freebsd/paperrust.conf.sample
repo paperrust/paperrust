@@ -1,0 +1,53 @@
+# PaperRust configuration for FreeBSD (/usr/local/etc/paperrust.conf).
+#
+#   cp /usr/local/etc/paperrust.conf.sample /usr/local/etc/paperrust.conf
+#   chown root:paperrust /usr/local/etc/paperrust.conf && chmod 0640 /usr/local/etc/paperrust.conf
+#
+# Format: KEY=value, one per line, # starts a comment. The rc script exports this file with
+# sh(1) (`set -a; . file`) and paperrust also reads it itself, so: no spaces around "=", and put
+# values containing spaces, $, quotes or # in 'single quotes'.
+# All settings: docs/user/configuration.md (the paperless-ngx names PAPERLESS_* work as well).
+
+# --- Database (PostgreSQL >= 14; SQLite/MariaDB are not supported) --------------------------------
+PAPERRUST_DBHOST=127.0.0.1
+PAPERRUST_DBPORT=5432
+PAPERRUST_DBNAME=paperrust
+PAPERRUST_DBUSER=paperrust
+PAPERRUST_DBPASS='change-me'
+
+# --- Required: long random string, e.g. `openssl rand -hex 48` ------------------------------------
+# When switching from paperless-ngx keep THE SAME value (sessions, share links, encrypted fields).
+PAPERRUST_SECRET_KEY='change-me'
+
+# --- Network --------------------------------------------------------------------------------------
+# Listen address. Keep 127.0.0.1 and put a reverse proxy with TLS in front (nginx, Caddy, relayd);
+# 0.0.0.0:8000 exposes the server on all interfaces.
+PAPERRUST_BIND=127.0.0.1:8000
+# Public URL behind the proxy (sets allowed hosts / CSRF origins)
+#PAPERRUST_URL=https://paperrust.example.com
+
+PAPERRUST_TIME_ZONE=Europe/Zurich
+# Tesseract languages, e.g. deu+eng (tesseract --list-langs shows what is installed)
+PAPERRUST_OCR_LANGUAGE=eng
+
+# --- Directories (defaults of the rc script; change only if needed) -------------------------------
+#PAPERRUST_BASE_DIR=/var/db/paperrust
+#PAPERRUST_DATA_DIR=/var/db/paperrust/data
+#PAPERRUST_MEDIA_ROOT=/var/db/paperrust/media
+#PAPERRUST_CONSUMPTION_DIR=/var/db/paperrust/consume
+#PAPERRUST_STATICDIR=/usr/local/share/paperrust/static
+#PAPERRUST_ROUTES=/usr/local/share/paperrust/routes.toml
+
+# --- Native libraries from FreeBSD packages (found automatically; set only to override) ----------
+#PAPERRUST_PDFIUM_PATH=/usr/local/lib/libpdfium.so
+#PAPERRUST_TESSERACT_PATH=/usr/local/bin/tesseract
+#PAPERRUST_TESSDATA_DIR=/usr/local/share/tessdata
+#PAPERLESS_THUMBNAIL_FONT_NAME=/usr/local/share/fonts/Liberation/LiberationSerif-Regular.ttf
+
+# --- First administrator without a prompt (`paperrust manage manage_superuser`); remove afterwards
+#PAPERRUST_ADMIN_USER=admin
+#PAPERRUST_ADMIN_PASSWORD='change-me'
+
+# Large consumption folders on FreeBSD: kqueue needs one open file per watched file. If the log
+# shows "Too many open files", raise kern.maxfiles / the login class limit or poll instead:
+#PAPERRUST_CONSUMER_POLLING=10

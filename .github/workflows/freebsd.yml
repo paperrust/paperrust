@@ -1,0 +1,132 @@
+# FreeBSD server package (no desktop app; the web UI is served by `paperrust`).
+#
+# Job 1 builds the web UI + server statics on Ubuntu (same as Extended "frontend-dist").
+# Job 2 starts a FreeBSD 14 amd64 VM (vmactions/freebsd-vm, QEMU/KVM on the runner) and runs
+# packaging/freebsd/build.sh (pkg deps, rustup with rust-toolchain.toml, release builds, tar.gz +
+# pkg) and packaging/freebsd/smoke.sh (PostgreSQL 17, pkg add, rc.d service, HTTP checks, upload).
+# Artifact: paperrust-freebsd-x86_64 (PaperRust-<ver>-freebsd-x86_64.tar.gz, paperrust-<ver>.pkg,
+# SHA256SUMS-freebsd-x86_64.txt). Details: packaging/freebsd/README.md.
+name: FreeBSD
+
+on:
+  workflow_dispatch:
+    inputs:
+      freebsd_release:
+        description: "FreeBSD release of the build VM (packages run on this and newer 14.x)"
+        default: "14.4"
+      lto:
+        description: "Release LTO (fat = like the other releases; thin = faster build for tests)"
+        type: choice
+        options: [fat, thin]
+        default: fat
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: freebsd-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend-dist:
+    name: Web UI + server statics
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: frontend-light/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend-light/package.json
+          cache: pnpm
+          cache-dependency-path: frontend-light/pnpm-lock.yaml
+      - name: Build web UI
+        working-directory: frontend-light
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+      - name: Statics from Python packages (Swagger UI, DRF) – pinned as in the Dockerfile
+        run: bash scripts/fetch-extra-static.sh "$RUNNER_TEMP/extra-static"
+      - name: Server statics (STATIC_ROOT)
+        run: EXTRA_STATIC="$RUNNER_TEMP/extra-static" bash scripts/build-static.sh results/static
+      - name: Check result
+        run: |
+          test -f frontend-light/dist/index.html
+          test -f results/static/base.css
+          test -d results/static/drf_spectacular_sidecar
+          du -sh frontend-light/dist results/static
+      - name: Archive
+        run: tar -cf frontend-dist.tar frontend-light/dist results/static
+      - uses: actions/upload-artifact@v7
+        with:
+          name: frontend-dist-freebsd
+          path: frontend-dist.tar
+          retention-days: 3
+
+  freebsd:
+    name: FreeBSD ${{ inputs.freebsd_release || '14.4' }} amd64 (build + smoke test)
+    needs: frontend-dist
+    runs-on: ubuntu-24.04
+    # VM builds are slow: fat LTO of paperrust in a 4-vCPU guest; the job limit is 360 min.
+    timeout-minutes: 330
+    env:
+      FREEBSD_RELEASE: ${{ inputs.freebsd_release || '14.4' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # upstream/ provides document.webp (include_bytes!) and its LICENSE
+          submodules: true
+      - uses: actions/download-artifact@v8
+        with:
+          name: frontend-dist-freebsd
+      - name: Free disk space on the runner (VM image + guest disk)
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          df -h /
+      - name: Start FreeBSD VM
+        uses: vmactions/freebsd-vm@v1.6.0
+        with:
+          release: ${{ env.FREEBSD_RELEASE }}
+          arch: x86_64
+          # ubuntu-24.04 runner: 4 vCPU, 16 GB. Linking paperrust with fat LTO needs > 5 GB.
+          mem: 12288
+          cpu: 4
+          sync: rsync
+          copyback: true
+          sync-time: true
+          custom-shell-name: freebsd
+          prepare: |
+            set -ex
+            freebsd-version
+            pkg install -y curl git pkgconf
+      - name: Build (inside the VM)
+        shell: freebsd {0}
+        run: |
+          set -ex
+          LTO="${{ inputs.lto || 'fat' }}" FRONTEND_TAR="$PWD/frontend-dist.tar" OUT_DIR="$PWD/out" \
+            sh packaging/freebsd/build.sh
+      - name: List packages
+        run: ls -l out/ && cat out/SHA256SUMS-freebsd-*.txt
+      # uploaded before the smoke test, so a failing test still leaves the packages for inspection
+      # (the release only takes packages from green runs)
+      - uses: actions/upload-artifact@v7
+        with:
+          name: paperrust-freebsd-x86_64
+          path: |
+            out/PaperRust-*-freebsd-*.tar.gz
+            out/paperrust-*.pkg
+            out/SHA256SUMS-freebsd-*.txt
+          if-no-files-found: error
+          retention-days: 14
+      - name: Smoke test (inside the VM)
+        shell: freebsd {0}
+        run: |
+          set -ex
+          sh packaging/freebsd/smoke.sh

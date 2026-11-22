@@ -1,0 +1,161 @@
+# PaperRust – macOS desktop package (unsigned, ad-hoc signed): PaperRust.app in a .dmg plus a portable
+# tar.gz, for Apple Silicon (macos-15) and Intel (macos-15-intel). Built natively on each runner:
+# release binaries, Tauri shell, Homebrew Tesseract bundled with its dylibs, PostgreSQL/PDFium pinned
+# in apps/desktop/pack/sources.json (apps/desktop/pack/pack-macos.sh), then a headless smoke test of the
+# app's programs (apps/desktop/pack/macos-smoke.sh).
+#
+# Nothing is published: artifacts are kept for 7 days. Assets: PaperRust-<ver>-macos-<arch>.dmg/.tar.gz.
+# Minimum macOS = what the bundled PostgreSQL/Homebrew libraries need (runner macOS, currently 15);
+# written to Info.plist and PACKAGE.json.
+
+name: macOS
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      trace:
+        description: "Trace the pack script (set -x)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  CARGO_NET_RETRY: "10"
+  RUST_BACKTRACE: short
+
+jobs:
+  frontend-dist:
+    # Same as the job of the same name in extended.yml (kept separate so this workflow runs on its own).
+    name: Web UI + server statics
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: frontend-light/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend-light/package.json
+          cache: pnpm
+          cache-dependency-path: frontend-light/pnpm-lock.yaml
+      - name: Build web UI
+        working-directory: frontend-light
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+      - name: Statics from Python packages (Swagger UI, DRF) – pinned as in the Dockerfile
+        run: bash scripts/fetch-extra-static.sh "$RUNNER_TEMP/extra-static"
+      - name: Server statics (STATIC_ROOT)
+        run: EXTRA_STATIC="$RUNNER_TEMP/extra-static" bash scripts/build-static.sh results/static
+      - name: Check result
+        run: |
+          test -f frontend-light/dist/index.html
+          test -f results/static/base.css
+          du -sh frontend-light/dist results/static
+      - name: Archive
+        run: tar -cf frontend-dist.tar frontend-light/dist results/static
+      - uses: actions/upload-artifact@v7
+        with:
+          name: frontend-dist-macos
+          path: frontend-dist.tar
+          retention-days: 1
+
+  desktop-macos:
+    name: Desktop package macOS ${{ matrix.arch }} (unsigned)
+    needs: frontend-dist
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    # Intel is a best-effort extra: its failure does not fail the workflow.
+    continue-on-error: ${{ matrix.arch == 'x86_64' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: aarch64
+            runner: macos-15
+          - arch: x86_64
+            runner: macos-15-intel
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      HOMEBREW_NO_INSTALL_CLEANUP: "1"
+      HOMEBREW_NO_ENV_HINTS: "1"
+      PAPERRUST_PACK_TRACE: ${{ inputs.trace && '1' || '' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+      - name: Machine
+        run: |
+          sw_vers
+          uname -m
+          sysctl -n hw.ncpu hw.memsize
+          xcode-select -p
+          bash --version | sed -n 1p
+          python3 --version
+      - name: Toolchain
+        run: |
+          rustup toolchain install --profile minimal
+          rustc --version
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: desktop-macos-${{ matrix.arch }}
+          workspaces: |
+            . -> target
+            apps/desktop-shell -> ../../target
+      - name: Tesseract (Homebrew, bundled into the package)
+        run: |
+          brew install tesseract
+          tesseract --version
+          otool -L "$(brew --prefix tesseract)/lib/libtesseract.5.dylib"
+      - uses: actions/download-artifact@v8
+        with:
+          name: frontend-dist-macos
+      - name: Unpack web UI + statics
+        run: tar -xf frontend-dist.tar
+      - name: Release builds
+        run: |
+          cargo build --release --locked -p pl-server --bin paperrust
+          cargo build --release --locked -p paperrust-desktop
+          cargo build --release --locked -p pl-dbmigrate --bin paperrust-migrate-db
+          cargo build --release --locked -p pl-pdftools --features engine --bin paperrust-pdftool
+      - name: Release build Tauri shell
+        working-directory: apps/desktop-shell
+        run: cargo build --release --locked
+      - name: Fetch all crates (license list runs cargo metadata --offline)
+        run: |
+          cargo fetch --locked
+          cd apps/desktop-shell
+          cargo fetch --locked
+      - name: pack-macos.sh --tar --dmg
+        run: bash apps/desktop/pack/pack-macos.sh --tar --dmg
+      - name: Package layout
+        if: always()
+        run: |
+          ls -la results/desktop || true
+          cat results/desktop/PaperRust-*-macos-${{ matrix.arch }}/PACKAGE.json || true
+          ls -la results/desktop/PaperRust.app/Contents results/desktop/PaperRust.app/Contents/MacOS results/desktop/PaperRust.app/Contents/Resources || true
+          plutil -p results/desktop/PaperRust.app/Contents/Info.plist || true
+      - name: Smoke test (headless, the app's programs)
+        run: bash apps/desktop/pack/macos-smoke.sh results/desktop/PaperRust.app/Contents/Resources
+      - uses: actions/upload-artifact@v7
+        with:
+          name: paperrust-macos-${{ matrix.arch }}
+          path: |
+            results/desktop/*.dmg
+            results/desktop/*.tar.gz
+            results/desktop/*/PACKAGE.json
+          retention-days: 7
+          if-no-files-found: error

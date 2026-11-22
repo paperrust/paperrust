@@ -78,6 +78,8 @@ pub fn font_dirs() -> Vec<PathBuf> {
         "/usr/share/fonts/liberation-mono",
         "/usr/share/fonts/TTF",
         "/usr/local/share/fonts/liberation",
+        // FreeBSD x11-fonts/liberation-fonts-ttf (capital L)
+        "/usr/local/share/fonts/Liberation",
     ] {
         v.push(PathBuf::from(d));
     }

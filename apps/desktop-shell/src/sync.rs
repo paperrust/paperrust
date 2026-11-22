@@ -43,14 +43,18 @@ pub fn app_ui(p: &Profile) -> bool {
     enabled_for(p) && p.ui == Ui::App
 }
 
-/// Light UI build: `PAPERRUST_LIGHT_UI_DIR`, otherwise `light\` next to the program (package), in
+/// Light UI build: `PAPERRUST_LIGHT_UI_DIR`, otherwise `light\` in the installation root (package), in
 /// debug builds alternatively `frontend-light/dist` of the repo.
 pub fn app_dir() -> Option<std::path::PathBuf> {
     let ok = |p: std::path::PathBuf| p.join("index.html").is_file().then_some(p);
     if let Some(d) = std::env::var_os("PAPERRUST_LIGHT_UI_DIR").map(std::path::PathBuf::from).and_then(ok) {
         return Some(d);
     }
-    if let Some(d) = std::env::current_exe().ok().and_then(|e| e.parent().map(|p| p.join("light"))).and_then(ok) {
+    // Next to the program, or in Contents/Resources of the macOS app bundle (layout::install_root).
+    let root = |e: std::path::PathBuf| {
+        paperrust_desktop::layout::install_root(&e, paperrust_desktop::paths::Os::current(), std::path::Path::exists)
+    };
+    if let Some(d) = std::env::current_exe().ok().map(|e| root(e).join("light")).and_then(ok) {
         return Some(d);
     }
     if cfg!(debug_assertions) {
