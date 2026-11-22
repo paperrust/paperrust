@@ -133,7 +133,8 @@ service paperrust status
 code="$(http "$BASE/accounts/login/")"
 [ "$code" = 200 ] || die "login page: HTTP $code"
 code="$(http "$BASE/api/")"
-case "$code" in 200 | 302 | 401 | 403) ;; # 302: unauthenticated browsers go to the login page (as in paperless-ngx) *) die "/api/: HTTP $code" ;; esac
+# 302: unauthenticated browsers are sent to the login page (as in paperless-ngx)
+case "$code" in 200 | 302 | 401 | 403) ;; *) die "/api/: HTTP $code" ;; esac
 code="$(http "$BASE/static/base.css")"
 [ "$code" = 200 ] || die "/static/base.css: HTTP $code (PAPERRUST_STATICDIR)"
 code="$(http -L "$BASE/rs/app/")"
