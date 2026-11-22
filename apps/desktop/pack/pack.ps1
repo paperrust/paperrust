@@ -46,6 +46,8 @@
 .EXAMPLE
   # additionally NSIS installer (Tauri bundler; downloads pinned tauri-cli + NSIS, no admin):
   .\apps\desktop\pack\pack.ps1 -Zip -Installer
+  # also the MSI (ArtCraft Launcher); -Msi alone builds only the MSI:
+  .\apps\desktop\pack\pack.ps1 -Zip -Installer -Msi
 
 .EXAMPLE
   # fetch and check only small parts:
@@ -70,7 +72,9 @@ param(
     # ZIP of the directory next to <Out> (PaperRust-<version>-windows-x64.zip)
     [switch]$Zip,
     # NSIS installer via the Tauri bundler (see section Installer below)
-    [switch]$Installer
+    [switch]$Installer,
+    # MSI installer via the Tauri bundler (WiX), the format the ArtCraft Launcher installs
+    [switch]$Msi
 )
 
 Set-StrictMode -Version 3
@@ -643,8 +647,11 @@ SELECT convert_to(U&'\00E4', 'LATIN1') = '\xe4'::bytea;
         Write-Host ("    {0:N1} MB, SHA-256 {1}" -f ($z.Length / 1MB), (Get-FileHash -Algorithm SHA256 $zipFile).Hash.ToLowerInvariant())
     }
 
-    if ($Installer) {
-        & (Join-Path $PSScriptRoot 'installer.ps1') -PackDir $Out -Version $Version -Cache $Cache -TargetDir $TargetDir
+    if ($Installer -or $Msi) {
+        $bundles = @()
+        if ($Installer) { $bundles += 'nsis' }
+        if ($Msi) { $bundles += 'msi' }
+        & (Join-Path $PSScriptRoot 'installer.ps1') -PackDir $Out -Version $Version -Cache $Cache -TargetDir $TargetDir -Bundles $bundles
         if ($LASTEXITCODE -ne 0) { throw "installer.ps1 fehlgeschlagen ($LASTEXITCODE)" }
     }
 } finally {

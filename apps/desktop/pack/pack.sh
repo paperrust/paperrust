@@ -29,8 +29,8 @@
 # Why tar.gz and no AppImage: PostgreSQL writes its data directory outside the package
 # (~/.local/share/paperrust/pgdata) and needs executables with fixed relative paths
 # (pgsql/bin -> ../lib); an AppImage is remounted on every start (FUSE needed, paths
-# change) and brings no update/signature model that Tauri would not already have. Deb/RPM/AppImage
-# via the Tauri bundler are a later step (docs/DESKTOP.md section 19).
+# change) and brings no update/signature model that Tauri would not already have. .deb/.rpm of this
+# directory: apps/desktop/pack/linux-pkg.sh (installs it unchanged under /opt/paperrust).
 #
 # Third-party binaries only from sources.json (URL + SHA-256 pinned), cache file name = checksum, checked again before every
 # use; archives are only unpacked, never executed (except the self-test of the

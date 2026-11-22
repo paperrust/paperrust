@@ -180,14 +180,15 @@ jobs:
           cargo fetch --locked
           cd apps/desktop-shell
           cargo fetch --locked
-      - name: pack.ps1 -Zip
+      - name: pack.ps1 -Zip -Msi
         shell: powershell
-        run: .\apps\desktop\pack\pack.ps1 -Zip
+        run: .\apps\desktop\pack\pack.ps1 -Zip -Msi
       - uses: actions/upload-artifact@v7
         with:
           name: paperrust-windows-x64
           path: |
             results/desktop/*.zip
+            results/desktop/*.msi
             results/desktop/*/PACKAGE.json
           retention-days: 7
 
@@ -232,10 +233,18 @@ jobs:
           (cd apps/desktop-shell && cargo fetch --locked)
       - name: pack.sh --tar
         run: bash apps/desktop/pack/pack.sh --tar
+      - name: .deb + .rpm (linux-pkg.sh)
+        run: |
+          sudo apt-get install --yes --no-install-recommends rpm
+          bash apps/desktop/pack/linux-pkg.sh
+          dpkg-deb --info results/desktop/*.deb
+          rpm -qip results/desktop/*.rpm
       - uses: actions/upload-artifact@v7
         with:
           name: paperrust-linux-x86_64
           path: |
             results/desktop/*.tar.gz
+            results/desktop/*.deb
+            results/desktop/*.rpm
             results/desktop/*/PACKAGE.json
           retention-days: 7

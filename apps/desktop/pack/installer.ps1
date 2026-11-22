@@ -1,7 +1,7 @@
 ﻿<#
 .SYNOPSIS
-  PaperRust Desktop – build an unsigned NSIS installer from a finished package directory
-  (Tauri bundler, `cargo tauri bundle`). Called by pack.ps1 -Installer.
+  PaperRust Desktop – build unsigned installers from a finished package directory
+  (Tauri bundler, `cargo tauri bundle`): NSIS (`-setup.exe`) and/or MSI. Called by pack.ps1 -Installer / -Msi.
 
 .DESCRIPTION
   - tauri-cli comes prebuilt and pinned from sources.json (tools.tauri_cli), no `cargo install`.
@@ -9,6 +9,8 @@
   - paperrust-app.exe must already be built (target\release); `tauri bundle` does not rebuild.
   - Installation type „nur für mich“ (currentUser): %LOCALAPPDATA%\PaperRust Desktop\ – deliberately
     separate from the data folder %LOCALAPPDATA%\PaperRust\ (uninstalling leaves the data in place).
+  - MSI (WiX, also downloaded by the bundler): per-machine to %ProgramFiles%\PaperRust Desktop\, the
+    format the ArtCraft Launcher installs (it runs msiexec and verifies SHA256SUMS.txt). Same data folder.
   - No signature, no updater artifact (both need keys/certificates of the user).
 #>
 [CmdletBinding()]
@@ -17,6 +19,8 @@ param(
     [Parameter(Mandatory)][string]$Version,
     [string]$Cache,
     [string]$TargetDir,
+    # Which installers: nsis, msi or both.
+    [ValidateSet('nsis', 'msi')][string[]]$Bundles = @('nsis'),
     # LZMA dictionary in MB (Z3). Tauri only sets `SetCompressor /SOLID lzma` (NSIS default 8 MB);
     # 64 MB combine identical parts across the whole package (measured: 58.1 -> 54.6 MiB).
     # Cost: ~3 min more build time, ~64 MB RAM when installing. 0 = Tauri default.
@@ -73,7 +77,7 @@ $conf = [ordered]@{
     version        = $Version
     bundle         = [ordered]@{
         active      = $true
-        targets     = @('nsis')
+        targets     = $Bundles
         publisher   = 'PaperRust'
         copyright   = 'GPL-3.0-only; based on paperless-ngx'
         category    = 'Productivity'
@@ -83,6 +87,8 @@ $conf = [ordered]@{
         resources   = $res
         windows     = [ordered]@{
             webviewInstallMode = [ordered]@{ type = 'downloadBootstrapper'; silent = $true }
+            # One language only: with several, WiX builds one MSI per language.
+            wix = [ordered]@{ language = 'en-US' }
             nsis = [ordered]@{
                 installMode = 'currentUser'
                 languages   = @('German', 'English')
@@ -99,17 +105,28 @@ $confFile = Join-Path $Cache 'tauri.bundle.json'
 [IO.File]::WriteAllText($confFile, ($conf | ConvertTo-Json -Depth 8), (New-Object Text.UTF8Encoding $false))
 
 # ------------------------------------------------------------------ bundling
-Step 'NSIS-Installer bauen (cargo tauri bundle)'
+Step ("Installer bauen: {0} (cargo tauri bundle)" -f ($Bundles -join ', '))
 $env:CARGO_TARGET_DIR = $TargetDir
 Push-Location $Shell
 try {
     # tauri writes progress to stderr: in PS 5.1 with ErrorActionPreference=Stop that would be an abort.
     $ErrorActionPreference = 'Continue'
-    & $cli bundle --bundles nsis --config $confFile 2>&1 | ForEach-Object { Write-Host "    $_" }
+    & $cli bundle --bundles ($Bundles -join ',') --config $confFile 2>&1 | ForEach-Object { Write-Host "    $_" }
     $rc = $LASTEXITCODE
     $ErrorActionPreference = 'Stop'
     if ($rc -ne 0) { throw "tauri bundle fehlgeschlagen ($rc)" }
 } finally { Pop-Location }
+
+# ------------------------------------------------------------------ MSI
+if ($Bundles -contains 'msi') {
+    $msi = Get-ChildItem (Join-Path $TargetDir 'release\bundle\msi') -Filter '*.msi' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if (-not $msi) { throw 'MSI nicht gefunden (target\release\bundle\msi)' }
+    # Asset name as the ArtCraft Launcher reads it: <stem>-<version>-windows-x64.msi
+    $msiDest = Join-Path (Split-Path $PackDir -Parent) ("PaperRust-$Version-windows-x64.msi")
+    Copy-Item -Force $msi.FullName $msiDest
+    Write-Host ("    {0} ({1:N1} MB, unsigniert), SHA-256 {2}" -f $msiDest, ($msi.Length / 1MB), (Get-FileHash -Algorithm SHA256 $msiDest).Hash.ToLowerInvariant())
+}
+if ($Bundles -notcontains 'nsis') { return }
 
 $setup = Get-ChildItem (Join-Path $TargetDir 'release\bundle\nsis') -Filter '*-setup.exe' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 if (-not $setup) { throw 'Installer nicht gefunden (target\release\bundle\nsis)' }

@@ -639,7 +639,8 @@ die Bundle-Typ-Kennung ergänzt).
 | Sprache | Deutsch + Englisch, Lizenzseite = GPL-3.0 |
 | Stilles Installieren/Deinstallieren | `setup.exe /S /D=<Ordner>`, `uninstall.exe /S` (geprüft: 34 s, 8 390 Dateien, 498,8 MB; Deinstallation entfernt Programmordner + Registry-Eintrag, **Daten bleiben**) |
 | Signatur | **keine** – SmartScreen warnt beim ersten Start („Weitere Informationen → Trotzdem ausführen“) |
-| MSI | nicht gebaut (WiX-Download ~30 MB, kein Mehrwert gegenüber NSIS für Einzelplatz) |
+| MSI | seit 0.1.1 zusätzlich (`pack.ps1 -Msi`, Tauri-Bundler mit WiX, Sprache en-US): `PaperRust-<ver>-windows-x64.msi`, pro Rechner nach `%ProgramFiles%\PaperRust Desktop\` (UAC), gleicher Datenordner. Grund: der ArtCraft Launcher installiert nur MSI (Linux: deb/rpm/Flatpak/AppImage) und prüft gegen `SHA256SUMS.txt` des Releases |
+| Linux deb/rpm | seit 0.1.1 (`apps/desktop/pack/linux-pkg.sh` nach `pack.sh`): portabler Baum unverändert unter `/opt/paperrust/`, `/usr/bin/paperrust` → `PaperRust.sh`, Startmenü-Eintrag + Symbol; Fenster-Bibliotheken (WebKitGTK 4.1) nur empfohlen, ohne sie öffnet der Browser; rpm ohne automatische Abhängigkeiten (mitgelieferte PostgreSQL/Tesseract-Bibliotheken). Geprüft im Ubuntu-24.04-Container (Installieren, Start über `paperrust`, Dateiliste rpm) |
 
 **Was der Nutzer für Signatur und Updater bereitstellen muss (Konten/Kosten):**
 

@@ -9,7 +9,7 @@
 # All versions pinned exactly (as of 2026-11-09, latest 2.x without pre-releases).
 [package]
 name = "paperrust-desktop-shell"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 license = "GPL-3.0-only"
 publish = false
