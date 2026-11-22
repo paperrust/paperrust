@@ -35,6 +35,7 @@ if [[ "${PAPERRUST_LINUX_BUILD_INNER:-}" != 1 ]]; then
 	[[ -d "$REPO/frontend-light/dist" ]] || { echo "frontend-light/dist missing (cd frontend-light && pnpm build)" >&2; exit 1; }
 	[[ -d "$REPO/results/static" ]] || { echo "results/static missing (scripts/build-static.sh)" >&2; exit 1; }
 	mkdir -p "$OUT"
+	OUT="$(cd "$OUT" && pwd)" # docker -v needs an absolute path (a relative one is taken as a volume name)
 	exec docker run --rm \
 		-e PAPERRUST_LINUX_BUILD_INNER=1 -e CARGO_BUILD_JOBS="$JOBS" -e ARCH="$ARCH" \
 		-e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
