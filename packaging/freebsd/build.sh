@@ -102,8 +102,9 @@ if [ -n "${CODEGEN_UNITS:-}" ]; then export CARGO_PROFILE_RELEASE_CODEGEN_UNITS=
 JOBS=""
 if [ -n "${BUILD_JOBS:-}" ]; then JOBS="-j $BUILD_JOBS"; fi
 # sqlite-vec 0.1.9 uses u_int8_t/u_int16_t/u_int64_t, which FreeBSD only declares in <sys/types.h>
-# (its #ifdef for Linux/macOS does not cover FreeBSD). Force-include the header for C builds (cc crate).
-export CFLAGS="${CFLAGS:-} -include sys/types.h"
+# (its #ifdef for Linux/macOS does not cover FreeBSD). Map the names to the <stdint.h> types via macros
+# (a forced -include broke ring's assembly sources; plain macros are harmless there).
+export CFLAGS="${CFLAGS:-} -Du_int8_t=uint8_t -Du_int16_t=uint16_t -Du_int64_t=uint64_t"
 
 log "cargo build paperrust + paperrust-migrate-db"
 start=$(date +%s)
