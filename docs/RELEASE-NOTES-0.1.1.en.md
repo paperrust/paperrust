@@ -34,9 +34,9 @@ unchanged – updating from 0.1.0 means replacing the image or program.
 
 ## Known limitations
 
-Unchanged from [0.1.0](RELEASE-NOTES-0.1.0.en.md#known-limits). Newly known: a two-word search requires
-both words (AND); paperless-ngx 3.1.3 returned more hits in the comparison test. This will be reviewed for
-the next release.
+Unchanged from [0.1.0](RELEASE-NOTES-0.1.0.en.md#known-limits). Note on search: several words require
+all of them (AND) – exactly like paperless-ngx 3.4.2 (checked 22 Nov). Older paperless-ngx versions (e.g. 3.1.3)
+combined them with OR and returned more hits; to get that, type `word1 OR word2`.
 
 ## Updating
 

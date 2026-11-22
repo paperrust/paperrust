@@ -129,18 +129,28 @@
         $("settings-error").textContent = "PaperRust startet neu …";
       } catch (e) { err(e); ev.target.checked = !ev.target.checked; }
     });
-    // Card "Oberfläche (Fern-Modus)": app UI (2b) selectable as soon as PaperRust + light UI build
+    // Card "Oberfläche (mit einem Server)": bundled PaperRust interface (2b) selectable as soon as
+    // the server kind is known and the package contains the build (docs/DESKTOP.md §26)
     const appRadio = document.querySelector("input[name=ui][value=app]");
     const srvRadio = document.querySelector("input[name=ui][value=server]");
     if (appRadio && srvRadio) {
       const usable = profile.supported && profile.app_available;
+      const ngx = profile.flavor === "paperless-ngx";
       appRadio.disabled = !usable;
       const label = appRadio.closest("label");
-      if (label) {
-        label.classList.toggle("disabled", !usable);
-        const small = label.querySelector("small");
-        if (small && usable) small.textContent = "Leichte Oberfläche aus der App; mit Offline-Bestand auch ohne Verbindung lesen und suchen.";
+      if (label) label.classList.toggle("disabled", !usable);
+      let note = "Gilt für " + profile.name + " (" + profile.flavor + "). ";
+      if (!profile.app_available) note += "Die PaperRust-Oberfläche ist in diesem Paket nicht enthalten.";
+      else if (!profile.supported) note += "Server-Art noch unbekannt – bitte einmal verbinden.";
+      else if (ngx) {
+        note += "Mit paperless-ngx: Dokumente, Tags, Suche und Bearbeiten laufen über die Schnittstelle des Servers; " +
+          "PaperRust-Zusatzfunktionen (Assistent, Zeitleiste, Abläufe) gibt es dort nicht – sie werden als nicht verfügbar angezeigt. " +
+          "Anmeldung einmal mit Benutzer und Passwort in der App (kein Single Sign-on).";
+      } else {
+        note += "Anmeldung einmal mit Benutzer und Passwort in der App; mit Offline-Bestand auch ohne Verbindung lesen und suchen.";
       }
+      note += " Umschalten startet PaperRust neu; im Tray-Menü geht es mit „Oberfläche des Servers“ zurück.";
+      $("ui-note").textContent = note;
       appRadio.checked = profile.ui === "app";
       srvRadio.checked = profile.ui !== "app";
       for (const r of [appRadio, srvRadio]) {

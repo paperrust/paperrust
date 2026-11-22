@@ -114,6 +114,17 @@ export function toV2Patch(p: Record<string, unknown>, m: IdMaps): Record<string,
   return out
 }
 
+/**
+ * v2 write not possible here, v1 should take over: the desktop app's gateway in front of a paperless-ngx
+ * server answers API v2 only from its local replica (writes 503), older servers 404/405/501
+ * (docs/DESKTOP.md §26). Edit conflicts (412) and validation errors (400) are real answers – no fallback.
+ */
+export function v2WriteUnsupported(e: unknown): boolean {
+  if (e instanceof Conflict) return false
+  const status = (e as { status?: unknown } | null)?.status
+  return status === 404 || status === 405 || status === 501 || status === 503
+}
+
 /** PATCH /documents/{uuid} with If-Match; returns the new rev (ETag) */
 export async function patchV2(ref: V2Ref, patch: Record<string, unknown>): Promise<number> {
   const r = await req('PATCH', `/documents/${ref.uuid}`, patch, { 'If-Match': `"${ref.rev}"` })

@@ -31,13 +31,8 @@ pub struct SyncState {
     running: Mutex<Option<Running>>,
 }
 
-/// Start address of the app UI (mode 2b; Windows/WebView2: own scheme as
-/// `http://<scheme>.localhost`).
-#[cfg(windows)]
-pub const APP_URL: &str = "http://prapi.localhost/rs/app/";
-#[cfg(not(windows))]
-pub const APP_URL: &str = "prapi://localhost/rs/app/";
-/// Origin of the app UI (navigation allow list).
+/// Origin of the app UI (navigation allow list; start address via
+/// [`crate::uimode::app_start_url`]). Windows/WebView2: own scheme as `http://<scheme>.localhost`.
 #[cfg(windows)]
 pub const APP_ORIGIN_URL: &str = "http://prapi.localhost/";
 #[cfg(not(windows))]
@@ -229,17 +224,8 @@ pub fn sync_profile_set_ui(id: String, ui: String, app: AppHandle, shared: tauri
         "server" => Ui::Server,
         _ => return Err("Unbekannte Oberfläche.".into()),
     };
-    if new_ui == Ui::App && app_dir().is_none() {
-        return Err("Die App-Oberfläche ist in diesem Paket nicht enthalten (light\\ fehlt).".into());
-    }
-    crate::with_profile(&id, |cfg, _| {
-        let p = cfg.profiles.iter_mut().find(|p| p.id == id).ok_or("Unbekanntes Profil.")?;
-        if new_ui == Ui::App && !known_flavor(p) {
-            return Err("Server-Art unbekannt – bitte einmal verbinden, dann erneut versuchen.".into());
-        }
-        p.ui = new_ui;
-        Ok(())
-    })?;
+    let available = app_dir().is_some();
+    crate::with_profile(&id, |cfg, _| crate::uimode::set_profile_ui(cfg, &id, new_ui, available))?;
     tracing::info!(profile = %id, ui = %ui, "Oberfläche gewechselt");
     if crate::is_active_running(&shared, &id) {
         crate::restart_app(&app, shared.inner());

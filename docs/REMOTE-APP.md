@@ -5,7 +5,10 @@ Stand 2026-11-09. Entscheidungsvorlage.
 > **Umsetzungsstand:** Modus **2a fertig** (P1, docs/DESKTOP.md §22: Erst-Start-Wahl, `app.toml`,
 > Erkennung, Login im WebView, WebView-Daten je Profil, Origin-Allowlist, TLS-Pin über WebView2,
 > http-Opt-in, Offline-Seite, Einstellungen, Tray je Modus; E2E `results/desktop/remote/`).
-> 2b/3 offen (P5). Rahmen: docs/DESKTOP.md (Modus 1, vorhanden),
+> 2b/3 offen (P5). **Nachtrag 2026-11-22:** Oberfläche je Profil in Einstellungen, Verbindungsformular
+> und Tray wählbar („PaperRust-Oberfläche (aus der App)“ = 2b, auch gegen paperless-ngx / „Oberfläche des
+> Servers“ = 2a), Betriebsart wechseln mit Rückfrage über Tray „Betriebsart wechseln …“ – docs/DESKTOP.md §26.
+> Rahmen: docs/DESKTOP.md (Modus 1, vorhanden),
 docs/ARCHITECTURE-V2.md, docs/SYNC.md, docs/FRONTEND-LIGHT.md.
 
 ## 1. Modi und Varianten
@@ -31,6 +34,9 @@ die die Light-UI noch nicht hat.
   Server-Profile verwalten (hinzufügen, umbenennen, Abmelden/Entfernen), Oberfläche wählen (Server/App),
   Sync-Auswahl (Modus 3). Wechsel startet die Hülle neu; **lokale Daten bleiben unberührt** (`pgdata/` wird
   bei Modus „remote“ weder gestartet noch gelöscht).
+  Tray „Betriebsart wechseln …“ öffnet die Karte direkt; vor dem Wechsel eine Rückfrage, die sagt, was
+  passiert (DESKTOP.md §26). Der Tray-Umschalter „Neue Oberfläche“ schaltet bei paperless-ngx auf die
+  App-Oberfläche (2b) um, „Oberfläche des Servers“ zurück auf 2a.
 - Ablage: `<Datenordner>/app.toml` (Datenordner wie DESKTOP.md §3; Rechte M4):
 
 ```toml

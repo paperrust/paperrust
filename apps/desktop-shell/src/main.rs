@@ -36,6 +36,8 @@ mod prapi;
 mod remote;
 mod sync;
 mod tray;
+// Interface choice in remote mode (server UI / bundled PaperRust UI) and "change mode", DESKTOP.md §26.
+mod uimode;
 mod update;
 mod wv2;
 
@@ -113,6 +115,8 @@ struct View {
     profile: Option<String>,
     /// Profile over unencrypted http.
     insecure: bool,
+    /// Package contains the bundled PaperRust interface (`light\`): connect form offers it.
+    app_ui_available: bool,
     /// Reconciliation after "Von paperless-ngx umsteigen" (first start only): the page shows verdict and
     /// short summary before it switches to the UI.
     switch: Option<SwitchView>,
@@ -599,6 +603,19 @@ fn load_config(paths: &AppPaths) -> AppConfig {
     }
 }
 
+/// Like [`load_config`], but an unreadable `app.toml` is an error instead of an empty
+/// configuration – for changes that save afterwards (otherwise the profiles would be lost).
+fn load_config_strict(paths: &AppPaths) -> Result<AppConfig, String> {
+    match AppConfig::load(&paths.app_config_file()) {
+        Ok(Some((c, _))) => Ok(c),
+        Ok(None) => Ok(AppConfig::default()),
+        Err(e) => {
+            tracing::error!("{e}");
+            Err("app.toml ist nicht lesbar und wird nicht überschrieben – Einzelheiten im Log.".into())
+        }
+    }
+}
+
 fn save_config(paths: &AppPaths, cfg: &AppConfig) -> Result<(), String> {
     paperrust_desktop::perms::create_private_dir(&paths.home).map_err(|e| format!("{}: {e}", paths.home.display()))?;
     cfg.save(&paths.app_config_file())
@@ -656,6 +673,9 @@ struct ConnectForm {
     /// User has confirmed the fingerprint (SPKI pin from `confirm_tls`).
     #[serde(default)]
     tls_pin: String,
+    /// Interface: `app` = bundled PaperRust interface, `server` = the server's own (default).
+    #[serde(default)]
+    ui: Option<String>,
 }
 
 #[derive(Debug, Default, Serialize)]
@@ -747,13 +767,14 @@ async fn server_connect(form: ConnectForm, app: AppHandle, shared: tauri::State<
     };
     tracing::info!(url = %su.base, flavor = ?det.flavor, version = ?det.version, "Server erkannt");
     let paths = AppPaths::from_env().map_err(|e| e.to_string())?;
-    let mut cfg = load_config(&paths);
+    let mut cfg = load_config_strict(&paths)?;
+    let ui = uimode::ui_for_new_profile(form.ui.as_deref(), det.flavor, sync::app_dir().is_some());
     let id = cfg.upsert(Profile {
         id: String::new(),
         name: mode::clean_name(&form.name, &su.base),
         url: su.base.clone(),
         flavor: det.flavor,
-        ui: mode::Ui::Server,
+        ui,
         tls_pin: pin.unwrap_or_default(),
         allow_http: !su.https,
         extra_origins: vec![],
@@ -836,15 +857,36 @@ fn settings_state(shared: tauri::State<'_, Arc<Shared>>) -> Result<SettingsView,
     })
 }
 
-/// Switch mode (restarts). Local data stays untouched.
+fn mode_plan(shared: &Shared, mode: &str) -> Result<(AppPaths, AppConfig, Mode, uimode::SwitchPlan), String> {
+    let m = Mode::parse(mode).ok_or("Unbekannte Betriebsart.")?;
+    let paths = AppPaths::from_env().map_err(|e| e.to_string())?;
+    let cfg = load_config_strict(&paths)?;
+    let env_mode = std::env::var(ENV_MODE).ok().and_then(|v| Mode::parse(&v));
+    let local_data = paths.config_file.exists() || paths.pgdata.exists();
+    let plan = uimode::plan_switch(&cfg, shared.start(), env_mode, m, local_data);
+    Ok((paths, cfg, m, plan))
+}
+
+/// What a mode switch would do (confirmation text of the settings page).
+#[tauri::command]
+fn settings_mode_plan(mode: String, shared: tauri::State<'_, Arc<Shared>>) -> Result<uimode::SwitchPlan, String> {
+    mode_plan(&shared, &mode).map(|(_, _, _, p)| p)
+}
+
+/// Switch mode (restarts). Only `mode` in `app.toml` changes: local data, profiles and
+/// logins stay untouched; a running local server is stopped in an orderly way by the restart.
 #[tauri::command]
 fn settings_set_mode(mode: String, app: AppHandle, shared: tauri::State<'_, Arc<Shared>>) -> Result<(), String> {
-    let m = Mode::parse(&mode).ok_or("Unbekannte Betriebsart.")?;
-    let paths = AppPaths::from_env().map_err(|e| e.to_string())?;
-    let mut cfg = load_config(&paths);
-    cfg.mode = m;
+    let (paths, mut cfg, m, plan) = mode_plan(&shared, &mode)?;
+    if let Some(b) = plan.blocked {
+        return Err(b);
+    }
+    if plan.unchanged {
+        return Ok(());
+    }
+    uimode::apply_switch(&mut cfg, m);
     save_config(&paths, &cfg)?;
-    tracing::info!(mode = m.as_str(), "Betriebsart gewechselt");
+    tracing::info!(mode = m.as_str(), next = plan.next, "Betriebsart gewechselt");
     restart_app(&app, shared.inner());
     Ok(())
 }
@@ -1365,7 +1407,10 @@ fn install_tray_menu(app: &AppHandle, mode: TrayMode) {
     } else {
         (Vec::new(), String::new())
     };
-    let spec = tray::menu_spec(mode, &profiles, &active);
+    // the running profile decides (not app.toml, which may already be changed before a restart)
+    let shared = app.state::<Arc<Shared>>().inner().clone();
+    let app_ui = mode == TrayMode::Remote && lock(&shared.remote).as_ref().is_some_and(|r| sync::app_ui(&r.profile));
+    let spec = tray::menu_spec(mode, &profiles, &active, app_ui);
     match tray::build_menu(app, &spec) {
         Ok(b) => {
             if let Some(t) = app.tray_by_id(TRAY) {
@@ -1377,7 +1422,6 @@ fn install_tray_menu(app: &AppHandle, mode: TrayMode) {
             if let Some(item) = app.try_state::<UpdateItem>() {
                 *lock(&item.0) = b.update;
             }
-            let shared = app.state::<Arc<Shared>>().inner().clone();
             refresh_update_view(app, &shared);
         }
         Err(e) => tracing::error!(error = %e, "Tray-Menü"),
@@ -1388,7 +1432,13 @@ fn on_tray_menu(app: &AppHandle, id: &str) {
     match id {
         "open" => show_main(app),
         design::MODERN_ID | design::CLASSIC_ID => {
-            switch_design(app, if id == design::MODERN_ID { design::Design::Modern } else { design::Design::Classic })
+            tray_design(app, if id == design::MODERN_ID { design::Design::Modern } else { design::Design::Classic })
+        }
+        uimode::SERVER_UI_ID => set_active_ui(app, mode::Ui::Server),
+        uimode::MODE_ID => {
+            if let Some(u) = local_url("settings.html#mode") {
+                navigate_main(app, u);
+            }
         }
         "backup" => start_backup(app),
         "consume" => open_dir(|p| p.consume.clone()),
@@ -1434,6 +1484,56 @@ fn on_tray_menu(app: &AppHandle, id: &str) {
     }
 }
 
+/// Tray "Neue/Klassische Oberfläche" in all modes: in remote mode the server kind and the
+/// interface of the running profile decide ([`uimode::design_action`]); paperless-ngx has no
+/// PaperRust interface of its own -> switch to the bundled one (restart).
+fn tray_design(app: &AppHandle, target: design::Design) {
+    let shared = app.state::<Arc<Shared>>().inner().clone();
+    let ctx = if shared.start() == Some(Start::Remote) { lock(&shared.remote).clone() } else { None };
+    let Some(ctx) = ctx else {
+        return switch_design(app, target);
+    };
+    match uimode::design_action(ctx.profile.flavor, ctx.profile.ui, sync::app_dir().is_some(), target) {
+        uimode::DesignAction::Navigate => switch_design(app, target),
+        uimode::DesignAction::ServerHome => {
+            if let Ok(u) = Url::parse(&ctx.server.base) {
+                navigate_main(app, u);
+            }
+        }
+        uimode::DesignAction::UseAppUi => {
+            remember_design(target);
+            set_active_ui(app, mode::Ui::App);
+        }
+        uimode::DesignAction::Unavailable(note) => {
+            tracing::warn!("Oberfläche nicht wechselbar: {note}");
+            if let Some(u) = local_url("settings.html#ui") {
+                navigate_main(app, u);
+            }
+        }
+    }
+}
+
+/// Set the interface of the running remote profile (tray) and restart.
+fn set_active_ui(app: &AppHandle, ui: mode::Ui) {
+    let shared = app.state::<Arc<Shared>>().inner().clone();
+    let Some(id) = lock(&shared.remote).as_ref().map(|r| r.profile.id.clone()) else {
+        return;
+    };
+    let available = sync::app_dir().is_some();
+    match with_profile(&id, |cfg, _| uimode::set_profile_ui(cfg, &id, ui, available)) {
+        Ok(()) => {
+            tracing::info!(profile = %id, app_ui = (ui == mode::Ui::App), "Oberfläche gewechselt (Tray)");
+            restart_app(app, &shared);
+        }
+        Err(e) => {
+            tracing::warn!("Oberfläche nicht gewechselt: {e}");
+            if let Some(u) = local_url("settings.html#ui") {
+                navigate_main(app, u);
+            }
+        }
+    }
+}
+
 /// Tray "Neue/Klassische Oberfläche": main window to the same route of the other UI
 /// (docs/DESIGN2.md §6). On local app pages (first start, error) only show the window.
 fn switch_design(app: &AppHandle, target: design::Design) {
@@ -1453,7 +1553,7 @@ fn switch_design(app: &AppHandle, target: design::Design) {
 fn build_tray(app: &AppHandle, mode: TrayMode) -> tauri::Result<()> {
     app.manage(BackupItem::default());
     app.manage(UpdateItem::default());
-    let built = tray::build_menu(app, &tray::menu_spec(mode, &[], ""))?;
+    let built = tray::build_menu(app, &tray::menu_spec(mode, &[], "", false))?;
     *lock(&app.state::<BackupItem>().0) = built.backup;
     *lock(&app.state::<UpdateItem>().0) = built.update;
     let menu = built.menu;
@@ -1703,6 +1803,22 @@ fn set_offline(app: &AppHandle, shared: &Shared, error: String, last_ok: &Option
     set_tooltip(app, &format!("PaperRust – offline ({name})"));
 }
 
+/// Store a newly detected server kind for a profile that had none (only `Unknown` is replaced).
+fn remember_flavor(shared: &Shared, id: &str, flavor: mode::Flavor) {
+    let r = with_profile(id, |cfg, _| {
+        if let Some(p) = cfg.profile_mut(id).filter(|p| p.flavor == mode::Flavor::Unknown) {
+            p.flavor = flavor;
+        }
+        Ok(())
+    });
+    if let Err(e) = r {
+        tracing::warn!("Server-Art nicht gespeichert: {e}");
+    }
+    if let Some(c) = lock(&shared.remote).as_mut() {
+        c.profile.flavor = flavor;
+    }
+}
+
 /// Connection loop: first detect, then check every 15 s; offline → own page with
 /// retry (15 s, doubled up to 2 min); "Erneut versuchen"/load error → immediately.
 async fn remote_loop(app: AppHandle, shared: Arc<Shared>) {
@@ -1728,6 +1844,11 @@ async fn remote_loop(app: AppHandle, shared: Arc<Shared>) {
                 tracing::info!(flavor = ?d.flavor, version = ?d.version, "Server erkannt");
                 if d.flavor != ctx.profile.flavor && ctx.profile.flavor != mode::Flavor::Unknown {
                     tracing::warn!(was = ?ctx.profile.flavor, now = ?d.flavor, "Server-Art hat sich geändert");
+                }
+                // Profile without a known kind (environment, handwritten app.toml): remember it, so the
+                // PaperRust interface can be chosen in the settings/tray
+                if ctx.profile.flavor == mode::Flavor::Unknown && d.flavor != mode::Flavor::Unknown {
+                    remember_flavor(&shared, &ctx.profile.id, d.flavor);
                 }
             })
         };
@@ -2197,6 +2318,7 @@ fn begin(app: &AppHandle, shared: &Arc<Shared>) -> tauri::Result<()> {
     let start = mode::decide(cfg_opt.as_ref(), env_mode, managed_local, local_data);
     *lock(&shared.start) = Some(start);
     let can_migrate_db = InstallLayout::from_current_exe().is_ok_and(|l| l.migrate_db_bin.is_some());
+    lock(&shared.view).app_ui_available = sync::app_dir().is_some();
     match start {
         Start::Local => {
             lock(&shared.view).mode = "local".into();
@@ -2249,7 +2371,7 @@ fn begin(app: &AppHandle, shared: &Arc<Shared>) -> tauri::Result<()> {
                     // the client core, no server page in the window (REMOTE-APP §1/§7)
                     set_tooltip(app, "PaperRust – App-Oberfläche");
                     *lock(&shared.nav) = NavPolicy::remote(sync::APP_ORIGIN_URL, &[]);
-                    lock(&shared.view).ready_url = Some(sync::APP_URL.into());
+                    lock(&shared.view).ready_url = Some(uimode::app_start_url(sync::APP_ORIGIN_URL, preferred_design()));
                 } else {
                     set_tooltip(app, "PaperRust – verbindet …");
                     tauri::async_runtime::spawn(remote_loop(app.clone(), shared.clone()));
@@ -2343,6 +2465,7 @@ fn main() {
             retry,
             server_connect,
             settings_state,
+            settings_mode_plan,
             settings_set_mode,
             profile_activate,
             profile_rename,

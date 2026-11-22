@@ -189,6 +189,8 @@ async function connectForm(url, name, { expectHttp = false, expectTls = false } 
   await page.waitForSelector("#fields-remote:not([hidden])", { timeout: 30000 });
   await page.fill("input[name=server_url]", url);
   await page.fill("input[name=profile_name]", name);
+  // mode 2a is tested here: the server's own interface (the form preselects the PaperRust UI, §26)
+  if (await page.isVisible("#ui-choice")) await page.check("input[name=ui][value=server]");
   await page.click("#submit");
   let tlsInfo = null;
   if (expectHttp) {

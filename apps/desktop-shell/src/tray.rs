@@ -34,8 +34,9 @@ fn item(id: &str, label: &str) -> Entry {
     Entry::Item { id: id.into(), label: label.into(), enabled: true }
 }
 
-/// `profiles` = (ID, name), `active` = ID of the active profile.
-pub fn menu_spec(mode: TrayMode, profiles: &[(String, String)], active: &str) -> Vec<Entry> {
+/// `profiles` = (ID, name), `active` = ID of the active profile, `app_ui` = the active profile
+/// shows the bundled PaperRust interface (then "Oberfläche des Servers" leads back to mode 2a).
+pub fn menu_spec(mode: TrayMode, profiles: &[(String, String)], active: &str, app_ui: bool) -> Vec<Entry> {
     match mode {
         TrayMode::Local => vec![
             item("open", "PaperRust öffnen"),
@@ -48,6 +49,7 @@ pub fn menu_spec(mode: TrayMode, profiles: &[(String, String)], active: &str) ->
             item("logs", "Logs öffnen"),
             Entry::Separator,
             item("updates", UPDATE_LABEL),
+            item(crate::uimode::MODE_ID, crate::uimode::MODE_LABEL),
             item("settings", "Einstellungen …"),
             item("quit", "Beenden"),
         ],
@@ -57,6 +59,9 @@ pub fn menu_spec(mode: TrayMode, profiles: &[(String, String)], active: &str) ->
                 item(crate::design::MODERN_ID, crate::design::MODERN_LABEL),
                 item(crate::design::CLASSIC_ID, crate::design::CLASSIC_LABEL),
             ];
+            if app_ui {
+                v.push(item(crate::uimode::SERVER_UI_ID, crate::uimode::SERVER_UI_LABEL));
+            }
             if !profiles.is_empty() {
                 v.push(Entry::Profiles(
                     profiles.iter().map(|(id, name)| (format!("{PROFILE_PREFIX}{id}"), name.clone(), id == active)).collect(),
@@ -64,6 +69,7 @@ pub fn menu_spec(mode: TrayMode, profiles: &[(String, String)], active: &str) ->
             }
             v.extend([
                 item("updates", UPDATE_LABEL),
+                item(crate::uimode::MODE_ID, crate::uimode::MODE_LABEL),
                 item("settings", "Einstellungen …"),
                 item("logs", "Logs öffnen"),
                 Entry::Separator,
@@ -133,10 +139,24 @@ mod tests {
 
     #[test]
     fn local_menu_keeps_mode1_entries() {
-        let s = menu_spec(TrayMode::Local, &[], "");
+        let s = menu_spec(TrayMode::Local, &[], "", false);
         assert_eq!(
             ids(&s),
-            ["open", "design-modern", "design-classic", "backup", "-", "consume", "backups", "logs", "-", "updates", "settings", "quit"]
+            [
+                "open",
+                "design-modern",
+                "design-classic",
+                "backup",
+                "-",
+                "consume",
+                "backups",
+                "logs",
+                "-",
+                "updates",
+                "mode",
+                "settings",
+                "quit"
+            ]
         );
         assert!(matches!(&s[3], Entry::Item { enabled: false, .. }), "Sicherung erst nach dem Start");
     }
@@ -144,8 +164,8 @@ mod tests {
     #[test]
     fn remote_menu_without_local_functions() {
         let profiles = vec![("a1".to_string(), "Büro".to_string()), ("b2".to_string(), "NAS".to_string())];
-        let s = menu_spec(TrayMode::Remote, &profiles, "b2");
-        assert_eq!(ids(&s), ["open", "design-modern", "design-classic", "profiles[2]", "updates", "settings", "logs", "-", "quit"]);
+        let s = menu_spec(TrayMode::Remote, &profiles, "b2", false);
+        assert_eq!(ids(&s), ["open", "design-modern", "design-classic", "profiles[2]", "updates", "mode", "settings", "logs", "-", "quit"]);
         let Entry::Profiles(p) = &s[3] else { unreachable!() };
         assert_eq!(p[0], ("profile:a1".to_string(), "Büro".to_string(), false));
         assert!(p[1].2, "aktives Profil angehakt");
@@ -154,9 +174,21 @@ mod tests {
         }
         // without a profile no submenu
         assert_eq!(
-            ids(&menu_spec(TrayMode::Remote, &[], "")),
-            ["open", "design-modern", "design-classic", "updates", "settings", "logs", "-", "quit"]
+            ids(&menu_spec(TrayMode::Remote, &[], "", false)),
+            ["open", "design-modern", "design-classic", "updates", "mode", "settings", "logs", "-", "quit"]
         );
-        assert_eq!(ids(&menu_spec(TrayMode::FirstRun, &[], "")), ["open", "logs", "-", "quit"]);
+        assert_eq!(ids(&menu_spec(TrayMode::FirstRun, &[], "", false)), ["open", "logs", "-", "quit"]);
+    }
+
+    #[test]
+    fn remote_menu_offers_server_ui_only_from_the_app_ui() {
+        let profiles = vec![("a1".to_string(), "NAS".to_string())];
+        let s = menu_spec(TrayMode::Remote, &profiles, "a1", true);
+        assert_eq!(
+            ids(&s),
+            ["open", "design-modern", "design-classic", "ui-server", "profiles[1]", "updates", "mode", "settings", "logs", "-", "quit"]
+        );
+        assert!(!ids(&menu_spec(TrayMode::Remote, &profiles, "a1", false)).contains(&"ui-server".to_string()));
+        assert!(!ids(&menu_spec(TrayMode::Local, &[], "", true)).contains(&"ui-server".to_string()), "local: no server UI");
     }
 }

@@ -96,6 +96,8 @@
     show($("choice-fresh"), kind !== "connect");
     show($("choice-import"), kind !== "connect");
     show($("choice-migrate"), (kind === "setup" || first) && s.can_migrate_db);
+    // Interface for the new profile (DESKTOP.md §26): only if the package contains the PaperRust UI
+    show($("ui-choice"), !!s.app_ui_available);
     $("setup-title").textContent = kind === "connect" ? "Mit einem Server verbinden" : "Willkommen";
     $("setup-intro").textContent = INTRO[kind];
     // Cancel: first start/remote without a profile = quit; from the settings = back
@@ -210,6 +212,8 @@
   async function connect() {
     const f = form.elements;
     const req = { url: f.server_url.value, name: f.profile_name.value, allow_http: false, tls_pin: "" };
+    const ui = form.querySelector("input[name=ui]:checked");
+    if (ui && !$("ui-choice").hidden) req.ui = ui.value;
     if (!$("http-confirm").hidden) {
       if (!f.allow_http.checked) { $("form-error").textContent = "Bitte die unverschlüsselte Verbindung bestätigen."; return; }
       req.allow_http = true;

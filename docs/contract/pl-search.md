@@ -331,6 +331,29 @@ bleibt. Test `more_like_this_survives_deleted_docs`. Abweichung von upstream (gi
 11. Globale Suche, Abschnitte Saved Views/Custom Fields/Mail-Regeln/Mail-Konten: Serializer sind
    in pl-search nachgebaut (Abhängigkeitszyklus bzw. private Serializer) – Änderungen an den
    Serializern in pl-fields-views/pl-mail müssen hier nachgezogen werden (CORE-REQUEST 4).
+12. **Kein Unterschied zu v3.4.2, aber zu älteren ngx-Versionen (z. B. 3.1.3): mehrere Wörter ohne
+   Operator werden mit UND verknüpft.** Geprüft 2026-11-22 nach einem Vergleich auf einer echten
+   Sammlung (`?query=<wort1> <wort2>`: PaperRust 28 Treffer, ngx 3.1.3 500 Treffer). Upstream 3.4.2:
+   - `query=` (erweiterte Suche): `_query.py::parse_user_query` → `wc.parse` →
+     `MultifieldParser(..., group=AndGroup)` (whoosh-compat 0.3, `parser/default.py`, Standard-Gruppe
+     `AndGroup`); jedes Wort wird über die Standardfelder ODER-expandiert, die Wörter untereinander
+     UND. Nur ein ausdrückliches `OR` macht ein Wort optional.
+   - Fuzzy an (`ADVANCED_FUZZY_SEARCH_THRESHOLD` gesetzt): `_widen_leaf` erweitert jedes Wort *an
+     seiner Stelle* zu `Or(wort, fuzzy(wort))`, die UND-Verknüpfung bleibt
+     (`tests/search/test_fuzzy_widening.py::test_every_word_needs_a_near_match`: „The old clause
+     OR'd the words“). Zusätzlich verwirft `search_ids` Treffer mit normierter Punktzahl unter dem
+     Schwellwert.
+   - `text=`/`title_search=` und die globale Suche (`GlobalSearchView`, `SearchMode.TEXT`):
+     `parse_simple_query` – jedes Token `Occur.Must` (UND).
+   - `title_content` (veralteter DB-Filter, `filters.py::TitleContentFilter`): ganzer String als
+     `icontains`-Teilstring, keine Wortzerlegung.
+   - `more_like_id`: tantivy `more_like_this_query` (bis 12 Terme, ODER) – keine Benutzerwörter.
+   - Doku `docs/usage.md` „Combining terms“: „Terms with no operator between them are combined with AND“.
+   PaperRust macht dasselbe (`wc/parser/plugins.rs::do_groups` mit `GroupKind::And`,
+   `query_simple.rs` `Occur::Must` je Token); Regressionstest
+   `tests_backend.rs::query_mode_bare_words_are_anded` (Fuzzy aus/an, `OR`-Ranking). Wer das alte
+   Verhalten will, schreibt `wort1 OR wort2`. Das Verhalten von 3.1.3 (Whoosh) wurde nicht im Code
+   nachgelesen, nur aus dem Vergleich und dem upstream-Testkommentar abgeleitet.
 
 ## CORE-REQUEST
 

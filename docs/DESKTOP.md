@@ -1231,3 +1231,72 @@ wird nach dem Abmelden wieder als Eigentümer angemeldet – dafür einen Browse
 - E2E-Skripte (`apps/desktop/e2e/desktop-e2e.mjs`, `apps/desktop-shell/e2e/remote-e2e.mjs`) auf den
   neuen Ablauf umgestellt (kein Konto-Formular, Oberfläche statt Anmeldeseite) – **noch nicht
   ausgeführt**.
+
+## 26. PaperRust-Oberfläche mit einem Server und Betriebsart wechseln (2026-11-22)
+
+Befund des Eigentümers (0.1.1): Mit einem paperless-ngx-Server verbunden zeigte die App nur die
+ngx-Oberfläche; „Neue Oberfläche“ im Tray führte auf `…/rs/app/m/` des ngx-Servers (gibt es dort nicht).
+Wie man nach der Einrichtung die Betriebsart wechselt, war nicht auffindbar.
+
+**Was schon da war:** Modus 2b (`ui = "app"`, REMOTE-APP §1): Das Paket liefert die Light-UI unter
+`light\`; `prapi` (`pl_sync_client::Gateway`) liefert `/rs/app/…` (inkl. Design 2 unter `/rs/app/m/…`,
+SPA-Rückfall), leitet `/api/…` und `/rs/api/v2/…` mit dem Geräte-Token aus dem Schlüsselbund an den
+Server weiter und hat eine eigene Anmeldeseite. Gegen paperless-ngx (P6): Token über `/api/token/`,
+`/api/…` direkt zum Server, `/rs/api/v2/…` nur aus dem lokalen Replikat (lesen; Schreiben 503).
+Die Einstellungen hatten eine Betriebsart-Karte (ohne Rückfrage) und eine schwer verständliche
+Karte „App-Oberfläche mit Offline-Bestand“.
+
+**Neu (`apps/desktop-shell/src/uimode.rs`, reine Logik mit Tests):**
+
+- *Oberfläche wählen.* Karte „Oberfläche (mit einem Server)“ direkt unter der Betriebsart:
+  „PaperRust-Oberfläche (aus der App)“ (= `ui = "app"`) oder „Oberfläche des Servers“ (= 2a, bleibt
+  erhalten: alle Server-Funktionen, Single Sign-on). Hinweistext je Server-Art (bei paperless-ngx: was
+  fehlt, Anmeldung mit Benutzer/Passwort). Das Verbindungsformular fragt beim Einrichten dasselbe
+  (Vorauswahl PaperRust-Oberfläche, nur wenn `light\` im Paket ist; `ConnectForm.ui`,
+  `ui_for_new_profile`).
+- *Start im gewählten Design.* Die App-Oberfläche startet nach `[ui] design`: `rs/app/m/` (neu) oder
+  `rs/app/` (klassisch) auf dem prapi-Origin (`app_start_url`; vorher immer `rs/app/`).
+- *Tray.* „Neue/Klassische Oberfläche“ entscheidet nach Server-Art und laufender Oberfläche
+  (`design_action`): PaperRust-Server oder App-Oberfläche → gleiche Route im anderen Design;
+  paperless-ngx mit Server-Oberfläche → „Neue“ schaltet das Profil auf die App-Oberfläche (Neustart),
+  „Klassische“ = ngx-Startseite; Server-Art unbekannt/`light\` fehlt → Einstellungen (`#ui`) mit
+  Hinweis. Neuer Eintrag „Oberfläche des Servers“ (nur wenn die App-Oberfläche läuft) führt zurück zu 2a.
+- *Betriebsart wechseln.* Tray-Eintrag „Betriebsart wechseln …“ (lokal und fern) öffnet
+  `settings.html#mode` (Karte wird kurz markiert, zeigt „Jetzt: …“). „Wechseln und neu starten …“
+  holt zuerst `settings_mode_plan` (`plan_switch`) und fragt mit einem Text, der sagt, was passiert:
+  lokale Daten bleiben unverändert (werden im Fern-Modus nur nicht gestartet), Server-Profile bleiben,
+  ohne Profil folgt das Adressformular, ohne lokale Daten die Erst-Start-Wahl. Erst nach Bestätigung
+  ändert `settings_set_mode` nur `mode` in `app.toml` (`apply_switch`) und startet neu (ein laufender
+  lokaler Server wird geordnet beendet). Gesperrt, wenn `PAPERRUST_DESKTOP_MODE` etwas anderes
+  festlegt. Ein unlesbares `app.toml` wird nicht mehr überschrieben (`load_config_strict`, vorher
+  hätte der Wechsel alle Profile verloren).
+- *Server-Art merken.* Profile ohne bekannte Art (Umgebung, handgeschrieben) speichern die beim
+  Verbinden erkannte Art, damit die App-Oberfläche wählbar wird.
+- *frontend-light (Design 2).* Speichern im Dokument-Editor fällt bei 404/405/501/503 auf eine
+  v2-Schreibanfrage auf v1 zurück (`v2WriteUnsupported`), statt einen Fehler zu zeigen – nötig für
+  paperless-ngx hinter der App (v2 dort nur aus dem Replikat). Funktionen, die nur PaperRust hat
+  (Assistent, Zeitleiste, Abläufe, Rollen), zeigten schon vorher „nicht verfügbar“ bei 404/503.
+
+**So wechselt man:** Tray (Rechtsklick) → „Betriebsart wechseln …“ → Auswahl → „Wechseln und neu
+starten …“ → Rückfrage bestätigen. Neue Oberfläche mit einem ngx-Server: Tray → „Neue Oberfläche
+(PaperRust-Design)“ oder Einstellungen → Oberfläche → „PaperRust-Oberfläche“; nach dem Neustart
+einmal mit Benutzer und Passwort anmelden (Token im Windows-Schlüsselbund). Zurück: Tray →
+„Oberfläche des Servers“.
+
+**Grenzen / offen:**
+
+- Gegen paperless-ngx liefert das Gateway `/rs/api/v2/server` mit `product: "paperrust"` und v2 nur aus
+  dem Replikat (Dokumente nur, soweit im Offline-Bestand); Design 2 nutzt für Listen/Bearbeiten v1, das
+  läuft direkt zum Server. Saubere Kennung (z. B. `product: "paperless-ngx"`) und 501 statt 503 für
+  v2-Schreiben gehören in `crates/pl-sync-client/src/gateway.rs` (nicht Teil dieses Auftrags).
+- Anmeldung in der App-Oberfläche nur mit Benutzer/Passwort (+2FA); Single Sign-on geht nur mit
+  „Oberfläche des Servers“.
+- Antworten laufen gesammelt durch das Gateway (kein Streaming): Assistent-Antworten gegen einen
+  PaperRust-Server erscheinen erst vollständig.
+- Nicht im echten Fenster geprüft (nur Unit-Tests, `cargo clippy`, `node --check`); E2E
+  `remote-e2e.mjs` wählt im Formular jetzt ausdrücklich „Oberfläche des Servers“ – nicht ausgeführt.
+
+Tests: `uimode::tests::{tray_design_switch_per_server_kind, app_start_follows_design,
+profile_ui_switch_checks, new_profile_ui, switch_plan_texts_and_targets,
+switching_keeps_profiles_and_preferences}`, `tray::tests::remote_menu_offers_server_ui_only_from_the_app_ui`
+(+ angepasste Menü-Tests), frontend-light `src/design2/api/v2docs.test.ts`.

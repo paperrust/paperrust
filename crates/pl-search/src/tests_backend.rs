@@ -238,3 +238,40 @@ fn query_mode_search_and_note_highlights() {
     let err = b.search_ids("asn:abc", None, None, false, SearchMode::Query, None, None).unwrap_err();
     assert_eq!(err.messages().unwrap(), ["Invalid numeric value 'abc' for field 'asn'.".to_string()]);
 }
+
+// upstream: whoosh_compat.parse -> MultifieldParser(group=AndGroup) (default
+// grouping), docs/usage.md "Terms with no operator between them are combined
+// with AND", test_fuzzy_widening.py::test_every_word_needs_a_near_match.
+// Bare words in query mode are ANDed, with fuzzy search off and on; only an
+// explicit OR makes a word optional. (paperless-ngx 3.1.3 behaved differently.)
+#[test]
+fn query_mode_bare_words_are_anded() {
+    let docs = [
+        TestDoc::new(201, "Invoice alpha", "electricity bill"),
+        TestDoc::new(202, "Invoice beta", "water bill"),
+        TestDoc::new(203, "Letter gamma", "electricity notice"),
+    ];
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("index");
+    write_docs(&dir, Some("en"), &docs);
+    // Some(0.0): fuzzy widening on, but no score cut (upstream search_ids drops
+    // hits whose normalized score is below ADVANCED_FUZZY_SEARCH_THRESHOLD).
+    for fuzzy in [None, Some(0.0)] {
+        let b = SearchBackend::new(settings(&dir, Some("en"), fuzzy));
+        let q = |s: &str| {
+            let mut ids = b.search_ids(s, None, None, false, SearchMode::Query, None, None).unwrap();
+            ids.sort();
+            ids
+        };
+        assert_eq!(q("invoice electricity"), vec![201], "fuzzy={fuzzy:?}");
+        assert_eq!(q("electricity invoice"), vec![201], "fuzzy={fuzzy:?}");
+        assert_eq!(q("invoice AND electricity"), vec![201], "fuzzy={fuzzy:?}");
+        assert_eq!(q("invoice OR electricity"), vec![201, 202, 203], "fuzzy={fuzzy:?}");
+        // OR ranking: the document holding both words scores first.
+        let ranked = b.search_ids("invoice OR electricity", None, None, false, SearchMode::Query, None, None).unwrap();
+        assert_eq!(ranked.first(), Some(&201), "fuzzy={fuzzy:?}");
+    }
+    // Simple text mode (also used by global search) requires every token too.
+    let b = SearchBackend::new(settings(&dir, Some("en"), None));
+    assert_eq!(text(&b, "invoice electricity"), vec![201]);
+}

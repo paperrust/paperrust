@@ -37,6 +37,12 @@
     const s = state;
     for (const r of document.querySelectorAll("input[name=mode]")) r.checked = r.value === s.mode;
     $("apply-mode").disabled = true;
+    const active = s.profiles.find((p) => p.active);
+    $("mode-current").textContent = s.running === "local"
+      ? "Jetzt: Auf diesem Computer."
+      : s.running === "remote"
+        ? "Jetzt: Mit einem Server verbunden" + (active ? " (" + active.name + ", " + active.flavor + ")." : ".")
+        : "";
     $("local-data").textContent = s.local_data
       ? "Lokale Daten (Datenbank, Dokumente) bleiben bei jedem Wechsel erhalten."
       : "Noch keine lokalen Daten auf diesem Computer.";
@@ -163,13 +169,32 @@
       $("apply-mode").disabled = !chosen || chosen.value === state.mode;
     }
   });
+  // Change mode (docs/DESKTOP.md §26): the shell describes what happens (local data stays,
+  // profiles stay, address form/first-start choice if needed) – confirm, then switch and restart.
   $("apply-mode").addEventListener("click", async () => {
     const chosen = document.querySelector("input[name=mode]:checked");
+    if (!chosen) return;
+    err(null);
     try {
+      const plan = await invoke("settings_mode_plan", { mode: chosen.value });
+      if (plan.blocked) { err(plan.blocked); return; }
+      if (plan.unchanged) { $("apply-mode").disabled = true; return; }
+      if (!window.confirm(plan.confirm)) return;
       await invoke("settings_set_mode", { mode: chosen.value });
       restarting();
     } catch (e) { err(e); }
   });
+  // Tray "Betriebsart wechseln …" / "Oberfläche" open the page with #mode / #ui
+  function focusAnchor() {
+    const id = location.hash.replace("#", "");
+    const el = id && document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ block: "start" });
+    el.classList.add("highlight");
+    setTimeout(() => el.classList.remove("highlight"), 2000);
+  }
+  window.addEventListener("hashchange", focusAnchor);
+  setTimeout(focusAnchor, 50);
   $("add-profile").addEventListener("click", () => invoke("begin_connect"));
   $("back").addEventListener("click", () => invoke("close_settings"));
   $("logs").addEventListener("click", (ev) => { ev.preventDefault(); invoke("open_log", { name: null }); });

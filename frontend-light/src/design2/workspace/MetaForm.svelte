@@ -10,7 +10,7 @@
   import { session } from '../../stores/settings.svelte'
   import { Autosaver, type SaveState } from '../lib/autosave'
   import { ws } from '../stores/workspace.svelte'
-  import { Conflict, idMaps, patchV2, resolveDoc, toV2Patch, type IdMaps, type V2Ref } from '../api/v2docs'
+  import { Conflict, idMaps, patchV2, resolveDoc, toV2Patch, v2WriteUnsupported, type IdMaps, type V2Ref } from '../api/v2docs'
   import ObjectPicker from '../components/ObjectPicker.svelte'
   import { openCreateObject } from './pdf-actions'
   import Icon from '../components/Icon.svelte'
@@ -54,9 +54,15 @@
   async function save(patch: Record<string, unknown>): Promise<Document> {
     const vp = v2ref && v2maps ? toV2Patch(patch, v2maps) : null
     if (v2ref && vp) {
-      v2ref = { ...v2ref, rev: await patchV2(v2ref, vp) }
-      via = 'v2'
-      return api.getDocument(docId)
+      try {
+        v2ref = { ...v2ref, rev: await patchV2(v2ref, vp) }
+        via = 'v2'
+        return api.getDocument(docId)
+      } catch (e) {
+        // no v2 writes here (e.g. paperless-ngx behind the desktop app) → v1 for this document
+        if (!v2WriteUnsupported(e)) throw e
+        v2ref = null
+      }
     }
     via = 'v1'
     const d = await api.patchDocument({ id: docId, ...patch })

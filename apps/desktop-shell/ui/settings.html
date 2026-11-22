@@ -10,19 +10,32 @@
   <main>
     <h1>Einstellungen</h1>
 
-    <section class="card" aria-labelledby="h-mode">
+    <section class="card" aria-labelledby="h-mode" id="mode">
       <h2 id="h-mode">Betriebsart</h2>
+      <p class="hint" id="mode-current"></p>
       <fieldset class="choices" id="mode-choice">
         <legend class="sr-only">Betriebsart</legend>
         <label class="choice"><input type="radio" name="mode" value="local">
           <span><strong>Auf diesem Computer</strong><small>Datenbank, Dokumente und Texterkennung laufen lokal.</small></span></label>
         <label class="choice"><input type="radio" name="mode" value="remote">
-          <span><strong>Mit einem Server verbinden</strong><small>Oberfläche vom Server; auf diesem Computer läuft keine Datenbank.</small></span></label>
+          <span><strong>Mit einem Server verbinden</strong><small>PaperRust- oder paperless-ngx-Server im Netz; auf diesem Computer läuft keine Datenbank. Oberfläche wählbar (unten).</small></span></label>
       </fieldset>
       <p class="hint" id="local-data"></p>
       <div class="buttons">
-        <button type="button" id="apply-mode" disabled>Übernehmen und neu starten</button>
+        <button type="button" id="apply-mode" disabled>Wechseln und neu starten …</button>
       </div>
+    </section>
+
+    <section class="card" aria-labelledby="h-ui" id="ui">
+      <h2 id="h-ui">Oberfläche (mit einem Server)</h2>
+      <fieldset class="choices">
+        <legend class="sr-only">Oberfläche</legend>
+        <label class="choice disabled"><input type="radio" name="ui" value="app" disabled>
+          <span><strong>PaperRust-Oberfläche (aus der App)</strong><small>Die neue Oberfläche läuft in der App und spricht mit der Schnittstelle des Servers.</small></span></label>
+        <label class="choice"><input type="radio" name="ui" value="server" checked>
+          <span><strong>Oberfläche des Servers</strong><small>Wie im Browser – alle Funktionen des Servers, Anmeldung auf dessen Anmeldeseite (auch Single Sign-on).</small></span></label>
+      </fieldset>
+      <p class="hint" id="ui-note">Noch kein Server eingerichtet.</p>
     </section>
 
     <section class="card" aria-labelledby="h-profiles">
@@ -32,17 +45,6 @@
       <div class="buttons">
         <button type="button" id="add-profile" class="secondary">Server hinzufügen …</button>
       </div>
-    </section>
-
-    <section class="card" aria-labelledby="h-ui">
-      <h2 id="h-ui">Oberfläche (Fern-Modus)</h2>
-      <fieldset class="choices">
-        <legend class="sr-only">Oberfläche</legend>
-        <label class="choice"><input type="radio" name="ui" value="server" checked>
-          <span><strong>Oberfläche vom Server</strong><small>Wie im Browser – alle Funktionen des Servers, Anmeldung auf dessen Anmeldeseite.</small></span></label>
-        <label class="choice disabled"><input type="radio" name="ui" value="app" disabled>
-          <span><strong>App-Oberfläche mit Offline-Bestand</strong><small>Folgt (Sync, Modus 3).</small></span></label>
-      </fieldset>
     </section>
 
     <!-- P5: offline data (mode 3), logic in sync.js via prapi://…/local/… -->

@@ -78,7 +78,7 @@
           <span><strong>Bestehende Datenbank übernehmen</strong><small>SQLite, MariaDB/MySQL oder PostgreSQL von paperless-ngx 2.20 oder 3.x.</small></span></label>
         <p class="group-title" id="group-remote" hidden>Oder</p>
         <label class="choice" id="choice-remote" hidden><input type="radio" name="mode" value="remote">
-          <span><strong>Mit einem Server verbinden</strong><small>PaperRust- oder paperless-ngx-Server im Netz. Anmeldung und Oberfläche kommen vom Server, auf diesem Computer läuft keine Datenbank.</small></span></label>
+          <span><strong>Mit einem Server verbinden</strong><small>PaperRust- oder paperless-ngx-Server im Netz. Auf diesem Computer läuft keine Datenbank.</small></span></label>
       </fieldset>
 
       <div id="fields-fresh" class="fields">
@@ -109,6 +109,13 @@
         <label>Name (optional)
           <input name="profile_name" maxlength="60" placeholder="z. B. Büro">
         </label>
+        <fieldset class="choices" id="ui-choice" hidden>
+          <legend class="sr-only">Oberfläche</legend>
+          <label class="choice"><input type="radio" name="ui" value="app" checked>
+            <span><strong>PaperRust-Oberfläche (aus der App)</strong><small>Die neue Oberfläche, auch mit paperless-ngx-Servern. Anmeldung mit Benutzer und Passwort in der App.</small></span></label>
+          <label class="choice"><input type="radio" name="ui" value="server">
+            <span><strong>Oberfläche des Servers</strong><small>Wie im Browser, Anmeldung auf der Seite des Servers (auch Single Sign-on).</small></span></label>
+        </fieldset>
         <p class="hint" id="remote-info" hidden></p>
         <div id="http-confirm" class="confirm" hidden>
           <p class="warn" id="http-message"></p>

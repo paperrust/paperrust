@@ -35,9 +35,9 @@ Dateien bleiben unverändert – ein Update von 0.1.0 ist ein Austausch des Imag
 
 ## Bekannte Grenzen
 
-Unverändert gegenüber [0.1.0](RELEASE-NOTES-0.1.0.md#bekannte-grenzen). Neu bekannt: Eine Suche mit zwei
-Wörtern verlangt beide Wörter (UND); paperless-ngx 3.1.3 lieferte im Vergleichstest mehr Treffer. Das wird
-für die nächste Version geprüft.
+Unverändert gegenüber [0.1.0](RELEASE-NOTES-0.1.0.md#bekannte-grenzen). Hinweis zur Suche: Mehrere Wörter
+verlangen alle Wörter (UND) – genau wie paperless-ngx 3.4.2 (geprüft 22.11.). Ältere paperless-ngx-Versionen
+(z. B. 3.1.3) verbanden mit ODER und lieferten mehr Treffer; wer das möchte, schreibt `wort1 OR wort2`.
 
 ## Update
 

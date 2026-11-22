@@ -101,6 +101,8 @@ body.settings.busy button { pointer-events: none; opacity: .6; }
 .badge.ok { border-color: var(--accent); color: var(--accent); }
 .badge.warn { border-color: var(--error); color: var(--error); }
 .choice.disabled { opacity: .55; cursor: default; }
+/* Tray "Betriebsart wechseln …" / interface note: briefly mark the target card */
+.card.highlight { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); transition: box-shadow .3s; }
 .profiles .buttons { justify-content: flex-start; flex-wrap: wrap; }
 .profiles button { padding: 5px 12px; font-size: 13px; }
 /* Switch: reconciliation after the first start (SwitchView) */
