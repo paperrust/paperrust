@@ -1,0 +1,16 @@
+# CodeQL (advanced setup, workflow codeql.yml): test code, fuzzing, measurement scripts and vendored
+# upstream code are not scanned. Tests inside source files (#[cfg(test)]) cannot be excluded by path;
+# their alerts are dismissed individually with a reason.
+name: PaperRust CodeQL config
+paths-ignore:
+  - "**/tests/**"
+  - "tests/**"
+  - "fuzz/**"
+  - "results/**"
+  - "upstream/**"
+  - "reference/**"
+  - "frontend-light/tests/**"
+  - "frontend-light/e2e/**"
+  - "apps/desktop-shell/e2e/**"
+  - "**/*.test.ts"
+  - "**/*.spec.ts"
