@@ -11,11 +11,11 @@ it uses the **same database, the same files and the same REST API**, but runs as
 paperless-ngx with one command (or one click in the desktop app), and there is a way back.
 
 Website: <https://paperrust.org> · Documentation: [English](docs/user/en/README.md) ·
-[Deutsch](docs/user/README.md) · Release notes 0.1.0: [English](docs/RELEASE-NOTES-0.1.0.en.md) ·
-[Deutsch](docs/RELEASE-NOTES-0.1.0.md)
+[Deutsch](docs/user/README.md) · Release notes 0.1.1: [English](docs/RELEASE-NOTES-0.1.1.en.md) ·
+[Deutsch](docs/RELEASE-NOTES-0.1.1.md) (0.1.0: [English](docs/RELEASE-NOTES-0.1.0.en.md))
 
 > [!IMPORTANT]
-> **Status: 0.1.0, the first version.** PaperRust is young software. Read the
+> **Status: 0.1.1, an early version.** PaperRust is young software. Read the
 > [known limits](docs/RELEASE-NOTES-0.1.0.en.md#limits) and try it with a **copy** of your data first.
 > The Windows installer is not code-signed yet.
 
@@ -34,7 +34,7 @@ documents, same database – details and limits below:
   working, and [switching](#switching-from-paperless-ngx) takes a few commands – with a way back.
 
 ```sh
-docker pull ghcr.io/paperrust/paperrust:0.1.0     # linux/amd64 + linux/arm64
+docker pull ghcr.io/paperrust/paperrust:0.1.1     # linux/amd64 + linux/arm64
 ```
 
 ## Why PaperRust?
@@ -118,14 +118,14 @@ cd paperrust
 
 ### Docker compose
 
-The published image `ghcr.io/paperrust/paperrust` (tags `0.1.0`, `0.1`, `latest`; amd64 and arm64)
+The published image `ghcr.io/paperrust/paperrust` (tags `0.1.1`, `0.1`, `latest`; amd64 and arm64)
 starts with PostgreSQL like this:
 
 ```sh
 cd docker
 mkdir -p consume export
 # first set PAPERRUST_SECRET_KEY (and optionally PAPERRUST_ADMIN_USER/PASSWORD) in docker-compose.env
-export PAPERRUST_IMAGE=ghcr.io/paperrust/paperrust:0.1.0
+export PAPERRUST_IMAGE=ghcr.io/paperrust/paperrust:0.1.1
 docker compose -f docker-compose.postgres.yml pull
 docker compose -f docker-compose.postgres.yml up -d      # PaperRust + PostgreSQL 17
 ```
@@ -154,7 +154,7 @@ available. Database setup, configuration, static files and a systemd unit:
 
 ## Switching from paperless-ngx
 
-> **Please stay healthily sceptical.** PaperRust 0.1.0 is a first version. The core is thoroughly tested –
+> **Please stay healthily sceptical.** PaperRust 0.1 is an early version. The core is thoroughly tested –
 > but not with your documents. Before switching: make a **full backup** of paperless-ngx (export, or database
 > and media folder), **try PaperRust with a copy first**, and only turn paperless-ngx off once everything is
 > right. Don't migrate blindly. The way back to paperless-ngx stays open.
@@ -177,7 +177,7 @@ works through the backup or an export in the paperless-ngx 3.4.2 format. If unsu
 # 1. back up (paperless-ngx stopped: docker compose down, then start only the database)
 docker compose up -d db
 docker compose exec db pg_dump -U paperless -Fc paperless > paperless-before.pgdump
-# 2. in docker-compose.yml replace the paperless-ngx image with ghcr.io/paperrust/paperrust:0.1.0
+# 2. in docker-compose.yml replace the paperless-ngx image with ghcr.io/paperrust/paperrust:0.1.1
 #    (template: docker/docker-compose.migrate-from-paperless.yml) – keep volumes and PAPERLESS_SECRET_KEY
 # 3. trial run: checks everything, changes nothing
 docker compose run --rm webserver paperrust migrate --dry-run \

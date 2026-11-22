@@ -180,15 +180,16 @@ jobs:
           cargo fetch --locked
           cd apps/desktop-shell
           cargo fetch --locked
-      - name: pack.ps1 -Zip -Msi
+      - name: pack.ps1 -Zip -Installer -Msi
         shell: powershell
-        run: .\apps\desktop\pack\pack.ps1 -Zip -Msi
+        run: .\apps\desktop\pack\pack.ps1 -Zip -Installer -Msi
       - uses: actions/upload-artifact@v7
         with:
           name: paperrust-windows-x64
           path: |
             results/desktop/*.zip
             results/desktop/*.msi
+            results/desktop/*-setup.exe
             results/desktop/*/PACKAGE.json
           retention-days: 7
 
