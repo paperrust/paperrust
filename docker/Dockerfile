@@ -153,7 +153,7 @@ ARG TESSERACT_LANGS="eng deu fra ita spa"
 ARG PG_CLIENT_MAJOR=17
 ARG PAPERRUST_UID=1000
 ARG PAPERRUST_GID=1000
-ARG PAPERRUST_VERSION=0.1.1
+ARG PAPERRUST_VERSION=0.1.2
 ARG VCS_REF=
 
 # ca-certificates: TLS für Mail/OIDC/LLM/Webhooks (rustls liest die System-Zertifikate)

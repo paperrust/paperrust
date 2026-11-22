@@ -2779,7 +2779,7 @@ dependencies = [
 
 [[package]]
 name = "paperrust-desktop"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "libc",
  "rand 0.8.8",
@@ -2794,7 +2794,7 @@ dependencies = [
 
 [[package]]
 name = "paperrust-desktop-shell"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "base64 0.22.1",
  "paperrust-desktop",
@@ -2972,7 +2972,7 @@ checksum = "f6b464fbc74e149a392436b17d523f769e057cb6877f6a5c4618bc6f11800548"
 
 [[package]]
 name = "pl-domain"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -2984,7 +2984,7 @@ dependencies = [
 
 [[package]]
 name = "pl-sync-client"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "bytes",
  "chrono",
