@@ -955,8 +955,8 @@ pub struct Config {
     pub product_name: Option<String>,
     /// `PAPERLESS_ENABLE_UPDATE_CHECK`: `None` = `"default"`, otherwise bool.
     pub enable_update_check: Option<bool>,
-    /// `PAPERLESS_TASK_WORKERS` (default 1; `auto` = derived from cores and memory, see
-    /// `crate::resources::task_workers_from_env`).
+    /// `PAPERLESS_TASK_WORKERS` (unset = `auto`, derived from cores and memory; a number is used
+    /// unchanged, `1` = one task at a time; see `crate::resources::task_workers_from_env`).
     pub task_workers: i64,
     /// `PAPERLESS_WORKER_TIMEOUT` (time limit per task, default 1800).
     pub worker_timeout: i64,

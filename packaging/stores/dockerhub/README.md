@@ -19,13 +19,10 @@ Gotenberg. Apps and scripts written for paperless-ngx keep working.
 | Tag | Meaning |
 |---|---|
 | `latest` | Newest stable release |
-| `0.1`, `0.1.2`, ... | Release line / exact release (pin one of these in production) |
+| `0.1`, `0.1.3`, ... | Release line / exact release (pin one of these in production) |
 | `edge` | Manual development build, not for production |
 
 Platforms: `linux/amd64`, `linux/arm64`. The same image is also published as `ghcr.io/paperrust/paperrust`.
-
-> **Note:** Docker Hub receives release tags starting with the next release. Until then only `edge` is here; the
-> current stable release is `ghcr.io/paperrust/paperrust:0.1.1` (same image, use it in the compose file below).
 
 ## Quick start (docker compose)
 

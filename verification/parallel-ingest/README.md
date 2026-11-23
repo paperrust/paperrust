@@ -1,8 +1,9 @@
 # Formal check: parallel document ingest
 
-PaperRust can consume several documents at the same time (`PAPERLESS_TASK_WORKERS` > 1 or
-`auto`; since 2026-11-23 the default is 1 again, as upstream; the automatic default of commit
-`499c72f0` became the opt-in value `auto`). The locks stay active in every case. Two tasks can then race on the same archive serial number
+PaperRust consumes several documents at the same time by default: `PAPERLESS_TASK_WORKERS` unset
+means `auto` (since 2026-11-23, together with the shared OCR page pool; derived from cores and
+memory), and any number > 1 does the same; `PAPERRUST_TASK_WORKERS=1` restores one document at a
+time as upstream. The locks stay active in every case. Two tasks can then race on the same archive serial number
 (ASN), the same file content, or the same new tag name. The code closes these races with PostgreSQL
 advisory locks. This folder holds small TLA+ models of that code. The TLC model checker tries
 **every interleaving** of the tasks within the bounds below and checks that nothing bad can happen.

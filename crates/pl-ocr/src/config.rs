@@ -127,7 +127,7 @@ impl Default for OcrSettings {
             ocr_color_conversion_strategy: "RGB".into(),
             ocr_user_args: None,
             max_image_pixels: None,
-            threads_per_worker: default_threads_per_worker(1, available_cores()),
+            threads_per_worker: pl_core::resources::ocr_threads_per_document(None),
             remote_ocr_engine: None,
             remote_ocr_api_key: None,
             remote_ocr_endpoint: None,
@@ -137,11 +137,9 @@ impl Default for OcrSettings {
     }
 }
 
-fn available_cores() -> i64 {
-    std::thread::available_parallelism().map(|n| n.get() as i64).unwrap_or(1)
-}
-
-/// `default_threads_per_worker(task_workers)`: `max(floor(cores / workers), 1)`.
+/// `default_threads_per_worker(task_workers)`: `max(floor(cores / workers), 1)` (upstream; kept
+/// for comparison – PaperRust uses `pl_core::resources::ocr_threads_per_document` with the shared
+/// page pool).
 /// (Python: `task_workers == 0` → `ZeroDivisionError`, not caught; here 1.)
 pub fn default_threads_per_worker(task_workers: i64, cores: i64) -> i64 {
     let cores = cores.max(1);
@@ -234,20 +232,21 @@ impl OcrSettings {
         };
         let afg =
             choice("PAPERLESS_ARCHIVE_FILE_GENERATION", get("PAPERLESS_ARCHIVE_FILE_GENERATION"), &["auto", "always", "never"], "auto")?;
-        // Unset: 1 (upstream), so one document uses all cores. `auto` (PaperRust opt-in): same
-        // automatic task count as the worker pool (pl-queue), so that tasks × threads matches
-        // the cores. Anything else: `int()` with the ngx error text.
-        let task_workers = match get("PAPERLESS_TASK_WORKERS") {
-            Some(v) if pl_core::resources::is_auto(&v) => {
-                pl_core::resources::task_workers_or_auto(None, int_opt("PAPERLESS_THREADS_PER_WORKER")?)
-            }
-            Some(v) => py_int("PAPERLESS_TASK_WORKERS", &v)?,
-            None => pl_core::resources::DEFAULT_TASK_WORKERS,
-        };
-        let threads = match int_opt("PAPERLESS_THREADS_PER_WORKER")? {
-            Some(t) => t,
-            None => default_threads_per_worker(task_workers, available_cores()),
-        };
+        // `PAPERLESS_TASK_WORKERS` is only validated here (unset or `auto`: automatic, otherwise
+        // `int()` with the ngx error text); the number of parallel tasks is pl-queue's business.
+        if let Some(v) = get("PAPERLESS_TASK_WORKERS")
+            && !pl_core::resources::is_auto(&v)
+        {
+            py_int("PAPERLESS_TASK_WORKERS", &v)?;
+        }
+        // PaperRust: unset `PAPERLESS_THREADS_PER_WORKER` means "up to the whole page pool per
+        // document, shared": the process-wide page pool (`crate::permits`) keeps the total at
+        // `P = min(cores, memory cap)`, so a lone document uses every core and concurrent documents
+        // share them – for any task count (upstream: fixed `cores / task_workers` per document).
+        // The value the startup memory cap writes is `P` itself, so it is used as is (same result
+        // as unset). An explicit value is this document's upper bound
+        // (`pl_core::resources::ocr_threads_per_document`, shared with pl-queue).
+        let threads = pl_core::resources::ocr_threads_per_document(int_opt("PAPERLESS_THREADS_PER_WORKER")?);
         let remote_mode = choice("PAPERLESS_REMOTE_OCR_MODE", get("PAPERLESS_REMOTE_OCR_MODE"), &["always", "workflow_only"], "always")?;
         Ok(Self {
             ocr_pages: int_opt("PAPERLESS_OCR_PAGES")?,
@@ -571,18 +570,23 @@ mod tests {
         let env = |pairs: &'static [(&'static str, &'static str)]| {
             move |k: &str| pairs.iter().find(|(a, _)| *a == k).map(|(_, v)| (*v).to_string())
         };
-        let cores = available_cores();
-        // unset: 1 task -> all cores for one document
+        let (cores, mem) = pl_core::resources::machine();
+        // the whole page pool per document: min(cores, memory cap), shared by all documents
+        let pool = pl_core::resources::pool_threads(cores, mem, false);
+        assert!((1..=cores).contains(&pool));
+        // unset (= automatic task count)
         let s = OcrSettings::from_env(env(&[])).unwrap();
-        assert_eq!(s.threads_per_worker, default_threads_per_worker(1, cores));
-        // number: as before
-        let s = OcrSettings::from_env(env(&[("PAPERLESS_TASK_WORKERS", "2")])).unwrap();
-        assert_eq!(s.threads_per_worker, default_threads_per_worker(2, cores));
-        // `auto` (any case): same task count as pl-queue
-        let auto = pl_core::resources::task_workers_or_auto(None, None);
+        assert_eq!(s.threads_per_worker, pool);
+        assert_eq!(OcrSettings::default().threads_per_worker, pool);
+        // `1` (one task at a time, upstream) and other numbers: also the whole pool per document
+        for n in ["1", "2"] {
+            let s = OcrSettings::from_env(|k| (k == "PAPERLESS_TASK_WORKERS").then(|| n.to_string())).unwrap();
+            assert_eq!(s.threads_per_worker, pool);
+        }
+        // `auto` (any case): the whole pool per document, shared (was cores / tasks)
         for v in ["auto", "AUTO"] {
             let s = OcrSettings::from_env(|k| (k == "PAPERLESS_TASK_WORKERS").then(|| v.to_string())).unwrap();
-            assert_eq!(s.threads_per_worker, default_threads_per_worker(auto, cores));
+            assert_eq!(s.threads_per_worker, pool);
         }
         // explicit threads win
         let s = OcrSettings::from_env(env(&[("PAPERLESS_TASK_WORKERS", "auto"), ("PAPERLESS_THREADS_PER_WORKER", "3")])).unwrap();

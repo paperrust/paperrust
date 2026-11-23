@@ -26,4 +26,4 @@ doppelte Tags bleiben aktiv (formal geprüft, `verification/parallel-ingest/`).
 Nächster Schritt: Kerne dynamisch verteilen (ein Dokument allein bekommt alle Kerne, mehrere teilen sie sich),
 dann erneut messen.
 
-Rohdaten: `log_*.txt`, `run_ser_rs.json`, `run_par_rs.json` (par3-JSON folgt nach Laufende).
+Rohdaten: `log_*.txt`, `run_ser_rs.json`, `run_par_rs.json` , `run_par3_rs.json`.

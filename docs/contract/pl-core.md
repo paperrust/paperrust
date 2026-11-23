@@ -81,7 +81,7 @@ Quelle: `src/paperless/settings/__init__.py`, `settings/custom.py`, `settings/pa
   (die Redis-Felder `celery_redis_url`, `channels_redis_url`, `redis_prefix` sind seit 2026-11-14 entfernt);
   fachlich `filename_format`, `filename_format_remove_none`, `audit_log_enabled` (true),
   `empty_trash_delay` (30, min 1), `app_title`, `app_logo`, `enable_update_check` (None = "default"),
-  `task_workers` (1; PaperRust: `auto` = `resources::task_workers_from_env`, Known difference 14), `worker_timeout` (1800), `tika_enabled`, `ai_enabled`, `enable_compression`
+  `task_workers` (upstream 1; PaperRust: unset = `auto`, `resources::task_workers_from_env`, Known difference 14), `worker_timeout` (1800), `tika_enabled`, `ai_enabled`, `enable_compression`
   (yes), `db_read_cache_enabled` (no). Alles Weitere: `config.env.get("PAPERLESS_…")` + Parser.
 * DB (`parse_db_settings`): Engine `PAPERLESS_DBENGINE` ∈ {sqlite, postgresql, mariadb}, sonst
   `postgresql` wenn `PAPERLESS_DBHOST` gesetzt, sonst `sqlite`. `DBNAME/DBUSER/DBPASS` (paperless),
@@ -382,17 +382,45 @@ Konfiguration (Defaults, URL/Hosts, DB, dotenv, entfernte Variablen → Hinweis)
     prüft nichts. Unter Linux unverändert (gewöhnliche Namen wie bei `PosixPath`). Neu:
     `sanitize_component` (Bereinigung eines Namensteils statt Fehler; genutzt von der Arbeitskopie im
     Consumer), `is_windows_device_name`, `is_windows_reserved_component`.
-14. **`PAPERLESS_TASK_WORKERS=auto`** (`resources.rs`, 2026-11-23): unset = 1 as upstream
-    (`DEFAULT_TASK_WORKERS`; threads per worker then `max(cores / 1, 1)` = all cores, memory cap of
-    `apply_ocr_resource_cap` unchanged). The value `auto` (case-insensitive, `is_auto`) is a PaperRust
-    opt-in: `default_task_workers` = `min(ceil(cores / t), 4, budget / (t × 100 MB))`, at least 1
-    (`t` = explicit `THREADS_PER_WORKER` or 2). upstream `int("auto")` fails at startup. Every other
-    value is parsed with `int()` and keeps the ngx error text. Shared entry point
-    `task_workers_from_env` (pl-core `Config`, pl-queue); pl-ocr parses the same way with its own
-    `py_int`. History: 2026-11-22 the automatic value was the default for an unset variable; withdrawn
-    2026-11-23 because a single document got slower (Raspberry Pi 5, 3 cores: 255 documents 214 s →
-    162 s, but one 8-page scan alone 14.8 s → 24 s). Startup log: `task workers: N (default|auto: from
-    cores and memory|set explicitly)`.
+14. **`PAPERLESS_TASK_WORKERS` unset = `auto`; shared OCR page pool** (`resources.rs`, 2026-11-23).
+    upstream: unset = 1, `THREADS_PER_WORKER = max(cores // workers, 1)`, `int("auto")` fails at
+    startup. PaperRust:
+    - **Tasks:** unset or `auto` (case-insensitive, `is_auto`) = `default_task_workers` =
+      `min(ceil(cores / t), 4, budget / (t × 100 MB))`, at least 1 (`t` = explicit
+      `THREADS_PER_WORKER` or 2, `budget` = 50 % of the memory available at start). `DEFAULT_TASK_WORKERS`
+      is now the string `"auto"`; `UPSTREAM_TASK_WORKERS = 1`. A number is used unchanged (`1` = one task
+      at a time, upstream behaviour); other values keep the ngx `int()` error text. Shared entry point
+      `task_workers_from_env` (pl-core `Config`, pl-queue); pl-ocr validates the same way with `py_int`.
+    - **OCR threads:** one process-wide page pool (pl-ocr Known difference 23) of
+      `P = pool_threads(cores, mem, threads_explicit)` = `min(cores, memory_threads_cap(1, mem))`
+      (explicit `THREADS_PER_WORKER`: `P = cores`, no memory cap); each document may use up to `P`
+      (explicit: up to the set value). `ocr_threads_per_document` gives that per-document value to
+      pl-ocr (`jobs`) and pl-queue (`TaskContext::threads_per_worker`, informational).
+    - **Memory cap in the environment:** if `THREADS_PER_WORKER` is unset and `P < cores`,
+      `apply_ocr_resource_cap` writes `PAPERLESS_THREADS_PER_WORKER = P` (= `memory_threads_cap(1, mem)`,
+      the pool total; before: `memory_threads_cap(task_workers, mem)`). Because that value is `P`
+      itself, pl-ocr/pl-queue may read it like a set value; only the pool size must not treat it as
+      "set by the user" (`threads_written_by_cap`), and `task_workers_or_auto` keeps the startup
+      plan's task count when it sees it (otherwise the written value would change the derivation).
+    - **Startup log** (`ResourcePlan::describe`): `task workers: N (default: auto from cores and
+      memory|auto: from cores and memory|set explicitly); OCR: shared page pool of P threads (per
+      document up to P[; capped from C cores to fit 50% of available memory at ~100 MB per OCR
+      thread]); cores: C, available memory: M MB` (explicit threads: `per document up to T, set
+      explicitly`). Level `warn` when the memory cap applies, else `info`.
+    - **Machine:** `machine()` measures once per process. Cores = `std::thread::available_parallelism`
+      (on Linux it already honours the affinity mask / cpuset and cgroup v1/v2 CPU quotas, so
+      `docker --cpus`/`--cpuset-cpus` are respected without own code). Available memory on Linux =
+      min(`MemAvailable`, every cgroup limit on the way from the own cgroup to the root):
+      v2 `memory.max − (memory.current − inactive_file)`, v1 `memory.limit_in_bytes −
+      (memory.usage_in_bytes − total_inactive_file)`; `max` and values ≥ 2^60 (v1 "unlimited") count
+      as no limit; the mount root is always checked (container with a host path in
+      `/proc/self/cgroup`). Reclaimable page cache (`inactive_file`) does not count as used. Pure
+      parsers with tests: `parse_cgroup_limit`, `parse_memory_stat`, `cgroup_available`,
+      `parse_proc_self_cgroup`, `cgroup_ancestors`, `cgroup_memory_available` (takes a file reader).
+    - History: 2026-11-22 automatic default; withdrawn 2026-11-23 because a lone 8-page scan only got
+      `cores / tasks` threads (Raspberry Pi 5: 14.8 s → 24 s); default again 2026-11-23 with the page
+      pool (NAS, 3 cores, `results/benchmark/2026-11-23-nas-adaptive/bericht.md`: lone scan 15.5 s as
+      serial, OCR batch 55 s instead of 95 s, 0 errors).
 
 ## API-Änderungen
 

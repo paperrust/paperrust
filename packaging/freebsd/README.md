@@ -34,7 +34,7 @@ Built on FreeBSD 14.4; the packages run on 14.4 and newer 14.x (pkg ABI `FreeBSD
 ### 1. Package
 
 ```sh
-pkg add ./paperrust-0.1.2.pkg
+pkg add ./paperrust-0.1.3.pkg
 ```
 
 `pkg add` pulls the dependencies from the FreeBSD repository: `tesseract` (with `tesseract-data`,
@@ -45,7 +45,7 @@ Without the package (tarball):
 
 ```sh
 pkg install tesseract pdfium liberation-fonts-ttf ca_root_nss
-tar -xzf PaperRust-0.1.2-freebsd-x86_64.tar.gz --strip-components 1 -C /usr/local
+tar -xzf PaperRust-0.1.3-freebsd-x86_64.tar.gz --strip-components 1 -C /usr/local
 pw groupadd paperrust
 pw useradd paperrust -g paperrust -d /var/db/paperrust -s /usr/sbin/nologin -c PaperRust
 install -d -o paperrust -g paperrust -m 0750 /var/db/paperrust /var/log/paperrust
@@ -138,8 +138,9 @@ Not tested / known limits:
 
 - Only amd64 is built. aarch64 would need a native or emulated arm64 VM (slow) and is not set up.
 - Memory-based limits: on Linux PaperRust caps OCR threads by available memory (`/proc/meminfo`,
-  cgroups). On FreeBSD this information is not read; set `PAPERRUST_THREADS_PER_WORKER` /
-  `PAPERRUST_TASK_WORKERS` yourself on small machines.
+  cgroup limits). On FreeBSD this information is not read (the default `PAPERRUST_TASK_WORKERS=auto`
+  then only counts cores); set `PAPERRUST_THREADS_PER_WORKER` / `PAPERRUST_TASK_WORKERS` yourself on
+  small machines (`PAPERRUST_TASK_WORKERS=1` = one document at a time).
 - Consumption folder: file events via kqueue (one open file per watched file). Very large
   consumption folders may need a higher `kern.maxfiles`/login class limit or
   `PAPERRUST_CONSUMER_POLLING=<seconds>`.

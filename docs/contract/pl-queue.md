@@ -274,8 +274,8 @@ zusammen neu starten (ein alter Worker erhöht `fence_token` nicht).
 | Variable | Standard | |
 |---|---|---|
 | `PAPERRUST_QUEUE_BACKEND` / `PAPERRUST_QUEUE` | – | **wirkungslos seit 2026-11-14** (immer PostgreSQL); `celery`/`redis` → Hinweis beim Start, nie Abbruch |
-| `PAPERLESS_TASK_WORKERS` | 1 (upstream); `auto` = automatisch (`pl_core::resources::task_workers_from_env`; Known difference 16) | Parallelität (≥ 1) |
-| `PAPERLESS_THREADS_PER_WORKER` | `max(floor(cpus/workers),1)` | an Handler |
+| `PAPERLESS_TASK_WORKERS` | `auto` = automatisch (PaperRust-Standard; upstream 1; `pl_core::resources::task_workers_from_env`; Known difference 16); `1` = eine Aufgabe nach der anderen | Parallelität (≥ 1) |
+| `PAPERLESS_THREADS_PER_WORKER` | Größe des OCR-Seiten-Pools (`pl_core::resources::ocr_threads_per_document`; upstream `max(floor(cpus/workers),1)`) | an Handler (nur Information) |
 | `PAPERLESS_WORKER_TIMEOUT` | 1800 | Zeitlimit (s) |
 | `PAPERLESS_TIME_ZONE` | UTC | Beat-Zeitzone |
 | `PAPERRUST_QUEUE_NAMES` | `celery` | Liste |
@@ -373,21 +373,24 @@ zusammen neu starten (ein alter Worker erhöht `fence_token` nicht).
     (Desktop-Test 2026-11-18). Verpasste Termine holt der gespeicherte Zustand (`PgBeatStore`) beim
     nächsten Start einmal nach, auch wenn der Rechner nachts aus ist. `beat::CATCH_UP_ON_FIRST_START`
     bleibt als (leere) Liste für künftige Fälle.
-16. **`PAPERLESS_TASK_WORKERS=auto`** (opt-in since 2026-11-23; 2026-11-22 to 2026-11-23 it was the
-    default for an unset variable): unset = 1 slot as upstream (`CELERY_WORKER_CONCURRENCY`), so a
-    single document gets all cores (`THREADS_PER_WORKER` = cores). The value `auto`
-    (case-insensitive; upstream `int("auto")` fails) sets the slot count to
-    `pl_core::resources::default_task_workers`:
+16. **`PAPERLESS_TASK_WORKERS` unset = `auto`** (PaperRust default since 2026-11-23, together with
+    pl-ocr's shared page pool; upstream `CELERY_WORKER_CONCURRENCY` = 1, `int("auto")` fails). Unset or
+    `auto` (case-insensitive) sets the slot count to `pl_core::resources::default_task_workers`:
     `min(ceil(cores / t), 4, budget / (t × 100 MB))`, at least 1, with `t` = explicit
     `PAPERLESS_THREADS_PER_WORKER` or 2 and `budget` = 50 % of the memory available at start
-    (4 cores → 2 slots; 3 cores with `THREADS_PER_WORKER=2` → 2; 12 cores → 4). The default for
-    `THREADS_PER_WORKER` stays upstream's `max(cores // workers, 1)`, so slots × OCR threads ≤ cores.
-    Cores/memory are measured once per process, so pl-queue (slots) and pl-ocr (threads) agree.
-    An explicit number is used unchanged; other values fail with the ngx `int()` text. Why not the
-    default: Raspberry Pi 5 (3 cores) – 255 documents 214 s (1 slot) vs. 162 s (auto), but one
-    8-page scan alone 14.8 s vs. 24 s; single-document speed must not regress. The slots serve all
-    tasks (mail, index, training), as with Celery concurrency > 1. The consumer is safe with
-    several slots (pl-consumer Known difference 24).
+    (4 cores → 2 slots; 3 cores → 2; 12 cores → 4). `PAPERRUST_TASK_WORKERS=1` restores one task at a
+    time; any number is used unchanged; other values fail with the ngx `int()` text.
+    `QueueConfig::threads_per_worker` (passed to handlers in `TaskContext`, informational) follows the
+    page-pool rule: explicit value, else the pool size `min(cores, memory cap)`
+    (`pl_core::resources::ocr_threads_per_document`; upstream `max(cores // workers, 1)`). The cores
+    are not split per slot: documents share the pool page by page, so a lone document still uses all
+    cores. Cores/memory are measured once per process, so pl-queue (slots) and pl-ocr (pool) agree.
+    History: automatic default 2026-11-22, withdrawn 2026-11-23 (Raspberry Pi 5, lone 8-page scan
+    14.8 s → 24 s with fixed `cores / slots` threads), default again the same day with the pool (NAS,
+    3 cores: lone scan 15.5 s as serial, OCR batch 55 s instead of 95 s, 0 errors;
+    `results/benchmark/2026-11-23-nas-adaptive/bericht.md`). The slots serve all tasks (mail, index,
+    training), as with Celery concurrency > 1. The consumer is safe with several slots (pl-consumer
+    Known difference 24).
 
 17. **Start nur mit nachweisbarer Lease** (2026-11-23, TLA+-Befunde F1/F2, `verification/task-queue/`):
     Ein Job, dessen Lease vor dem Start nicht mehr nachweisbar ist (Pause zwischen Beanspruchen und

@@ -344,10 +344,12 @@ Mit `paperrust serve --worker` erledigt dasselbe Programm neben der Weboberfläc
 - Startet PaperRust neu, geht keine Aufgabe verloren; offene Aufgaben werden danach abgearbeitet.
 - Bricht ein Worker mitten in einer Aufgabe ab, wird sie erneut zugestellt – höchstens
   `PAPERRUST_QUEUE_MAX_DELIVERIES` Mal (Standard 3). Danach gilt sie als fehlgeschlagen.
-- Wie viele Aufgaben gleichzeitig laufen, legt `PAPERRUST_TASK_WORKERS` fest (Standard 1, damit
-  ein einzelnes Dokument alle Kerne bekommt; `auto` wählt nach Kernen und Speicher, z. B. 2 bei
-  4 Kernen; das Startprotokoll nennt den Wert); eine
-  einzelne Aufgabe darf höchstens `PAPERRUST_WORKER_TIMEOUT` Sekunden dauern (Standard 1800).
+- Wie viele Aufgaben gleichzeitig laufen, legt `PAPERRUST_TASK_WORKERS` fest. Standard ist
+  `auto`: PaperRust wählt nach Kernen und Speicher (z. B. 2 bei 4 Kernen) und die Dokumente teilen
+  sich die Kerne – ein einzelnes Dokument bekommt trotzdem alle. `PAPERRUST_TASK_WORKERS=1` stellt
+  ein Dokument nach dem anderen ein (wie paperless-ngx). Das Startprotokoll nennt die Werte
+  (`parallel OCR: task workers: …`). Eine einzelne Aufgabe darf höchstens
+  `PAPERRUST_WORKER_TIMEOUT` Sekunden dauern (Standard 1800).
 
 Laufende und erledigte Aufgaben sehen Sie unter *Aufgaben* und im Dialog *Systemstatus*.
 

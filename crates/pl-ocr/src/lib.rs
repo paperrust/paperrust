@@ -13,6 +13,8 @@
 //! - [`pdfwrite`]: trait [`pdfwrite::ArchiveBuilder`] – invisible text layer, image pages, PDF/A stamp.
 //! - [`native`]: [`native::NativeOcrmypdf`] – executes the OCRmyPDF arguments with engine/renderer.
 //! - [`preprocess`]: straightening (deskew) and cleaning (clean, unpaper replacement) before OCR.
+//! - [`pipeline`]/[`permits`]: page-parallel OCR; process-wide page permits shared by all
+//!   documents (a lone document uses all cores, concurrent documents share them).
 //! - [`thumbnail`]: `make_thumbnail_from_pdf` (WebP, 500 px wide).
 //! - [`pdfa`]: PDF/A cleanup and self-check (replacement for Ghostscript `-dPDFA`);
 //!   [`glyphless`]: embedded text layer font; [`color`]: `OCR_COLOR_CONVERSION_STRATEGY`;
@@ -37,6 +39,7 @@ pub mod pdfa;
 pub mod pdfa_fonts;
 pub mod pdfimage;
 pub mod pdfwrite;
+pub mod permits;
 pub mod pipeline;
 pub mod preprocess;
 pub mod remote;

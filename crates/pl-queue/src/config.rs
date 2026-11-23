@@ -13,11 +13,14 @@ use crate::DEFAULT_QUEUE;
 /// Settings (all from the environment, see the contract).
 #[derive(Debug, Clone)]
 pub struct QueueConfig {
-    /// `PAPERLESS_TASK_WORKERS`: concurrently running tasks per worker process. Unset: 1 (upstream);
-    /// `auto`: derived from cores and memory (`pl_core::resources::task_workers_or_auto`).
+    /// `PAPERLESS_TASK_WORKERS`: concurrently running tasks per worker process. Unset or `auto`:
+    /// derived from cores and memory (`pl_core::resources::task_workers_or_auto`; upstream: 1);
+    /// a number is used unchanged (`1` = one task at a time).
     pub concurrency: usize,
-    /// `PAPERLESS_THREADS_PER_WORKER` (max(floor(cpus / workers), 1)): passed on to handlers
-    /// (OCR threads); the queue itself does not use it.
+    /// `PAPERLESS_THREADS_PER_WORKER`: OCR page tasks one document may run at once – unset: the
+    /// size of pl-ocr's shared page pool (`pl_core::resources::ocr_threads_per_document`;
+    /// upstream: `max(floor(cpus / workers), 1)`). Informational for handlers; the queue itself
+    /// does not use it.
     pub threads_per_worker: usize,
     /// `PAPERLESS_WORKER_TIMEOUT` (1800 s): hard time limit per task.
     pub time_limit_secs: f64,
@@ -50,7 +53,8 @@ fn positive_f64(env: &Env, key: &str, default: f64) -> Result<f64, ConfigError> 
     Ok(v)
 }
 
-/// `default_threads_per_worker(task_workers)`.
+/// `default_threads_per_worker(task_workers)` (upstream formula; kept for comparison – PaperRust
+/// uses `pl_core::resources::ocr_threads_per_document`).
 pub fn default_threads_per_worker(task_workers: i64) -> usize {
     let cores = std::thread::available_parallelism().map_or(1, |n| n.get()).max(1) as i64;
     if task_workers <= 0 {
@@ -66,15 +70,12 @@ impl QueueConfig {
         // PAPERRUST_QUEUE / PAPERRUST_QUEUE_BACKEND have no effect (PostgreSQL only); an old
         // value such as `celery` leads to a notice at startup (pl_core::config::retired_warnings),
         // never to an abort.
-        // Unset: 1 (upstream); `auto`: from cores/memory (PaperRust opt-in, see contract).
+        // Unset or `auto`: from cores/memory (PaperRust default; upstream: 1); see contract.
         let workers = pl_core::resources::task_workers_from_env(env)?;
         if workers < 1 {
             return Err(ConfigError::Invalid("PAPERRUST_TASK_WORKERS must be >= 1".into()));
         }
-        let threads = match env.int("PAPERLESS_THREADS_PER_WORKER")? {
-            Some(t) => t.max(1) as usize,
-            None => default_threads_per_worker(workers),
-        };
+        let threads = usize::try_from(pl_core::resources::ocr_threads_per_document(env.int("PAPERLESS_THREADS_PER_WORKER")?)).unwrap_or(1);
         let timeout = env.int_or("PAPERLESS_WORKER_TIMEOUT", 1800)?;
         if timeout <= 0 {
             return Err(ConfigError::Invalid("PAPERRUST_WORKER_TIMEOUT must be > 0".into()));
@@ -112,17 +113,20 @@ mod tests {
     #[test]
     fn defaults_and_overrides() {
         let c = QueueConfig::from_env(&Env::from_pairs([("HOSTNAME", "box")])).unwrap();
-        // unset: 1 like upstream, all cores for that one task
-        assert_eq!(c.concurrency, 1);
-        assert_eq!(c.threads_per_worker, default_threads_per_worker(1));
+        // unset: automatic like `auto` (PaperRust default), the whole page pool per document
+        assert_eq!(c.concurrency as i64, pl_core::resources::task_workers_or_auto(None, None));
+        assert!((1..=pl_core::resources::MAX_AUTO_TASK_WORKERS as usize).contains(&c.concurrency));
+        assert_eq!(c.threads_per_worker as i64, pl_core::resources::ocr_threads_per_document(None));
         // `auto` (any case): same derivation as pl-ocr's threads per task
         for v in ["auto", "AUTO"] {
             let a = QueueConfig::from_env(&Env::from_pairs([("PAPERRUST_TASK_WORKERS", v)])).unwrap();
             assert_eq!(a.concurrency as i64, pl_core::resources::task_workers_or_auto(None, None));
             assert!((1..=pl_core::resources::MAX_AUTO_TASK_WORKERS as usize).contains(&a.concurrency));
         }
+        // `1` restores one task at a time (upstream)
         let c1 = QueueConfig::from_env(&Env::from_pairs([("PAPERRUST_TASK_WORKERS", "1")])).unwrap();
         assert_eq!(c1.concurrency, 1);
+        assert_eq!(c1.threads_per_worker, c.threads_per_worker);
         assert!(QueueConfig::from_env(&Env::from_pairs([("PAPERLESS_TASK_WORKERS", "0")])).is_err());
         assert_eq!(c.time_limit_secs, 1800.0);
         assert_eq!(c.queues, vec!["celery".to_string()]);

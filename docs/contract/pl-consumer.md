@@ -490,9 +490,9 @@ Quelle fehlt, Ziel existiert), Rollback, leere Ordner löschen, Versionen der Wu
 
 23. **OCR-Sprache automatisch** (2026-11-21, `PAPERRUST_OCR_LANGUAGE_AUTO`, Standard aus; PaperRust-Erweiterung): nach der Texterkennung `langdetect` (jetzt in pl-parsers) auf den Text; bei ≥ 200 Buchstaben, Wahrscheinlichkeit ≥ 0,90, Sprache nicht eingestellt und installiert → zweite Erkennung mit dieser Sprache, deren Ergebnis zählt (Fehler → erstes Ergebnis). `native::auto_ocr_language`, Test `tests/ocr_language_auto.rs`. Messung: `results/benchmark/2026-11-21-ocr-lang`.
 
-24. **Several consume tasks in parallel** (2026-11-22; only with `PAPERLESS_TASK_WORKERS` > 1 or
-    `auto` – since 2026-11-23 the default is 1 again as upstream, pl-queue Known difference 16; the
-    fixes below stay active in every case). Upstream has the same windows with `TASK_WORKERS` > 1 but leaves
+24. **Several consume tasks in parallel** (2026-11-22; with `PAPERLESS_TASK_WORKERS` unset/`auto`
+    – the default since 2026-11-23, pl-queue Known difference 16 – or a number > 1; `1` = one at a
+    time as upstream; the fixes below stay active in every case). Upstream has the same windows with `TASK_WORKERS` > 1 but leaves
     them open; PaperRust closes them:
     - **ASN**: `AsnCheckPlugin` checks before parsing; two tasks with the same ASN could both pass.
       The store transaction now starts with `claim_unique`: `pg_advisory_xact_lock` on

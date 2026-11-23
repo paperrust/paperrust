@@ -340,8 +340,8 @@ OCR-Felder mit AC-Feld: Vorrang AC (E3), wirksam L (nächstes Dokument).
 
 | Schlüssel | Bedeutung | Typ | Standard | Quelle | Wirksam | Geh. | Kl. |
 |---|---|---|---|---|---|---|---|
-| `TASK_WORKERS` | parallele Aufgaben (Einlesen läuft so viele Dokumente gleichzeitig) | int oder `auto` | 1 (wie upstream); `auto`: `ceil(Kerne ÷ 2)` (mit gesetztem `THREADS_PER_WORKER`: `ceil(Kerne ÷ THREADS_PER_WORKER)`), höchstens 4, nach freiem Speicher begrenzt | E | W | nein | B |
-| `THREADS_PER_WORKER` | OCR-Threads je Aufgabe | int | automatisch: `max(Kerne ÷ TASK_WORKERS, 1)`, nach freiem Speicher begrenzt | E | W | nein | B |
+| `TASK_WORKERS` | parallele Aufgaben (Einlesen läuft so viele Dokumente gleichzeitig) | int oder `auto` | `auto` (seit 2026-11-23; upstream 1): `ceil(Kerne ÷ 2)` (mit gesetztem `THREADS_PER_WORKER`: `ceil(Kerne ÷ THREADS_PER_WORKER)`), höchstens 4, nach freiem Speicher begrenzt; die Dokumente teilen sich die Kerne über den Seiten-Pool; `1` = ein Dokument nach dem anderen (upstream) | E | W | nein | B |
+| `THREADS_PER_WORKER` | höchstens so viele Seiten eines Dokuments gleichzeitig (OCR); alle Dokumente teilen sich einen Seiten-Pool (pl-ocr Known difference 23) | int | automatisch: Pool = `min(Kerne, Speichergrenze)` (Pool × 100 MB ≤ halber freier Speicher, Container-Grenzen zählen), je Dokument bis zum ganzen Pool; gesetzt: Obergrenze je Dokument, Pool = Kerne; upstream `max(Kerne ÷ TASK_WORKERS, 1)` | E | W | nein | B |
 | `WORKER_TIMEOUT` | Zeitlimit je Aufgabe | s | 1800 | E | L | nein | A |
 | `TRAIN_TASK_CRON` | Klassifikator trainieren | Crontab/disable | `5 */1 * * *` | E | W | nein | A |
 | `INDEX_TASK_CRON` | Index optimieren | Crontab | `0 0 * * *` | E | W | nein | A |

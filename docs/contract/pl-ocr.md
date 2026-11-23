@@ -35,7 +35,7 @@ Archiv-Steuerung ist eigenständig: `PAPERLESS_ARCHIVE_FILE_GENERATION` = auto/a
 | `PAPERLESS_OCR_COLOR_CONVERSION_STRATEGY` | `RGB` | `ColorConvertChoices(…)` | `color_conversion_strategy` | `db or env` |
 | `PAPERLESS_OCR_USER_ARGS` | `None` | JSON; Fehler → `{}` | `user_args` (JSON) | `db if truthy else json(env)` |
 | `PAPERLESS_MAX_IMAGE_PIXELS` | `None` | `int()` | – | Pillow-Grenze in paperless (`maybe_override_pixel_limit`: 0 → aus, <0/None → Pillow-Standard 89 478 485) |
-| `PAPERLESS_THREADS_PER_WORKER` | `max(cores // PAPERLESS_TASK_WORKERS, 1)`; unset `TASK_WORKERS` = 1 (upstream, all cores); `TASK_WORKERS=auto` = PaperRust automatic value (pl-queue Known difference 16, `pl_core::resources::task_workers_or_auto`); other non-numbers: `int()` error text unchanged | `int()` | – | → `jobs` |
+| `PAPERLESS_THREADS_PER_WORKER` | upstream `max(cores // PAPERLESS_TASK_WORKERS, 1)`; PaperRust (2026-11-23): unset = **the whole page pool per document, shared** – pool `min(cores, memory cap)` (Known difference 23, `pl_core::resources::ocr_threads_per_document`), for every `TASK_WORKERS` value (unset = `auto`, `auto`, number); the value the startup memory cap writes is the pool size itself and is used as is (only the pool size ignores it, `threads_written_by_cap`); `TASK_WORKERS` is still validated (unset/`auto` or `int()` error text unchanged) | `int()` | – | → `jobs` (per-document upper bound) |
 | `PAPERLESS_REMOTE_OCR_ENGINE/_API_KEY/_ENDPOINT` | `None` | – | `remote_ocr_*` | `db or env` |
 | `PAPERLESS_REMOTE_OCR_MODE` | `always` | Start (always/workflow_only) | `remote_ocr_mode` | `db or env` |
 | `PAPERLESS_REMOTE_OCR_ALLOW_INTERNAL_ENDPOINTS` | `true` | bool | – | nur env |
@@ -208,6 +208,12 @@ ImageOps ── FsImageOps (Pillow-Semantik)
   gleichzeitig; Ergebnis in Seitenreihenfolge, bei Fehlern gewinnt die erste Seite in Seitenreihenfolge.
   `jobs = 1` ist die frühere serielle Schleife. Archiv/Sidecar sind unabhängig von `jobs` identisch
   (Tests `crates/pl-ocr/tests/parallel.rs`); Messung `results/bench/ingest/`.
+  Seit 2026-11-23 zusätzlich **gemeinsamer Seiten-Pool** (`src/permits.rs`, `pipeline::ordered_shared`,
+  Known difference 23): jede Seitenaufgabe (Rastern + Erkennen) hält eine von prozessweit `Kerne`
+  Erlaubnissen; `jobs` ist nur noch die Obergrenze je Dokument. Die Erlaubnis wird auf dem
+  Aufrufer-Thread vor dem Rastern geholt, wandert mit der Seite zum Worker und wird nach der Seite
+  zurückgegeben (höchstens `jobs` Raster je Dokument, höchstens Pool-Größe insgesamt). Seiten ohne
+  Arbeit (`Skip`) brauchen keine Erlaubnis. `NativeOcrmypdf::page_pool = None` = Verhalten vorher.
 - Tesseract-Weg (`crates/pl-ocr/src/tesslib.rs`): Ist eine `libtesseract` **derselben Version** wie das
   Programm vorhanden, laufen OSD und Erkennung im Prozess über die C-API (dynamisch geladen, kein
   Bauzeit-Link): je (Sprachen, psm) ein Pool initialisierter Instanzen, höchstens so viele wie gleichzeitig
@@ -496,6 +502,36 @@ ITU-R 601.
    deutschen Daten, wird mit Warnung `eng` genommen (nur beim Standard; explizit gewählte, fehlende Sprachen
    scheitern weiter mit `MissingDependencyError`). Test: `tests/language_default.rs`. Die Suchsprache
    (`pl-core`, Stemming) folgt weiter `PAPERLESS_OCR_LANGUAGE` mit Standard `eng`.
+
+23. **Kerne werden zwischen gleichzeitigen Dokumenten geteilt** (2026-11-23; OCRmyPDF/upstream: feste
+   `jobs = THREADS_PER_WORKER = max(Kerne // TASK_WORKERS, 1)` je Dokument). Anlass: Raspberry Pi 5,
+   3 Kerne (`results/benchmark/2026-11-23-pi5-parallel/bericht.md`): mit `TASK_WORKERS=auto` bekam ein
+   allein laufender 8-seitiger Scan nur `Kerne ÷ Aufgaben` Threads (24 s statt 14,8 s). Jetzt
+   (`src/permits.rs`): ein prozessweiter Pool mit `Kerne` Seiten-Erlaubnissen (bei ungesetztem
+   `THREADS_PER_WORKER` zusätzlich nach `pl_core::resources::memory_threads_cap(1, freier Speicher)`
+   begrenzt, d. h. Pool × 100 MB ≤ halber freier Speicher). Jede Seitenaufgabe (Rastern + Erkennen
+   einer Seite) läuft unter einer Erlaubnis. Ein Dokument allein nimmt alle freien Erlaubnisse (bis zu
+   seinem `jobs`); mehrere teilen: eine frei werdende Erlaubnis geht an das wartende Dokument mit den
+   **wenigsten** gehaltenen Erlaubnissen (bei Gleichstand: wer zuerst wartete). Ein neues Dokument
+   bekommt damit spätestens nach einer Seitenzeit eine Erlaubnis, keines verhungert, nie mehr als
+   Pool-Größe Seitenaufgaben gleichzeitig. Sperrreihenfolge: ein Mutex + Condvar im Pool, sonst nichts;
+   gewartet wird nur ohne gehaltene Erlaubnis (Halter warten nie auf weitere) → verklemmungsfrei.
+   Standard für `jobs` bei ungesetztem `THREADS_PER_WORKER` ist deshalb **der ganze Pool** =
+   `min(Kerne, Speichergrenze)` (für jede `TASK_WORKERS`-Einstellung; vorher `Kerne ÷ TASK_WORKERS`;
+   die Speichergrenze schreibt `pl_core::resources::apply_ocr_resource_cap` als
+   `PAPERLESS_THREADS_PER_WORKER = memory_threads_cap(1, Speicher)` in die Umgebung, gilt also als
+   `jobs` unverändert; nur `permits::threads_set_by_user` erkennt sie, damit der Pool nicht auf `Kerne`
+   springt). Seit 2026-11-23 ist `TASK_WORKERS` ungesetzt = `auto` (pl-queue Known difference 16), der
+   Pool ist also im Standard aktiv geteilt; ein gesetzter Wert ist die Obergrenze je
+   Dokument, der Pool bleibt bei `Kerne` (keine Überbelegung mehr mit z. B. `TASK_WORKERS=2`,
+   `THREADS_PER_WORKER=4` auf 4 Kernen: zusammen höchstens 4 statt 8 Seiten). Nur die Reihenfolge der
+   Arbeit ändert sich: Seitenreihenfolge, Archiv-Bytes und Text sind gleich (Tests
+   `pipeline::tests::shared_*`, `permits::tests::*`, `tests/parallel.rs`). Nicht vom Pool erfasst (wie
+   vorher): Arbeit außerhalb der Seitenschleife (PDF/A-Bau, Verkleinerung, Vorschaubild, Textauszug)
+   und die Zeilen-Threads von `preprocess::rotate` bei großen Seiten (bis zu 8, innerhalb einer
+   Erlaubnis). Tesseract selbst bleibt je Instanz einfädig (`OMP_THREAD_LIMIT=1` bzw.
+   `omp_set_max_active_levels(0)` je Worker-Thread in `tesslib`). Zeitmessung:
+   `examples/page_pool_bench.rs`.
 
 ## 12. Was läuft ohne externe Programme / was braucht Werkzeuge
 

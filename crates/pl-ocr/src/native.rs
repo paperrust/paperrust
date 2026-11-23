@@ -149,6 +149,9 @@ pub struct NativeOcrmypdf {
     pub max_render_dpi: f64,
     /// Working directory for page images.
     pub workdir: PathBuf,
+    /// Page-work permits shared with all other documents of the process ([`crate::permits`]);
+    /// `None`: fixed `jobs` page tasks without sharing (previous behaviour; benchmarks).
+    pub page_pool: Option<std::sync::Arc<crate::permits::PagePool>>,
 }
 
 /// Evaluated OCRmyPDF options.
@@ -736,7 +739,7 @@ pub fn page_dpi(opts: &Options, a: &pdfwrite::PageAnalysis) -> f64 {
 
 impl NativeOcrmypdf {
     pub fn new(engine: Option<Box<dyn OcrEngine>>, renderer: Box<dyn PdfRenderer>, workdir: PathBuf) -> Self {
-        Self { engine, renderer, meta: OutputMeta::default(), max_render_dpi: 600.0, workdir }
+        Self { engine, renderer, meta: OutputMeta::default(), max_render_dpi: 600.0, workdir, page_pool: Some(crate::permits::global()) }
     }
 
     fn engine(&self, languages: &str, checked: &mut bool) -> Result<&dyn OcrEngine> {
@@ -912,9 +915,15 @@ impl NativeOcrmypdf {
         let mut checked = false;
         // Preparation per single image serial (order as before), OCR parallel (`jobs`).
         let mut prepared: Vec<PageImage> = Vec::with_capacity(frames.len());
-        let ocrs = crate::pipeline::ordered(
+        let wants = |i: usize| {
+            let big = opts.skip_big.is_some_and(|mp| f64::from(frames[i].width()) * f64::from(frames[i].height()) > mp * 1e6);
+            !opts.no_ocr && opts.pages.as_ref().is_none_or(|p| p.contains(&(i + 1))) && !big
+        };
+        let ocrs = crate::pipeline::ordered_shared(
+            self.page_pool.as_deref(),
             opts.jobs,
             frames.len(),
+            wants,
             |i| {
                 let pageno = i + 1;
                 let raster = Raster::from_dynamic(&frames[i], dpi.0);
@@ -1040,11 +1049,13 @@ impl NativeOcrmypdf {
         };
         let limit = pixel_limit(opts.max_image_mpixels);
         let mut checked = false;
-        // Rasterizing (PDFium, not thread-safe) serially on this thread, OCR parallel (`jobs`);
-        // results in page order, first error in page order wins.
-        let results = crate::pipeline::ordered(
+        // Rasterizing (PDFium, not thread-safe) serially on this thread, OCR parallel (`jobs`,
+        // shared page permits); results in page order, first error in page order wins.
+        let results = crate::pipeline::ordered_shared(
+            self.page_pool.as_deref(),
             opts.jobs,
             plans.len(),
+            |i| plans[i].0 != PagePlan::Skip,
             |i| {
                 let (plan, a) = &plans[i];
                 if *plan == PagePlan::Skip {
