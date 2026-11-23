@@ -12,6 +12,7 @@ pub mod extras;
 pub mod fernet;
 pub mod importer;
 pub mod medialock;
+pub mod noteformat;
 pub mod pypath;
 pub mod safepath;
 pub mod tagtree;

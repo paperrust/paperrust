@@ -15,8 +15,8 @@ the end exactly whether everything arrived.
 
 - **Your old data stays intact.** PaperRust only reads paperless-ngx. If PaperRust does change
   something in your existing database, it makes a backup itself first.
-- **Which version?** PaperRust takes over paperless-ngx **2.20**, **3.0 to 3.4** and also the newer
-  paperless-ngx with the new tag tree (after 3.4.2) directly. You do **not** need to update
+- **Which version?** PaperRust takes over paperless-ngx **2.20**, **3.0 to 3.4** and **3.5 (up to
+  3.5.1)** directly. You do **not** need to update
   paperless-ngx first. Only older 2.x versions (before 2.19.6) need an export.
   **paperless-ngx 1.x:** update to 2.20 first and start it once; an export from 1.x cannot be
   taken over (not by paperless-ngx 3 either).
@@ -151,10 +151,11 @@ paperless-ngx 3 first.
 
 <a id="newer"></a>
 
-## Newer paperless-ngx versions (after 3.4.2)
+## Newer paperless-ngx versions (3.5)
 
-The development version of paperless-ngx after 3.4.2 already stores the tag tree the way PaperRust
-does. PaperRust takes over such a database directly, on all ways above. If paperless-ngx brings a
+paperless-ngx 3.5.0 and 3.5.1 already store the tag tree the way PaperRust does and support notes in
+Markdown – so does PaperRust. PaperRust takes over such a database directly, on all ways above;
+Markdown notes stay Markdown notes. An export from paperless-ngx 3.5 can be taken over as well. If paperless-ngx brings a
 change that PaperRust does not know yet, the switch stops **before** anything is changed and names
 the way out: make an export (case 3).
 

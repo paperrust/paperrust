@@ -56,6 +56,8 @@ pub fn paperrust_migrations() -> Vec<(&'static str, &'static str)> {
     v.extend_from_slice(pl_indexer::migrations::ALL);
     // L6 step 1 (docs/DATAMODEL-V2.md §1.9): tag tree as adjacency list, treenode columns removed.
     v.extend_from_slice(pl_objects::migrations::ALL);
+    // Note format plain/markdown (paperless-ngx 3.5 documents.0030_note_format, #14626).
+    v.extend_from_slice(pl_documents_write::migrations::ALL);
     // Scanner integration (pl-scan): known eSCL scanners, devices for SMTP receipt.
     v.extend_from_slice(pl_scan::store::migrations::ALL);
     // Ransomware protection (pl-guard): guard state, events, backup runs.
@@ -71,6 +73,10 @@ pub fn paperrust_migrations() -> Vec<(&'static str, &'static str)> {
     v.extend(pl_store::datamodel::migrations());
     // Indexes on tables of the conversion stages (expand-only, check themselves which table exists).
     v.extend_from_slice(pl_store::migrations::AFTER_STAGES);
+    // Folder view (pl-api-v2 folders): paperrust_folder/_document_folder/_folder_grant. After the stages, so the
+    // cleanup trigger lands on paperrust_document. File directly like the roles; same SQL as
+    // pl_api_v2::folders::MIGRATION.
+    v.push(("pl_api_v2.0002_paperrust_folder", include_str!("../../pl-api-v2/migrations/0002_paperrust_folder.sql")));
     v
 }
 
@@ -117,8 +123,13 @@ pub async fn detect_state(conn: &mut PgConnection) -> CliResult<DbState> {
 /// Migrations from paperless-ngx after v3.4.2 (upstream `dev`) whose effect PaperRust knows (same
 /// list as pl-dbmigrate `schema::KNOWN_NEWER`): documents.0028 removes the treenode columns like
 /// `pl_objects.0001_paperrust_tag_adjacency` (idempotent), 0029 only changes a choice list.
-pub const KNOWN_NEWER: &[(&str, &str)] =
-    &[("documents", "0028_replace_tag_tree_fields"), ("documents", "0029_alter_workflowrun_type_alter_workflowtrigger_type")];
+/// 0030 (paperless-ngx 3.5.0, #14626) adds `documents_note.format` like
+/// `pl_documents_write.0001_paperrust_note_format` (which also sets the missing column default).
+pub const KNOWN_NEWER: &[(&str, &str)] = &[
+    ("documents", "0028_replace_tag_tree_fields"),
+    ("documents", "0029_alter_workflowrun_type_alter_workflowtrigger_type"),
+    ("documents", "0030_note_format"),
+];
 
 /// First migration that only needs a paperless-ngx 2.x database.
 const V2_MARKER: (&str, &str) = ("documents", "0003_remove_document_storage_type");
@@ -771,10 +782,24 @@ mod tests {
         for (a, n) in KNOWN_NEWER {
             p.insert((a.to_string(), n.to_string()));
         }
-        assert_eq!(classify(&p), DbState::Current { extra: 2 });
-        p.insert(("documents".into(), "0030_future".into()));
+        assert_eq!(classify(&p), DbState::Current { extra: 3 });
+        p.insert(("documents".into(), "0031_future".into()));
         let DbState::Mismatch { missing, unknown } = classify(&p) else { panic!("Mismatch erwartet") };
         assert!(mismatch_message(&missing, &unknown).contains("document_exporter"));
+    }
+
+    /// paperless-ngx 3.5.0/3.5.1: v3.4.2 plus documents.0028–0030 (no further migrations in 3.5.1,
+    /// src/documents/migrations@v3.5.1) is accepted as current.
+    #[test]
+    fn ngx_3_5_database_is_current() {
+        let mut p = present_all();
+        for n in ["0028_replace_tag_tree_fields", "0029_alter_workflowrun_type_alter_workflowtrigger_type", "0030_note_format"] {
+            p.insert(("documents".into(), n.into()));
+        }
+        assert_eq!(classify(&p), DbState::Current { extra: 3 });
+        assert!(paperrust_migrations().iter().any(|(n, sql)| *n == "pl_documents_write.0001_paperrust_note_format"
+            && sql.contains("ADD COLUMN IF NOT EXISTS format varchar(16) NOT NULL DEFAULT 'plain'")
+            && sql.contains("ALTER COLUMN format SET DEFAULT 'plain'")));
     }
 
     #[test]

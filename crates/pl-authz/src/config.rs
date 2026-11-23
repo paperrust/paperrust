@@ -207,7 +207,7 @@ mod tests {
         assert_eq!(host("https://*"), None);
         assert_eq!(host("https://.example.com"), None);
         assert_eq!(host("https://"), None);
-        assert_eq!(pl_core::config::initial_allowed_hosts(None, true), vec!["localhost"]);
+        assert_eq!(pl_core::config::initial_allowed_hosts(None, true), vec!["localhost", "127.0.0.1", "[::1]"]);
         assert_eq!(pl_core::config::initial_allowed_hosts(None, false), vec!["*"]);
     }
 

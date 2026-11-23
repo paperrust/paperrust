@@ -36,8 +36,12 @@ pub mod migrations {
     /// `migrations/0001_paperrust_task_queue.sql`.
     pub const M0001_TASK_QUEUE: &str = include_str!("../migrations/0001_paperrust_task_queue.sql");
 
+    /// `migrations/0002_paperrust_task_queue_fence_token.sql` (per-delivery fencing token).
+    pub const M0002_FENCE_TOKEN: &str = include_str!("../migrations/0002_paperrust_task_queue_fence_token.sql");
+
     /// All migrations in order `(name, sql)`.
-    pub const ALL: &[(&str, &str)] = &[("0001_paperrust_task_queue", M0001_TASK_QUEUE)];
+    pub const ALL: &[(&str, &str)] =
+        &[("0001_paperrust_task_queue", M0001_TASK_QUEUE), ("0002_paperrust_task_queue_fence_token", M0002_FENCE_TOKEN)];
 
     /// Applies all migrations (idempotent). Call only deliberately (operator/tests).
     pub async fn apply(pool: &sqlx::PgPool) -> Result<(), sqlx::Error> {

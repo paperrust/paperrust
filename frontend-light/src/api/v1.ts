@@ -41,6 +41,8 @@ export interface Document {
   permissions?: ObjectPermissions
   versions?: DocumentVersionInfo[]
   duplicate_documents?: { id: number; title: string; deleted_at?: string | null }[]
+  /** PaperRust folder view: folder id, null = "Unsorted" (only sent once the instance has folders) */
+  folder?: number | null
   /** Additional Angular fields of the OpenDocumentsService (sessionStorage) */
   __changedFields?: string[]
   __selectedVersionId?: number
@@ -61,9 +63,13 @@ export interface DocumentVersionInfo {
   redacted?: boolean
 }
 
+/** Note text format (upstream 3.5.1, PR #14626). Older servers (ngx 3.4.2) send none: treat as plain. */
+export type NoteFormat = 'plain' | 'markdown'
+
 export interface DocumentNote {
   id: number
   note: string
+  format?: NoteFormat
   created: string
   user?: number | { id: number; username: string; first_name?: string; last_name?: string }
 }
@@ -385,8 +391,9 @@ export class V1Client {
   deleteDocument(id: number) {
     return this.request<void>('DELETE', `/api/documents/${id}/`)
   }
-  addNote(id: number, note: string) {
-    return this.request<DocumentNote[]>('POST', `/api/documents/${id}/notes/`, { note })
+  addNote(id: number, note: string, format: NoteFormat = 'plain') {
+    // older servers ignore `format` and store the note as plain text
+    return this.request<DocumentNote[]>('POST', `/api/documents/${id}/notes/`, { note, format })
   }
   deleteNote(id: number, noteId: number) {
     return this.request<DocumentNote[]>('DELETE', `/api/documents/${id}/notes/?id=${noteId}`)

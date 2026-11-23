@@ -340,8 +340,8 @@ OCR-Felder mit AC-Feld: Vorrang AC (E3), wirksam L (nächstes Dokument).
 
 | Schlüssel | Bedeutung | Typ | Standard | Quelle | Wirksam | Geh. | Kl. |
 |---|---|---|---|---|---|---|---|
-| `TASK_WORKERS` | parallele Aufgaben | int | 1 (Desktop: automatisch) | E | W | nein | B |
-| `THREADS_PER_WORKER` | OCR-Threads je Aufgabe | int | automatisch | E | W | nein | B |
+| `TASK_WORKERS` | parallele Aufgaben (Einlesen läuft so viele Dokumente gleichzeitig) | int oder `auto` | 1 (wie upstream); `auto`: `ceil(Kerne ÷ 2)` (mit gesetztem `THREADS_PER_WORKER`: `ceil(Kerne ÷ THREADS_PER_WORKER)`), höchstens 4, nach freiem Speicher begrenzt | E | W | nein | B |
+| `THREADS_PER_WORKER` | OCR-Threads je Aufgabe | int | automatisch: `max(Kerne ÷ TASK_WORKERS, 1)`, nach freiem Speicher begrenzt | E | W | nein | B |
 | `WORKER_TIMEOUT` | Zeitlimit je Aufgabe | s | 1800 | E | L | nein | A |
 | `TRAIN_TASK_CRON` | Klassifikator trainieren | Crontab/disable | `5 */1 * * *` | E | W | nein | A |
 | `INDEX_TASK_CRON` | Index optimieren | Crontab | `0 0 * * *` | E | W | nein | A |

@@ -15,6 +15,7 @@
   import { stateFromQuery } from '../lib/filters'
   import Icon from './Icon.svelte'
   import { SYMBOL } from '../lib/icons'
+  import { foldersEnabled } from '../api/folders'
 
   const rail = $derived(ui.rail)
   const isActive = (p: string) => router.path === p || router.path.startsWith(p + '/')
@@ -25,6 +26,8 @@
   const MANAGE_TYPES = ['tag', 'correspondent', 'documenttype', 'storagepath', 'customfield', 'savedview', 'document', 'workflow', 'mailaccount', 'paperlesstask']
   const canAutomation = $derived(session.can('view', 'workflow') || (aiStatus.enabled && session.can('view', 'document')))
   const aiOn = $derived(aiStatus.enabled || !!session.get(SETTINGS_KEYS.AI_ENABLED))
+  // folder view (optional, Settings → Appearance): own nav item only when switched on
+  const foldersOn = $derived(foldersEnabled(session.settings) && session.can('view', 'document'))
   const canManage = $derived(session.isAdmin || MANAGE_TYPES.some((p) => session.can('view', p)))
 
   onMount(() => {
@@ -58,6 +61,7 @@
       <li>{@render item(router.href('dashboard'), 'grid-1x2', t('common.dashboard'), router.path === 'dashboard', null, 'd2-nav-overview')}</li>
       <li>{@render item(router.href('inbox'), 'inbox', t('common.inbox'), router.path === 'inbox', counts.inbox, 'd2-nav-inbox')}</li>
       <li>{@render item(router.href('documents'), 'files', t('common.all_documents'), inList && (!listRules || listRules.length === 0), counts.all, 'd2-nav-documents')}</li>
+      {#if foldersOn}<li>{@render item(router.href('folders/unsorted'), 'folder2', t('m.folders.title'), isActive('folders'), null, 'd2-nav-folders')}</li>{/if}
       {#if aiOn}<li>{@render item(router.href('assistant'), 'stars', t('m.ui.ai_assistant'), router.path === 'assistant', null, 'd2-nav-assistant')}</li>{/if}
       <!-- "Automation" area (workflows, email fetching, AI review list – docs/WORKFLOWS-NEU.md topic 10 B); counter = open AI suggestions -->
       {#if canAutomation}<li>{@render item(router.href('automation/workflows'), SYMBOL.workflow, t('m.auto.title'), isActive('automation'), aiStatus.enabled ? aiStatus.pending : null, 'd2-nav-automation')}</li>{/if}

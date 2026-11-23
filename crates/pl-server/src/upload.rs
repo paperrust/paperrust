@@ -241,6 +241,9 @@ pub struct Validated {
     pub from_webui: Option<bool>,
     /// PaperRust: `ai_ocr` (optional, boolean) = AI text recognition for this document.
     pub ai_ocr: Option<bool>,
+    /// PaperRust (folder view stage 2): `folder` (optional, folder id) = file the new document into this
+    /// folder. Parsed here; visibility/permission is checked in the handler (needs the user).
+    pub folder: Option<i64>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -360,6 +363,15 @@ impl Lookups for PgLookups {
 }
 
 /// `PrimaryKeyRelatedField.to_internal_value` for a form string.
+/// Pk syntax of the PaperRust upload field `folder` (bigint id), DRF wording like [`pk_value`].
+fn folder_pk(raw: &str) -> Result<i64, String> {
+    match py_int(raw) {
+        PyInt::Invalid => Err("Incorrect type. Expected pk value, received str.".into()),
+        PyInt::Huge { .. } => Err(pl_api_v2::folders::upload_folder_missing(raw)),
+        PyInt::Int(v) => i64::try_from(v).ok().filter(|v| *v > 0).ok_or_else(|| pl_api_v2::folders::upload_folder_missing(raw)),
+    }
+}
+
 async fn pk_value(lookups: &dyn Lookups, table: &'static str, raw: &str) -> Result<i64, String> {
     let does_not_exist = || format!("Invalid pk \"{raw}\" - object does not exist.");
     match py_int(raw) {
@@ -512,6 +524,15 @@ pub async fn validate(
         match drf_boolean(v) {
             Some(b) => out.ai_ocr = Some(b),
             None => errors.add("ai_ocr", "Must be a valid boolean."),
+        }
+    }
+
+    // PaperRust: folder = PrimaryKeyRelatedField(allow_null=True, required=False) on paperrust_folder; missing or
+    // blank → no folder (ngx behaviour). Existence and permission: `pl_api_v2::folders::check_upload_target`.
+    if let Raw::Value(v) = get_value(form, "folder", true) {
+        match folder_pk(v) {
+            Ok(id) => out.folder = Some(id),
+            Err(e) => errors.add("folder", e),
         }
     }
 
@@ -873,6 +894,16 @@ async fn post_document_inner(ctx: &RequestContext, auth: &AuthUser, state: &AppS
         Ok(v) => v,
         Err(errors) => return Err(ApiError::validation(errors.to_value())),
     };
+    // PaperRust: upload into a folder – same rules as moving the document there (folder view stage 2)
+    if let Some(fid) = v.folder
+        && let Err(msg) = pl_api_v2::folders::check_upload_target(state.db(), auth.user(), fid)
+            .await
+            .map_err(|e| ApiError::internal(format!("folder check failed: {e:?}")))?
+    {
+        let mut errors = ValidationErrors::new();
+        errors.add("folder", msg);
+        return Err(ApiError::validation(errors.to_value()));
+    }
     let Some(file) = form.document else {
         return Err(ApiError::internal("validated upload without file"));
     };
@@ -913,6 +944,7 @@ async fn post_document_inner(ctx: &RequestContext, auth: &AuthUser, state: &AppS
         owner_id: Some(auth.user().id),
         custom_fields,
         ai_ocr: v.ai_ocr.unwrap_or(false),
+        folder_id: v.folder,
         ..Default::default()
     };
     let Some(queue) = state.service::<std::sync::Arc<dyn pl_queue::TaskQueue>>() else {
@@ -1087,6 +1119,18 @@ mod tests {
         assert_eq!(v.ai_ocr, Some(true));
         let e = run(&form(&[("ai_ocr", "vielleicht")], Some(("t.txt", b"hello")), dir.path())).await.unwrap_err();
         assert_eq!(e["ai_ocr"][0], "Must be a valid boolean.");
+        // PaperRust folder (folder view stage 2): missing/blank = no folder; pk syntax checked here
+        assert_eq!(v.folder, None);
+        let v = run(&form(&[("folder", "")], Some(("t.txt", b"hello")), dir.path())).await.unwrap();
+        assert_eq!(v.folder, None);
+        let v = run(&form(&[("folder", "12")], Some(("t.txt", b"hello")), dir.path())).await.unwrap();
+        assert_eq!(v.folder, Some(12));
+        let e = run(&form(&[("folder", "abc")], Some(("t.txt", b"hello")), dir.path())).await.unwrap_err();
+        assert_eq!(e["folder"][0], "Incorrect type. Expected pk value, received str.");
+        let e = run(&form(&[("folder", "0")], Some(("t.txt", b"hello")), dir.path())).await.unwrap_err();
+        assert_eq!(e["folder"][0], "Invalid pk \"0\" - object does not exist.");
+        let e = run(&form(&[("folder", "99999999999999999999999")], Some(("t.txt", b"hello")), dir.path())).await.unwrap_err();
+        assert_eq!(e["folder"][0], "Invalid pk \"99999999999999999999999\" - object does not exist.");
     }
 
     #[tokio::test]

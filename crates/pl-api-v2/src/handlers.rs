@@ -191,10 +191,14 @@ pub async fn notes(v2: V2, Caller(p): Caller, Path(uuid): Path<String>) -> V2Res
 #[serde(deny_unknown_fields)]
 pub struct NoteBody {
     note: String,
+    /// `plain` (default) or `markdown` (paperless-ngx 3.5, #14626)
+    #[serde(default)]
+    format: Option<String>,
 }
 
 pub async fn add_note(v2: V2, Caller(p): Caller, Path(uuid): Path<String>, V2Json(b): V2Json<NoteBody>) -> V2Result<Response> {
-    let items = v2.repo.add_note(&p, parse_uuid(&uuid)?, &b.note).await?;
+    let format = b.format.as_deref().unwrap_or("plain");
+    let items = v2.repo.add_note(&p, parse_uuid(&uuid)?, &b.note, format).await?;
     Ok(json_with_rev(StatusCode::CREATED, &json!({ "items": items }), None))
 }
 

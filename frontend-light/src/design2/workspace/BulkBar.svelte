@@ -20,6 +20,8 @@
   import { SYMBOL } from '../lib/icons'
   import * as pdf from './pdf-actions'
   import { bulkParameters, canBulkChangeVisibility, type VisibilityMode, type VisibilityValue } from '../lib/visibility'
+  import { folders } from '../stores/folders.svelte'
+  import { folderOptions } from '../api/folders'
 
   let busy = $state(false)
   let confirmDelete = $state(false)
@@ -92,6 +94,21 @@
       busy = false
     }
   }
+  // Folder view: "Move to folder…" (target needs change permission, the server checks the documents)
+  const showFolders = $derived(canEdit && folders.enabled)
+  $effect(() => {
+    if (showFolders) folders.ensure()
+  })
+  const folderOpts = $derived(folderOptions(folders.items, (f) => f.user_can_change))
+  // shared with drag & drop: clears the selection afterwards, moved documents leave the open folder (stage-1 bug)
+  async function moveTo(folder: number | null) {
+    busy = true
+    try {
+      await folders.moveDocs([...ws.selected], folder)
+    } finally {
+      busy = false
+    }
+  }
   // PDF actions of the selection like in the classic bulk edit (pdf-actions.ts)
   let pdfOpen = $state(false)
   const selectedDocs = $derived(ws.docs.filter((d) => ws.selected.includes(d.id)))
@@ -153,6 +170,10 @@
       onchange={(_, id) => run('set_document_type', { document_type: id }, t('m.workspace.document_type_set_documents', { PH: n }))} />
     <ObjectPicker variant="chip" label={t('common.storage_path')} icon="folder" allowNone options={opts(data.storagePaths)} selected={[]} disabled={busy} id="d2-bulk-path"
       onchange={(_, id) => run('set_storage_path', { storage_path: id }, t('m.workspace.storage_path_set_documents', { PH: n }))} />
+    {#if showFolders}
+      <ObjectPicker variant="chip" label={t('m.folders.move_to')} icon="folder2" allowNone noneLabel={t('m.folders.unsorted')} options={folderOpts} selected={[]} disabled={busy} id="d2-bulk-folder"
+        onchange={(_, id) => void moveTo(id)} />
+    {/if}
     {#if fieldOpts.length}
       <ObjectPicker variant="chip" label={t('common.custom_fields')} icon={SYMBOL.customField} options={fieldOpts} selected={[]} disabled={busy} id="d2-bulk-field"
         onchange={(_, id) => id !== null && void pdf.openBulkCustomField([...ws.selected], id, data.customFields, reload)} />

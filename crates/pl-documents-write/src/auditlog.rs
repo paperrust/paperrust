@@ -144,6 +144,8 @@ pub const DOCUMENT_REVERSE: &[(&str, &str)] = &[
 pub struct NoteRow {
     pub id: i64,
     pub note: String,
+    /// `Note.format` (paperless-ngx 3.5, `plain`/`markdown`)
+    pub format: String,
     pub created: DateTime<Utc>,
     pub document_id: Option<i64>,
     pub user_id: Option<i64>,
@@ -159,6 +161,7 @@ pub fn note_fields(n: &NoteRow) -> FieldVals {
         ("restored_at", dt(&n.restored_at)),
         ("transaction_id", uuid_s(&n.transaction_id)),
         ("note", s(n.note.clone())),
+        ("format", s(n.format.clone())),
         ("created", dt(&Some(n.created))),
         ("document", fk(n.document_id)),
         ("user", fk(n.user_id)),

@@ -20,6 +20,8 @@ pub mod d2;
 pub mod devices;
 pub mod error;
 pub mod files;
+/// Folder view `/folders…` (PaperRust only).
+pub mod folders;
 pub mod handlers;
 pub mod http;
 /// Life areas `/life-areas…` (PaperRust UI).
@@ -117,6 +119,7 @@ pub fn router(v2: V2) -> Router<AppState> {
     r = settings::routes(r);
     r = asn::routes(r);
     r = life_areas::routes(r);
+    r = folders::routes(r);
     r = timeline::routes(r);
     r = roles::routes(r);
     #[cfg(feature = "ai")]

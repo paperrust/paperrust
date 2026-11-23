@@ -81,7 +81,7 @@ Quelle: `src/paperless/settings/__init__.py`, `settings/custom.py`, `settings/pa
   (die Redis-Felder `celery_redis_url`, `channels_redis_url`, `redis_prefix` sind seit 2026-11-14 entfernt);
   fachlich `filename_format`, `filename_format_remove_none`, `audit_log_enabled` (true),
   `empty_trash_delay` (30, min 1), `app_title`, `app_logo`, `enable_update_check` (None = "default"),
-  `task_workers` (1), `worker_timeout` (1800), `tika_enabled`, `ai_enabled`, `enable_compression`
+  `task_workers` (1; PaperRust: `auto` = `resources::task_workers_from_env`, Known difference 14), `worker_timeout` (1800), `tika_enabled`, `ai_enabled`, `enable_compression`
   (yes), `db_read_cache_enabled` (no). Alles Weitere: `config.env.get("PAPERLESS_…")` + Parser.
 * DB (`parse_db_settings`): Engine `PAPERLESS_DBENGINE` ∈ {sqlite, postgresql, mariadb}, sonst
   `postgresql` wenn `PAPERLESS_DBHOST` gesetzt, sonst `sqlite`. `DBNAME/DBUSER/DBPASS` (paperless),
@@ -382,6 +382,17 @@ Konfiguration (Defaults, URL/Hosts, DB, dotenv, entfernte Variablen → Hinweis)
     prüft nichts. Unter Linux unverändert (gewöhnliche Namen wie bei `PosixPath`). Neu:
     `sanitize_component` (Bereinigung eines Namensteils statt Fehler; genutzt von der Arbeitskopie im
     Consumer), `is_windows_device_name`, `is_windows_reserved_component`.
+14. **`PAPERLESS_TASK_WORKERS=auto`** (`resources.rs`, 2026-11-23): unset = 1 as upstream
+    (`DEFAULT_TASK_WORKERS`; threads per worker then `max(cores / 1, 1)` = all cores, memory cap of
+    `apply_ocr_resource_cap` unchanged). The value `auto` (case-insensitive, `is_auto`) is a PaperRust
+    opt-in: `default_task_workers` = `min(ceil(cores / t), 4, budget / (t × 100 MB))`, at least 1
+    (`t` = explicit `THREADS_PER_WORKER` or 2). upstream `int("auto")` fails at startup. Every other
+    value is parsed with `int()` and keeps the ngx error text. Shared entry point
+    `task_workers_from_env` (pl-core `Config`, pl-queue); pl-ocr parses the same way with its own
+    `py_int`. History: 2026-11-22 the automatic value was the default for an unset variable; withdrawn
+    2026-11-23 because a single document got slower (Raspberry Pi 5, 3 cores: 255 documents 214 s →
+    162 s, but one 8-page scan alone 14.8 s → 24 s). Startup log: `task workers: N (default|auto: from
+    cores and memory|set explicitly)`.
 
 ## API-Änderungen
 
@@ -421,7 +432,7 @@ Konfiguration (Defaults, URL/Hosts, DB, dotenv, entfernte Variablen → Hinweis)
   `config::allowed_host_from_url_hostname`, benutzt von `Config::from_env_map`, `pl-authz::AuthConfig`
   und `pl-server::config` (alle drei Lesestellen gleich).
   - `["*"]` nur, wenn weder `PAPERLESS_ALLOWED_HOSTS` gesetzt ist noch `PAPERLESS_URL` (nicht leer);
-    sonst die Liste aus `PAPERLESS_ALLOWED_HOSTS` (fehlend/leer → leer) + `localhost`, dann der Host
+    sonst die Liste aus `PAPERLESS_ALLOWED_HOSTS` (fehlend/leer → leer) + `localhost`, `127.0.0.1`, `[::1]` (upstream 40598db44, #14846, `dev` after 3.5.1), dann der Host
     aus `PAPERLESS_URL`. v3.4.2: nur `PAPERLESS_URL` gesetzt → `["*", host]` (jeder Host erlaubt).
   - Hostname aus `PAPERLESS_URL`: kleingeschrieben, ein Punkt am Ende entfernt, IPv6 in `[]` (vorher
     ohne Klammern, passte nie zu `split_domain_port`); leer, `*` oder mit `.` beginnend → Startfehler

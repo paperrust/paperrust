@@ -1,4 +1,5 @@
-<!-- Drop files anywhere → upload (shared upload store, progress via XHR + /ws/status/). -->
+<!-- Drop files anywhere → upload (shared upload store, progress via XHR + /ws/status/). In the folder view the files
+     go into the open folder (consumerStatus.folder, set by the workspace). -->
 <script lang="ts">
   import { t } from '../../lib/i18n'
   import { consumerStatus } from '../../stores/uploads.svelte'
@@ -34,7 +35,8 @@
 
 {#if depth > 0}
   <div class="drop" aria-hidden="true">
-    <div class="box"><Icon name="cloud-arrow-up" size="2.5rem" /><p>{t('m.ui.drop_files_upload')}</p></div>
+    <div class="box"><Icon name="cloud-arrow-up" size="2.5rem" /><p>{t('m.ui.drop_files_upload')}</p>
+      {#if consumerStatus.folder}<p class="into">{t('m.folders.upload_into', { PH: consumerStatus.folder.name })}</p>{/if}</div>
   </div>
 {/if}
 
@@ -61,5 +63,13 @@
     color: var(--d2-accent-text);
     font-size: var(--d2-fs-xl);
     font-weight: 600;
+  }
+  .box p {
+    margin: 0;
+  }
+  .into {
+    color: var(--d2-text-2);
+    font-size: var(--d2-fs-md, 1rem);
+    font-weight: 500;
   }
 </style>

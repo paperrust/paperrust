@@ -431,6 +431,17 @@ Quelle: `DocumentViewSet.suggestions`, `matching.match_*` (mit `user=request.use
     „Document with this Archive Serial Number already exists in the trash.“
 
 12. **langdetect verschoben** (2026-11-21): Modul und Profile liegen jetzt in `pl-parsers` (`pl_parsers::langdetect`, Daten `crates/pl-parsers/data/langdetect/`), `pl_documents::langdetect` verweist darauf – Verhalten unverändert; Grund: pl-consumer braucht es für die OCR-Sprachautomatik (sonst Abhängigkeitskreis).
+13. **Notes carry `format`** (2026-11-22, matches paperless-ngx 3.5.1, upstream #14626): `NotesSerializer`
+    fields `id, note, format, created, user` in the `notes` field of documents (`NOTES_SQL`) and in
+    `GET /api/documents/{id}/notes/` (`load_notes`). Needs `documents_note.format`
+    (PaperRust migration `pl_documents_write.0001_paperrust_note_format`). The v3.4.2 parity set
+    (`tests/parity.rs`, `notes`) differs in this field.
+14. **Feld `folder` (nur PaperRust, Ordneransicht, 2026-11-22):** `serialize_documents_db` hängt **nach** den
+    upstream-Feldern das Lesefeld `folder` an (Ordner-id oder `null` = „Unsortiert“, aus
+    `paperrust_document_folder`). Nur wenn die Instanz mindestens einen Ordner hat oder `fields=folder`
+    ausdrücklich angefragt wird; ohne Ordner (und ohne Tabelle) bleiben die Antworten byte-gleich zu
+    paperless-ngx. Eine zusätzliche Abfrage je Seite (ein Index-Zugriff). Schreiben nur über
+    `POST /rs/api/v2/folders/move-documents`, nicht über v1 (v1 ist ngx-Vertrag).
 
 ## Parität
 

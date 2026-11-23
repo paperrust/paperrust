@@ -6,7 +6,7 @@ Celery-Brücke und Backend-Auswahl sind entfernt. Teil A beschreibt das upstream
 das nachgebaut wird. Upstream-Stand
 paperless-ngx **v3.4.2**, Celery 5.6.3 / kombu 5.6.2 / billiard (Quelltext in `reference/venv`
 gelesen, nicht aus dem Gedächtnis). Crate: `crates/pl-queue`, Migration
-`crates/pl-queue/migrations/0001_paperrust_task_queue.sql`, DB-Tests `crates/pl-queue/tests/db.rs`,
+`crates/pl-queue/migrations/0001_paperrust_task_queue.sql` (+ `0002_paperrust_task_queue_fence_token.sql`), DB-Tests `crates/pl-queue/tests/db.rs`,
 Golden-Generator `tests/parity/pl-queue/celery_crontab_golden.py`.
 
 ## Teil A – Upstream-Verhalten (Quelle in Klammern)
@@ -193,25 +193,37 @@ QueueError { Db, Query, Json, Unsupported, Invalid }
   Meldungen in der Lücke gehen verloren. Rückkehr nur bei Shutdown oder geschlossenem Pool
   (`relay_notifications_with(.., RelayBackoff)` für Tests).
 
-### B2. Tabelle `paperrust_task_queue` (Migration 0001, expand-only, nicht automatisch)
+### B2. Tabelle `paperrust_task_queue` (Migrationen 0001 + 0002, expand-only, nicht automatisch)
 
 Spalten: `id, task_id (unique), task_name, queue, priority, args, kwargs, headers, state
-(queued|running|done|failed|revoked), attempts (Zustellungen seit Einreihen, Fencing-Token),
-retries, eta, expires, time_limit, locked_by, locked_until, heartbeat_at, revoke_requested,
-terminate_requested, link, link_error, group_id, group_index, created_at, started_at, finished_at,
-result, error`. Dazu `paperrust_task_group` (Chord-Zähler) und `paperrust_beat_state`
+(queued|running|done|failed|revoked), attempts (Zustellungen seit Einreihen/Retry, für
+`MAX_DELIVERIES` und Coalescing), retries, eta, expires, time_limit, locked_by, locked_until,
+heartbeat_at, revoke_requested, terminate_requested, link, link_error, group_id, group_index,
+created_at, started_at, finished_at, result, error` und seit 0002 (2026-11-23)
+`fence_token bigint NOT NULL DEFAULT 0` (Fencing-Token je Zustellung: +1 bei jedem Beanspruchen,
+Retry und Release, nie zurückgesetzt; `ADD COLUMN IF NOT EXISTS`, Rückbau `DROP COLUMN`). Dazu `paperrust_task_group` (Chord-Zähler) und `paperrust_beat_state`
 (`name, task, last_run_at, total_run_count, tz`). Einspielen: `psql -f` oder bewusst
-`pl_queue::migrations::apply(&pool)`. Rückbau: die drei Tabellen löschen.
+`pl_queue::migrations::apply(&pool)` (spielt 0001 und 0002 ein; macht auch der Worker-Start und
+`paperrust manage migrate`). Rückbau: die drei Tabellen löschen. Beim Update alle Worker-Prozesse
+zusammen neu starten (ein alter Worker erhöht `fence_token` nicht).
 
 ### B3. Ablauf
 
 1. **Einreihen**: `record_pending` (wie `before_task_publish`) → `INSERT … ON CONFLICT (task_id) DO NOTHING`
    → NOTIFY. `eta` = `opts.eta` oder `now + countdown`; `expires` absolut.
-2. **Beanspruchen**: `WITH next AS (SELECT id … WHERE state='queued' AND eta<=now AND queue=ANY AND task_name=ANY ORDER BY priority, eta, id LIMIT n FOR UPDATE SKIP LOCKED) UPDATE … SET state='running', locked_by, locked_until=now+visibility, attempts=attempts+1`.
+2. **Beanspruchen**: `WITH next AS (SELECT id … WHERE state='queued' AND eta<=now AND queue=ANY AND task_name=ANY ORDER BY priority, eta, id LIMIT n FOR UPDATE SKIP LOCKED) UPDATE … SET state='running', locked_by, locked_until=now+visibility, attempts=attempts+1,
+   fence_token=fence_token+1`. Der lokale Lease-Beginn (`Job::claimed_at`) wird zusammen mit diesem
+   `now` genommen, vor dem Senden.
 3. **Vor dem Start** (`Request.revoked`): `revoke_requested` → REVOKED „revoked“; `expires ≤ now` →
    REVOKED „expired“ (ohne `date_started`).
-4. **Start**: PaperlessTask `started`. Handler in eigenem tokio-Task; Heartbeat alle
-   `visibility/3` verlängert die Lease; `terminate_requested` → Abbruch → REVOKED „terminated“.
+4. **Start**: Nur solange die Lease nachweisbar ist (vor 80 % seit `claimed_at`); dann
+   `mark_started` als **eine Transaktion**: gefencter Lease-`UPDATE` (wie Heartbeat) + PaperlessTask
+   `started` (TLA+-Befund F2, 2026-11-23). Gehört die Zeile inzwischen einer anderen Zustellung oder
+   ist sie fertig → nichts geschrieben, Handler startet **nicht**; `terminate_requested` inzwischen
+   gesetzt → REVOKED „terminated“ ohne Ausführung; DB-Fehler → Handler startet auf der Lease des
+   Beanspruchens (Selbst-Fencing gilt). Handler in eigenem tokio-Task; Heartbeat `visibility/3` nach
+   dem letzten erfolgreichen, nach einem Fehlschlag erneut nach `visibility/15`;
+   `terminate_requested` → Abbruch → REVOKED „terminated“.
 5. **Ende**: Erfolg → `done` + `mark_success` + `link`-Callbacks (Ergebnis als erstes Argument, außer
    `.si`) + Gruppenabrechnung. Fehler → `RetryMode::Auto` mit Task-Regel (A2) bzw. `Explicit`
    (Standard 3/180 s): `queued`, `eta = now + countdown`, `retries+1`, PaperlessTask bleibt
@@ -228,10 +240,16 @@ result, error`. Dazu `paperrust_task_group` (Chord-Zähler) und `paperrust_beat_
 7. **Absturz** (keine Heartbeats): nach `locked_until` legt `reap_expired_leases` (jeder Worker,
    alle `visibility/2`) den Job zurück (`queued`); nach `PAPERRUST_QUEUE_MAX_DELIVERIES` Zustellungen
    FAILURE `WorkerLostError` „Worker exited prematurely: lease expired after N deliveries. Job: <id>.“
-8. **Fencing / keine doppelte Ausführung**: Abschluss/Heartbeat/Retry/Release nur mit gleichem
-   `attempts` und (`running` + eigener `locked_by` **oder** `queued` = zurückgelegt, aber nicht neu
-   beansprucht). Der Worker bricht selbst ab, wenn 80 % der Lease ohne erfolgreichen Heartbeat
-   verstreichen (DB nicht erreichbar) oder der Heartbeat „verloren“ meldet. Garantie: höchstens
+8. **Fencing / keine doppelte Ausführung**: Abschluss/Heartbeat/`mark_started`/Retry/Release nur mit
+   gleichem `fence_token` und (`running` + eigener `locked_by` **oder** `queued` = zurückgelegt, aber
+   nicht neu beansprucht). Bis 2026-11-23 war der Token `attempts`; der wiederholte sich innerhalb
+   eines Prozesses nach Retry/Release (TLA+-Befund F3: verspätetes `complete()` einer alten Zustellung
+   wurde für eine neuere angenommen, angehängte Coalescing-IDs gingen verloren). Der Worker bricht
+   selbst ab, sobald er seine Lease nicht mehr mit Reserve nachweisen kann: eigener Timer bei 80 % der
+   Lease nach dem Senden des letzten erfolgreichen Lease-Schreibens (Beanspruchen, `mark_started`,
+   Heartbeat), unabhängig von Heartbeat-Versuchen (TLA+-Befund F1: vorher nur nach einem Versuch
+   geprüft, bei sofort fehlschlagenden Heartbeats erst bei 100 %), oder wenn der Heartbeat „verloren“
+   meldet. Garantie: höchstens
    ein Worker führt einen Job gleichzeitig aus, solange die Uhren der Worker-Rechner nicht mehr als
    20 % der Lease auseinanderliegen; „genau einmal“ gilt für Zustand und PaperlessTask, Handler
    müssen bei Neuzustellung nach Absturz idempotent sein (wie mit Celery-acks_late).
@@ -256,7 +274,7 @@ result, error`. Dazu `paperrust_task_group` (Chord-Zähler) und `paperrust_beat_
 | Variable | Standard | |
 |---|---|---|
 | `PAPERRUST_QUEUE_BACKEND` / `PAPERRUST_QUEUE` | – | **wirkungslos seit 2026-11-14** (immer PostgreSQL); `celery`/`redis` → Hinweis beim Start, nie Abbruch |
-| `PAPERLESS_TASK_WORKERS` | 1 | Parallelität (≥ 1) |
+| `PAPERLESS_TASK_WORKERS` | 1 (upstream); `auto` = automatisch (`pl_core::resources::task_workers_from_env`; Known difference 16) | Parallelität (≥ 1) |
 | `PAPERLESS_THREADS_PER_WORKER` | `max(floor(cpus/workers),1)` | an Handler |
 | `PAPERLESS_WORKER_TIMEOUT` | 1800 | Zeitlimit (s) |
 | `PAPERLESS_TIME_ZONE` | UTC | Beat-Zeitzone |
@@ -292,7 +310,15 @@ result, error`. Dazu `paperrust_task_group` (Chord-Zähler) und `paperrust_beat_
 * `tests/relay_db.rs` (1 Test, `#[ignore]`, braucht `PAPERRUST_RELAY_TEST_DATABASE_URL` auf
   `pl_sec_relay*`): Relay-Listener zweimal per `pg_terminate_backend` töten → neuer LISTEN-Backend,
   jede Meldung genau einmal, genau ein Listener aktiv, sauberes Stoppen.
-* `tests/db.rs` (7 Tests, `#[ignore]`, brauchen `PAPERRUST_QUEUE_TEST_DATABASE_URL` auf eine
+* `cargo test -p pl-queue`: dazu 3 Unit-Tests der Lease-Zeitlogik (`worker::LeaseTiming`: 48/20/4 s
+  bei 60 s, Fence-Termin 80 % nach letztem Erfolg, F1-Regression: sofort fehlschlagende Heartbeats
+  enden bei 48 s statt 60 s; keine Panik bei NaN/0/negativ).
+* `tests/db.rs` (10 Tests, `#[ignore]`; 2026-11-23 auf `pl_queue_test_fence` aus `paperless_snapshot`
+  gelaufen, 10/10; darunter `stale_mark_started_is_a_noop` (F2: veraltetes `mark_started` → `Lost`,
+  PaperlessTask bleibt `success`; zurückgelegte Zeile wird übernommen; Terminate vor Start) und
+  `old_delivery_rejected_after_reclaim_in_same_process` (F3: gleiches `(attempts, locked_by)` nach
+  Retry, altes complete/fail/retry/release/heartbeat/mark_started abgelehnt, angehängte IDs bleiben;
+  Release erhöht den Token); brauchen `PAPERRUST_QUEUE_TEST_DATABASE_URL` auf eine
   Datenbank `pl_queue_test*`; der Test verweigert andere Namen): PaperlessTask-Lebenszyklus inkl.
   Duplikat→failure und consume_file-`input_data`; idempotentes Einreihen; 4 Worker × 3 parallel,
   300 Jobs, jeder genau einmal, Last verteilt; Absturz (Lease-Ablauf → Neuzustellung, Fencing des
@@ -347,6 +373,27 @@ result, error`. Dazu `paperrust_task_group` (Chord-Zähler) und `paperrust_beat_
     (Desktop-Test 2026-11-18). Verpasste Termine holt der gespeicherte Zustand (`PgBeatStore`) beim
     nächsten Start einmal nach, auch wenn der Rechner nachts aus ist. `beat::CATCH_UP_ON_FIRST_START`
     bleibt als (leere) Liste für künftige Fälle.
+16. **`PAPERLESS_TASK_WORKERS=auto`** (opt-in since 2026-11-23; 2026-11-22 to 2026-11-23 it was the
+    default for an unset variable): unset = 1 slot as upstream (`CELERY_WORKER_CONCURRENCY`), so a
+    single document gets all cores (`THREADS_PER_WORKER` = cores). The value `auto`
+    (case-insensitive; upstream `int("auto")` fails) sets the slot count to
+    `pl_core::resources::default_task_workers`:
+    `min(ceil(cores / t), 4, budget / (t × 100 MB))`, at least 1, with `t` = explicit
+    `PAPERLESS_THREADS_PER_WORKER` or 2 and `budget` = 50 % of the memory available at start
+    (4 cores → 2 slots; 3 cores with `THREADS_PER_WORKER=2` → 2; 12 cores → 4). The default for
+    `THREADS_PER_WORKER` stays upstream's `max(cores // workers, 1)`, so slots × OCR threads ≤ cores.
+    Cores/memory are measured once per process, so pl-queue (slots) and pl-ocr (threads) agree.
+    An explicit number is used unchanged; other values fail with the ngx `int()` text. Why not the
+    default: Raspberry Pi 5 (3 cores) – 255 documents 214 s (1 slot) vs. 162 s (auto), but one
+    8-page scan alone 14.8 s vs. 24 s; single-document speed must not regress. The slots serve all
+    tasks (mail, index, training), as with Celery concurrency > 1. The consumer is safe with
+    several slots (pl-consumer Known difference 24).
+
+17. **Start nur mit nachweisbarer Lease** (2026-11-23, TLA+-Befunde F1/F2, `verification/task-queue/`):
+    Ein Job, dessen Lease vor dem Start nicht mehr nachweisbar ist (Pause zwischen Beanspruchen und
+    Start ≥ 80 % der Lease) oder dessen `mark_started` meldet, dass eine andere Zustellung die Zeile
+    hat, wird nicht ausgeführt und nichts geschrieben; der Aufräumer stellt ihn neu zu (höchstens
+    einmal gleichzeitig, mindestens einmal insgesamt). Celery kennt keine Lease.
 
 ## Ergänzung 2026-11-18: Wartungsaufgaben (A1)
 

@@ -340,6 +340,7 @@ pub async fn update_document_fields(conn: &mut PgConnection, d: &DocRow, fields:
 
 /// Duplikate (`Document.global_objects.filter(Q(checksum=c) | Q(archive_checksum=c)).order_by("-created")`):
 /// (id, title, original_filename, filename, deleted_at)
+#[derive(Debug, Clone)]
 pub struct DuplicateRow {
     pub id: i64,
     pub title: String,
@@ -348,14 +349,38 @@ pub struct DuplicateRow {
     pub in_trash: bool,
 }
 
+/// PaperRust: also documents whose stored file is a shrunk copy of a delivered file with this checksum
+/// (`paperrust_source_checksum`, created on first use). Without shrinking identical to upstream.
 pub async fn find_duplicates(conn: &mut PgConnection, checksum: &str) -> Result<Vec<DuplicateRow>, sqlx::Error> {
-    let q = Query::select()
-        .columns([a("id"), a("title"), a("original_filename"), a("filename"), a("deleted_at")])
-        .from(a("documents_document"))
-        .cond_where(sea_query::Cond::any().add(Expr::col(a("checksum")).eq(checksum)).add(Expr::col(a("archive_checksum")).eq(checksum)))
-        .order_by(a("created"), Order::Desc)
-        .to_owned();
-    let rows = fetch_all(conn, &q).await?;
+    crate::source_checksum::ensure_conn(conn).await?;
+    find_duplicates_with(conn, checksum, true).await
+}
+
+/// SQL of [`find_duplicates_with`]. The second branch (PaperRust) also matches documents whose
+/// stored file is a shrunk copy of a delivered file with this checksum (`paperrust_source_checksum`).
+/// UNION (not OR with a subquery) so that each branch uses its index.
+fn duplicates_sql(with_source: bool) -> &'static str {
+    if with_source {
+        concat!(
+            "SELECT id, title, original_filename, filename, deleted_at, created FROM documents_document ",
+            "WHERE checksum = $1 OR archive_checksum = $1 ",
+            "UNION ",
+            "SELECT d.id, d.title, d.original_filename, d.filename, d.deleted_at, d.created ",
+            "FROM paperrust_source_checksum s JOIN documents_document d ON d.id = s.document_id WHERE s.checksum = $1 ",
+            "ORDER BY created DESC"
+        )
+    } else {
+        concat!(
+            "SELECT id, title, original_filename, filename, deleted_at, created FROM documents_document ",
+            "WHERE checksum = $1 OR archive_checksum = $1 ORDER BY created DESC"
+        )
+    }
+}
+
+/// Like [`find_duplicates`]; `with_source` = also match `paperrust_source_checksum` (the caller has
+/// made sure the table exists).
+async fn find_duplicates_with(conn: &mut PgConnection, checksum: &str, with_source: bool) -> Result<Vec<DuplicateRow>, sqlx::Error> {
+    let rows = sqlx::query(duplicates_sql(with_source)).bind(checksum).fetch_all(&mut *conn).await?;
     rows.iter()
         .map(|r| {
             Ok(DuplicateRow {
@@ -738,8 +763,27 @@ pub async fn content_type_id(conn: &mut PgConnection, app_label: &str, model: &s
     })
 }
 
-/// `get_or_create(name__iexact=part, defaults={"name": part})` for tags (subfolders as tags).
+/// Transaction-scoped advisory lock on `key` (released at commit/rollback). Serializes
+/// check-then-insert sequences of concurrent consume tasks across processes (ASN, checksum, tag
+/// name). Hash collisions only make unrelated keys wait for each other.
+pub async fn advisory_xact_lock(conn: &mut PgConnection, key: &str) -> Result<(), sqlx::Error> {
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))").bind(key).execute(&mut *conn).await?;
+    Ok(())
+}
+
+/// `Tag.objects.get_or_create(name__iexact=…)` (barcode tags, sub-directories as tags).
+/// Concurrent consume tasks (several task slots) could both miss the tag and create it twice
+/// (`documents_tag` has no case-insensitive unique constraint): the lookup and the insert run in
+/// one transaction under an advisory lock on `upper(name)` (same function as the lookup).
 pub async fn get_or_create_tag(conn: &mut PgConnection, name: &str) -> Result<i64, sqlx::Error> {
+    let mut tx = sqlx::Connection::begin(&mut *conn).await?;
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended('paperrust:tag:' || upper($1), 0))").bind(name).execute(&mut *tx).await?;
+    let id = get_or_create_tag_locked(&mut tx, name).await?;
+    tx.commit().await?;
+    Ok(id)
+}
+
+async fn get_or_create_tag_locked(conn: &mut PgConnection, name: &str) -> Result<i64, sqlx::Error> {
     let q = Query::select()
         .column(a("id"))
         .from(a("documents_tag"))
@@ -779,5 +823,16 @@ mod tests {
         assert_eq!(value_field_name("nope"), None);
         assert!(custom_value_expr("integer", &Value::from("x")).is_err());
         assert!(custom_value_expr("date", &Value::from("2024-02-03")).is_ok());
+    }
+
+    #[test]
+    fn duplicates_sql_matches_upstream_and_source_checksum() {
+        let up = duplicates_sql(false);
+        assert!(up.contains("WHERE checksum = $1 OR archive_checksum = $1") && up.ends_with("ORDER BY created DESC"));
+        assert!(!up.contains("paperrust_source_checksum"));
+        let pr = duplicates_sql(true);
+        assert!(pr.starts_with(up.trim_end_matches(" ORDER BY created DESC")), "upstream branch unchanged");
+        assert!(pr.contains("UNION") && pr.contains("JOIN documents_document d ON d.id = s.document_id WHERE s.checksum = $1"));
+        assert!(pr.ends_with("ORDER BY created DESC"));
     }
 }

@@ -87,6 +87,8 @@ export class ConsumerStatusState {
   trayCollapsed = $state(false)
   /** PaperRust "AI text recognition" for the next uploads (field ai_ocr; switch in the upload area) */
   aiOcr = $state(false)
+  /** PaperRust folder view: folder that is open while uploading (field `folder`; set by the design2 workspace) */
+  folder = $state<{ id: number; name: string } | null>(null)
   private ws: WebSocket | null = null
   private listeners = { detected: new Set<Listener>(), finished: new Set<Listener>(), failed: new Set<Listener>(), started: new Set<() => void>(), updated: new Set<(m: any) => void>() }
 
@@ -296,6 +298,7 @@ export class ConsumerStatusState {
     formData.append('document', file, file.name)
     formData.append('from_webui', 'true')
     if (this.aiOcr) formData.append('ai_ocr', 'true')
+    if (this.folder) formData.append('folder', String(this.folder.id))
     const status = this.newFileUpload(file.name)
     status.message = t('app.connecting')
     api.uploadDocument(formData, {
@@ -309,7 +312,8 @@ export class ConsumerStatusState {
       },
       error: (httpStatus, statusText, body: any) => {
         // Angular shows error.error.document (array → "a,b" like toString)
-        if (httpStatus === 400) this.fail(status, body?.document != null ? String(body.document) : '')
+        // PaperRust: a refused upload folder answers {"folder": [...]}
+        if (httpStatus === 400) this.fail(status, body?.document != null ? String(body.document) : body?.folder != null ? String(body.folder) : '')
         else this.fail(status, t('app.http_error', { PH: httpStatus, PH_1: statusText }))
       },
     })

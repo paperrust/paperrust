@@ -264,6 +264,21 @@ löst – vor Stufe 5 nachmessen).
 | Feldwerte | 697 MB | ≈ 350 MB |
 | `paperrust_sync_object` | 301 MB | 0 |
 
+### 1.13 Ordneransicht (nachträglich, 2026-11-22, keine Umbaustufe)
+
+Eigene Tabellen der Ordneransicht (Migration `pl_api_v2.0002_paperrust_folder`, expand-only, läuft nach den
+Stufen; Vertrag docs/contract/pl-api-v2.md „Ordner“):
+
+| Tabelle | Spalten | Bemerkung |
+|---|---|---|
+| `paperrust_folder` | `id bigserial`, `uuid`, `rev`, `name varchar(128)`, `parent_id` → self, `owner_id`, `sort`, `color`, `created`, `modified` | Baum als Adjazenzliste wie 1.9; eindeutig `(coalesce(parent_id,0), lower(name))` |
+| `paperrust_document_folder` | `document_id` PK, `folder_id` → `paperrust_folder` ON DELETE CASCADE, `moved` | höchstens ein Ordner je Dokument, keine Zeile = „Unsortiert“; Index `(folder_id, document_id)` |
+| `paperrust_folder_grant` | `folder_id`, `subject`, `perms` | Kodierung wie 1.8 (`subject` ±, Bits 1/2/4) |
+
+Bewusst **keine** Spalte in `paperrust_document` (anders als im Ordner-Entwurf): die Seitentabelle funktioniert in
+jeder Stufe, lässt die Sicht `documents_document`, `manage datamodel check` und den Rückbau unberührt. Rückbau:
+die drei Tabellen löschen. In `paperrust-extras.json` enthalten.
+
 ## 2. Übergangsweg
 
 ### 2.1 Sichten statt hartem Schnitt – warum

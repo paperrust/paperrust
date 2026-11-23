@@ -165,12 +165,34 @@ pub(crate) async fn to_params(store: &Store, user: &User, leaves: &[&Cond]) -> D
             Cond::MimeType(m) => put("mime_type", m.clone(), &mut params)?,
             Cond::SharedByMe(true) => put("shared_by__id", user.id.to_string(), &mut params)?,
             Cond::SharedByMe(false) => {}
+            Cond::Folder(f) => {
+                if !f.any.is_empty() {
+                    let ids = folder_ids(store, &f.any).await?;
+                    put(if f.subfolders { "folder__id__tree" } else { "folder__id__in" }, ids, &mut params)?;
+                }
+                if let Some(n) = f.is_null {
+                    put("folder__isnull", if n { "1" } else { "0" }.into(), &mut params)?;
+                }
+            }
             Cond::All(_) | Cond::Any(_) | Cond::Not(_) => {
                 return Err(DomainError::Internal("non-leaf condition after flattening".into()));
             }
         }
     }
     Ok(params)
+}
+
+/// Folder UUIDs → ids (comma-separated, unknown → 0 = matches nothing).
+async fn folder_ids(store: &Store, u: &[Uuid]) -> DomainResult<String> {
+    let rows: Vec<(Uuid, i64)> =
+        sqlx::query_as("SELECT uuid, id FROM paperrust_folder WHERE uuid = ANY($1::uuid[])").bind(u).fetch_all(&store.db).await.map_err(
+            |e| match e.as_database_error().and_then(|d| d.code()).as_deref() {
+                Some("42P01") => DomainError::NotInstalled("folder view (paperrust_folder, `paperrust manage migrate`)"),
+                _ => DomainError::Internal(e.to_string()),
+            },
+        )?;
+    let map: HashMap<Uuid, i64> = rows.into_iter().collect();
+    Ok(u.iter().map(|x| map.get(x).map(|i| i.to_string()).unwrap_or_else(|| "0".into())).collect::<Vec<_>>().join(","))
 }
 
 type Put<'a> = dyn FnMut(&str, String, &mut Vec<(String, String)>) -> DomainResult<()> + Send + 'a;
@@ -715,9 +737,9 @@ fn cf_value(r: &sqlx::postgres::PgRow, docs: &HashMap<i64, Ident>) -> DomainResu
 
 /// Notes per document (newest first, like v1), user ID separate for the resolution.
 async fn load_notes(store: &Store, ids: &[i64]) -> DomainResult<HashMap<i64, Vec<(Note, Option<i64>)>>> {
-    type Row = (i32, i32, String, DateTime<Utc>, Option<i32>);
+    type Row = (i32, i32, String, DateTime<Utc>, Option<i32>, String);
     let rows: Vec<Row> = sqlx::query_as(
-        "SELECT document_id, id, note, created, user_id FROM documents_note
+        "SELECT document_id, id, note, created, user_id, format FROM documents_note
           WHERE document_id = ANY($1::int4[]) AND deleted_at IS NULL ORDER BY created DESC, id DESC",
     )
     .bind(ids.iter().map(|i| *i as i32).collect::<Vec<_>>())
@@ -725,8 +747,10 @@ async fn load_notes(store: &Store, ids: &[i64]) -> DomainResult<HashMap<i64, Vec
     .await
     .map_err(db_err)?;
     let mut out: HashMap<i64, Vec<(Note, Option<i64>)>> = HashMap::new();
-    for (doc, id, note, created, uid) in rows {
-        out.entry(i64::from(doc)).or_default().push((Note { legacy_id: i64::from(id), note, created, user: None }, uid.map(i64::from)));
+    for (doc, id, note, created, uid, format) in rows {
+        out.entry(i64::from(doc))
+            .or_default()
+            .push((Note { legacy_id: i64::from(id), note, format, created, user: None }, uid.map(i64::from)));
     }
     Ok(out)
 }

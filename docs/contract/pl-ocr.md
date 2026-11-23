@@ -35,7 +35,7 @@ Archiv-Steuerung ist eigenständig: `PAPERLESS_ARCHIVE_FILE_GENERATION` = auto/a
 | `PAPERLESS_OCR_COLOR_CONVERSION_STRATEGY` | `RGB` | `ColorConvertChoices(…)` | `color_conversion_strategy` | `db or env` |
 | `PAPERLESS_OCR_USER_ARGS` | `None` | JSON; Fehler → `{}` | `user_args` (JSON) | `db if truthy else json(env)` |
 | `PAPERLESS_MAX_IMAGE_PIXELS` | `None` | `int()` | – | Pillow-Grenze in paperless (`maybe_override_pixel_limit`: 0 → aus, <0/None → Pillow-Standard 89 478 485) |
-| `PAPERLESS_THREADS_PER_WORKER` | `max(cores // PAPERLESS_TASK_WORKERS, 1)` | `int()` | – | → `jobs` |
+| `PAPERLESS_THREADS_PER_WORKER` | `max(cores // PAPERLESS_TASK_WORKERS, 1)`; unset `TASK_WORKERS` = 1 (upstream, all cores); `TASK_WORKERS=auto` = PaperRust automatic value (pl-queue Known difference 16, `pl_core::resources::task_workers_or_auto`); other non-numbers: `int()` error text unchanged | `int()` | – | → `jobs` |
 | `PAPERLESS_REMOTE_OCR_ENGINE/_API_KEY/_ENDPOINT` | `None` | – | `remote_ocr_*` | `db or env` |
 | `PAPERLESS_REMOTE_OCR_MODE` | `always` | Start (always/workflow_only) | `remote_ocr_mode` | `db or env` |
 | `PAPERLESS_REMOTE_OCR_ALLOW_INTERNAL_ENDPOINTS` | `true` | bool | – | nur env |

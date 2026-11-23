@@ -2,7 +2,7 @@
 //!
 //! The upstream format (`manifest.json`, Django's serializer) only knows the models of paperless-ngx.
 //! PaperRust's own data – "else" branches and AI conditions of the workflows, workflow history,
-//! system settings, roles, ASN ranges, life areas, term aliases, detected deadlines,
+//! system settings, roles, ASN ranges, life areas, folders, term aliases, detected deadlines,
 //! AI history, question history, scanners, processed mails – was so far **lost** when backing up
 //! with `document_exporter` (finding C6-1). It is now stored in a separate file [`FILE_NAME`] next to
 //! `manifest.json`: paperless-ngx ignores it on the way back, PaperRust's `document_importer`
@@ -39,6 +39,12 @@ pub const TABLES: &[(&str, Option<&str>)] = &[
     ("paperrust_asn_range", None),
     ("paperrust_asn_print", None),
     ("paperrust_life_area", None),
+    // folder view (pl-api-v2 folders): tree, document → folder, shares – parents first
+    ("paperrust_folder", None),
+    ("paperrust_document_folder", None),
+    ("paperrust_folder_grant", None),
+    // original checksum of shrunk documents (pl-consumer source_checksum, duplicate detection)
+    ("paperrust_source_checksum", None),
     ("paperrust_taxonomy_alias", None),
     ("paperrust_workflow_ext", None),
     ("paperrust_workflow_else_action", None),
@@ -184,6 +190,8 @@ mod tests {
         assert!(pos("paperrust_role") < pos("paperrust_role_assignment"));
         assert!(pos("paperrust_ai_audit") < pos("paperrust_ai_review"));
         assert!(pos("paperrust_ask_conversation") < pos("paperrust_ask_message"));
+        assert!(pos("paperrust_folder") < pos("paperrust_document_folder"));
+        assert!(pos("paperrust_folder") < pos("paperrust_folder_grant"));
         // secrets and access credentials are not included
         assert!(!TABLES.iter().any(|(t, _)| *t == "paperrust_device_token" || *t == "paperrust_ai_mcp_scope"));
         assert_eq!(TABLES.iter().find(|(t, _)| *t == "paperrust_setting").unwrap().1, Some("secret_ct IS NULL"));

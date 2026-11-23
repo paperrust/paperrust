@@ -97,6 +97,8 @@ pub enum Cond {
     MimeType(String),
     /// Documents shared by the requesting user.
     SharedByMe(bool),
+    /// PaperRust folder view: folder of the document (not in paperless-ngx).
+    Folder(FolderSet),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Default)]
@@ -128,6 +130,19 @@ pub struct RefSet {
     pub all: Vec<Uuid>,
     #[serde(default)]
     pub none: Vec<Uuid>,
+    #[serde(default)]
+    pub is_null: Option<bool>,
+}
+
+/// Folder condition (PaperRust folder view): `any` = in one of these folders (with `subfolders` also in
+/// their subfolders), `is_null: true` = "Unsorted" (no folder), `false` = in any folder.
+#[derive(Debug, Clone, PartialEq, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FolderSet {
+    #[serde(default)]
+    pub any: Vec<Uuid>,
+    #[serde(default)]
+    pub subfolders: bool,
     #[serde(default)]
     pub is_null: Option<bool>,
 }
@@ -201,6 +216,18 @@ mod tests {
         assert_eq!(parse_sort(q.sort.as_deref()).unwrap(), ("title", false));
         assert_eq!(parse_sort(None).unwrap(), ("created", true));
         assert!(parse_sort(Some("content")).is_err());
+    }
+
+    #[test]
+    fn parses_folder_condition() {
+        let c: Cond = serde_json::from_value(serde_json::json!({"folder": {"is_null": true}})).unwrap();
+        assert_eq!(c, Cond::Folder(FolderSet { any: vec![], subfolders: false, is_null: Some(true) }));
+        let u = "8a3c1e52-4a0e-4b8e-9d3e-0c2f6e3b9a11";
+        let c: Cond = serde_json::from_value(serde_json::json!({"folder": {"any": [u], "subfolders": true}})).unwrap();
+        let Cond::Folder(f) = c else { panic!("folder") };
+        assert!(f.subfolders);
+        assert_eq!(f.any.len(), 1);
+        assert!(serde_json::from_value::<Cond>(serde_json::json!({"folder": {"all": []}})).is_err());
     }
 
     #[test]

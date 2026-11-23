@@ -165,7 +165,7 @@ selbst enthält.
 | b5d6009e1 (#14797) | Auswahl bleibt nach eingereihter Massenänderung | **nichts zu ändern**: frontend-light `BulkEditor.svelte` leert die Auswahl nur, wenn Originale gelöscht/zusammengeführt wurden (`clearSelection`), sonst bleibt sie; den Fall „Hintergrundaufgabe fertig → Auswahl verkleinern“ (app-frame) gibt es nicht | – | – |
 | 14252054a (#14821) | Eingabefelder melden den Wert beim Tippen, nicht erst beim Verlassen | frontend-light `InputText`, `InputTextarea`, `InputUrl`, `InputNumber` (`oninput` meldet an `onchange`; Zahl roh beim Tippen, normalisiert beim Verlassen) – betrifft v. a. ASN und benutzerdefinierte Felder in der Dokumentansicht | `svelte-check`, vitest (keine Komponententests vorhanden) | – |
 | 199d1a88e (#14803), 4973be849 (#14824) | Chat-Streaming unter ASGI; Socket-Zeitlimits für Broker/Celery im Status | **entfällt**: kein ASGI/Python-Server, kein Celery/Redis | – | – |
-| (#14626) | Notizen als Markdown | **geplant, nach Datenmodell Stufe 7** – braucht Schemaänderung, noch nicht umgesetzt | – | – |
+| (#14626) | Notizen als Markdown | **umgesetzt 2026-11-22**, siehe §9 | `notes::tests::note_create_validation_like_3_5_1` | – |
 
 ### Übernommen als eigene Migration (2026-11-13): 8aa99a381 (#14612, django-treenode → Adjazenzliste)
 
@@ -194,3 +194,25 @@ docs/contract/pl-objects.md „Tag-Baum (Adjazenzliste, L6 Schritt 1)“.
 - **Beim nächsten Versionssprung** (upstream-Release mit `0028`): Quell-DBs mit angewandter `0028` haben die
   Spalten nicht mehr – `pl-dbmigrate` (`schema/`, Erkennung) und `pl-cli` (`baseline/`, Nachholen) müssen
   diesen Stand als „gleich, Tag-Spalten schon weg“ annehmen; die PaperRust-Migration ist idempotent.
+
+## 9. paperless-ngx 3.5.0 / 3.5.1 (2026-11-22)
+
+Analyse: `results/upstream/2026-11-22-ngx-3.5.md` (in the main checkout). Kein formaler Versionssprung
+(`upstream/` bleibt v3.4.2); übernommen wurde, was den Umstieg sichert, plus einzelne Ideen. Quelle: Tag
+v3.5.1 (blobloser Klon), für #14846 `dev` (245e819cb).
+
+| Commit / PR | Thema | Stand in PaperRust | Tests |
+|---|---|---|---|
+| Migration `documents.0030_note_format` | Umstieg von ngx 3.5.x: neue Spalte `documents_note.format varchar(16) NOT NULL`, Standard danach entfernt | **umgesetzt**: `0030` in `KNOWN_NEWER` (pl-dbmigrate `schema.rs`, pl-cli `migrate.rs`); eigene idempotente Migration `pl_documents_write.0001_paperrust_note_format` (Spalte anlegen falls fehlend, Standard `'plain'` setzen); Kopie (`pl-dbmigrate` `Shape::v342(drop_tag_tree, note_format)` + `newer_ddl`) kopiert `format`; `switch`-Hinweis | `schema::tests::known_newer_and_v220`, `migrate::shape_tests::*` (pl-dbmigrate), `migrate::tests::ngx_3_5_database_is_current`, `classify_states` (pl-cli) |
+| b63ea7754 + 694619c33 (#14626) | Notizen als Markdown | **umgesetzt**: v1 `GET/POST /api/documents/{id}/notes/` und `notes` der Dokumente mit `format` (Reihenfolge `id, note, format, created, user`), POST-Validierung wie `NoteCreateSerializer` 3.5.1 (Rechte vor Validierung); v2 `/documents/{uuid}/notes` mit `format`; Audit-Diff mit `format`; frontend-light (klassisch + design2): Umschalter Klartext/Markdown, Vorschau, Anzeige über den bereinigten Chat-Renderer (`components/document-notes/notes.ts` → `chat/markdown.ts`, HTML wird escaped, nur http/https/mailto-Links) | `notes::tests::note_create_validation_like_3_5_1` (pl-documents-write), frontend-light `components/document-notes/notes.test.ts` |
+| Export/Import `format` | Rückweg zu ngx 3.5, Import von 3.5-Exporten | **umgesetzt**: Importer nimmt `format` an (Spalte da → schreiben, sonst überspringen); Exporter schreibt `format` nur für Nicht-`plain`-Notizen (3.4.2-Importer lehnt unbekannte Felder ab) und warnt bei Markdown-Notizen (pl-cli Known differences 19) | `export::importer::tests::ngx_3_5_note_format_accepted`, `export::noteformat::tests::*` |
+| a22579e31 (#14805) | Chat-Tempo beim Streamen | **umgesetzt** in frontend-light `components/chat/Chat.svelte` + `typewriter.ts`: jeder Schub wird über 0,75–3 s verteilt (1 ms je Zeichen, 16-ms-Takt) statt 10 ms je Zeichen; design2-Assistent hat keinen Tipp-Effekt | `typewriter.test.ts` |
+| 40598db44 (#14846, `dev`) | Loopback-Hosts immer erlaubt | **umgesetzt**: `pl_core::config::initial_allowed_hosts` hängt `localhost`, `127.0.0.1`, `[::1]` an (außer bei `*`), `LOOPBACK_HOSTS`; Doku `configuration.md` (de/en) | `config::tests::allowed_hosts_at_startup_upstream_00096e025`, `url_and_hosts` (pl-core), pl-authz/pl-server-Konfigtests angepasst |
+
+Offen aus der Analyse (nicht Teil dieses Schritts): verschachtelte Tag-Anzeige (#14843), „Was ist neu“
+(#14835), frontend-light-Nachprüfung #14682/#14717/#14699.
+
+Nicht geprüft: echte ngx-3.5.1-Datenbank (Referenz-Agent) per `switch` in-place und als Kopie, und ein
+echter ngx-3.5-Export mit Notizen – nur Unit-Tests (Klassifizierung, Kopier-Schema, Importer/Exporter-Logik).
+Die Paritätstests gegen die v3.4.2-Referenz unterscheiden sich jetzt im Feld `format` der Notizen und bei
+der POST-Validierung (bewusst, Vertrag pl-documents-write Known differences 20).

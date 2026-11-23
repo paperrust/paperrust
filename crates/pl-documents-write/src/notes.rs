@@ -1,4 +1,6 @@
 // upstream: src/documents/views.py@v3.4.2 (DocumentViewSet.notes, POST/DELETE branch),
+//           POST validation and `format` from paperless-ngx v3.5.1 (#14626):
+//           src/documents/serialisers.py (NoteCreateSerializer), views.py (DocumentViewSet.notes),
 //           src/documents/permissions.py@v3.4.2 (PaperlessNotePermissions, has_perms_owner_aware),
 //           django-auditlog 3.4.1 (LogEntryManager.log_create, log_create receiver for Note)
 //
@@ -63,6 +65,81 @@ async fn notes_json(state: &AppState, auth: &AuthUser, doc_id: i64) -> ApiResult
     Ok(v.pop().and_then(|o| o.get("notes").cloned()).unwrap_or(Value::Array(vec![])))
 }
 
+/// `Note.Format` choices (paperless-ngx 3.5, models.py `Note.Format`).
+pub const NOTE_FORMATS: [&str; 2] = ["plain", "markdown"];
+
+/// `NoteCreateSerializer` (paperless-ngx v3.5.1 serialisers.py): `note = CharField()` (required,
+/// trimmed, not blank, not null, no NUL characters) and `format = ChoiceField(Note.Format.choices,
+/// default="plain", required=False)`. Errors as DRF: `{field: [message]}` in declaration order.
+pub fn validate_note_create(data: &Value) -> Result<(String, &'static str), Value> {
+    let empty = Map::new();
+    let m = match data {
+        Value::Object(m) => m,
+        // an empty body parses to {} upstream (request.data is never None)
+        Value::Null => &empty,
+        // DRF Serializer with non-dict data
+        other => {
+            let got = match other {
+                Value::Array(_) => "list",
+                Value::String(_) => "str",
+                Value::Bool(_) => "bool",
+                Value::Number(n) if n.is_f64() => "float",
+                _ => "int",
+            };
+            return Err(json!({"non_field_errors": [format!("Invalid data. Expected a dictionary, but got {got}.")]}));
+        }
+    };
+    let mut errors = Map::new();
+    let note = match m.get("note") {
+        None => {
+            errors.insert("note".into(), json!(["This field is required."]));
+            None
+        }
+        Some(Value::Null) => {
+            errors.insert("note".into(), json!(["This field may not be null."]));
+            None
+        }
+        Some(v @ (Value::String(_) | Value::Number(_))) => {
+            let s = crate::drf::py_str(v);
+            let t = s.trim();
+            if t.is_empty() {
+                errors.insert("note".into(), json!(["This field may not be blank."]));
+                None
+            } else if t.contains('\0') {
+                errors.insert("note".into(), json!(["Null characters are not allowed."]));
+                None
+            } else {
+                Some(t.to_string())
+            }
+        }
+        Some(_) => {
+            errors.insert("note".into(), json!(["Not a valid string."]));
+            None
+        }
+    };
+    let format = match m.get("format") {
+        None => Some(NOTE_FORMATS[0]),
+        Some(Value::Null) => {
+            errors.insert("format".into(), json!(["This field may not be null."]));
+            None
+        }
+        Some(v) => {
+            let s = crate::drf::py_str(v);
+            match NOTE_FORMATS.iter().find(|f| **f == s) {
+                Some(f) => Some(*f),
+                None => {
+                    errors.insert("format".into(), json!([format!("\"{s}\" is not a valid choice.")]));
+                    None
+                }
+            }
+        }
+    };
+    match (note, format) {
+        (Some(n), Some(f)) if errors.is_empty() => Ok((n, f)),
+        _ => Err(Value::Object(errors)),
+    }
+}
+
 fn ok(ctx: &RequestContext, v: Value) -> Response {
     pl_core::Drf::ok(v).indent(ctx.negotiation.indent).into_response()
 }
@@ -84,51 +161,47 @@ pub async fn notes_create_handler(
         if !can_view {
             return Err(forbidden("Insufficient permissions to view notes"));
         }
-        // DRF's FormParser/MultiPartParser: `request.data["note"]` is the last value of the key.
+        // DRF's FormParser/MultiPartParser: `request.data[key]` is the last value of the key.
         let data = match crate::form::parse(&ctx.headers, &body).await? {
             Some(form) => {
                 let mut m = Map::new();
-                if let Some(n) = form.get("note") {
-                    m.insert("note".into(), Value::String(n.to_owned()));
+                for key in ["note", "format"] {
+                    if let Some(v) = form.get(key) {
+                        m.insert(key.into(), Value::String(v.to_owned()));
+                    }
                 }
                 Value::Object(m)
             }
             None => crate::views::parse_json_body(&ctx.headers, &body)?,
         };
+        // 3.5.1: change permission first, then NoteCreateSerializer(...).is_valid(raise_exception=True)
+        let Some((_, can_change)) = doc_and_perm(&state, &auth, &pk, "change_document").await? else {
+            return Err(ApiError::Core(pl_core::ApiError::not_found()));
+        };
+        if !can_change {
+            return Err(forbidden("Insufficient permissions to create notes"));
+        }
+        let (note, format) = validate_note_create(&data).map_err(ApiError::Validation)?;
         let result: ApiResult<Value> = async {
-            let Some((_, can_change)) = doc_and_perm(&state, &auth, &pk, "change_document").await? else {
-                return Err(ApiError::Uncaught("gone".into()));
-            };
-            if !can_change {
-                return Err(forbidden("Insufficient permissions to create notes"));
-            }
-            // request.data["note"] (KeyError → except → {"error": …})
-            let note_v = match &data {
-                Value::Object(m) => m.get("note").cloned(),
-                _ => None,
-            };
-            let Some(note_v) = note_v else { return Err(ApiError::Uncaught("KeyError: 'note'".into())) };
-            let note = match &note_v {
-                Value::String(s) => s.clone(),
-                Value::Null => return Err(ApiError::Uncaught("null note".into())),
-                other => crate::drf::py_str(other),
-            };
             let lctx = log_ctx(&state, &ctx, &auth, peer);
             let media = MediaCfg::from_config(&state.live_config());
             let mut conn = state.db().acquire().await?;
             let created = now_micros();
-            let id: i32 =
-                sqlx::query_scalar("INSERT INTO documents_note (note, created, document_id, user_id) VALUES ($1, $2, $3, $4) RETURNING id")
-                    .bind(&note)
-                    .bind(created)
-                    .bind(doc_id as i32)
-                    .bind(auth.user().id as i32)
-                    .fetch_one(&mut *conn)
-                    .await?;
+            let id: i32 = sqlx::query_scalar(
+                "INSERT INTO documents_note (note, format, created, document_id, user_id) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+            )
+            .bind(&note)
+            .bind(format)
+            .bind(created)
+            .bind(doc_id as i32)
+            .bind(auth.user().id as i32)
+            .fetch_one(&mut *conn)
+            .await?;
             if lctx.enabled {
                 let n = NoteRow {
                     id: i64::from(id),
                     note: note.clone(),
+                    format: format.to_string(),
                     created,
                     document_id: Some(doc_id),
                     user_id: Some(auth.user().id),
@@ -226,5 +299,34 @@ pub async fn notes_destroy_handler(
     match r {
         Ok(r) => r,
         Err(e) => e.into_response(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn note_create_validation_like_3_5_1() {
+        assert_eq!(validate_note_create(&json!({"note": "  hi  "})), Ok(("hi".into(), "plain")));
+        assert_eq!(validate_note_create(&json!({"note": "x", "format": "markdown"})), Ok(("x".into(), "markdown")));
+        assert_eq!(validate_note_create(&json!({"note": 5})), Ok(("5".into(), "plain")));
+        assert_eq!(validate_note_create(&json!({})), Err(json!({"note": ["This field is required."]})));
+        assert_eq!(validate_note_create(&Value::Null), Err(json!({"note": ["This field is required."]})));
+        assert_eq!(validate_note_create(&json!({"note": "   "})), Err(json!({"note": ["This field may not be blank."]})));
+        assert_eq!(validate_note_create(&json!({"note": null})), Err(json!({"note": ["This field may not be null."]})));
+        assert_eq!(validate_note_create(&json!({"note": ["a"]})), Err(json!({"note": ["Not a valid string."]})));
+        assert_eq!(validate_note_create(&json!({"note": true})), Err(json!({"note": ["Not a valid string."]})));
+        let both = validate_note_create(&json!({"format": "html", "note": ""})).unwrap_err();
+        assert_eq!(both, json!({"note": ["This field may not be blank."], "format": ["\"html\" is not a valid choice."]}));
+        // declaration order (note before format), independent of the request order
+        assert_eq!(both.as_object().map(|m| m.keys().cloned().collect::<Vec<_>>()), Some(vec!["note".to_string(), "format".to_string()]));
+        assert_eq!(validate_note_create(&json!({"note": "a", "format": null})), Err(json!({"format": ["This field may not be null."]})));
+        assert_eq!(validate_note_create(&json!({"note": "a", "format": ""})), Err(json!({"format": ["\"\" is not a valid choice."]})));
+        assert_eq!(validate_note_create(&json!({"note": "a\u{0}b"})), Err(json!({"note": ["Null characters are not allowed."]})));
+        assert_eq!(
+            validate_note_create(&json!([1])),
+            Err(json!({"non_field_errors": ["Invalid data. Expected a dictionary, but got list."]}))
+        );
     }
 }

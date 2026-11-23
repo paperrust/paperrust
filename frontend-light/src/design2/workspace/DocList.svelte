@@ -1,5 +1,6 @@
 <!-- Compact document list (concept A, middle). Continuous loading on scrolling in the pane, keyboard:
-     ↑/↓ or j/k move, Enter/Space open, x selects. -->
+     ↑/↓ or j/k move, Enter/Space open, x selects. Click opens, ctrl/cmd-click toggles, shift-click selects a range.
+     Folder view: rows can be dragged onto a folder (the whole selection travels along). -->
 <script lang="ts">
   import { t } from '../../lib/i18n'
   import { api } from '../../api/client'
@@ -7,6 +8,9 @@
   import { ws } from '../stores/workspace.svelte'
   import Icon from '../components/Icon.svelte'
   import type { Document } from '../../api/v1'
+  import { ui } from '../stores/ui.svelte'
+  import { folders } from '../stores/folders.svelte'
+  import { endDrag, startDocDrag } from './folder-dnd'
 
   let listEl: HTMLUListElement
   let sentinel: HTMLLIElement | undefined = $state()
@@ -20,6 +24,9 @@
   }
   const corr = (d: Document) => (d.correspondent != null ? data.correspondents.get(d.correspondent)?.name : null)
   const type = (d: Document) => (d.document_type != null ? data.documentTypes.get(d.document_type)?.name : null)
+
+  // drag & drop only in the folder view, with the mouse (touch: bulk bar "Move to folder")
+  const canDrag = $derived(ws.ctx.kind === 'folder' && folders.canOrganize && !ui.mobile)
 
   $effect(() => {
     if (!sentinel) return
@@ -69,9 +76,12 @@
       tabindex={i === ws.focusIndex ? 0 : -1}
       data-i={i}
       data-id={d.id}
+      class:dragging={folders.drag?.kind === 'docs' && folders.drag.ids.includes(d.id)}
+      draggable={canDrag ? 'true' : undefined}
+      ondragstart={(e) => canDrag && startDocDrag(e, d.id)}
+      ondragend={endDrag}
       onclick={(e) => {
-        if (e.shiftKey || e.ctrlKey || e.metaKey) ws.toggle(d.id)
-        else ws.open(d.id)
+        ws.click(d.id, { shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey })
         ws.focusIndex = i
       }}
       onkeydown={(e) => onkeydown(e, i, d)}
@@ -138,6 +148,9 @@
   }
   .row.sel {
     background: var(--d2-surface-3);
+  }
+  .row.dragging {
+    opacity: 0.55;
   }
   .row.active {
     border-left-color: var(--d2-accent);

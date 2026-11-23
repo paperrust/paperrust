@@ -25,6 +25,8 @@ Gemessen gegen paperless-ngx 3.4.2 auf demselben kleinen arm64-Rechner (NVIDIA J
 gleiche Dokumente, gleiche Datenbank – Einzelheiten und Grenzen weiter unten:
 
 - **17-mal schneller beim Einlesen:** 230 Dokumente in 1 min 46 s statt 29 min 56 s.
+- **Raspberry Pi 5:** 230 Dokumente in 3 min 05 s statt 27 min 07 s, mit einem Zwölftel der Rechenzeit
+  (100 statt 1 253 CPU-Sekunden) – [Bericht](results/benchmark/2026-11-22-pi5/bericht.md).
 - **16-mal schnellerer erster Start** (3,3 s statt 53 s); nach einem Neustart antwortet es nach 0,6 s
   statt 34 s.
 - **12- bis 19-mal schnellere Antworten mit mehreren Nutzern gleichzeitig** (Median, 1–10 Personen,
@@ -62,7 +64,7 @@ je Aufstellung ein Lauf, 255 erfundene Dokumente. PaperRust (Commit `e546b8f`) g
 **Wo PaperRust schlechter ist:** Die Datenbank braucht mehr Arbeitsspeicher (nach dem Einlesen 74
 statt 49 MiB) und mehr Platz (logisch 28,4 statt 18,2 MB, das Datenbank-Volume 11 % mehr), und die
 Speicherspitze beim Einlesen (800 MiB) liegt nur knapp unter paperless-ngx (838 MiB). Gemessen wurden
-nur ein Gerät und saubere Testdokumente; Unterschiede unter etwa 10 % nicht überbewerten.
+in dieser Tabelle nur ein Gerät (Raspberry Pi 5: siehe oben) und saubere Testdokumente; Unterschiede unter etwa 10 % nicht überbewerten.
 
 Vollständiger Bericht mit Methode und Grenzen:
 [results/benchmark/2026-11-20-jetson/bericht.md](results/benchmark/2026-11-20-jetson/bericht.md),

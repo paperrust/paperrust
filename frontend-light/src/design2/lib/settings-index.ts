@@ -25,6 +25,7 @@ const DISPLAY: Raw[] = [
   { k: 'm.settings.interface_design', route: 'settings', where: 'display', kw: 'design klassisch modern oberfläche interface' },
   { k: 'm.settings.color_scheme', route: 'settings', where: 'display', kw: 'dunkel hell theme dark light farbe' },
   { k: 'm.settings.density', route: 'settings', where: 'display', kw: 'kompakt abstand dichte compact' },
+  { k: 'm.folders.setting_title', route: 'settings', where: 'display', kw: 'ordner ordneransicht folder folders unsortiert papermerge' },
   { k: 'common.language', route: 'settings', where: 'display', kw: 'sprache language' },
   { k: 'm.settings.home_customize', route: 'settings', where: 'display', kw: 'startseite bausteine widgets dashboard' },
   { k: 'common.keyboard_shortcuts', route: 'settings', where: 'display', kw: 'tasten kürzel shortcuts' },

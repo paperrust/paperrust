@@ -40,6 +40,7 @@
     if (p === 'assistant') return 'assistant'
     if (p === 'automation' || p.startsWith('automation/') || p === 'ai/review' || p === 'workflows') return 'automation'
     if (/^asn\/\d+$/.test(p)) return 'workspace'
+    if (/^folders(\/(unsorted|\d+)(\/\d+)?)?$/.test(p)) return 'workspace'
     if (MANAGE.test(p)) return 'manage'
     if (/^settings(\/.*)?$/.test(p)) return 'settings'
     return 'unknown'

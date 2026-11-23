@@ -26,6 +26,7 @@ Gotenberg. Neu in Version 0.1.0 und bekannte Grenzen: [Release-Notizen](../RELEA
 | [Mail](mail.md) | Mail-Konten und -Regeln, verarbeitete Mails |
 | [Workflows](workflows.md) | Nachschlagen: Auslöser, Filter, Aktionen, Platzhalter |
 | [Custom Fields](custom-fields.md) | eigene Felder |
+| [Ordneransicht](folders.md) | Dokumente in Ordnern ablegen (optional, nur PaperRust) |
 | [Benutzer und Rechte](permissions.md) | Benutzer, Gruppen, globale und Objektrechte, MFA |
 | [Dateinamen und Speicherpfade](storage-paths.md) | Ablage-Vorlagen |
 | [ASN-Etiketten](asn-labels.md) | Etiketten mit Archivnummer drucken, Stapel automatisch aufteilen, Trennblätter |

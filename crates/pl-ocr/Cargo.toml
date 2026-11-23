@@ -8,6 +8,9 @@ publish.workspace = true
 [dependencies]
 # values from the UI (docs/SETTINGS.md §8)
 pl-envlive.workspace = true
+# PAPERLESS_TASK_WORKERS=auto (pl_core::resources::task_workers_or_auto), shared with pl-queue.
+# pl-core depends on no pl-* crate except pl-envlive, so no cycle.
+pl-core.workspace = true
 # E14: text extraction with reading order like `pdftotext -layout` (pl-parsers `pdftext`); pl-parsers
 # depends on no pl-* crate, so no cycle.
 pl-parsers.workspace = true

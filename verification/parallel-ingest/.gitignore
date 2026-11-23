@@ -1,0 +1,4 @@
+# TLA+ tools jar (fetched by run.sh) and TLC working files - never commit
+/tools/
+states/
+*.out

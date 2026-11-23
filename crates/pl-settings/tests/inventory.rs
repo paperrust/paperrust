@@ -28,6 +28,7 @@ const EXCEPTIONS: &[(&str, &str)] = &[
     ("PAPERRUST_UPDATE_CHECK", "Test (pl-system config.rs)"),
     ("PAPERRUST_AUTOMATION_TEST_SERVER", "Test (pl-automation automation_db)"),
     ("PAPERRUST_CONSUMER_TEST_DATABASE_URL", "Test"),
+    ("PAPERRUST_FOLDERS_TEST_DATABASE_URL", "Test (pl-api-v2 folders_api)"),
     ("PAPERRUST_INDEXER_DB_URL", "Test"),
     ("PAPERRUST_INDEXER_PARITY_CONTROL_INDEX", "Test"),
     ("PAPERRUST_INDEXER_PARITY_DIR", "Test"),

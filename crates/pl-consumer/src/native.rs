@@ -511,10 +511,27 @@ pub struct FileClassifier {
     pub path: PathBuf,
     pub key: Vec<u8>,
     pub threshold: f64,
+    /// Last loaded model (see [`ClassifierCache`]).
+    pub cache: ClassifierCache,
 }
 
-impl ClassifierSource for FileClassifier {
-    fn load(&self) -> Option<SharedClassifier> {
+/// Identity of the model file: (modification time, size).
+type FileStamp = (std::time::SystemTime, u64);
+
+/// Model loaded last, keyed by the file's modification time and size. Upstream reads the file for
+/// every document; with several consume tasks in parallel that would deserialize the model once
+/// per task and keep one copy per task in memory. The cache shares one copy, reloads it as soon
+/// as training replaced the file, and lets concurrent first loads wait for one load (mutex)
+/// instead of all loading at once. Behaviour is unchanged otherwise (same file, same result).
+#[derive(Default)]
+pub struct ClassifierCache(std::sync::Mutex<Option<(FileStamp, SharedClassifier)>>);
+
+impl FileClassifier {
+    pub fn new(path: PathBuf, key: Vec<u8>, threshold: f64) -> Self {
+        Self { path, key, threshold, cache: ClassifierCache::default() }
+    }
+
+    fn load_uncached(&self) -> Option<SharedClassifier> {
         match pl_classifier::load_classifier(&self.path, &self.key, false) {
             Ok(Some(model)) => Some(Arc::new(ThresholdClassifier { model, threshold: self.threshold })),
             Ok(None) => None,
@@ -523,6 +540,34 @@ impl ClassifierSource for FileClassifier {
                 None
             }
         }
+    }
+}
+
+fn file_stamp(path: &Path) -> Option<FileStamp> {
+    let m = std::fs::metadata(path).ok().filter(|m| m.is_file())?;
+    Some((m.modified().ok()?, m.len()))
+}
+
+impl ClassifierSource for FileClassifier {
+    fn load(&self) -> Option<SharedClassifier> {
+        let mut g = match self.cache.0.lock() {
+            Ok(g) => g,
+            Err(p) => p.into_inner(),
+        };
+        let Some(stamp) = file_stamp(&self.path) else {
+            // missing file (or no modification time on this platform): no caching
+            *g = None;
+            return self.load_uncached();
+        };
+        if let Some((s, c)) = g.as_ref()
+            && *s == stamp
+        {
+            return Some(c.clone());
+        }
+        let loaded = self.load_uncached();
+        // stamp taken before loading: a file replaced during the load is reloaded next time
+        *g = loaded.clone().map(|c| (stamp, c));
+        loaded
     }
 }
 
@@ -718,5 +763,49 @@ impl ScriptRunner for CommandScripts {
             return Err(format!("Command '['{}']' returned non-zero exit status {code}.", script.display()));
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn save_model(path: &Path, key: &[u8]) {
+        pl_classifier::DocumentClassifier::new().save(path, key).expect("save model");
+    }
+
+    /// One shared model for all concurrent consume tasks; reloaded after the file changed.
+    #[test]
+    fn classifier_cache_shares_and_reloads() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("classification_model.pickle");
+        let key = b"secret".to_vec();
+        let src = FileClassifier::new(path.clone(), key.clone(), 0.5);
+        // no file: nothing loaded, nothing cached
+        assert!(src.load().is_none());
+        save_model(&path, &key);
+        let a = src.load().expect("model");
+        let b = src.load().expect("model");
+        assert!(Arc::ptr_eq(&a, &b), "same file -> same shared model");
+        // concurrent loads share the cached copy too
+        let src = Arc::new(src);
+        let handles: Vec<_> = (0..4)
+            .map(|_| {
+                let s = src.clone();
+                std::thread::spawn(move || s.load().expect("model"))
+            })
+            .collect();
+        for h in handles {
+            assert!(Arc::ptr_eq(&a, &h.join().unwrap()));
+        }
+        // training replaced the file: new modification time -> reload
+        save_model(&path, &key);
+        let later = std::time::SystemTime::now() + std::time::Duration::from_secs(5);
+        std::fs::File::options().write(true).open(&path).unwrap().set_modified(later).unwrap();
+        let c = src.load().expect("model");
+        assert!(!Arc::ptr_eq(&a, &c), "changed file -> reloaded");
+        // file removed: no model any more
+        std::fs::remove_file(&path).unwrap();
+        assert!(src.load().is_none());
     }
 }

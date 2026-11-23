@@ -152,3 +152,31 @@ pub fn effective_content() -> SimpleExpr {
 pub fn scalar(sel: SelectStatement) -> SimpleExpr {
     SimpleExpr::SubQuery(None, Box::new(sel.into_sub_query_statement()))
 }
+
+/// PaperRust folder view: document → folder (side table, no row = "Unsorted").
+pub const DOC_FOLDER: &str = "paperrust_document_folder";
+/// PaperRust folder tree (adjacency list).
+pub const FOLDER: &str = "paperrust_folder";
+
+/// `EXISTS (SELECT 1 FROM paperrust_document_folder pdf WHERE pdf.document_id = doc.id [AND folder in …])`
+/// for a [`pl_domain::filter::FolderCond`]. `Tree` resolves the subfolders with a recursive CTE (one
+/// uncorrelated subquery, hashed once).
+pub fn folder_exists(c: &pl_domain::filter::FolderCond) -> SimpleExpr {
+    use pl_domain::filter::FolderCond;
+    let mut sel = select_one_from(DOC_FOLDER, "pdf");
+    sel.and_where(col("pdf", "document_id").eq(doc_col("id")));
+    match c {
+        FolderCond::Any => {}
+        FolderCond::In(ids) => {
+            sel.and_where(col("pdf", "folder_id").is_in(ids.iter().copied()));
+        }
+        FolderCond::Tree(ids) => {
+            let list = ids.iter().map(i64::to_string).collect::<Vec<_>>().join(", ");
+            let list = if list.is_empty() { "NULL".to_string() } else { list };
+            sel.and_where(Expr::cust(format!(
+                r#""pdf"."folder_id" IN (WITH RECURSIVE "pft"("id") AS (SELECT "pfr"."id" FROM "{FOLDER}" AS "pfr" WHERE "pfr"."id" IN ({list}) UNION SELECT "pfc"."id" FROM "{FOLDER}" AS "pfc" INNER JOIN "pft" ON "pfc"."parent_id" = "pft"."id") SELECT "pft"."id" FROM "pft")"#
+            )));
+        }
+    }
+    exists(sel)
+}

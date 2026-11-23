@@ -26,6 +26,7 @@ New in version 0.1.0 and known limits: [release notes](../../RELEASE-NOTES-0.1.0
 | [Mail](mail.md) | mail accounts and rules, processed mail |
 | [Workflows](workflows.md) | reference: triggers, filters, actions, placeholders |
 | [Custom fields](custom-fields.md) | own fields |
+| [Folder view](folders.md) | file documents in folders (optional, PaperRust only) |
 | [Users and permissions](permissions.md) | users, groups, global and object permissions, MFA |
 | [File names and storage paths](storage-paths.md) | storage templates |
 | [ASN labels](asn-labels.md) | print archive serial number labels, split batches automatically, separator sheets |

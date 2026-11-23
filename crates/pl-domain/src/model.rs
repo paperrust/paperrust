@@ -307,10 +307,17 @@ pub struct Files {
     pub thumbnail: ThumbInfo,
 }
 
+fn note_format_plain() -> String {
+    "plain".into()
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Note {
     pub legacy_id: i64,
     pub note: String,
+    /// `plain` or `markdown` (paperless-ngx 3.5 `Note.format`, #14626)
+    #[serde(default = "note_format_plain")]
+    pub format: String,
     pub created: DateTime<Utc>,
     pub user: Option<UserRef>,
 }

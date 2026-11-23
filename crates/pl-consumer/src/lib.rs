@@ -28,6 +28,8 @@ pub mod reprocess;
 pub mod scheduled;
 pub mod settings;
 pub mod signals;
+/// PaperRust: checksum of the delivered file when a shrunk copy is stored (duplicate check).
+pub mod source_checksum;
 pub mod stages;
 pub mod task;
 pub mod templating;

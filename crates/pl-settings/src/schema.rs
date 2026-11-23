@@ -693,7 +693,7 @@ pub static SCHEMA: &[SettingDef] = &[
         "Volltextsuche der Dokumentliste (L3: legacy = alle Treffer ranken und mit SQL schneiden, native = Rechte im Index, nur Top-N, Trefferzahl aus tantivy)",
     ),
     // ---- 1.11 Tasks, workers, schedules ----
-    s(K::Tasks, "PAPERLESS_TASK_WORKERS", B, W, INT1, Some("1"), "parallele Aufgaben"),
+    s(K::Tasks, "PAPERLESS_TASK_WORKERS", B, W, STR, Some("1"), "parallele Aufgaben (Zahl ≥ 1 oder auto = nach Kernen und Speicher)"),
     s(K::Tasks, "PAPERLESS_THREADS_PER_WORKER", B, W, INT1, None, "OCR-Threads je Aufgabe (Standard automatisch)"),
     s(K::Tasks, "PAPERLESS_WORKER_TIMEOUT", A, L, INT1, Some("1800"), "Zeitlimit je Aufgabe (s)"),
     s(K::Tasks, "PAPERLESS_TRAIN_TASK_CRON", A, W, CRON, Some("5 */1 * * *"), "Klassifikator trainieren"),

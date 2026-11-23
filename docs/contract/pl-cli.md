@@ -65,6 +65,10 @@ haben Zeilen), `export-descriptor.json`.
    ersetzt (gesquasht), historisch (git-Historie ≤ v3.4.2) oder fremde App; sonst Abbruch mit
    „This database is not at paperless-ngx v3.4.2 …“ (fehlend → erst auf 3.4.2 aktualisieren;
    unbekannt → neuere Version, nicht unterstützt). Tabellen ohne `django_migrations` → Abbruch.
+   Known newer migrations (`migrate::KNOWN_NEWER`, same list as pl-dbmigrate): `documents.0028`,
+   `0029`, `0030_note_format` – a paperless-ngx 3.5.0/3.5.1 database counts as current.
+   `pl_documents_write.0001_paperrust_note_format` (own migration) then adds `documents_note.format`
+   if missing and sets the default `'plain'`.
 2. Neuinstallation in **einer Transaktion**: pre-data, `django_migrations` (applied =
    `clock_timestamp()`), ContentTypes/Permissions mit den upstream-IDs, `AnonymousUser` (id 1,
    unbrauchbares Passwort `!`+40 Zeichen), ApplicationConfiguration-Singleton (id 1, `app_logo=''`),
@@ -433,6 +437,15 @@ Swagger-UI-Dateien: drf-spectacular-sidecar 2026.10.1 (Swagger UI, Apache-2.0, L
 20. **Schema-Titel `PaperRust REST API`** (Branding): `info.title` des Schemas und damit der
     Dateiname in `Content-Disposition` heißen `PaperRust REST API (<version>).json|yaml` statt
     `Paperless-ngx REST API …` (`openapi.rs` `TITLE`). Inhalt der Pfade/Schemas unverändert.
+21. **Note `format` in export/import** (2026-11-22, paperless-ngx 3.5 #14626, `export::noteformat`):
+    the importer accepts `format` on `documents.note` records (3.5 exports carry it on every note) and
+    writes it when `documents_note.format` exists, else skips it; a missing field → `plain`. The
+    exporter writes `format` (after `note`, 3.5 order) **only for non-plain notes**; upstream 3.5
+    always writes it. Reason: plain notes stay byte-identical to a v3.4.2 export, so the export imports
+    into paperless-ngx 3.4.2 (whose importer rejects unknown fields) and into 3.5 (missing field →
+    model default). Exports with Markdown notes need paperless-ngx ≥ 3.5; the exporter then prints
+    „N note(s) use Markdown … paperless-ngx before 3.5 cannot import this export“. `metadata.json`
+    stays `{"version": "3.4.2"}`.
 
 ## CORE-REQUEST
 
@@ -491,6 +504,7 @@ Share-Link-Bündeln (keine in den Referenzdaten), sehr große Bestände (Laufzei
   zusätzlich `paperrust-extras.json` neben `manifest.json` (Ordner und ZIP): „Sonst“-Zweige und
   KI-Bedingungen der Workflows (`paperrust_workflow_else_action`, `paperrust_workflow_ext`),
   Workflow-Verlauf, nicht geheime Systemeinstellungen, Rollen, ASN-Bereiche/-Drucke, Lebensbereiche,
+  Ordner der Ordneransicht (`paperrust_folder`, `paperrust_document_folder`, `paperrust_folder_grant`, seit 2026-11-22),
   Begriffs-Aliasse, erkannte Fristen, KI-Prompts/-Optionen/-Verlauf, Fragen-Verlauf, Scanner/Scan-Geräte
   und `paperless_mail_processedmail` (sichert upstream nicht – ohne sie holt der Mail-Abruf schon
   verarbeitete Mails erneut). `document_importer` spielt die Datei nach den upstream-Modellen in

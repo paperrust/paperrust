@@ -420,3 +420,339 @@ async fn e2e_watcher_oneshot_subdirs_as_tags_impl() {
     assert!(tags.contains(&tag));
     assert!(env.consume_dir().join("Projekt Q/.DS_Store").exists(), "ignored file untouched");
 }
+
+// ------------------------------------------------------------------------------------------------
+// Concurrent consumption (several task slots, PAPERLESS_TASK_WORKERS > 1)
+// ------------------------------------------------------------------------------------------------
+
+/// Like [`run_big`], but a multi-threaded runtime (big worker stacks), so spawned consume tasks
+/// really run in parallel and `blocking_io` takes the `block_in_place` path.
+fn run_big_mt<F: std::future::Future<Output = ()>>(make: impl FnOnce() -> F + Send + 'static) {
+    std::thread::Builder::new()
+        .stack_size(64 << 20)
+        .spawn(move || {
+            tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(4)
+                .thread_stack_size(64 << 20)
+                .enable_all()
+                .build()
+                .expect("runtime")
+                .block_on(make())
+        })
+        .expect("spawn")
+        .join()
+        .unwrap_or_else(|e| std::panic::resume_unwind(e));
+}
+
+fn nonce() -> u64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos() as u64
+}
+
+/// Consumes all `files` at the same time (one tokio task each, no task id).
+async fn consume_parallel(
+    consumer: &Consumer,
+    files: Vec<(PathBuf, DocumentMetadataOverrides)>,
+) -> Vec<Result<ConsumeOutcome, pl_consumer::ConsumeError>> {
+    let barrier = Arc::new(tokio::sync::Barrier::new(files.len()));
+    let mut handles = Vec::new();
+    for (path, o) in files {
+        let c = consumer.clone();
+        let b = barrier.clone();
+        handles.push(tokio::spawn(async move {
+            b.wait().await;
+            let doc = ConsumableDocument::new(DocumentSource::ConsumeFolder, &path).unwrap();
+            c.consume_file(doc, Some(o), None).await
+        }));
+    }
+    let mut out = Vec::new();
+    for h in handles {
+        out.push(h.await.expect("consume task panicked"));
+    }
+    out
+}
+
+#[test]
+#[ignore = "braucht PAPERRUST_CONSUMER_TEST_DATABASE_URL (DB-Kopie pl_consumer_test*)"]
+fn e2e_concurrent_same_asn() {
+    run_big_mt(e2e_concurrent_same_asn_impl);
+}
+
+/// Four different documents with the same ASN at once: exactly one is stored, the others fail
+/// with the AsnCheck message (not a raw unique-constraint error), the ASN exists once.
+async fn e2e_concurrent_same_asn_impl() {
+    let Some(pool) = pool().await else {
+        eprintln!("SKIP: PAPERRUST_CONSUMER_TEST_DATABASE_URL not set");
+        return;
+    };
+    let env = make_env(pool.clone(), |_| {});
+    let n = nonce();
+    let asn = 1_500_000_000 + (n % 100_000_000) as i64;
+    let files = (0..4)
+        .map(|i| {
+            let p = env.put_text(&format!("asn-race-{i}.txt"), &format!("asn race {n} document {i}"));
+            (p, DocumentMetadataOverrides { asn: Some(asn), ..Default::default() })
+        })
+        .collect();
+    let results = consume_parallel(&env.consumer, files).await;
+    let ok = results.iter().filter(|r| matches!(r, Ok(ConsumeOutcome::Success { .. }))).count();
+    assert_eq!(ok, 1, "{results:?}");
+    for r in &results {
+        if let Err(e) = r {
+            let m = e.to_string();
+            assert!(m.contains(&format!("Given ASN {asn} already exists")), "{m}");
+        }
+    }
+    let count: i64 = sqlx::query_scalar("select count(*) from documents_document where archive_serial_number = $1")
+        .bind(asn as i32)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 1);
+}
+
+#[test]
+#[ignore = "braucht PAPERRUST_CONSUMER_TEST_DATABASE_URL (DB-Kopie pl_consumer_test*)"]
+fn e2e_concurrent_duplicates() {
+    run_big_mt(e2e_concurrent_duplicates_impl);
+}
+
+/// Four identical files at once with CONSUMER_DELETE_DUPLICATES: one document, three
+/// duplicates (originals deleted) - never two documents with the same checksum.
+async fn e2e_concurrent_duplicates_impl() {
+    let Some(pool) = pool().await else {
+        eprintln!("SKIP: PAPERRUST_CONSUMER_TEST_DATABASE_URL not set");
+        return;
+    };
+    let env = make_env(pool.clone(), |s| s.consumer_delete_duplicates = true);
+    let content = format!("duplicate race {}", nonce());
+    let files: Vec<_> =
+        (0..4).map(|i| (env.put_text(&format!("dup-race-{i}.txt"), &content), DocumentMetadataOverrides::default())).collect();
+    let paths: Vec<PathBuf> = files.iter().map(|(p, _)| p.clone()).collect();
+    let checksum = pl_consumer::compute_checksum(&paths[0]).unwrap();
+    let results = consume_parallel(&env.consumer, files).await;
+    let ok = results.iter().filter(|r| matches!(r, Ok(ConsumeOutcome::Success { .. }))).count();
+    let dup = results.iter().filter(|r| matches!(r, Ok(ConsumeOutcome::Duplicate { .. }))).count();
+    assert_eq!((ok, dup), (1, 3), "{results:?}");
+    let count: i64 =
+        sqlx::query_scalar("select count(*) from documents_document where checksum = $1").bind(&checksum).fetch_one(&pool).await.unwrap();
+    assert_eq!(count, 1);
+    assert!(paths.iter().all(|p| !p.exists()), "originals of stored and rejected files are gone");
+}
+
+#[test]
+#[ignore = "braucht PAPERRUST_CONSUMER_TEST_DATABASE_URL (DB-Kopie pl_consumer_test*)"]
+fn e2e_concurrent_same_filename() {
+    run_big_mt(e2e_concurrent_same_filename_impl);
+}
+
+/// Six documents whose FILENAME_FORMAT yields the same name, at once: all stored, every
+/// original file name unique and present on disk (MEDIA_LOCK + unique-name search).
+async fn e2e_concurrent_same_filename_impl() {
+    let Some(pool) = pool().await else {
+        eprintln!("SKIP: PAPERRUST_CONSUMER_TEST_DATABASE_URL not set");
+        return;
+    };
+    let n = nonce();
+    let env = make_env(pool.clone(), |s| s.templating.filename_format = Some("race/{{ title }}".into()));
+    let files = (0..6)
+        .map(|i| {
+            let p = env.put_text(&format!("name-race-{i}.txt"), &format!("filename race {n} document {i}"));
+            (p, DocumentMetadataOverrides { title: Some(format!("Same title {n}")), ..Default::default() })
+        })
+        .collect();
+    let results = consume_parallel(&env.consumer, files).await;
+    let ids: Vec<i64> = results.into_iter().map(ok_id).collect();
+    let mut names = std::collections::BTreeSet::new();
+    for id in ids {
+        let d = load(&pool, id).await;
+        let f = d.filename.expect("filename");
+        assert!(env.settings().originals_dir.join(&f).is_file(), "{f} on disk");
+        assert!(names.insert(f.clone()), "filename {f} used twice");
+    }
+    assert_eq!(names.len(), 6);
+}
+
+#[test]
+#[ignore = "braucht PAPERRUST_CONSUMER_TEST_DATABASE_URL (DB-Kopie pl_consumer_test*)"]
+fn e2e_concurrent_get_or_create_tag() {
+    run_big_mt(e2e_concurrent_get_or_create_tag_impl);
+}
+
+/// Barcode tags / sub-directories as tags from several tasks at once: one tag, same id for all.
+async fn e2e_concurrent_get_or_create_tag_impl() {
+    let Some(pool) = pool().await else {
+        eprintln!("SKIP: PAPERRUST_CONSUMER_TEST_DATABASE_URL not set");
+        return;
+    };
+    let name = format!("Race Tag {}", nonce());
+    let barrier = Arc::new(tokio::sync::Barrier::new(8));
+    let mut handles = Vec::new();
+    for i in 0..8 {
+        let (pool, b) = (pool.clone(), barrier.clone());
+        let name = if i % 2 == 0 { name.clone() } else { name.to_uppercase() };
+        handles.push(tokio::spawn(async move {
+            let mut conn = pool.acquire().await.unwrap();
+            b.wait().await;
+            pl_consumer::db::get_or_create_tag(&mut conn, &name).await.unwrap()
+        }));
+    }
+    let mut ids = std::collections::BTreeSet::new();
+    for h in handles {
+        ids.insert(h.await.unwrap());
+    }
+    assert_eq!(ids.len(), 1, "{ids:?}");
+    let count: i64 =
+        sqlx::query_scalar("select count(*) from documents_tag where upper(name) = upper($1)").bind(&name).fetch_one(&pool).await.unwrap();
+    assert_eq!(count, 1);
+}
+
+#[test]
+#[ignore = "braucht PAPERRUST_CONSUMER_TEST_DATABASE_URL (DB-Kopie pl_consumer_test*)"]
+fn e2e_upload_into_folder() {
+    run_big(e2e_upload_into_folder_impl);
+}
+
+const FOLDER_TABLES: &str = include_str!("../../pl-api-v2/migrations/0002_paperrust_folder.sql");
+
+/// Folder view stage 2: the override `folder_id` (upload field `folder`) files the new document into that folder;
+/// a folder deleted since the upload leaves it unsorted instead of failing the ingestion.
+async fn e2e_upload_into_folder_impl() {
+    let Some(pool) = pool().await else {
+        eprintln!("SKIP: PAPERRUST_CONSUMER_TEST_DATABASE_URL not set");
+        return;
+    };
+    sqlx::raw_sql(FOLDER_TABLES).execute(&pool).await.expect("folder tables");
+    let env = make_env(pool.clone(), |_| {});
+    let name = format!("e2e-folder-{}", nonce());
+    let fid: i64 =
+        sqlx::query_scalar("INSERT INTO paperrust_folder (name) VALUES ($1) RETURNING id").bind(&name).fetch_one(&pool).await.unwrap();
+    let p = env.put_text(&format!("{name}.txt"), &format!("folder upload {}", nonce()));
+    let id = ok_id(env.consume(&p, DocumentMetadataOverrides { folder_id: Some(fid), ..Default::default() }).await);
+    let got: Option<i64> = sqlx::query_scalar("SELECT folder_id FROM paperrust_document_folder WHERE document_id = $1")
+        .bind(id as i32)
+        .fetch_optional(&pool)
+        .await
+        .unwrap();
+    assert_eq!(got, Some(fid));
+    // unknown folder → stored, unsorted
+    let p = env.put_text(&format!("{name}-gone.txt"), &format!("folder gone {}", nonce()));
+    let id2 = ok_id(env.consume(&p, DocumentMetadataOverrides { folder_id: Some(i64::from(i32::MAX)), ..Default::default() }).await);
+    let got: Option<i64> = sqlx::query_scalar("SELECT folder_id FROM paperrust_document_folder WHERE document_id = $1")
+        .bind(id2 as i32)
+        .fetch_optional(&pool)
+        .await
+        .unwrap();
+    assert_eq!(got, None);
+    sqlx::query("DELETE FROM paperrust_document_folder WHERE folder_id = $1").bind(fid).execute(&pool).await.unwrap();
+    sqlx::query("DELETE FROM paperrust_folder WHERE id = $1").bind(fid).execute(&pool).await.unwrap();
+}
+
+/// Scan-like PDF (one noisy RGB image, no text) above 1 MB, so that `PAPERRUST_SHRINK_ON_INGEST_MB=1`
+/// shrinks it (same construction as pl-pdftools tests/common `scan_pdf`). `seed` makes the content unique.
+fn scan_pdf(path: &Path, seed: u32) {
+    use lopdf::content::{Content, Operation};
+    use lopdf::{Dictionary, Document, Object, Stream, dictionary};
+    let (w, h) = (1200u32, 1600u32);
+    let mut raw = Vec::with_capacity((w * h * 3) as usize);
+    let mut s = seed | 1;
+    for y in 0..h {
+        for x in 0..w {
+            s = s.wrapping_mul(1_103_515_245).wrapping_add(12345);
+            let n = ((s >> 16) & 0x1f) as u8;
+            raw.push(((x * 255 / w) as u8).saturating_add(n));
+            raw.push(((y * 255 / h) as u8).saturating_add(n));
+            raw.push(200u8.saturating_sub(n));
+        }
+    }
+    let mut img = Stream::new(
+        dictionary! { "Type" => "XObject", "Subtype" => "Image", "Width" => w as i64, "Height" => h as i64, "ColorSpace" => "DeviceRGB", "BitsPerComponent" => 8 },
+        raw,
+    );
+    img.compress().unwrap();
+    let mut doc = Document::with_version("1.5");
+    let img_id = doc.add_object(img);
+    let mut xo = Dictionary::new();
+    xo.set("Im0", img_id);
+    let ops = vec![
+        Operation::new("q", vec![]),
+        Operation::new("cm", vec![432.into(), 0.into(), 0.into(), 576.into(), 0.into(), 0.into()]),
+        Operation::new("Do", vec!["Im0".into()]),
+        Operation::new("Q", vec![]),
+    ];
+    let pages_id = doc.new_object_id();
+    let content_id = doc.add_object(Stream::new(Dictionary::new(), Content { operations: ops }.encode().unwrap()));
+    let page_id = doc.add_object(dictionary! {
+        "Type" => "Page", "Parent" => pages_id, "MediaBox" => vec![0.into(), 0.into(), 432.into(), 576.into()],
+        "Contents" => content_id, "Resources" => dictionary! { "XObject" => xo },
+    });
+    doc.objects.insert(pages_id, Object::Dictionary(dictionary! { "Type" => "Pages", "Kids" => vec![page_id.into()], "Count" => 1 }));
+    let catalog_id = doc.add_object(dictionary! { "Type" => "Catalog", "Pages" => pages_id });
+    doc.trailer.set("Root", catalog_id);
+    doc.save(path).unwrap();
+}
+
+/// Resets the settings overlay of this process when the test ends (also on panic).
+struct OverlayReset;
+impl Drop for OverlayReset {
+    fn drop(&mut self) {
+        pl_core::config::set_live_overlay(Default::default());
+    }
+}
+
+#[test]
+#[ignore = "braucht PAPERRUST_CONSUMER_TEST_DATABASE_URL (DB-Kopie pl_consumer_test*)"]
+fn e2e_shrunk_original_is_duplicate() {
+    run_big_mt(e2e_shrunk_original_is_duplicate_impl);
+}
+
+/// PaperRust shrinking on ingest stores a smaller file (its checksum in `documents_document.checksum`,
+/// as the sanity checker expects). Uploading the same ORIGINAL again must still be a duplicate:
+/// sequentially, and with two identical originals at the same time (exactly one stored).
+async fn e2e_shrunk_original_is_duplicate_impl() {
+    let Some(pool) = pool().await else {
+        eprintln!("SKIP: PAPERRUST_CONSUMER_TEST_DATABASE_URL not set");
+        return;
+    };
+    let env = make_env(pool.clone(), |s| s.consumer_delete_duplicates = true);
+    let _reset = OverlayReset;
+    pl_core::config::set_live_overlay([("PAPERRUST_SHRINK_ON_INGEST_MB".to_string(), "1".to_string())].into_iter().collect());
+    let src_dir = tempfile::tempdir().unwrap();
+    let n = nonce();
+
+    // 1) sequential: store, then the same original again
+    let src = src_dir.path().join("scan.pdf");
+    scan_pdf(&src, n as u32);
+    assert!(std::fs::metadata(&src).unwrap().len() > 1024 * 1024, "test scan must exceed the 1 MB shrink limit");
+    let original_sum = pl_consumer::compute_checksum(&src).unwrap();
+    let id = ok_id(env.consume(&env.put(&src, "shrink-a.pdf"), DocumentMetadataOverrides::default()).await);
+    let d = load(&pool, id).await;
+    if d.checksum == original_sum {
+        eprintln!("SKIP: file was not shrunk (paperrust-pdftool missing next to the test binary?)");
+        return;
+    }
+    // stored checksum = stored file (sanity checker invariant)
+    let stored = env.settings().originals_dir.join(d.filename.as_deref().unwrap());
+    assert_eq!(pl_consumer::compute_checksum(&stored).unwrap(), d.checksum);
+    let again = env.put(&src, "shrink-b.pdf");
+    let r = env.consume(&again, DocumentMetadataOverrides::default()).await;
+    assert!(matches!(r, Ok(ConsumeOutcome::Duplicate { .. })), "same original again must be a duplicate: {r:?}");
+    assert!(!again.exists(), "duplicate original deleted");
+
+    // 2) concurrent: two identical new originals at once -> one stored, one duplicate
+    let src2 = src_dir.path().join("scan2.pdf");
+    scan_pdf(&src2, (n as u32).wrapping_add(7919));
+    let sum2 = pl_consumer::compute_checksum(&src2).unwrap();
+    let files = (0..2).map(|i| (env.put(&src2, &format!("shrink-race-{i}.pdf")), DocumentMetadataOverrides::default())).collect();
+    let results = consume_parallel(&env.consumer, files).await;
+    let ok = results.iter().filter(|r| matches!(r, Ok(ConsumeOutcome::Success { .. }))).count();
+    let dup = results.iter().filter(|r| matches!(r, Ok(ConsumeOutcome::Duplicate { .. }))).count();
+    assert_eq!((ok, dup), (1, 1), "{results:?}");
+    let count: i64 = sqlx::query_scalar(
+        "select count(*) from documents_document d join paperrust_source_checksum s on s.document_id = d.id where s.checksum = $1",
+    )
+    .bind(&sum2)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(count, 1, "one document for the original");
+}

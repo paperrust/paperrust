@@ -504,6 +504,7 @@ impl<'a> Builder<'a> {
                 Cond::Expr(if *b { pl_docfilter::filterset::duplicate_candidates().and(e) } else { e.not() })
             }
             Pred::SharedBy(uid) => Cond::Expr(doc_col("owner_id").eq(*uid).and(pl_docfilter::perms::document_is_shared())),
+            Pred::Folder(c) => Cond::Expr(pl_docfilter::sql::folder_exists(c)),
         }
     }
 

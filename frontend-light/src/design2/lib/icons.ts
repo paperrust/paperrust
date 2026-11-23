@@ -28,6 +28,12 @@ import i25 from 'bootstrap-icons/icons/tags.svg?raw'
 import i26 from 'bootstrap-icons/icons/person.svg?raw'
 import i27 from 'bootstrap-icons/icons/file-earmark.svg?raw'
 import i28 from 'bootstrap-icons/icons/folder.svg?raw'
+// folder view (folders tree, nav item, new folder)
+import iFolder2 from 'bootstrap-icons/icons/folder2.svg?raw'
+import iFolder2Open from 'bootstrap-icons/icons/folder2-open.svg?raw'
+import iFolderPlus from 'bootstrap-icons/icons/folder-plus.svg?raw'
+import iViewList from 'bootstrap-icons/icons/view-list.svg?raw'
+import iGrid3x3Gap from 'bootstrap-icons/icons/grid-3x3-gap.svg?raw'
 import i29 from 'bootstrap-icons/icons/plus-lg.svg?raw'
 import i30 from 'bootstrap-icons/icons/pencil.svg?raw'
 import i31 from 'bootstrap-icons/icons/three-dots.svg?raw'
@@ -173,6 +179,11 @@ const SET: Record<string, string> = {
   'eye': i73,
   'gear-wide-connected': i74,
   'chat-left-text': i75,
+  'folder2': iFolder2,
+  'folder2-open': iFolder2Open,
+  'folder-plus': iFolderPlus,
+  'view-list': iViewList,
+  'grid-3x3-gap': iGrid3x3Gap,
 }
 
 export type IconName = keyof typeof SET

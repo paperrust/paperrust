@@ -173,7 +173,7 @@ Nur bei Session-/AutoLogin-Authentifizierung und Methoden außer GET/HEAD/OPTION
 Antwort: 403 `{"detail": "CSRF Failed: <reason>"}`.
 
 Host: `get_host()` = `X-Forwarded-Host` (nur `PAPERLESS_USE_X_FORWARD_HOST`) bzw. `Host`,
-`split_domain_port` + `ALLOWED_HOSTS` (`*`, `.domain`, exakt; `localhost` und Host von
+`split_domain_port` + `ALLOWED_HOSTS` (`*`, `.domain`, exakt; `localhost`, `127.0.0.1`, `[::1]` (#14846) und Host von
 `PAPERLESS_URL` werden ergänzt). `is_secure()` = `SECURE_PROXY_SSL_HEADER`
 (`PAPERLESS_PROXY_SSL_HEADER`, JSON-Paar), sonst Schema der Verbindung (Rust: http).
 

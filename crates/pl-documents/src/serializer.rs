@@ -152,8 +152,8 @@ const TRUNCATE_CHARS: i32 = 550;
 
 /// Tags per document in `Tag.Meta.ordering` (`name`).
 const TAGS_SQL: &str = "ARRAY(SELECT bt.tag_id::bigint FROM documents_document_tags bt     JOIN documents_tag btt ON btt.id = bt.tag_id WHERE bt.document_id = d.id ORDER BY btt.name)";
-/// Non-deleted notes (`ORDER BY created`) with user.
-const NOTES_SQL: &str = "(SELECT json_agg(json_build_array(bn.id, bn.note, (EXTRACT(EPOCH FROM bn.created) * 1000000)::bigint, bu.id,     bu.username, bu.first_name, bu.last_name) ORDER BY bn.created) FROM documents_note bn     LEFT JOIN auth_user bu ON bu.id = bn.user_id WHERE bn.document_id = d.id AND bn.deleted_at IS NULL)";
+/// Non-deleted notes (`ORDER BY created`) with user; `format` (paperless-ngx 3.5) last.
+const NOTES_SQL: &str = "(SELECT json_agg(json_build_array(bn.id, bn.note, (EXTRACT(EPOCH FROM bn.created) * 1000000)::bigint, bu.id,     bu.username, bu.first_name, bu.last_name, bn.format) ORDER BY bn.created) FROM documents_note bn     LEFT JOIN auth_user bu ON bu.id = bn.user_id WHERE bn.document_id = d.id AND bn.deleted_at IS NULL)";
 const HAS_VERSIONS_SQL: &str = "EXISTS(SELECT 1 FROM documents_document bv     WHERE bv.root_document_id = d.id AND bv.deleted_at IS NULL)";
 
 #[derive(Clone)]
@@ -316,6 +316,7 @@ pub(crate) async fn load_notes(db: &sqlx::PgPool, ids: &[i64], tz: Tz) -> ApiRes
     let q = Query::select()
         .column((a("n"), a("id")))
         .column((a("n"), a("note")))
+        .column((a("n"), a("format")))
         .column((a("n"), a("created")))
         .column((a("n"), a("document_id")))
         .expr_as(Expr::col((a("u"), a("id"))), a("u_id"))
@@ -343,6 +344,8 @@ pub(crate) async fn load_notes(db: &sqlx::PgPool, ids: &[i64], tz: Tz) -> ApiRes
         let note = json!({
             "id": i64_col(&r, "id")?,
             "note": get::<String>(&r, "note")?,
+            // NotesSerializer field order of paperless-ngx 3.5.1: id, note, format, created, user
+            "format": get::<String>(&r, "format")?,
             "created": format_datetime(&created, &tz),
             "user": user,
         });
@@ -492,6 +495,39 @@ pub fn public_archive_filename(created: &NaiveDate, correspondent: Option<&str>,
     sanitize_filename(&format!("{head}{tail}"))
 }
 
+/// PaperRust folder view (docs/contract/pl-documents.md "Known differences"): read-only field `folder`
+/// (folder id or `null` = "Unsorted"), appended **after** the upstream fields.
+pub const FOLDER_FIELD: &str = "folder";
+
+/// Folder per document from `paperrust_document_folder`. `None` = no `folder` field: the table is missing
+/// (no PaperRust migrations) or – unless the field was requested explicitly via `fields=` – the instance has
+/// no folder at all, so responses stay byte-identical to paperless-ngx as long as the folder view is unused.
+async fn load_folders(db: &sqlx::PgPool, ids: &[i64], explicit: bool) -> ApiResult<Option<HashMap<i64, i64>>> {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static READY: AtomicBool = AtomicBool::new(false);
+    let map = |e: sqlx::Error| pl_core::ApiError::internal(format!("folders: {e}"));
+    if !READY.load(Ordering::Relaxed) {
+        let exists: bool =
+            sqlx::query_scalar("SELECT to_regclass('public.paperrust_document_folder') IS NOT NULL").fetch_one(db).await.map_err(map)?;
+        if !exists {
+            return Ok(None);
+        }
+        READY.store(true, Ordering::Relaxed);
+    }
+    let ids32: Vec<i32> = ids.iter().filter_map(|i| i32::try_from(*i).ok()).collect();
+    let (any, docs, folders): (bool, Vec<i64>, Vec<i64>) = sqlx::query_as(
+        "SELECT EXISTS (SELECT 1 FROM paperrust_folder), coalesce(array_agg(m.document_id::int8), '{}'),          coalesce(array_agg(m.folder_id), '{}') FROM paperrust_document_folder m WHERE m.document_id = ANY($1::int4[])",
+    )
+    .bind(&ids32)
+    .fetch_one(db)
+    .await
+    .map_err(map)?;
+    if !any && !explicit {
+        return Ok(None);
+    }
+    Ok(Some(docs.into_iter().zip(folders).collect()))
+}
+
 /// PaperRust (docs/contract/pl-pdftools.md §4.1): checksums of the redacted versions from
 /// `paperrust_redaction`. Only called if there are versions; if the table is missing (never
 /// redacted), the set is empty.
@@ -622,6 +658,8 @@ pub async fn serialize_documents_db(db: &sqlx::PgPool, tz: Tz, user: &User, ids:
         is_shared_by_requester: has("is_shared_by_requester"),
     };
     let owned = OwnedInfo::load(db, &DOCUMENT, &doc_ids, owned_fields, true).await?;
+    let explicit_folder = opts.fields.as_ref().is_some_and(|l| l.iter().any(|x| x == FOLDER_FIELD));
+    let folders = if opts.fields.is_none() || explicit_folder { load_folders(db, &doc_ids, explicit_folder).await? } else { None };
 
     let mut out = Vec::with_capacity(docs.len());
     for id in ids {
@@ -714,6 +752,9 @@ pub async fn serialize_documents_db(db: &sqlx::PgPool, tz: Tz, user: &User, ids:
             };
             m.insert((*f).to_string(), v);
         }
+        if let Some(fm) = &folders {
+            m.insert(FOLDER_FIELD.to_string(), json!(fm.get(&d.id)));
+        }
         out.push(Value::Object(m));
     }
     Ok(out)
@@ -749,7 +790,7 @@ fn notes_json(agg: Option<Value>, tz: Tz) -> ApiResult<Value> {
         let Value::Array(mut c) = r else {
             return Err(bundle_err("note row"));
         };
-        if c.len() != 7 {
+        if c.len() != 8 {
             return Err(bundle_err("note row"));
         }
         let created = DateTime::from_timestamp_micros(json_i64(&c[2])?).ok_or_else(|| bundle_err("note created"))?;
@@ -766,6 +807,7 @@ fn notes_json(agg: Option<Value>, tz: Tz) -> ApiResult<Value> {
         out.push(json!({
             "id": json_i64(&c[0])?,
             "note": json_str(&mut c[1]),
+            "format": json_str(&mut c[7]),
             "created": format_datetime(&created, &tz),
             "user": user,
         }));

@@ -251,7 +251,7 @@ mod tests {
         assert!(cfg(&[("PAPERLESS_RS_ROUTES", "x.toml")]).unwrap().routes_file_required);
         // Upstream setting under the primary name.
         let c = cfg(&[("PAPERRUST_ALLOWED_HOSTS", "a.example"), ("PAPERLESS_ALLOWED_HOSTS", "b.example")]).unwrap();
-        assert_eq!(c.settings.allowed_hosts, vec!["a.example", "localhost"]);
+        assert_eq!(c.settings.allowed_hosts, vec!["a.example", "localhost", "127.0.0.1", "[::1]"]);
     }
 
     #[test]
@@ -263,17 +263,17 @@ mod tests {
             ("PAPERLESS_COOKIE_PREFIX", "pl_"),
         ])
         .unwrap();
-        assert_eq!(c.settings.allowed_hosts, vec!["a.example", "b.example", "localhost", "paper.example"]);
+        assert_eq!(c.settings.allowed_hosts, vec!["a.example", "b.example", "localhost", "127.0.0.1", "[::1]", "paper.example"]);
         assert_eq!(c.settings.cors_allowed_origins, vec!["http://localhost:8000", "http://localhost:4200", "https://Paper.Example:8443"]);
         assert_eq!(c.settings.language_cookie_name, "pl_django_language");
         assert!(cfg(&[("PAPERLESS_URL", "nohost")]).is_err());
         assert!(cfg(&[("PAPERLESS_ENABLE_COMPRESSION", "maybe")]).is_err());
         // upstream fix 00096e025 (#14735): only PAPERLESS_URL set → no wildcard any more
         let c = cfg(&[("PAPERLESS_URL", "http://[::1]:8000")]).unwrap();
-        assert_eq!(c.settings.allowed_hosts, vec!["localhost", "[::1]"]);
+        assert_eq!(c.settings.allowed_hosts, vec!["localhost", "127.0.0.1", "[::1]", "[::1]"]);
         let c = cfg(&[("PAPERLESS_URL", "https://example.com."), ("PAPERLESS_ALLOWED_HOSTS", "*")]).unwrap();
         assert_eq!(c.settings.allowed_hosts, vec!["*", "example.com"]);
-        assert_eq!(cfg(&[("PAPERLESS_ALLOWED_HOSTS", "")]).unwrap().settings.allowed_hosts, vec!["localhost"]);
+        assert_eq!(cfg(&[("PAPERLESS_ALLOWED_HOSTS", "")]).unwrap().settings.allowed_hosts, vec!["localhost", "127.0.0.1", "[::1]"]);
         for bad in ["https://*", "https://.example.com"] {
             assert!(cfg(&[("PAPERLESS_URL", bad)]).is_err(), "{bad}");
         }

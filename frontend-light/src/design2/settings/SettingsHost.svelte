@@ -19,6 +19,7 @@
   import type { Density, ThemeMode } from '../lib/theme'
   import { DESIGN_KEY, designOf } from '../../lib/design-switch'
   import { settingsTab, DOC_SUBTABS, type SettingsTab } from './tabs'
+  import { foldersEnabled } from '../api/folders'
 
 
   const sec = $derived(router.path.split('/')[1] ?? '')
@@ -47,6 +48,20 @@
     const m = await import('../../lib/design-apply')
     await m.applyDesign(d, d === 'classic')
     savingDesign = false
+  }
+  // folder view (PaperRust only): optional, off by default, per user
+  const foldersOn = $derived(foldersEnabled(session.settings))
+  let savingFolders = $state(false)
+  async function setFolders(on: boolean) {
+    savingFolders = true
+    try {
+      const { folders } = await import('../stores/folders.svelte')
+      await folders.setEnabled(on)
+    } catch {
+      toastService.showError(t('m.settings.could_not_save'))
+    } finally {
+      savingFolders = false
+    }
   }
   async function setDensity(d: Density) {
     try {
@@ -142,6 +157,11 @@
               <button role="radio" aria-checked={ui.density === d.k} class:on={ui.density === d.k} disabled={!canSave} onclick={() => setDensity(d.k)} id="d2-density-{d.k}">{t(d.label)}</button>
             {/each}
           </div>
+        </section>
+        <section class="card" aria-labelledby="d2-set-folders">
+          <h2 id="d2-set-folders">{t('m.folders.setting_title')}</h2>
+          <p class="d2-muted">{t('m.folders.setting_hint')}</p>
+          <label class="d2-check"><input type="checkbox" checked={foldersOn} disabled={!canSave || savingFolders} onchange={(e) => setFolders(e.currentTarget.checked)} id="d2-set-folders-on" />{t('m.folders.setting_switch')}</label>
         </section>
         <section class="card" aria-labelledby="d2-set-lang">
           <h2><label id="d2-set-lang" for="d2-language">{t('common.language')}</label></h2>

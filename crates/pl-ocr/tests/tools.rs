@@ -313,15 +313,24 @@ fn e2e_special_pdfs() {
     let r = parse_document(&b, &cfg(|_| {}), &d, &upstream("encrypted.pdf"), "application/pdf", true).unwrap();
     assert!(r.archive_path.is_none());
     assert_eq!(r.text, "");
-    // with-form: auto and force
+    // with-form: auto and force. Force/redo take the text from Tesseract, so pin `eng` like the
+    // upstream test settings (OCR_LANGUAGE=eng): with the PaperRust default `deu+eng` the German
+    // model reads this sample as "This is aPDF document" (word gap lost in recognition, not in
+    // text extraction; the digital text layer gives "a PDF").
+    let form = |mode: Mode| {
+        cfg(move |c| {
+            c.mode = mode;
+            c.language = "eng".into();
+        })
+    };
     for mode in [Mode::Auto, Mode::Force] {
         let d = tmp.path().join(format!("form-{mode}"));
-        let r = parse_document(&b, &cfg(|c| c.mode = mode), &d, &upstream("with-form.pdf"), "application/pdf", true).unwrap();
+        let r = parse_document(&b, &form(mode), &d, &upstream("with-form.pdf"), "application/pdf", true).unwrap();
         assert_ordered(&r.text, &["Please enter your name in here:", "This is a PDF document with a form."]);
     }
     // redo without archive
     let d = tmp.path().join("form-redo");
-    let r = parse_document(&b, &cfg(|c| c.mode = Mode::Redo), &d, &upstream("with-form.pdf"), "application/pdf", false).unwrap();
+    let r = parse_document(&b, &form(Mode::Redo), &d, &upstream("with-form.pdf"), "application/pdf", false).unwrap();
     assert!(r.archive_path.is_none());
     assert_ordered(&r.text, &["Please enter your name in here:", "This is a PDF document with a form."]);
     // tagged without text → OCR still runs

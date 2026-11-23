@@ -13,7 +13,8 @@ use crate::DEFAULT_QUEUE;
 /// Settings (all from the environment, see the contract).
 #[derive(Debug, Clone)]
 pub struct QueueConfig {
-    /// `PAPERLESS_TASK_WORKERS` (1): concurrently running tasks per worker process.
+    /// `PAPERLESS_TASK_WORKERS`: concurrently running tasks per worker process. Unset: 1 (upstream);
+    /// `auto`: derived from cores and memory (`pl_core::resources::task_workers_or_auto`).
     pub concurrency: usize,
     /// `PAPERLESS_THREADS_PER_WORKER` (max(floor(cpus / workers), 1)): passed on to handlers
     /// (OCR threads); the queue itself does not use it.
@@ -65,7 +66,8 @@ impl QueueConfig {
         // PAPERRUST_QUEUE / PAPERRUST_QUEUE_BACKEND have no effect (PostgreSQL only); an old
         // value such as `celery` leads to a notice at startup (pl_core::config::retired_warnings),
         // never to an abort.
-        let workers = env.int_or("PAPERLESS_TASK_WORKERS", 1)?;
+        // Unset: 1 (upstream); `auto`: from cores/memory (PaperRust opt-in, see contract).
+        let workers = pl_core::resources::task_workers_from_env(env)?;
         if workers < 1 {
             return Err(ConfigError::Invalid("PAPERRUST_TASK_WORKERS must be >= 1".into()));
         }
@@ -110,7 +112,18 @@ mod tests {
     #[test]
     fn defaults_and_overrides() {
         let c = QueueConfig::from_env(&Env::from_pairs([("HOSTNAME", "box")])).unwrap();
+        // unset: 1 like upstream, all cores for that one task
         assert_eq!(c.concurrency, 1);
+        assert_eq!(c.threads_per_worker, default_threads_per_worker(1));
+        // `auto` (any case): same derivation as pl-ocr's threads per task
+        for v in ["auto", "AUTO"] {
+            let a = QueueConfig::from_env(&Env::from_pairs([("PAPERRUST_TASK_WORKERS", v)])).unwrap();
+            assert_eq!(a.concurrency as i64, pl_core::resources::task_workers_or_auto(None, None));
+            assert!((1..=pl_core::resources::MAX_AUTO_TASK_WORKERS as usize).contains(&a.concurrency));
+        }
+        let c1 = QueueConfig::from_env(&Env::from_pairs([("PAPERRUST_TASK_WORKERS", "1")])).unwrap();
+        assert_eq!(c1.concurrency, 1);
+        assert!(QueueConfig::from_env(&Env::from_pairs([("PAPERLESS_TASK_WORKERS", "0")])).is_err());
         assert_eq!(c.time_limit_secs, 1800.0);
         assert_eq!(c.queues, vec!["celery".to_string()]);
         assert!(c.threads_per_worker >= 1);
@@ -127,6 +140,8 @@ mod tests {
         assert_eq!((c.concurrency, c.threads_per_worker, c.time_limit_secs), (4, 2, 60.0));
         assert_eq!(c.queues, vec!["celery".to_string(), "ocr".to_string()]);
         assert!(QueueConfig::from_env(&Env::from_pairs([("PAPERLESS_TASK_WORKERS", "x")])).is_err());
+        let e = QueueConfig::from_env(&Env::from_pairs([("PAPERLESS_TASK_WORKERS", "autox")])).unwrap_err().to_string();
+        assert!(e.contains("invalid literal for int() with base 10: 'autox'"), "{e}");
         // old values do not abort startup
         assert!(QueueConfig::from_env(&Env::from_pairs([("PAPERRUST_QUEUE_BACKEND", "celery")])).is_ok());
         assert!(QueueConfig::from_env(&Env::from_pairs([("PAPERRUST_QUEUE", "redis")])).is_ok());

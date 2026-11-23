@@ -42,7 +42,7 @@ pl-server (Montage /rs/api/v2, PAPERRUST_API_V2, v1-Schreibrouter)
 | GET | `/documents` | `cursor`, `limit` (1–1000, Std. 100), `sort`, `include`, `count` |
 | POST | `/documents/query` | `DocQuery` (pl-domain `query.rs`) |
 | GET/PATCH | `/documents/{uuid}` | `include=content,notes,sharing`; PATCH mit `If-Match: "<rev>"` |
-| GET/POST | `/documents/{uuid}/notes` | POST `{"note":…}` über v1 |
+| GET/POST | `/documents/{uuid}/notes` | POST `{"note":…, "format":"plain"\|"markdown"}` über v1 (`format` optional, Standard `plain`, Validierung wie v1/3.5.1); Notizen enthalten `format` |
 | DELETE | `/documents/{uuid}/notes/{legacy_id}` | über v1 |
 | GET/HEAD | `/documents/{uuid}/files/{original\|archive\|preview\|thumbnail}` | ETag, 304, Range/If-Range, 206/416 |
 | GET | `/{tags,correspondents,document_types,storage_paths,custom_fields,saved_views,users,groups}` | `cursor`, `limit`, `sort=name\|-name\|id\|-id`, `name_contains`, `count`, `document_count`, `include=sharing` |
@@ -58,6 +58,7 @@ pl-server (Montage /rs/api/v2, PAPERRUST_API_V2, v1-Schreibrouter)
 | PUT | `/asn/config` | Body `{ranges_enabled?, location_field_name?}` (Superuser) → wie GET. GET hängt am Ende an: `ranges_enabled`, `location_field_name`, `can_manage_ranges` (übrige Felder/Reihenfolge unverändert) |
 | GET/POST | `/asn/ranges` | Nummernkreise: GET → `{enabled, items:[{id,name,code,location,first_asn,last_asn,note,created,modified,used,next_asn,remaining}]}` (Recht wie `/asn`); POST `{name,code,location?,first_asn,last_asn,note?}` → 201 (Superuser) |
 | GET/PUT/PATCH/DELETE | `/asn/ranges/{id}` | ein Nummernkreis; PUT voll, PATCH teilweise, DELETE → 204 (ändern: Superuser); Überschneidung/doppeltes Kürzel → 400 `fields.*`; unbekannt → 404. `POST /asn/preview` liefert am Ende zusätzlich `range` (oder `null`) |
+| GET/POST/PATCH/DELETE | `/folders[/{id}]`, POST `/folders/move-documents` | Ordneransicht (nur PaperRust), Abschnitt „Ordner `/folders`“ unten |
 
 Formen: Fehler `{"error":{"code","message","fields"?,"current_rev"?}}`; Listen
 `{"items":[…],"next_cursor":…|null,"count"?}`; Zeitpunkte RFC 3339 UTC, `created` als `YYYY-MM-DD`;
@@ -505,3 +506,170 @@ Fehlerform wie überall in v2 (`{"error":{…}}`); 404 für unbekannte Rollen-id
   Nicht-Superuser-Regeln, Modus-Wächter, Codename-Prüfung, Themenabdeckung.
 - DB (`tests/roles_api.rs`, `#[ignore]`, eigene Kopie `pl_roles_api_test` aus `paperless_snapshot`,
   Anleitung im Kopfkommentar).
+
+## Ordner `/folders` (Ordneransicht, Stufe 1)
+
+Quelle: Entwurf `results/ideas/2026-11-22-papermerge-ordneransicht.md` (Datenmodell b, Stufe „1 MVP
+Backend“). Code: `crates/pl-api-v2/src/folders.rs`, Migration
+`crates/pl-api-v2/migrations/0002_paperrust_folder.sql` (`pl_api_v2.0002_paperrust_folder`, läuft mit
+`manage migrate` **nach** den Datenmodell-Stufen und beim ersten Aufruf der Ordner-API). **Nur PaperRust**,
+kein Gegenstück in paperless-ngx 3.4.2.
+
+### Tabellen (expand-only)
+
+| Tabelle | Inhalt |
+|---|---|
+| `paperrust_folder` | `id bigserial`, `uuid`, `rev`, `name varchar(128)` (getrimmt, nicht leer), `parent_id → paperrust_folder` (NULL = oberste Ebene), `owner_id` (NULL = für alle), `sort`, `color` (`#rrggbb`), `created`, `modified`; eindeutig `(coalesce(parent_id,0), lower(name))` |
+| `paperrust_document_folder` | `document_id` (PK) → `folder_id` (ON DELETE CASCADE), `moved`; **keine Zeile = „Unsortiert“**, höchstens ein Ordner je Dokument |
+| `paperrust_folder_grant` | `(folder_id, subject)` → `perms`; Kodierung wie `paperrust_object_grant`: `subject` > 0 Benutzer, < 0 −Gruppe; Bits 1 ansehen, 2 ändern, 4 löschen |
+
+Trigger: Dokument endgültig gelöscht (Papierkorb geleert) → Zuordnung weg (auf `paperrust_document` ab
+Stufe 1, sonst `documents_document`); Benutzer gelöscht → `owner_id` NULL und seine Freigaben weg; Gruppe
+gelöscht → ihre Freigaben weg.
+
+### Rechte
+
+- Ordner überhaupt nutzen: aktiver Benutzer mit `documents.view_document` (sonst 403). Anlegen, Ändern,
+  Löschen, Dokumente verschieben zusätzlich `documents.change_document` (Antwortfeld `can_organize`).
+- Sichtbar: Superuser, Besitzer, alle bei `owner_id` NULL, Freigabe mit Bit 1 (Benutzer oder eine seiner
+  Gruppen). Ändern: Superuser, Besitzer, ohne Besitzer oder Bit 2; Löschen entsprechend Bit 4. Unsichtbar → 404.
+- Besitzer und Freigaben (`owner`, `set_permissions`) ändern nur Superuser, Besitzer oder bei Ordnern ohne
+  Besitzer jeder mit Änderungsrecht (wie v1). Neuer Ordner gehört dem Aufrufer; anderer/kein Besitzer nur
+  für Superuser.
+- Unterordner anlegen/hineinverschieben: Änderungsrecht am Elternordner.
+- **Keine Vererbung** auf Dokumente: Dokumentrechte bleiben je Dokument. Verschieben braucht
+  `change_document` am Dokument (Objektrecht wie `bulk_edit`) und Änderungsrecht am Zielordner.
+
+### Routen
+
+`Folder` (Felder in dieser Reihenfolge):
+```json
+{"id":3,"uuid":"…","rev":1,"name":"Rechnungen","parent":null,"owner":7,"color":null,"sort":0,
+ "user_can_change":true,"user_can_delete":true,"document_count":12,
+ "created":"2026-11-22T10:00:00Z","modified":"2026-11-22T10:00:00Z"}
+```
+
+| Methode | Pfad | Body / Query | Antwort |
+|---|---|---|---|
+| GET | `/folders[?counts=0]` | – | `{"items":[Folder…],"unsorted":n,"can_organize":bool}`; flach, Reihenfolge `sort, lower(name), id`; Baum über `parent` (Ordner mit unsichtbarem Elternordner = Wurzel). `document_count` = sichtbare Dokumente direkt im Ordner, `unsorted` = sichtbare Dokumente ohne Ordner; mit `counts=0` beides weg (`unsorted: null`) |
+| POST | `/folders` | `{name, parent?, color?, sort?, owner?, set_permissions?}` | 201 `Folder` + `path` + ggf. `permissions`, ETag `"rev"` |
+| GET | `/folders/{id}` | – | `Folder` + `path:[{id,name}…]` (sichtbare Vorfahren ab Wurzel, inkl. selbst) + für Besitzer/Superuser `permissions:{view,change,delete:{users,groups}}` |
+| PATCH | `/folders/{id}` | wie POST, alles optional; `parent: null` = oberste Ebene; `If-Match: "rev"` optional | 200 wie GET; Ordner danach unsichtbar (weggegeben) → `{"id":…,"visible":false}` |
+| DELETE | `/folders/{id}?contents=parent\|unsorted` | `If-Match` optional | 200 `{"moved_documents":n,"moved_folders":m}`. `parent` (Standard): Dokumente und Unterordner in den Elternordner (bei oberster Ebene: Dokumente „Unsortiert“, Unterordner oberste Ebene); `unsorted`: Dokumente „Unsortiert“, Unterordner oberste Ebene. **Dokumente werden nie gelöscht.** |
+| POST | `/folders/move-documents` | `{"documents":[id\|uuid…],"folder":id\|uuid\|null}` | 200 `{"moved":n,"folder":id\|null}` (`moved` = Zeilen, deren Ordner sich wirklich geändert hat); `null` = „Unsortiert“; höchstens 50 000 Dokumente |
+
+Fehler (v2-Format): leerer/zu langer Name, Steuerzeichen → 400 `fields.name`; Name auf der Ebene schon
+vorhanden → 400 `fields.name` „A folder with this name already exists here.“; Elternordner fehlt/unsichtbar
+→ 400 `fields.parent`; in sich selbst/Unterordner verschieben → 400 `fields.parent`; Farbe → 400
+`fields.color`; unbekannter Benutzer/Gruppe → 400 „Invalid pk "x" - object does not exist.“; Unterordner
+mit gleichem Namen beim Löschen → 409; `If-Match` passt nicht → 412; Verschieben: unbekannte/unsichtbare
+Dokumente → 400 `fields.documents` „Some documents don't exist or were specified twice.“, nicht änderbar
+→ 403 „Insufficient permissions.“ (Texte wie v1 `bulk_edit`).
+
+Nebenläufigkeit: Baumänderungen (Elternordner ändern, Löschen) laufen unter
+`pg_advisory_xact_lock(hashtext('paperrust_folder_tree'))` – zwei gleichzeitige Verschiebungen können keinen
+Kreis bauen. Verschieben von Dokumenten ist ein `INSERT … ON CONFLICT` (letzter Schreiber gewinnt).
+
+### Filter (v1 und v2)
+
+v1 `/api/documents/` (pl-docfilter, nach den upstream-Filtern): `folder__id`, `folder__id__in`,
+`folder__id__tree` (Ordner samt Unterordnern, rekursives CTE), `folder__isnull` (`1` = „Unsortiert“).
+v2 `documents/query`: Bedingung `{"folder":{"any":[uuid…],"subfolders":bool,"is_null":bool}}` (wird auf die
+v1-Parameter abgebildet, unbekannte UUID = trifft nichts). AST-Knoten `Pred::Folder(FolderCond)`
+(`pl-domain`), SQL `pl_docfilter::sql::folder_exists` (korreliertes `EXISTS`). Die Offline-Replik
+(`pl-sync-client`) antwortet auf `folder` mit „nicht unterstützt“ (Stufe 3).
+
+v1-Dokument: zusätzliches Lesefeld `folder` (id oder `null`) **am Ende**, nur wenn die Instanz mindestens
+einen Ordner hat oder `fields=folder` ausdrücklich angefragt wird (docs/contract/pl-documents.md).
+
+### Export/Import
+
+`paperrust_folder`, `paperrust_document_folder`, `paperrust_folder_grant` stehen in
+`paperrust-extras.json` (pl-cli `export::extras::TABLES`) → Rundreise über `document_exporter` /
+`document_importer` verlustfrei; paperless-ngx ignoriert die Datei.
+
+### Known differences / Entscheidungen (Ordner)
+
+- **Nur PaperRust:** paperless-ngx kennt keine Ordner. Ein Rückweg nach ngx verliert die Ordner (sie bleiben
+  nur in den Extras für einen späteren Re-Import); `--folders-as-tags` ist Stufe 5. Fremd-Apps sehen höchstens
+  das v1-Feld `folder`; ngx selbst ignoriert die `folder__*`-Parameter, PaperRust filtert damit.
+- **Abweichung vom Entwurf, Datenmodell:** statt Spalte `paperrust_document.folder_id` eine 1:1-Seitentabelle
+  `paperrust_document_folder` (gleiche Bedeutung: höchstens ein Ordner, keine Zeile = „Unsortiert“).
+  Grund: funktioniert in jeder Datenmodell-Stufe (auch ohne Stufe 1, Test-Kopien), lässt die
+  Kompatibilitäts-Sicht `documents_document`, die Prüfung `manage datamodel check` und den Rückbau unberührt.
+  Folge: Verschieben erhöht `rev` des Dokuments nicht (Sync-Art `folder` ist Stufe 3).
+- **Abweichung vom Entwurf, Freigaben:** eigene Tabelle `paperrust_folder_grant` mit derselben Kodierung statt
+  einer neuen `object_kind` in `paperrust_object_grant`. Grund: `paperrust_object_grant` gibt es erst ab
+  Stufe 4, ihre Zeilen werden über `paperrust_grant_perm` in die guardian-Sichten projiziert, und der
+  Extras-Import ersetzt Tabellen ganz (würde alle Dokumentfreigaben löschen); die Lese-Helfer in pl-authz
+  gehen über `auth_permission`, die es für Ordner nicht gibt. Eine spätere Zusammenlegung ist eine
+  Datenmigration. Eine Oberfläche für Ordnerfreigaben gibt es in Stufe 1 nicht (nur API).
+- Verschieben schreibt keinen Audit-Log-Eintrag und ändert `modified` des Dokuments nicht (ngx-Spalten bleiben
+  unberührt).
+- Zähler je Ordner sind ein `COUNT … GROUP BY` über die sichtbaren Dokumente bei jedem `GET /folders`; bei
+  1 Mio. Dokumenten nicht gemessen (Entwurf: erst messen, dann ggf. Zählertabelle, Stufe 2).
+- Ordner-Filter auf einer Datenbank ohne PaperRust-Migrationen → 500 (Tabelle fehlt); die Ordner-API legt die
+  Tabellen beim ersten Aufruf selbst an.
+
+### Stufe 2: Hochladen in einen Ordner, Drag & Drop, Kacheln
+
+**Upload-Feld `folder` (nur PaperRust)** an `POST /api/documents/post_document/` (pl-server `upload.rs`,
+`PostDocumentView.post`): optional, Ordner-id. Fehlt das Feld oder ist es leer → Verhalten wie paperless-ngx
+(kein Ordner, „Unsortiert“). Prüfung in zwei Schritten:
+
+1. Syntax in `validate` wie ein `PrimaryKeyRelatedField`: keine Zahl → `{"folder": ["Incorrect type. Expected pk
+   value, received str."]}`, ≤ 0 oder zu groß → `Invalid pk "<x>" - object does not exist.` (400, zusammen mit den
+   übrigen Feldfehlern).
+2. Nach erfolgreicher Validierung `pl_api_v2::folders::check_upload_target(pool, user, id)` – dieselben Regeln wie
+   `move-documents`: `documents.view_document` + `documents.change_document` und Änderungsrecht an einem
+   sichtbaren Ordner (das neue Dokument gehört dem Hochladenden, die Dokumentseite ist damit erfüllt). Unbekannt
+   oder unsichtbar → 400 `{"folder": ["Invalid pk \"<id>\" - object does not exist."]}`, sichtbar ohne Recht →
+   400 `{"folder": ["You do not have permission to add documents to this folder."]}`. Ohne Ordnertabellen
+   (Ordner-API nie benutzt) → „does not exist“; der Upload legt keine Tabellen an.
+
+Weitergabe: `DocumentMetadataOverrides.folder_id` (pl-consumer `data.rs`; in `input_data`/Task-kwargs nur wenn
+gesetzt, wie `ai_ocr`). Der Consumer trägt den Ordner in `apply_overrides` (gleiche Transaktion wie das Anlegen)
+in `paperrust_document_folder` ein. Ist der Ordner inzwischen gelöscht, bleibt das Dokument „Unsortiert“
+(Warnung im Log `paperless.consumer`), die Verarbeitung scheitert nicht.
+
+**Oberfläche (design2, keine neue Route):**
+- Drag & Drop mit der Maus: Dokumente aus Liste/Kacheln (bei Mehrfachauswahl die ganze Auswahl) auf einen Ordner
+  im Baum, eine Ordnerkachel oder „Unsortiert“ → `POST /folders/move-documents`; Ordner im Baum/auf Kacheln →
+  `PATCH /folders/{id}` `{parent}` („Unsortiert“ = `parent: null`). Ziele ohne Änderungsrecht, der Ordner selbst,
+  sein Teilbaum und der jetzige Elternordner nehmen nichts an (keine Hervorhebung); Serverfehler (Kreis, doppelter
+  Name, Rechte) erscheinen als Fehlermeldung mit dem Servertext. Danach Hinweis mit „Rückgängig“, wenn der
+  vorherige Ordner aller Dokumente bekannt ist. Tastatur/Touch: weiter „In Ordner verschieben“ in der Leiste.
+- Kacheln: Umschalter Liste/Kacheln je Benutzer in `ui_settings.paperrust.folder_view` (`list`|`tiles`, Standard
+  `list`). Erst Unterordner (bei „Unsortiert“ = Ordnerwurzel die obersten Ordner), dann Dokumente mit dem
+  vorhandenen Vorschaubild (`/api/documents/{id}/thumb/`).
+- Auswahl in Liste und Kacheln: Klick öffnet, Strg/Cmd-Klick schaltet um, **Umschalt-Klick wählt den Bereich**
+  ab dem letzten Klick (vorher schaltete Umschalt-Klick in der Liste nur einzeln um).
+- Nach „In Ordner verschieben“ ist die Auswahl leer; in der Ordneransicht verlassen verschobene Dokumente die
+  Liste sofort (Stufe-1-Fehler „2 ausgewählt“ behoben).
+
+### Known differences / Entscheidungen (Stufe 2)
+
+- **Upload-Feld `folder`** gibt es nur in PaperRust. paperless-ngx 3.4.2 hat kein solches Feld; DRF ignoriert
+  unbekannte Felder, ein ngx-Server würde es also stillschweigend übergehen (Dokument „Unsortiert“). Ohne das
+  Feld ist die v1-Antwort unverändert (Task-id als String).
+- Die Ordnerprüfung kommt **nach** der übrigen Validierung: ein Upload mit Feldfehlern und falschem Ordner meldet
+  zuerst nur die Feldfehler.
+- Rechte am Ordner werden beim Hochladen geprüft, nicht noch einmal bei der Verarbeitung (wie
+  `owner_id`/Freigaben-Overrides von ngx). Wird der Ordner dazwischen gelöscht, landet das Dokument in
+  „Unsortiert“.
+- Das Eintragen schreibt keinen Audit-Log-Eintrag (wie `move-documents`).
+- Zählertabelle je Ordner (Entwurf Stufe 2) noch nicht gebaut: weiter `COUNT … GROUP BY` je `GET /folders`,
+  nicht gemessen.
+
+### Tests (Ordner)
+
+- Unit (`cargo test -p pl-api-v2 --lib folders`): Namen, Farben, Pfad mit unsichtbarem Elternordner,
+  Kreisprüfung, `contents`, Freigabe-Zeilen hin und zurück, Body-Parsing (`null` vs. fehlend, UUID/id),
+  Rechte-SQL, Migration expand-only. pl-docfilter: Filterparameter → SQL/AST.
+- DB (`tests/folders_api.rs`, `#[ignore]`, eigene Kopie `pl_folders_api_test` aus `paperless_snapshot`,
+  Anleitung im Kopfkommentar): `folder_lifecycle_and_permissions`, Stufe 2 `upload_target_rules`
+  (`PAPERRUST_FOLDERS_TEST_DATABASE_URL`).
+- Stufe 2: pl-server `upload.rs` Unit (Feld `folder`: fehlt/leer/Zahl/kein pk), pl-consumer `data.rs` Unit
+  (`folder_id` nur wenn gesetzt, `update`), DB `pl-consumer/tests/e2e.rs::e2e_upload_into_folder` (`#[ignore]`,
+  `PAPERRUST_CONSUMER_TEST_DATABASE_URL`). Frontend: `frontend-light/src/design2/lib/folder-dnd.test.ts`
+  (Drop-Regeln, Auswahl, Rückgängig, Kacheln).

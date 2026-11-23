@@ -567,7 +567,7 @@ async fn run_inner(o: &SwitchOptions, rep: &mut Report) -> Result<()> {
                     "Schema",
                     format!(
                         "neuere paperless-ngx-Version als {} mit bekannten Änderungen ({}) – wird so übernommen \
-                         (Tags ohne die alten treenode-Spalten, wie PaperRust selbst)",
+                         (Tags ohne die alten treenode-Spalten, Notizen mit Format plain/markdown – wie PaperRust selbst)",
                         crate::schema::VERSION,
                         newer.iter().map(|(a, n)| format!("{a}.{n}")).collect::<Vec<_>>().join(", ")
                     ),

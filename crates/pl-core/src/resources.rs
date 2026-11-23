@@ -13,7 +13,20 @@
 //! upstream default is lowered so far that
 //! `task_workers × threads_per_worker × OCR_THREAD_MB` fits into half of the memory
 //! available at startup (at least 1). If the value is set, it stays unchanged; likewise
-//! `PAPERLESS_TASK_WORKERS` (default 1 like upstream, never changed automatically).
+//! `PAPERLESS_TASK_WORKERS` (never changed by the memory cap).
+//!
+//! `PAPERLESS_TASK_WORKERS` (also `PAPERRUST_TASK_WORKERS`): unset means **1** like upstream
+//! ([`DEFAULT_TASK_WORKERS`]), so a single document gets all cores (`threads_per_worker = cores`).
+//! The automatic parallel default from 2026-11-22 was withdrawn on 2026-11-23 (Pi 5, 3 cores: a
+//! batch of 255 documents got faster, 214 s -> 162 s, but a single 8-page scan alone took 24 s
+//! instead of 14.8 s). It stays available as opt-in with the value `auto` (case-insensitive,
+//! [`is_auto`]): the number of parallel tasks is then derived from the machine
+//! ([`default_task_workers`]): `ceil(cores / threads)` where `threads` is the explicit
+//! `PAPERLESS_THREADS_PER_WORKER` or [`AUTO_THREADS_PER_TASK`], at most [`MAX_AUTO_TASK_WORKERS`],
+//! and no more than fit into the memory budget at `threads × OCR_THREAD_MB` each (at least 1). An
+//! explicit number is always used unchanged. The machine (cores, available memory) is measured
+//! once per process ([`machine`]) so that pl-queue (slots) and pl-ocr (threads per task) always
+//! derive the same numbers ([`task_workers_or_auto`]).
 //!
 //! The limited value is written into the process environment at program start as
 //! `PAPERLESS_THREADS_PER_WORKER` ([`apply_ocr_resource_cap`]), so that pl-ocr and pl-queue, which read
@@ -21,13 +34,42 @@
 
 use std::sync::OnceLock;
 
-use crate::config::Env;
+use crate::config::{ConfigError, Env};
+
+/// Default of an unset `PAPERLESS_TASK_WORKERS` (upstream `get_int_from_env("PAPERLESS_TASK_WORKERS", 1)`).
+pub const DEFAULT_TASK_WORKERS: i64 = 1;
+/// Value of `PAPERLESS_TASK_WORKERS` that selects the automatic task count (PaperRust opt-in).
+pub const TASK_WORKERS_AUTO: &str = "auto";
+
+/// `true` if a raw `PAPERLESS_TASK_WORKERS` value is `auto` (case-insensitive, surrounding
+/// whitespace ignored).
+pub fn is_auto(raw: &str) -> bool {
+    raw.trim().eq_ignore_ascii_case(TASK_WORKERS_AUTO)
+}
 
 /// Assumed memory requirement per parallel OCR instance (Tesseract 300 dpi ≈ 70 MB + raster).
 pub const OCR_THREAD_MB: u64 = 100;
 /// Share of the available memory that parallel OCR may occupy at most (rest:
 /// server, PostgreSQL, page raster, other programs).
 pub const RAM_SHARE_PERCENT: u64 = 50;
+/// OCR threads per task assumed when deriving the automatic task count (`auto`, threads unset):
+/// two tasks with two threads each on four cores. Page-parallel OCR of one big scan keeps two
+/// threads; batches use all cores even when documents need no OCR (text PDFs: ~1 core each).
+pub const AUTO_THREADS_PER_TASK: i64 = 2;
+/// Upper bound of the automatic task count (more parallel documents mostly add database
+/// connections, memory and contention on the media lock / search index without more speed).
+pub const MAX_AUTO_TASK_WORKERS: i64 = 4;
+
+/// Where `task_workers` comes from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WorkersSource {
+    /// Not set – upstream default [`DEFAULT_TASK_WORKERS`].
+    Default,
+    /// `auto` – derived from cores and memory ([`default_task_workers`]).
+    Auto,
+    /// A number set by the user (invalid values count as set; the configuration reports them).
+    Explicit,
+}
 
 /// Where `threads_per_worker` comes from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -46,7 +88,7 @@ pub enum ThreadsSource {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResourcePlan {
     pub task_workers: i64,
-    pub task_workers_explicit: bool,
+    pub workers_source: WorkersSource,
     pub threads_per_worker: i64,
     pub threads_source: ThreadsSource,
     /// upstream default (for comparison in the log).
@@ -76,7 +118,11 @@ impl ResourcePlan {
         format!(
             "task workers: {}{}, OCR threads per worker: {} ({src}); cores: {}, available memory: {mem}",
             self.task_workers,
-            if self.task_workers_explicit { " (set explicitly)" } else { " (default)" },
+            match self.workers_source {
+                WorkersSource::Default => " (default)",
+                WorkersSource::Auto => " (auto: from cores and memory)",
+                WorkersSource::Explicit => " (set explicitly)",
+            },
             self.threads_per_worker,
             self.cores,
         )
@@ -91,6 +137,26 @@ pub fn upstream_threads_per_worker(task_workers: i64, cores: i64) -> i64 {
     cores.max(1).div_euclid(task_workers).max(1)
 }
 
+/// Automatic task count for `PAPERLESS_TASK_WORKERS=auto` (PaperRust opt-in; unset = 1).
+///
+/// `threads` = explicit `PAPERLESS_THREADS_PER_WORKER` (None = unset). Result:
+/// `min(ceil(cores / t), MAX_AUTO_TASK_WORKERS, budget / (t × OCR_THREAD_MB))`, at least 1, with
+/// `t = threads` or [`AUTO_THREADS_PER_TASK`] and `budget` = [`RAM_SHARE_PERCENT`] of the available
+/// memory (no memory limit when unknown).
+pub fn default_task_workers(threads: Option<i64>, cores: i64, available_mb: Option<u64>) -> i64 {
+    let t = threads.filter(|t| *t >= 1).unwrap_or(AUTO_THREADS_PER_TASK);
+    let cores = cores.max(1);
+    let by_cores = ((cores + t - 1) / t).clamp(1, MAX_AUTO_TASK_WORKERS);
+    match available_mb {
+        Some(mb) => {
+            let budget = mb.saturating_mul(RAM_SHARE_PERCENT) / 100;
+            let by_mem = i64::try_from(budget / (t as u64).saturating_mul(OCR_THREAD_MB)).unwrap_or(i64::MAX);
+            by_cores.min(by_mem).max(1)
+        }
+        None => by_cores,
+    }
+}
+
 /// Maximum number of OCR threads per worker that fits into memory (at least 1).
 pub fn memory_threads_cap(task_workers: i64, available_mb: u64) -> i64 {
     let budget = available_mb.saturating_mul(RAM_SHARE_PERCENT) / 100;
@@ -98,9 +164,11 @@ pub fn memory_threads_cap(task_workers: i64, available_mb: u64) -> i64 {
     i64::try_from(per_worker).unwrap_or(i64::MAX).max(1)
 }
 
-/// Pure calculation (tests). `task_workers`/`threads` = set values (None = not set).
+/// Pure calculation (tests). `task_workers` = number to use (None = `auto`), `threads` = set
+/// value (None = not set). An unset `PAPERLESS_TASK_WORKERS` is `Some(DEFAULT_TASK_WORKERS)` here
+/// ([`plan_from_env`] maps it).
 pub fn plan_ocr_resources(task_workers: Option<i64>, threads: Option<i64>, cores: i64, available_mb: Option<u64>) -> ResourcePlan {
-    let workers = task_workers.unwrap_or(1);
+    let workers = task_workers.unwrap_or_else(|| default_task_workers(threads, cores, available_mb));
     let upstream = upstream_threads_per_worker(workers, cores);
     let (threads_per_worker, threads_source) = match (threads, available_mb) {
         (Some(t), _) => (t, ThreadsSource::Explicit),
@@ -112,7 +180,7 @@ pub fn plan_ocr_resources(task_workers: Option<i64>, threads: Option<i64>, cores
     };
     ResourcePlan {
         task_workers: workers,
-        task_workers_explicit: task_workers.is_some(),
+        workers_source: if task_workers.is_some() { WorkersSource::Explicit } else { WorkersSource::Auto },
         threads_per_worker,
         threads_source,
         upstream_threads: upstream,
@@ -125,12 +193,26 @@ pub fn plan_ocr_resources(task_workers: Option<i64>, threads: Option<i64>, cores
 /// error message comes later from the configuration itself; nothing is limited here then).
 pub fn plan_from_env(env: &Env, cores: i64, available_mb: Option<u64>) -> ResourcePlan {
     let parse = |k: &str| env.get(k).map(|v| v.trim().parse::<i64>().unwrap_or(i64::MIN));
-    let workers = parse("PAPERLESS_TASK_WORKERS").filter(|w| *w != i64::MIN);
-    let explicit_workers = env.get("PAPERLESS_TASK_WORKERS").is_some();
+    let raw_workers = env.get("PAPERLESS_TASK_WORKERS");
+    let (workers, source) = match raw_workers {
+        None => (Some(DEFAULT_TASK_WORKERS), WorkersSource::Default),
+        Some(v) if is_auto(v) => (None, WorkersSource::Auto),
+        Some(v) => (Some(v.trim().parse::<i64>().unwrap_or(DEFAULT_TASK_WORKERS)), WorkersSource::Explicit),
+    };
     let threads = parse("PAPERLESS_THREADS_PER_WORKER");
     let mut plan = plan_ocr_resources(workers, threads, cores, available_mb);
-    plan.task_workers_explicit = explicit_workers;
+    plan.workers_source = source;
     plan
+}
+
+/// Effective `PAPERLESS_TASK_WORKERS` from an [`Env`]: unset → [`DEFAULT_TASK_WORKERS`], `auto` →
+/// [`task_workers_or_auto`], otherwise `int()` (ngx error text for invalid values). Range checks
+/// (`>= 1`) are the caller's job.
+pub fn task_workers_from_env(env: &Env) -> Result<i64, ConfigError> {
+    match env.get("PAPERLESS_TASK_WORKERS") {
+        Some(v) if is_auto(v) => Ok(task_workers_or_auto(None, env.int("PAPERLESS_THREADS_PER_WORKER")?)),
+        _ => env.int_or("PAPERLESS_TASK_WORKERS", DEFAULT_TASK_WORKERS),
+    }
 }
 
 /// Logical cores (`os.cpu_count()`).
@@ -219,6 +301,36 @@ pub fn cgroup_available(max: Option<&str>, current: Option<&str>) -> Option<u64>
 }
 
 static PLAN: OnceLock<ResourcePlan> = OnceLock::new();
+static MACHINE: OnceLock<(i64, Option<u64>)> = OnceLock::new();
+
+/// (logical cores, available memory in MB), measured once per process. Every automatic default
+/// derives from this snapshot so that values computed at different times (worker pool start,
+/// consumer rebuild after a settings change) agree.
+pub fn machine() -> (i64, Option<u64>) {
+    *MACHINE.get_or_init(|| (available_cores(), available_memory_mb()))
+}
+
+/// Task count for raw values read from the environment (`workers` = parsed number, None = the
+/// value is `auto`; `threads` = parsed `PAPERLESS_THREADS_PER_WORKER`, None = unset). Callers map
+/// an unset `PAPERLESS_TASK_WORKERS` to [`DEFAULT_TASK_WORKERS`] themselves (see
+/// [`task_workers_from_env`]). An explicit worker count is returned unchanged (validation is the
+/// caller's job). `auto`: the worker count of the startup plan when the startup cap wrote
+/// `threads` itself (otherwise that written value would look explicit), else
+/// [`default_task_workers`] on [`machine`].
+pub fn task_workers_or_auto(workers: Option<i64>, threads: Option<i64>) -> i64 {
+    if let Some(w) = workers {
+        return w;
+    }
+    if let Some(p) = PLAN.get()
+        && p.workers_source == WorkersSource::Auto
+        && p.threads_source == ThreadsSource::MemoryCapped
+        && threads == Some(p.threads_per_worker)
+    {
+        return p.task_workers;
+    }
+    let (cores, mem) = machine();
+    default_task_workers(threads, cores, mem)
+}
 
 /// Computes the plan from process environment + `paperless.conf` and, if limited, writes
 /// `PAPERLESS_THREADS_PER_WORKER` into the process environment. Only the first call has an effect.
@@ -228,7 +340,8 @@ static PLAN: OnceLock<ResourcePlan> = OnceLock::new();
 /// while no other thread is running (like [`crate::config::apply_env_aliases`], after it).
 pub unsafe fn apply_ocr_resource_cap() -> &'static ResourcePlan {
     PLAN.get_or_init(|| {
-        let plan = plan_from_env(&Env::from_process(), available_cores(), available_memory_mb());
+        let (cores, mem) = machine();
+        let plan = plan_from_env(&Env::from_process(), cores, mem);
         if let Some((k, v)) = plan.env_override() {
             // SAFETY: per this function's contract no other thread is running yet.
             unsafe { std::env::set_var(k, v) };
@@ -266,13 +379,63 @@ mod tests {
     }
 
     #[test]
+    fn auto_task_workers() {
+        // neither value set: ceil(cores / 2), at most 4
+        assert_eq!(default_task_workers(None, 1, None), 1);
+        assert_eq!(default_task_workers(None, 2, None), 1);
+        assert_eq!(default_task_workers(None, 3, None), 2);
+        assert_eq!(default_task_workers(None, 4, None), 2);
+        assert_eq!(default_task_workers(None, 6, None), 3);
+        assert_eq!(default_task_workers(None, 12, None), 4);
+        assert_eq!(default_task_workers(None, 0, None), 1);
+        // explicit threads: Pi 5 benchmark (3 cores, THREADS_PER_WORKER=2) -> 2 tasks
+        assert_eq!(default_task_workers(Some(2), 3, Some(6000)), 2);
+        assert_eq!(default_task_workers(Some(1), 3, Some(6000)), 3);
+        assert_eq!(default_task_workers(Some(4), 4, Some(6000)), 1);
+        // invalid thread values fall back to the assumption
+        assert_eq!(default_task_workers(Some(0), 4, None), 2);
+        assert_eq!(default_task_workers(Some(i64::MIN), 4, None), 2);
+        // memory: 1 GB free -> 512 MB budget -> 2 tasks with 2 threads at 100 MB
+        assert_eq!(default_task_workers(None, 12, Some(1024)), 2);
+        // almost no memory -> 1
+        assert_eq!(default_task_workers(None, 12, Some(50)), 1);
+        assert_eq!(default_task_workers(None, 12, Some(0)), 1);
+    }
+
+    #[test]
+    fn auto_workers_and_threads_never_oversubscribe() {
+        for cores in 1..=64 {
+            for mem in [None, Some(256), Some(1024), Some(4096), Some(65536)] {
+                let p = plan_ocr_resources(None, None, cores, mem);
+                assert!(p.task_workers >= 1 && p.threads_per_worker >= 1);
+                assert!(p.task_workers <= MAX_AUTO_TASK_WORKERS);
+                // floor(cores / workers) threads each: never more OCR threads than cores (once
+                // there are at least as many cores as tasks)
+                if cores >= p.task_workers {
+                    assert!(p.task_workers * p.threads_per_worker <= cores, "cores {cores} mem {mem:?}: {p:?}");
+                }
+                if let Some(mb) = mem {
+                    let budget = (mb * RAM_SHARE_PERCENT / 100) as i64;
+                    if p.task_workers > 1 || p.threads_per_worker > 1 {
+                        assert!(p.task_workers * p.threads_per_worker * OCR_THREAD_MB as i64 <= budget, "{p:?}");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
     fn cap_by_memory() {
-        // 12 cores, 1 worker: 4 GB free -> 2 GB budget -> 20 threads > 12 -> upstream stays
+        // 12 cores, automatic tasks: 4 GB free -> 4 tasks, 3 threads each (upstream formula) fit
         let p = plan_ocr_resources(None, None, 12, Some(4096));
-        assert_eq!((p.threads_per_worker, p.threads_source), (12, ThreadsSource::Default));
+        assert_eq!((p.task_workers, p.threads_per_worker, p.threads_source), (4, 3, ThreadsSource::Default));
         assert_eq!(p.env_override(), None);
-        // 1,5 GB frei -> 768 MB -> 7 Threads
+        // 1.5 GB free -> 768 MB budget -> 3 tasks; 768 / 300 = 2 threads instead of 4
         let p = plan_ocr_resources(None, None, 12, Some(1536));
+        assert_eq!((p.task_workers, p.threads_per_worker, p.threads_source, p.upstream_threads), (3, 2, ThreadsSource::MemoryCapped, 4));
+        assert_eq!(p.env_override(), Some(("PAPERLESS_THREADS_PER_WORKER", "2".to_string())));
+        // 1 worker set (upstream setup): 1.5 GB free -> 768 MB -> 7 threads instead of 12
+        let p = plan_ocr_resources(Some(1), None, 12, Some(1536));
         assert_eq!((p.threads_per_worker, p.threads_source, p.upstream_threads), (7, ThreadsSource::MemoryCapped, 12));
         assert_eq!(p.env_override(), Some(("PAPERLESS_THREADS_PER_WORKER", "7".to_string())));
         // 3 workers set, 2 GB free -> 1024 / 300 = 3 instead of 4
@@ -290,12 +453,24 @@ mod tests {
         let p = plan_ocr_resources(Some(2), Some(6), 12, Some(100));
         assert_eq!((p.task_workers, p.threads_per_worker, p.threads_source), (2, 6, ThreadsSource::Explicit));
         assert_eq!(p.env_override(), None);
-        // task_workers is never changed automatically
+        // an explicit task_workers is never changed automatically
         let p = plan_ocr_resources(Some(8), None, 12, Some(100));
         assert_eq!(p.task_workers, 8);
-        // Memory unknown -> upstream
+        // memory unknown -> automatic tasks, upstream thread formula
         let p = plan_ocr_resources(None, None, 12, None);
-        assert_eq!((p.threads_per_worker, p.threads_source), (12, ThreadsSource::DefaultUnknownMemory));
+        assert_eq!((p.task_workers, p.threads_per_worker, p.threads_source), (4, 3, ThreadsSource::DefaultUnknownMemory));
+        // explicit threads only: tasks follow them
+        let p = plan_ocr_resources(None, Some(2), 3, Some(6000));
+        assert_eq!((p.task_workers, p.threads_per_worker, p.threads_source), (2, 2, ThreadsSource::Explicit));
+    }
+
+    #[test]
+    fn explicit_workers_pass_through() {
+        assert_eq!(task_workers_or_auto(Some(1), None), 1);
+        assert_eq!(task_workers_or_auto(Some(7), Some(1)), 7);
+        let (cores, mem) = machine();
+        assert_eq!(task_workers_or_auto(None, None), default_task_workers(None, cores, mem));
+        assert_eq!(task_workers_or_auto(None, Some(1)), default_task_workers(Some(1), cores, mem));
     }
 
     #[test]
@@ -305,14 +480,57 @@ mod tests {
         assert_eq!((p.threads_per_worker, p.threads_source), (3, ThreadsSource::Explicit));
         let env = Env::from_pairs([("PAPERLESS_TASK_WORKERS", "2")]);
         let p = plan_from_env(&env, 12, Some(1000));
-        assert_eq!((p.task_workers, p.task_workers_explicit, p.threads_per_worker), (2, true, 2));
+        assert_eq!((p.task_workers, p.workers_source, p.threads_per_worker), (2, WorkersSource::Explicit, 2));
         // invalid value: do not limit anything (the configuration reports the error itself)
         let env = Env::from_pairs([("PAPERLESS_THREADS_PER_WORKER", "x")]);
         assert_eq!(plan_from_env(&env, 12, Some(100)).env_override(), None);
+        let env = Env::from_pairs([("PAPERLESS_TASK_WORKERS", "x")]);
+        assert_eq!(plan_from_env(&env, 12, Some(100_000)).workers_source, WorkersSource::Explicit);
+        // unset: 1 task (upstream), all cores for it; 800 MB free -> 400 MB budget -> 4 threads
+        // instead of 12
         let p = plan_from_env(&Env::default(), 12, Some(800));
-        assert!(!p.task_workers_explicit);
-        assert_eq!(p.threads_per_worker, 4);
+        assert_eq!(p.workers_source, WorkersSource::Default);
+        assert_eq!((p.task_workers, p.threads_per_worker), (1, 4));
         assert!(p.describe().contains("capped from 12"));
+        assert!(p.describe().contains("(default)"));
+        let p = plan_from_env(&Env::default(), 3, Some(8000));
+        assert_eq!((p.task_workers, p.threads_per_worker, p.threads_source), (1, 3, ThreadsSource::Default));
+        // `auto` (any case, also via PAPERRUST_): automatic from cores and memory
+        for v in ["auto", "AUTO", " Auto "] {
+            let p = plan_from_env(&Env::from_pairs([("PAPERRUST_TASK_WORKERS", v)]), 12, Some(800));
+            assert_eq!(p.workers_source, WorkersSource::Auto);
+            assert_eq!((p.task_workers, p.threads_per_worker), (2, 2));
+            assert!(p.describe().contains("capped from 6"));
+            assert!(p.describe().contains("auto: from cores and memory"));
+        }
+        let p = plan_from_env(&Env::from_pairs([("PAPERLESS_TASK_WORKERS", "auto")]), 3, Some(8000));
+        assert_eq!((p.task_workers, p.threads_per_worker), (2, 1));
+    }
+
+    #[test]
+    fn task_workers_from_env_values() {
+        assert_eq!(task_workers_from_env(&Env::default()).unwrap(), 1);
+        assert_eq!(task_workers_from_env(&Env::from_pairs([("PAPERRUST_TASK_WORKERS", "3")])).unwrap(), 3);
+        let (cores, mem) = machine();
+        assert_eq!(
+            task_workers_from_env(&Env::from_pairs([("PAPERRUST_TASK_WORKERS", "Auto")])).unwrap(),
+            default_task_workers(None, cores, mem)
+        );
+        assert_eq!(
+            task_workers_from_env(&Env::from_pairs([("PAPERLESS_TASK_WORKERS", "auto"), ("PAPERLESS_THREADS_PER_WORKER", "1")])).unwrap(),
+            default_task_workers(Some(1), cores, mem)
+        );
+        let e = task_workers_from_env(&Env::from_pairs([("PAPERLESS_TASK_WORKERS", "autox")])).unwrap_err().to_string();
+        assert!(e.contains("invalid literal for int() with base 10: 'autox'"), "{e}");
+        assert!(
+            is_auto("auto")
+                && is_auto(
+                    " AUTO
+"
+                )
+                && !is_auto("")
+                && !is_auto("automatic")
+        );
     }
 
     #[test]

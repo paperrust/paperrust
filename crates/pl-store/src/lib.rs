@@ -152,8 +152,8 @@ impl Repo for Store {
         Box::pin(documents::notes(self, p, doc))
     }
 
-    fn add_note<'a>(&'a self, p: &'a Principal, doc: Uuid, text: &'a str) -> BoxFut<'a, Vec<Note>> {
-        Box::pin(legacy::add_note(self, p, doc, text))
+    fn add_note<'a>(&'a self, p: &'a Principal, doc: Uuid, text: &'a str, format: &'a str) -> BoxFut<'a, Vec<Note>> {
+        Box::pin(legacy::add_note(self, p, doc, text, format))
     }
 
     fn delete_note<'a>(&'a self, p: &'a Principal, doc: Uuid, note: i64) -> BoxFut<'a, Vec<Note>> {

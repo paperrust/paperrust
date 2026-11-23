@@ -15,6 +15,14 @@ on:
       extended_run_id:
         description: "Id of the green Extended run with the packages (URL …/actions/runs/<id>)"
         required: true
+      macos_run_id:
+        description: "Optional: id of a green macOS run of the same commit (adds the .dmg/.tar.gz)"
+        required: false
+        default: ""
+      freebsd_run_id:
+        description: "Optional: id of a green FreeBSD run of the same commit (adds .pkg/.tar.gz)"
+        required: false
+        default: ""
       draft:
         description: "Create as draft"
         type: boolean
@@ -36,6 +44,8 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       VERSION: ${{ inputs.version }}
       RUN_ID: ${{ inputs.extended_run_id }}
+      MAC_RUN_ID: ${{ inputs.macos_run_id }}
+      BSD_RUN_ID: ${{ inputs.freebsd_run_id }}
     steps:
       - name: Check inputs and the Extended run
         id: run
@@ -47,6 +57,16 @@ jobs:
           echo "run: $name / $conclusion / $sha"
           [ "$name" = Extended ] && [ "$conclusion" = success ] || { echo "run $RUN_ID is not a green Extended run"; exit 1; }
           if gh api "repos/$GITHUB_REPOSITORY/releases/tags/v$VERSION" >/dev/null 2>&1; then echo "release v$VERSION exists already"; exit 1; fi
+          # Optional extra platforms must be green runs of exactly the same commit
+          check_extra() { # $1 run id, $2 workflow name
+            [ -n "$1" ] || return 0
+            [[ "$1" =~ ^[0-9]+$ ]] || { echo "bad run id: $1"; exit 1; }
+            IFS=$'	' read -r n c s <<<"$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$1" --jq '[.name, .conclusion, .head_sha] | @tsv')"
+            echo "extra run: $n / $c / $s"
+            [ "$n" = "$2" ] && [ "$c" = success ] && [ "$s" = "$sha" ] || { echo "run $1 is not a green $2 run of $sha"; exit 1; }
+          }
+          check_extra "$MAC_RUN_ID" macOS
+          check_extra "$BSD_RUN_ID" FreeBSD
           echo "sha=$sha" >>"$GITHUB_OUTPUT"
       - uses: actions/checkout@v7
         with:
@@ -62,12 +82,26 @@ jobs:
           github-token: ${{ github.token }}
           pattern: paperrust-*
           path: dl
+      - uses: actions/download-artifact@v8
+        if: inputs.macos_run_id != ''
+        with:
+          run-id: ${{ inputs.macos_run_id }}
+          github-token: ${{ github.token }}
+          pattern: paperrust-macos-*
+          path: dl
+      - uses: actions/download-artifact@v8
+        if: inputs.freebsd_run_id != ''
+        with:
+          run-id: ${{ inputs.freebsd_run_id }}
+          github-token: ${{ github.token }}
+          pattern: paperrust-freebsd-*
+          path: dl
       - name: Collect packages and write SHA256SUMS.txt
         run: |
           mkdir out
           find dl -maxdepth 2 -type f \( -name "PaperRust-$VERSION-*.msi" -o -name "PaperRust-$VERSION-*-setup.exe" \
             -o -name "PaperRust-$VERSION-*.zip" -o -name "PaperRust-$VERSION-*.tar.gz" -o -name "PaperRust-$VERSION-*.deb" \
-            -o -name "PaperRust-$VERSION-*.rpm" \) -exec cp {} out/ \;
+            -o -name "PaperRust-$VERSION-*.rpm" -o -name "PaperRust-$VERSION-*.dmg" -o -name "paperrust-*.pkg" \) -exec cp {} out/ \;
           cd out
           for need in windows-x64-setup.exe windows-x64.msi windows-x64.zip linux-x86_64.tar.gz linux-x86_64.deb linux-x86_64.rpm; do
             test -f "PaperRust-$VERSION-$need" || { echo "missing PaperRust-$VERSION-$need"; exit 1; }
@@ -94,6 +128,12 @@ jobs:
           - Docker: \`ghcr.io/paperrust/paperrust:$VERSION\` (amd64, arm64)
           - Checksums: \`SHA256SUMS.txt\`. Packages are not code-signed yet.
           EOF
+          if ls out/PaperRust-"$VERSION"-macos-*.dmg >/dev/null 2>&1; then
+            echo "- macOS (preview, unsigned, macOS 15+): \`PaperRust-$VERSION-macos-aarch64.dmg\` (Apple Silicon), \`-macos-x86_64.dmg\` (Intel), \`.tar.gz\` (portable). First start: \`xattr -dr com.apple.quarantine /Applications/PaperRust.app\`" >>notes.md
+          fi
+          if ls out/paperrust-*.pkg >/dev/null 2>&1; then
+            echo "- FreeBSD 14 amd64 (server): \`$(cd out && ls paperrust-*.pkg)\` (\`pkg add\`), \`PaperRust-$VERSION-freebsd-x86_64.tar.gz\`; see packaging/freebsd/README.md" >>notes.md
+          fi
       - name: Create release (as github-actions[bot])
         run: |
           draft=()

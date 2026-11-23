@@ -16,6 +16,9 @@
   import Icon from '../components/Icon.svelte'
   import Visibility from '../components/Visibility.svelte'
   import { canChangeVisibility, type VisibilityValue } from '../lib/visibility'
+  import { folders } from '../stores/folders.svelte'
+  import { folderOptions, moveDocuments } from '../api/folders'
+  import { toastService } from '../../stores/toasts.svelte'
 
   let { doc, onsaved, onreload }: { doc: Document; onsaved: (d: Document) => void; onreload?: () => void } = $props()
 
@@ -50,6 +53,26 @@
       })
     }
   })
+
+  // Folder view: folder field (own endpoint, not part of the autosave patch)
+  $effect(() => {
+    if (folders.enabled) folders.ensure()
+  })
+  const folderOpts = $derived(folderOptions(folders.items, (f) => f.user_can_change || f.id === doc.folder))
+  let movingFolder = $state(false)
+  async function setFolder(v: number | null) {
+    movingFolder = true
+    try {
+      await moveDocuments([doc.id], v)
+      onsaved({ ...doc, folder: v })
+      void folders.refresh()
+      if (ws.ctx.kind === 'folder') void ws.reload()
+    } catch (e) {
+      toastService.showError(t('m.folders.could_not_move'), e)
+    } finally {
+      movingFolder = false
+    }
+  }
 
   async function save(patch: Record<string, unknown>): Promise<Document> {
     const vp = v2ref && v2maps ? toV2Patch(patch, v2maps) : null
@@ -181,6 +204,13 @@
       oncreate={readonly || !session.can('add', 'storagepath') ? undefined : (n) => openCreateObject('storage_path', n, (v) => { onsaved({ ...doc, storage_path: v }); saver.change('storage_path', v, true) })}
       onchange={(n) => { const v = (n[0] as number | undefined) ?? null; onsaved({ ...doc, storage_path: v }); saver.change('storage_path', v, true) }} />
   </div>
+  {#if folders.enabled}
+    <div class="f">
+      <span class="d2-label">{t('m.folders.folder')}</span>
+      <ObjectPicker label={t('m.folders.folder')} id="d2-field-folder" allowNone noneLabel={t('m.folders.unsorted')} options={folderOpts} selected={doc.folder != null ? [doc.folder] : []} placeholder={t('m.folders.unsorted')} disabled={readonly || movingFolder}
+        onchange={(n) => void setFolder((n[0] as number | null | undefined) ?? null)} />
+    </div>
+  {/if}
   <div class="f">
     <span class="d2-label">{t('common.tags')}</span>
     <ObjectPicker label={t('common.tags')} id="d2-field-tags" multi options={opts(data.tags)} selected={doc.tags} placeholder={t('m.workspace.no_tags')} disabled={readonly}

@@ -30,8 +30,10 @@ use crate::workflows::{
 /// Migration (name, SQL) for `paperrust manage migrate`.
 pub const MIGRATION: (&str, &str) = ("pl_consumer.0001_paperrust_workflow", include_str!("../migrations/0001_paperrust_workflow.sql"));
 
+/// All migrations of pl-consumer (pl-cli `paperrust_migrations()` includes this list), also the
+/// side table of the duplicate check (`crate::source_checksum`).
 pub mod migrations {
-    pub const ALL: &[(&str, &str)] = &[super::MIGRATION];
+    pub const ALL: &[(&str, &str)] = &[super::MIGRATION, crate::source_checksum::MIGRATION];
 }
 
 static READY: AtomicBool = AtomicBool::new(false);

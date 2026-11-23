@@ -38,7 +38,7 @@ const PREFETCH_LOADED_FIELDS: &[&str] = &[
     "mime_type",
 ];
 
-const NOTE_COLS: &str = "id, note, created, document_id, user_id, deleted_at, restored_at, transaction_id";
+const NOTE_COLS: &str = "id, note, created, document_id, user_id, deleted_at, restored_at, transaction_id, format";
 
 fn note_from_row(r: &sqlx::postgres::PgRow) -> Result<NoteRow, sqlx::Error> {
     Ok(NoteRow {
@@ -50,6 +50,7 @@ fn note_from_row(r: &sqlx::postgres::PgRow) -> Result<NoteRow, sqlx::Error> {
         deleted_at: r.try_get(5)?,
         restored_at: r.try_get(6)?,
         transaction_id: r.try_get(7)?,
+        format: r.try_get(8)?,
     })
 }
 

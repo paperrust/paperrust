@@ -32,6 +32,8 @@ bytes.workspace = true
 # System settings (WP5): registry/storage, logo check like v1 (SVG allow list, raster re-encoded)
 pl-settings.workspace = true
 sqlx.workspace = true
+# folders: object permission subquery of pl-authz as SQL text
+sea-query.workspace = true
 rand.workspace = true
 image.workspace = true
 quick-xml.workspace = true

@@ -190,11 +190,11 @@ impl Consumer {
         // Remote OCR parser (Azure) like upstream `register_defaults`; invisible without a valid engine.
         crate::remote::install(&mut parsing.registry, &remote);
         parsing.remote = Some(remote);
-        let classifier = native::FileClassifier {
-            path: settings.classifier_model_file.clone(),
-            key: settings.secret_key.clone().into_bytes(),
-            threshold: settings.classifier_match_threshold,
-        };
+        let classifier = native::FileClassifier::new(
+            settings.classifier_model_file.clone(),
+            settings.secret_key.clone().into_bytes(),
+            settings.classifier_match_threshold,
+        );
         let index: Arc<dyn SearchIndex> = match native::TantivyIndex::open(pl_indexer::IndexerConfig::from_env()) {
             Ok(i) => Arc::new(i),
             Err(e) => {
@@ -360,7 +360,16 @@ impl Consumer {
                 self.settings.barcodes.clone()
             }
         };
-        let mut st = State { input, metadata: overrides, tmp_dir: tmp.path.clone(), task_id, status_filename, barcodes };
+        let mut st = State {
+            input,
+            metadata: overrides,
+            tmp_dir: tmp.path.clone(),
+            task_id,
+            status_filename,
+            barcodes,
+            checksum: None,
+            shrunk: false,
+        };
         // FINDINGS B7: redelivered task (crash/hard abort after the commit of the document,
         // before the task completed) – the document already exists: report as successful instead of
         // ingesting the (meanwhile deleted) file again.
@@ -582,50 +591,66 @@ impl Consumer {
             ));
         }
         // pre_check_duplicate
-        let checksum = compute_checksum(&st.input.original_file).map_err(|e| ConsumeError::Other(e.to_string()))?;
+        let original = st.input.original_file.clone();
+        let checksum = blocking_io(|| compute_checksum(&original)).map_err(|e| ConsumeError::Other(e.to_string()))?;
+        // PaperRust side table of the duplicate check (shrunk files): create once per process.
+        crate::source_checksum::ensure_pool(&self.pool).await?;
         let mut conn = self.pool.acquire().await?;
         let dups = db::find_duplicates(&mut conn, &checksum).await?;
         drop(conn);
-        if let Some(first) = dups.first() {
-            let any_trash = dups.iter().any(|d| d.in_trash);
-            let mut log_msg = format!("Consuming duplicate {}: {} existing document(s) share the same content.", st.filename(), dups.len());
-            if any_trash {
-                log_msg.push_str(" Note: at least one existing document is in the trash.");
-            }
-            tracing::warn!(target: "paperless.consumer", "{log_msg}");
+        st.checksum = Some(checksum);
+        if !dups.is_empty() {
+            Self::warn_duplicate(st, &dups);
             if self.settings.consumer_delete_duplicates {
-                let label = Some(first.title.clone())
-                    .filter(|t| !t.is_empty())
-                    .or_else(|| first.original_filename.clone().filter(|t| !t.is_empty()))
-                    .or_else(|| {
-                        first
-                            .filename
-                            .as_deref()
-                            .filter(|f| !f.is_empty())
-                            .and_then(|f| Path::new(f).file_name().map(|n| n.to_string_lossy().into_owned()))
-                            .filter(|n| !n.is_empty())
-                    })
-                    .unwrap_or_else(|| first.id.to_string());
-                let _ = std::fs::remove_file(&st.input.original_file);
-                let mut failure = format!("Not consuming {}: It is a duplicate of {label} (#{})", st.filename(), first.id);
-                let status = if any_trash {
-                    failure.push_str(" Note: existing document is in the trash.");
-                    msg::DOCUMENT_ALREADY_EXISTS_IN_TRASH
-                } else {
-                    msg::DOCUMENT_ALREADY_EXISTS
-                };
-                self.send_progress(st, 100, 100, ProgressStatus::Failed, status, None);
-                tracing::error!(target: "paperless.consumer", "{failure}");
-                return Err(ConsumeError::Duplicate {
-                    message: format!("{}: {failure}", st.filename()),
-                    duplicate_id: first.id,
-                    in_trash: any_trash,
-                });
+                return Err(self.reject_duplicate(st, &dups));
             }
         }
         // pre_check_directories
         self.settings.ensure_directories().map_err(|e| ConsumeError::Other(e.to_string()))?;
         Ok(())
+    }
+
+    /// Warning of `pre_check_duplicate` ("Consuming duplicate ...").
+    fn warn_duplicate(st: &State, dups: &[db::DuplicateRow]) {
+        let any_trash = dups.iter().any(|d| d.in_trash);
+        let mut log_msg = format!("Consuming duplicate {}: {} existing document(s) share the same content.", st.filename(), dups.len());
+        if any_trash {
+            log_msg.push_str(" Note: at least one existing document is in the trash.");
+        }
+        tracing::warn!(target: "paperless.consumer", "{log_msg}");
+    }
+
+    /// `pre_check_duplicate` with `CONSUMER_DELETE_DUPLICATES`: delete the original, report
+    /// the duplicate. Also used when the re-check while storing finds a duplicate that a
+    /// concurrent task stored after this task's preflight (see `claim_unique`).
+    fn reject_duplicate(&self, st: &State, dups: &[db::DuplicateRow]) -> ConsumeError {
+        let any_trash = dups.iter().any(|d| d.in_trash);
+        let Some(first) = dups.first() else {
+            return ConsumeError::Other("duplicate check without duplicates".into());
+        };
+        let label = Some(first.title.clone())
+            .filter(|t| !t.is_empty())
+            .or_else(|| first.original_filename.clone().filter(|t| !t.is_empty()))
+            .or_else(|| {
+                first
+                    .filename
+                    .as_deref()
+                    .filter(|f| !f.is_empty())
+                    .and_then(|f| Path::new(f).file_name().map(|n| n.to_string_lossy().into_owned()))
+                    .filter(|n| !n.is_empty())
+            })
+            .unwrap_or_else(|| first.id.to_string());
+        let _ = std::fs::remove_file(&st.input.original_file);
+        let mut failure = format!("Not consuming {}: It is a duplicate of {label} (#{})", st.filename(), first.id);
+        let status = if any_trash {
+            failure.push_str(" Note: existing document is in the trash.");
+            msg::DOCUMENT_ALREADY_EXISTS_IN_TRASH
+        } else {
+            msg::DOCUMENT_ALREADY_EXISTS
+        };
+        self.send_progress(st, 100, 100, ProgressStatus::Failed, status, None);
+        tracing::error!(target: "paperless.consumer", "{failure}");
+        ConsumeError::Duplicate { message: format!("{}: {failure}", st.filename()), duplicate_id: first.id, in_trash: any_trash }
     }
 
     // ------------------------------------------------------------------------------------------
@@ -648,16 +673,22 @@ impl Consumer {
         }
         let mut conn = self.pool.acquire().await?;
         if let Some((_, in_trash)) = db::find_asn(&mut conn, asn).await? {
-            let mut log_msg = format!("Not consuming {}: Given ASN {asn} already exists!", st.filename());
-            let m = if in_trash {
-                log_msg.push_str(" Note: existing document is in the trash.");
-                msg::ASN_ALREADY_EXISTS_IN_TRASH
-            } else {
-                msg::ASN_ALREADY_EXISTS
-            };
-            return Err(self.fail(st, m, Some(&log_msg)));
+            return Err(self.asn_exists(st, asn, in_trash));
         }
         Ok(())
+    }
+
+    /// Failure of `AsnCheckPlugin` ("Given ASN ... already exists!"); also used by the re-check
+    /// while storing (`claim_unique`).
+    fn asn_exists(&self, st: &State, asn: i64, in_trash: bool) -> ConsumeError {
+        let mut log_msg = format!("Not consuming {}: Given ASN {asn} already exists!", st.filename());
+        let m = if in_trash {
+            log_msg.push_str(" Note: existing document is in the trash.");
+            msg::ASN_ALREADY_EXISTS_IN_TRASH
+        } else {
+            msg::ASN_ALREADY_EXISTS
+        };
+        self.fail(st, m, Some(&log_msg))
     }
 
     // ------------------------------------------------------------------------------------------
@@ -888,7 +919,7 @@ impl Consumer {
         // on Windows `C:start.bat` otherwise left the working folder (drive-relative path).
         let work_name = working_file_name(&filename);
         let working_copy = work.path.join(&work_name);
-        copy_with_stats(&st.input.original_file, &working_copy).map_err(|e| ConsumeError::Other(e.to_string()))?;
+        blocking_io(|| copy_with_stats(&st.input.original_file, &working_copy)).map_err(|e| ConsumeError::Other(e.to_string()))?;
         let mut mime_type = pl_parsers::mime::detect_file(&working_copy).map_err(|e| ConsumeError::Other(e.to_string()))?;
         tracing::debug!(target: "paperless.consumer", "Detected mime type: {mime_type}");
         // Unchanged original if qpdf repaired the working copy (it is saved and
@@ -928,8 +959,10 @@ impl Consumer {
                 }
             }
             if o.shrunk.is_some() {
-                // the shrunk file is stored (purpose of the setting)
+                // the shrunk file is stored (purpose of the setting); the original's checksum is
+                // recorded for the duplicate check (source_checksum.rs)
                 unmodified_original = None;
+                st.shrunk = true;
             }
         }
         let allow_remote = st.metadata.remote_ocr || self.remote_ocr_by_default;
@@ -1035,26 +1068,29 @@ impl Consumer {
             let r =
                 self.store_all(st, &source_file, &mime_type, &parsed, &thumbnail, page_count, classifier.as_deref(), &mut written).await;
             match r {
-                Err(e) if e.starts_with(RETRYABLE_MARK) && attempt < db::MAX_ATTEMPTS => {
+                Err(StoreFail::Error(e)) if e.starts_with(RETRYABLE_MARK) && attempt < db::MAX_ATTEMPTS => {
                     tracing::warn!(target: "paperless.consumer", "Storing {filename} hit a database conflict ({}), retrying", &e[RETRYABLE_MARK.len()..]);
                     for p in written.drain(..) {
                         let _ = std::fs::remove_file(p);
                     }
                     tokio::time::sleep(db::retry_backoff(attempt)).await;
                 }
-                Err(e) if e.starts_with(STORAGE_MARK) => break Err(format!("{MSG_STORAGE_FAILED}: {}", &e[STORAGE_MARK.len()..])),
-                Err(e) => break Err(e.strip_prefix(RETRYABLE_MARK).map(str::to_string).unwrap_or(e)),
+                Err(StoreFail::Error(e)) if e.starts_with(STORAGE_MARK) => {
+                    break Err(StoreFail::Error(format!("{MSG_STORAGE_FAILED}: {}", &e[STORAGE_MARK.len()..])));
+                }
+                Err(StoreFail::Error(e)) => break Err(StoreFail::Error(e.strip_prefix(RETRYABLE_MARK).map(str::to_string).unwrap_or(e))),
+                Err(f) => break Err(f),
                 Ok(v) => break Ok(v),
             }
         };
         let (doc_id, workflow_outcome) = match stored {
             Ok(v) => v,
-            Err(e) => {
+            Err(f) => {
                 // tests/chaos C1-3: if the connection broke at/before the COMMIT, it is open whether the document
                 // was saved. Then do NOT delete the stored files (otherwise: document without
                 // original/thumbnail), but note them; the next delivery decides
                 // ([`Consumer::resolve_pending_files`]).
-                let ambiguous = is_db_unavailable_text(&e) && st.task_id.is_some();
+                let ambiguous = matches!(&f, StoreFail::Error(e) if is_db_unavailable_text(e)) && st.task_id.is_some();
                 if ambiguous && let Some(task_id) = st.task_id.as_deref() {
                     if let Err(je) = self.write_pending_files(task_id, &written) {
                         tracing::warn!(target: "paperless.consumer", "Could not note files of {filename} for later cleanup: {je}");
@@ -1064,11 +1100,22 @@ impl Consumer {
                         let _ = std::fs::remove_file(p);
                     }
                 }
-                return Err(self.fail(
-                    st,
-                    &e,
-                    Some(&format!("The following error occurred while storing document {filename} after parsing: {e}")),
-                ));
+                return Err(match f {
+                    StoreFail::Error(e) => self.fail(
+                        st,
+                        &e,
+                        Some(&format!("The following error occurred while storing document {filename} after parsing: {e}")),
+                    ),
+                    StoreFail::Duplicate(dups) => {
+                        tracing::info!(target: "paperless.consumer", "{filename}: a concurrent task stored the same content meanwhile");
+                        Self::warn_duplicate(st, &dups);
+                        self.reject_duplicate(st, &dups)
+                    }
+                    StoreFail::AsnExists { asn, in_trash } => {
+                        tracing::info!(target: "paperless.consumer", "{filename}: a concurrent task took ASN {asn} meanwhile");
+                        self.asn_exists(st, asn, in_trash)
+                    }
+                });
             }
         };
 
@@ -1148,16 +1195,22 @@ impl Consumer {
         page_count: Option<i64>,
         classifier: Option<&(dyn pl_matching::Classifier + Send + Sync)>,
         written: &mut Vec<PathBuf>,
-    ) -> Result<(i64, workflows::RunOutcome), String> {
+    ) -> Result<(i64, workflows::RunOutcome), StoreFail> {
         let audit = AuditLog { enabled: self.settings.audit_log_enabled, actor_id: None };
         let mut outcome = workflows::RunOutcome::default();
         let mut tx = self.pool.begin().await.map_err(store_err)?;
+        self.claim_unique(&mut tx, st).await?;
         let text = parsed.text.clone().unwrap_or_default();
         let mut doc = if let Some(root_id) = st.input.root_document_id {
             self.create_version(&mut tx, st, root_id, &text, page_count, mime_type, working_copy).await?
         } else {
             self.store(&mut tx, st, &audit, &text, parsed.date, page_count, mime_type, working_copy).await?
         };
+        // PaperRust: stored file is a shrunk copy -> keep the original's checksum for the duplicate
+        // check (same transaction, visible together with the row; claim_unique holds the lock on it).
+        if let Some(orig) = crate::source_checksum::needs_record(st.shrunk, st.checksum.as_deref(), &doc.row.checksum) {
+            crate::source_checksum::record(&mut tx, doc.row.id, &orig).await.map_err(store_err)?;
+        }
         // refetch (Document.objects.get(pk=...))
         let fresh = db::load_document(&mut tx, doc.row.id).await.map_err(store_err)?.ok_or("document vanished")?;
         doc = DocInstance::from_db(fresh);
@@ -1190,10 +1243,10 @@ impl Consumer {
             let source_path = originals.join(&generated);
             pl_templating::validate_path_in_root(&source_path, &originals).map_err(|e| e.0)?;
             pl_templating::create_source_path_directory(&source_path).map_err(store_err)?;
-            write_atomic(working_copy, &source_path, written).map_err(store_err)?;
+            blocking_io(|| write_atomic(working_copy, &source_path, written)).map_err(store_err)?;
             doc.row.filename = Some(generated);
             let thumb_path = self.settings.thumbnail_path(doc.row.id);
-            write_atomic(thumbnail, &thumb_path, written).map_err(store_err)?;
+            blocking_io(|| write_atomic(thumbnail, &thumb_path, written)).map_err(store_err)?;
 
             if let Some(archive) = parsed.archive_path.as_deref().filter(|p| p.is_file()) {
                 let mut actx = ctx.clone();
@@ -1213,9 +1266,9 @@ impl Consumer {
                 let archive_path = archive_dir.join(&gen_a);
                 pl_templating::validate_path_in_root(&archive_path, &archive_dir).map_err(|e| e.0)?;
                 pl_templating::create_source_path_directory(&archive_path).map_err(store_err)?;
-                write_atomic(archive, &archive_path, written).map_err(store_err)?;
+                blocking_io(|| write_atomic(archive, &archive_path, written)).map_err(store_err)?;
                 doc.row.archive_filename = Some(gen_a);
-                doc.row.archive_checksum = Some(compute_checksum(&archive_path).map_err(store_err)?);
+                doc.row.archive_checksum = Some(blocking_io(|| compute_checksum(&archive_path)).map_err(store_err)?);
             }
         }
         // document.save() → post_save update_filename_and_move_files
@@ -1239,6 +1292,38 @@ impl Consumer {
         }
         tx.commit().await.map_err(store_err)?;
         Ok((doc.row.id, outcome))
+    }
+
+    /// Uniqueness re-check under transaction-scoped advisory locks, first thing in the store
+    /// transaction. With several task slots, two tasks can both pass `AsnCheckPlugin` /
+    /// `pre_check_duplicate` before either has stored (upstream with `PAPERLESS_TASK_WORKERS` > 1
+    /// has the same window): the second would then fail on the unique ASN constraint with a raw
+    /// database error, or - with `CONSUMER_DELETE_DUPLICATES` - store a duplicate. The lock is held
+    /// until this transaction ends, so a waiting task sees the other's committed document and is
+    /// rejected with the same message as the plugin. Fixed order (ASN, then checksum) and no other
+    /// lock held yet in this transaction, so no lock cycles.
+    /// The checksum key is that of the delivered file (`st.checksum`); a document whose stored file
+    /// is a shrunk copy records exactly this checksum in `paperrust_source_checksum` in the same
+    /// transaction, and `find_duplicates` matches it, so one lock key per task is enough.
+    async fn claim_unique(&self, tx: &mut PgConnection, st: &State) -> Result<(), StoreFail> {
+        if st.input.root_document_id.is_none()
+            && let Some(asn) = st.metadata.asn
+        {
+            db::advisory_xact_lock(tx, &format!("paperrust:asn:{asn}")).await.map_err(store_err)?;
+            if let Some((_, in_trash)) = db::find_asn(tx, asn).await.map_err(store_err)? {
+                return Err(StoreFail::AsnExists { asn, in_trash });
+            }
+        }
+        if self.settings.consumer_delete_duplicates
+            && let Some(sum) = st.checksum.as_deref()
+        {
+            db::advisory_xact_lock(tx, &format!("paperrust:checksum:{sum}")).await.map_err(store_err)?;
+            let dups = db::find_duplicates(tx, sum).await.map_err(store_err)?;
+            if !dups.is_empty() {
+                return Err(StoreFail::Duplicate(dups));
+            }
+        }
+        Ok(())
     }
 
     /// `_store`.
@@ -1283,7 +1368,7 @@ impl Consumer {
                 ),
             }
         }
-        let checksum = compute_checksum(working_copy).map_err(|e| e.to_string())?;
+        let checksum = blocking_io(|| compute_checksum(working_copy)).map_err(|e| e.to_string())?;
         let now = now_micros();
         let mut row = DocRow {
             id: 0,
@@ -1378,6 +1463,10 @@ impl Consumer {
         // PaperRust: storage location from the number range of the ASN (only with the "multiple number ranges" switch)
         if let Some(asn) = doc.row.archive_serial_number {
             crate::asn_location::apply_on_consume(conn, audit, doc.row.id, asn).await;
+        }
+        // PaperRust folder view (stage 2): upload into a folder (field `folder`, checked by the upload)
+        if let Some(fid) = m.folder_id {
+            assign_folder(conn, doc.row.id, fid).await.map_err(|e| e.to_string())?;
         }
         Ok(())
     }
@@ -1756,6 +1845,11 @@ struct State {
     status_filename: String,
     /// `BarcodeConfig()` of this run (environment + ApplicationConfiguration).
     barcodes: BarcodeSettings,
+    /// Checksum of the original from the preflight (duplicate re-check when storing).
+    checksum: Option<String>,
+    /// PaperRust: the stored file is a shrunk copy of the original (pdftools.rs); its checksum then
+    /// differs from `checksum` and the original's checksum goes to `paperrust_source_checksum`.
+    shrunk: bool,
 }
 
 impl State {
@@ -1806,6 +1900,30 @@ pub async fn create_custom_field_instance(
 }
 
 /// `DocumentBarcode.objects.bulk_create(...)`.
+/// Folder view (stage 2, pl-api-v2 `folders.rs`): put the new document into folder `folder_id`
+/// (`paperrust_document_folder`, at most one folder per document). A folder deleted since the upload (or
+/// missing folder tables) leaves the document in "Unsorted" with a warning instead of failing the ingestion.
+async fn assign_folder(conn: &mut PgConnection, doc_id: i64, folder_id: i64) -> Result<(), sqlx::Error> {
+    let tables: Option<String> = sqlx::query_scalar("SELECT to_regclass('paperrust_document_folder')::text").fetch_one(&mut *conn).await?;
+    let done = if tables.is_some() {
+        sqlx::query(
+            "INSERT INTO paperrust_document_folder (document_id, folder_id) SELECT $1::int4, f.id FROM paperrust_folder f WHERE f.id = $2 FOR KEY SHARE ON CONFLICT (document_id) DO UPDATE SET folder_id = EXCLUDED.folder_id, moved = now()",
+        )
+        .bind(doc_id)
+        .bind(folder_id)
+        .execute(&mut *conn)
+        .await?
+        .rows_affected()
+            > 0
+    } else {
+        false
+    };
+    if !done {
+        tracing::warn!(target: "paperless.consumer", "Folder {folder_id} no longer exists, document {doc_id} stays unsorted");
+    }
+    Ok(())
+}
+
 async fn store_barcodes(conn: &mut PgConnection, doc_id: i64, codes: &[StoredBarcode]) -> Result<(), sqlx::Error> {
     for c in codes {
         let q = Query::insert()
@@ -2241,6 +2359,38 @@ use crate::medialock::document_lock_table;
 /// or serialization failure (retry permitted). Removed before the message.
 const RETRYABLE_MARK: &str = "[retryable] ";
 
+/// Failure of `store_all`: an error text (40P01/40001 marked with [`RETRYABLE_MARK`]) or a
+/// uniqueness conflict found by `claim_unique` (reported like the preflight/ASN plugins).
+#[derive(Debug)]
+enum StoreFail {
+    Error(String),
+    Duplicate(Vec<db::DuplicateRow>),
+    AsnExists { asn: i64, in_trash: bool },
+}
+
+impl From<String> for StoreFail {
+    fn from(e: String) -> Self {
+        Self::Error(e)
+    }
+}
+
+impl From<&str> for StoreFail {
+    fn from(e: &str) -> Self {
+        Self::Error(e.to_string())
+    }
+}
+
+/// Synchronous file work (copying, checksums of whole files) inside the async consume path.
+/// On the multi-threaded runtime it runs via `block_in_place`, so the runtime moves its other
+/// tasks (web requests when the worker runs in the server process) to another thread instead of
+/// letting them wait behind a slow disk; elsewhere (current-thread runtime in tests) directly.
+pub(crate) fn blocking_io<T>(f: impl FnOnce() -> T) -> T {
+    match tokio::runtime::Handle::try_current() {
+        Ok(h) if h.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread => tokio::task::block_in_place(f),
+        _ => f(),
+    }
+}
+
 /// Error in `store_all` as text; 40P01/40001 with [`RETRYABLE_MARK`] (see `run_consumer`),
 /// write errors in the media folder (disk full, no write permission) with [`STORAGE_MARK`].
 fn store_err<E: std::fmt::Display + 'static>(e: E) -> String {
@@ -2600,5 +2750,23 @@ mod tests {
         assert_eq!(Plugin::Preflight.name(), "ConsumerPreflightPlugin");
         assert_eq!(Plugin::WorkflowTrigger.name(), "WorkflowTriggerPlugin");
         assert_eq!(ConsumeError::Consumer("x".into()).error_type(), "ConsumerError");
+    }
+
+    /// `blocking_io` on both runtime flavors (block_in_place only on the multi-threaded one,
+    /// which would panic on a current-thread runtime) and outside a runtime.
+    #[test]
+    fn blocking_io_all_runtimes() {
+        assert_eq!(blocking_io(|| 1), 1);
+        let rt = tokio::runtime::Builder::new_current_thread().build().unwrap();
+        assert_eq!(rt.block_on(async { blocking_io(|| 2) }), 2);
+        let rt = tokio::runtime::Builder::new_multi_thread().worker_threads(2).build().unwrap();
+        let v = rt.block_on(async { tokio::spawn(async { blocking_io(|| 3) }).await.unwrap() });
+        assert_eq!(v, 3);
+    }
+
+    #[test]
+    fn store_fail_from_text() {
+        assert!(matches!(StoreFail::from("x"), StoreFail::Error(e) if e == "x"));
+        assert!(matches!(StoreFail::from(String::from("y")), StoreFail::Error(e) if e == "y"));
     }
 }

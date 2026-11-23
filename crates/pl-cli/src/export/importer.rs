@@ -7,6 +7,11 @@
 //! `_import_files_from_manifest`, afterwards `document_index reindex`.
 //! Django behavior: `Field.to_python`, `Field.get_default`, `pre_save` (auto_now/auto_now_add →
 //! now, also on import), collector cascade (CASCADE/SET_NULL/PROTECT).
+//!
+//! paperless-ngx 3.5 exports carry `format` on every `documents.note` (#14626, migration
+//! documents.0030_note_format); it is written when `documents_note.format` exists in the target
+//! (always after `manage migrate`, `pl_documents_write.0001_paperrust_note_format`), otherwise
+//! skipped – like the treenode fields ([`super::tagtree`]).
 
 use std::collections::{BTreeMap, HashMap};
 use std::io::{BufRead, BufReader, Read};
@@ -322,6 +327,8 @@ fn default_param(f: &Field, now: &str, today: &str) -> Param {
 
 // ------------------------------------------------------------------ DB loading
 
+use super::noteformat::{FIELD as NOTE_FORMAT_FIELD, NOTE_MODEL};
+
 /// (column values, m2m lists per field index, primary key)
 type PendingRow = (Vec<Param>, Vec<(usize, Vec<i64>)>, Param);
 
@@ -339,14 +346,28 @@ struct Loader<'a> {
     today: String,
     /// `documents_tag` without treenode columns (PaperRust migration) → skip these fields.
     skip_treenode: bool,
+    /// `documents_note.format` exists in the target: the extra field (paperless-ngx 3.5 model)
+    note_format: Option<Field>,
     /// Table → is a compatibility view of the own data model (docs/DATAMODEL-V2.md):
     /// `INSERT … ON CONFLICT` does not work there (INSTEAD-OF trigger), UPDATE + INSERT instead.
     views: BTreeMap<String, bool>,
 }
 
 impl Loader<'_> {
-    fn insert_columns<'m>(&self, model: &'m Model) -> Vec<&'m Field> {
-        model.fields.iter().filter(|f| !f.generated && !(self.skip_treenode && super::tagtree::is_derived(&model.label, &f.name))).collect()
+    fn insert_columns<'s>(&'s self, model: &'s Model) -> Vec<&'s Field> {
+        let mut cols: Vec<&Field> = model
+            .fields
+            .iter()
+            .filter(|f| !f.generated && !(self.skip_treenode && super::tagtree::is_derived(&model.label, &f.name)))
+            .collect();
+        if model.label == NOTE_MODEL
+            && let Some(f) = &self.note_format
+        {
+            // model field order of paperless-ngx 3.5: …, note, format, created, …
+            let at = cols.iter().position(|c| c.name == "note").map_or(cols.len(), |i| i + 1);
+            cols.insert(at, f);
+        }
+        cols
     }
 
     fn add(&mut self, rec: &Value) -> CliResult<Option<String>> {
@@ -358,6 +379,9 @@ impl Loader<'_> {
         let empty = Map::new();
         let fields = rec.get("fields").and_then(Value::as_object).unwrap_or(&empty);
         for name in fields.keys() {
+            if label == NOTE_MODEL && name == NOTE_FORMAT_FIELD {
+                continue;
+            }
             if model.fields.iter().all(|f| &f.name != name) && model.m2m.iter().all(|m| &m.name != name) {
                 let class = label.split('.').nth(1).unwrap_or(&label);
                 return Err(CliError::Command(format!("{class} has no field named '{name}'")));
@@ -419,6 +443,19 @@ impl Loader<'_> {
             return Ok(());
         }
         let Some(model) = self.d.models.get(label) else { return Ok(()) };
+        let is_view = match self.views.get(&model.table) {
+            Some(v) => *v,
+            None => {
+                let v: bool = sqlx::query_scalar(
+                    "SELECT EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace                       WHERE n.nspname = current_schema() AND c.relname = $1 AND c.relkind = 'v')",
+                )
+                .bind(&model.table)
+                .fetch_one(&mut *conn)
+                .await?;
+                self.views.insert(model.table.clone(), v);
+                v
+            }
+        };
         let cols = self.insert_columns(model);
         let col_names: Vec<String> = cols.iter().map(|f| format!("\"{}\"", f.column)).collect();
         let mut vals = String::new();
@@ -443,19 +480,6 @@ impl Loader<'_> {
             }
             vals.push(')');
         }
-        let is_view = match self.views.get(&model.table) {
-            Some(v) => *v,
-            None => {
-                let v: bool = sqlx::query_scalar(
-                    "SELECT EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace                       WHERE n.nspname = current_schema() AND c.relname = $1 AND c.relkind = 'v')",
-                )
-                .bind(&model.table)
-                .fetch_one(&mut *conn)
-                .await?;
-                self.views.insert(model.table.clone(), v);
-                v
-            }
-        };
         let updates: Vec<String> =
             cols.iter().filter(|f| !f.primary_key).map(|f| format!("\"{0}\" = EXCLUDED.\"{0}\"", f.column)).collect();
         let statements: Vec<String> = if is_view {
@@ -786,6 +810,7 @@ pub async fn import(c: &Ctx, o: &ImportOptions) -> CliResult {
         delete_all(&mut tx, d, "auth.permission").await?;
         sqlx::raw_sql("SET CONSTRAINTS ALL DEFERRED").execute(&mut *tx).await?;
         let skip_treenode = !super::tagtree::has_columns(&mut tx).await?;
+        let note_format = if super::noteformat::has_column(&mut tx).await? { super::noteformat::field(d) } else { None };
         let mut loader = Loader {
             d,
             batch: o.batch_size,
@@ -795,6 +820,7 @@ pub async fn import(c: &Ctx, o: &ImportOptions) -> CliResult {
             now,
             today,
             skip_treenode,
+            note_format,
             views: BTreeMap::new(),
         };
         for p in &paths {
@@ -1253,6 +1279,65 @@ mod tests {
             assert_eq!(manifest_paths(d.path()).len(), 2);
             assert!(first_file(d.path()).is_some());
         }
+    }
+
+    fn loader(d: &descriptor::Descriptor, note_format: bool) -> Loader<'_> {
+        Loader {
+            d,
+            batch: 100,
+            pending: BTreeMap::new(),
+            order: Vec::new(),
+            loaded: Vec::new(),
+            now: "n".into(),
+            today: "t".into(),
+            skip_treenode: true,
+            note_format: if note_format { super::noteformat::field(d) } else { None },
+            views: BTreeMap::new(),
+        }
+    }
+
+    fn texts(l: &Loader<'_>) -> Vec<Option<String>> {
+        l.pending[NOTE_MODEL].rows[0]
+            .0
+            .iter()
+            .map(|p| match p {
+                Param::Text(t) => t.clone(),
+                Param::Json(_) => None,
+            })
+            .collect()
+    }
+
+    /// paperless-ngx 3.5 exports: `format` on every note is accepted; written when the column
+    /// exists (after `note`), defaulting to `plain`, and skipped otherwise.
+    #[test]
+    fn ngx_3_5_note_format_accepted() {
+        let d = descriptor::get();
+        let rec = serde_json::json!({"model": "documents.note", "pk": 7, "fields": {
+            "deleted_at": null, "restored_at": null, "transaction_id": null, "note": "**x**",
+            "format": "markdown", "created": "2026-11-17T10:00:00Z", "document": 1, "user": 2}});
+        let mut l = loader(d, true);
+        l.add(&rec).unwrap();
+        let names: Vec<&str> = l.insert_columns(&d.models[NOTE_MODEL]).iter().map(|f| f.column.as_str()).collect();
+        assert_eq!(names, ["id", "deleted_at", "restored_at", "transaction_id", "note", "format", "created", "document_id", "user_id"]);
+        assert_eq!(texts(&l)[5].as_deref(), Some("markdown"));
+        // 3.4.2 / PaperRust export without the field → default plain
+        let mut old = rec.clone();
+        old["fields"].as_object_mut().unwrap().remove("format");
+        let mut l = loader(d, true);
+        l.add(&old).unwrap();
+        assert_eq!(texts(&l)[5].as_deref(), Some("plain"));
+        // target without the column: field skipped, no error
+        let mut l = loader(d, false);
+        l.add(&rec).unwrap();
+        assert_eq!(texts(&l).len(), 8);
+        assert!(!l.insert_columns(&d.models[NOTE_MODEL]).iter().any(|f| f.name == "format"));
+        // other unknown fields still fail like Django
+        let mut bad = rec.clone();
+        bad["fields"]["colour"] = Value::from(1);
+        assert!(loader(d, true).add(&bad).unwrap_err().to_string().contains("has no field named 'colour'"));
+        let f = super::noteformat::field(d).unwrap();
+        assert_eq!(f.db_type, "varchar(16)");
+        assert!(is_text_type(&f.db_type));
     }
 
     #[test]

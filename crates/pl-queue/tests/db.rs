@@ -51,7 +51,9 @@ async fn pool() -> PgPool {
     let mut tx = pool.begin().await.unwrap();
     sqlx::query("SELECT pg_advisory_xact_lock(4242)").execute(&mut *tx).await.unwrap();
     sqlx::raw_sql(PAPERLESSTASK_DDL).execute(&mut *tx).await.unwrap();
-    sqlx::raw_sql(pl_queue::migrations::M0001_TASK_QUEUE).execute(&mut *tx).await.unwrap();
+    for (_, sql) in pl_queue::migrations::ALL {
+        sqlx::raw_sql(sql).execute(&mut *tx).await.unwrap();
+    }
     tx.commit().await.unwrap();
     pool
 }
@@ -365,7 +367,7 @@ async fn crashed_worker_task_is_redelivered_and_fenced() {
     // Worker A claims and "crashes" (no heartbeat, no completion)
     let a = queue.claim("crashy", std::slice::from_ref(&q), None, 10, 0.3).await.unwrap();
     assert_eq!(a.len(), 1);
-    queue.mark_started(&a[0]).await;
+    assert_eq!(queue.mark_started(&a[0], 0.3).await.unwrap(), Heartbeat::Ok);
     assert_eq!(queue.claim("other", std::slice::from_ref(&q), None, 10, 0.3).await.unwrap().len(), 0, "running job must not be claimable");
     tokio::time::sleep(Duration::from_millis(400)).await;
     // Cleanup (a parallel test worker may beat us to it – the result is the same)
@@ -628,6 +630,131 @@ async fn chords_links_and_errbacks() {
     assert!(errbacks.iter().any(|(_, a)| a.len() == 3 && a[1]["exc_type"] == "ValueError" && a[1]["exc_message"] == "bad -1"));
     assert!(errbacks.iter().any(|(_, a)| a.len() == 3 && a[1]["exc_type"] == "ChordError"));
     assert!(errbacks.iter().any(|(_, a)| a.is_empty()));
+}
+
+async fn fence_token(pool: &PgPool, id: Uuid) -> i64 {
+    sqlx::query("SELECT fence_token FROM paperrust_task_queue WHERE task_id = $1")
+        .bind(id.to_string())
+        .fetch_one(pool)
+        .await
+        .unwrap()
+        .get("fence_token")
+}
+
+/// TLA+ finding F2: `mark_started` of a delivery that lost its lease (paused between claim and
+/// start while another worker took over and finished) must not write anything and must report
+/// `Lost`, so the handler does not run. A delivery whose row was only put back (not claimed anew)
+/// takes it back like a heartbeat.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+#[ignore = "needs PAPERRUST_QUEUE_TEST_DATABASE_URL (own test database)"]
+async fn stale_mark_started_is_a_noop() {
+    let pool = pool().await;
+    let q = qname();
+    let queue = PgQueue::new(pool.clone(), 3);
+    let id = queue.enqueue("documents.tasks.train_classifier", Map::new(), opts(&q)).await.unwrap();
+    // A claims and pauses for longer than its lease.
+    let a = queue.claim("paused", std::slice::from_ref(&q), None, 10, 0.3).await.unwrap();
+    assert_eq!(a.len(), 1);
+    tokio::time::sleep(Duration::from_millis(400)).await;
+    queue.reap_expired_leases().await.unwrap();
+    assert_eq!(queue_state(&pool, id).await, "queued");
+    // B takes over and finishes.
+    let b = queue.claim("healthy", std::slice::from_ref(&q), None, 10, 5.0).await.unwrap();
+    assert_eq!(b.len(), 1);
+    assert_eq!(queue.mark_started(&b[0], 5.0).await.unwrap(), Heartbeat::Ok);
+    assert!(queue.complete(&b[0], Value::String("Training completed successfully".into())).await.unwrap());
+    assert_eq!(ptask(&pool, id).await.get::<String, _>("status"), "success");
+    // A wakes up: fenced mark_started is a no-op.
+    assert_eq!(queue.mark_started(&a[0], 5.0).await.unwrap(), Heartbeat::Lost);
+    assert_eq!(ptask(&pool, id).await.get::<String, _>("status"), "success", "stale mark_started overwrote the result");
+    assert_eq!(queue_state(&pool, id).await, "done");
+
+    // Put back but not claimed anew: the original delivery may still start (takes the row back).
+    let id2 = queue.enqueue("documents.tasks.train_classifier", Map::new(), opts(&q)).await.unwrap();
+    let c = queue.claim("slow-start", std::slice::from_ref(&q), None, 10, 0.3).await.unwrap();
+    assert_eq!(c.len(), 1);
+    tokio::time::sleep(Duration::from_millis(400)).await;
+    queue.reap_expired_leases().await.unwrap();
+    assert_eq!(queue_state(&pool, id2).await, "queued");
+    assert_eq!(queue.mark_started(&c[0], 5.0).await.unwrap(), Heartbeat::Ok);
+    assert_eq!(queue_state(&pool, id2).await, "running");
+    assert_eq!(ptask(&pool, id2).await.get::<String, _>("status"), "started");
+    assert_eq!(queue.claim("other", std::slice::from_ref(&q), None, 10, 5.0).await.unwrap().len(), 0);
+    assert!(queue.complete(&c[0], Value::Null).await.unwrap());
+
+    // revoke(terminate=True) between claim and start: mark_started reports Terminate.
+    let id3 = queue.enqueue("documents.tasks.train_classifier", Map::new(), opts(&q)).await.unwrap();
+    let d = queue.claim("w", std::slice::from_ref(&q), None, 10, 5.0).await.unwrap();
+    assert!(queue.revoke(id3, true).await.unwrap());
+    assert_eq!(queue.mark_started(&d[0], 5.0).await.unwrap(), Heartbeat::Terminate);
+}
+
+/// TLA+ finding F3: inside ONE process (same `locked_by`) the pair (attempts, locked_by) repeats
+/// after a retry; the per-delivery `fence_token` must still reject a late complete() of the old
+/// delivery, so the newer delivery (with ids appended by coalescing meanwhile) is not discarded.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+#[ignore = "needs PAPERRUST_QUEUE_TEST_DATABASE_URL (own test database)"]
+async fn old_delivery_rejected_after_reclaim_in_same_process() {
+    let pool = pool().await;
+    let q = qname();
+    let queue = PgQueue::new(pool.clone(), 3);
+    let me = "paperrust@box:4242";
+    let id = queue.enqueue("documents.tasks.bulk_update_documents", kw(json!({"document_ids": [1]})), opts(&q)).await.unwrap();
+    let t0 = fence_token(&pool, id).await;
+    // Delivery 1: finishes its handler, but its complete() is delayed past lease expiry.
+    let a1 = queue.claim(me, std::slice::from_ref(&q), None, 10, 0.3).await.unwrap().remove(0);
+    assert_eq!(a1.fence_token, t0 + 1);
+    tokio::time::sleep(Duration::from_millis(400)).await;
+    queue.reap_expired_leases().await.unwrap();
+    assert_eq!(queue_state(&pool, id).await, "queued");
+    // Delivery 2 (same process name) claims and asks for a retry.
+    let a2 = queue.claim(me, std::slice::from_ref(&q), None, 10, 5.0).await.unwrap().remove(0);
+    assert_eq!((a2.attempts, a2.fence_token), (2, t0 + 2));
+    assert!(queue.retry(&a2, 0.0, &pl_queue::Failure::new("Retry", "again")).await.unwrap());
+    assert_eq!(fence_token(&pool, id).await, t0 + 3, "retry must end the delivery's token");
+    // Coalescing appends ids to the waiting task (same condition as pl-documents-write MERGE_SQL).
+    let n = sqlx::query(
+        "UPDATE paperrust_task_queue SET kwargs = jsonb_set(kwargs, '{document_ids}', (kwargs -> 'document_ids') || '[2]'::jsonb) \
+         WHERE task_id = $1 AND state = 'queued' AND attempts = 0",
+    )
+    .bind(id.to_string())
+    .execute(&pool)
+    .await
+    .unwrap()
+    .rows_affected();
+    assert_eq!(n, 1);
+    // Delivery 3: same (attempts, locked_by) as delivery 1 - the old fence could not tell them apart.
+    let a3 = queue.claim(me, std::slice::from_ref(&q), None, 10, 5.0).await.unwrap().remove(0);
+    assert_eq!((a3.attempts, a3.locked_by.as_str()), (a1.attempts, a1.locked_by.as_str()));
+    assert_eq!(a3.fence_token, t0 + 4);
+    assert_eq!(a3.kwargs["document_ids"], json!([1, 2]));
+    assert_eq!(queue.mark_started(&a3, 5.0).await.unwrap(), Heartbeat::Ok);
+    // Delivery 1's late calls are all rejected.
+    assert!(!queue.complete(&a1, json!({"stale": true})).await.unwrap(), "old delivery's complete accepted");
+    assert!(!queue.fail(&a1, &pl_queue::Failure::new("X", "stale")).await.unwrap());
+    assert!(!queue.retry(&a1, 0.0, &pl_queue::Failure::new("X", "stale")).await.unwrap());
+    assert!(!queue.release(&a1).await.unwrap());
+    assert_eq!(queue.heartbeat(&a1, 5.0).await.unwrap(), Heartbeat::Lost);
+    assert_eq!(queue.mark_started(&a1, 5.0).await.unwrap(), Heartbeat::Lost);
+    assert_eq!(queue.heartbeat(&a2, 5.0).await.unwrap(), Heartbeat::Lost);
+    assert_eq!(queue_state(&pool, id).await, "running");
+    // Delivery 3 completes normally.
+    assert!(queue.complete(&a3, Value::Null).await.unwrap());
+    assert_eq!(queue_state(&pool, id).await, "done");
+
+    // release: the token moves on as well, so a late heartbeat of the released delivery cannot take
+    // the queued row back; the next claim gets a fresh token.
+    let id2 = queue.enqueue("documents.tasks.bulk_update_documents", kw(json!({"document_ids": [3]})), opts(&q)).await.unwrap();
+    let r1 = queue.claim(me, std::slice::from_ref(&q), None, 10, 5.0).await.unwrap().remove(0);
+    assert!(queue.release(&r1).await.unwrap());
+    assert_eq!(queue_state(&pool, id2).await, "queued");
+    assert_eq!(queue.heartbeat(&r1, 5.0).await.unwrap(), Heartbeat::Lost);
+    assert_eq!(queue_state(&pool, id2).await, "queued");
+    let r2 = queue.claim(me, std::slice::from_ref(&q), None, 10, 5.0).await.unwrap().remove(0);
+    assert_eq!(r2.attempts, r1.attempts, "release does not count as a delivery");
+    assert_eq!(r2.fence_token, r1.fence_token + 2);
+    assert!(!queue.complete(&r1, Value::Null).await.unwrap());
+    assert!(queue.complete(&r2, Value::Null).await.unwrap());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]

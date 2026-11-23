@@ -614,6 +614,11 @@ Ohne Feature `ai` sind die vier upstream-KI-Aufgaben als „nicht portiert“ re
    `ConsumableDocument(WebUI|ApiUpload)`, Overrides (`filename`, `title`, Objekte, `tag_ids`, `created`, `asn`,
    `owner_id` = Nutzer, `custom_fields` Dict bzw. `{id: null}`), `consume_file` über `TaskQueue`
    (`trigger_source` `web_ui`/`api_upload`), Antwort `200` `"<task-id>"` (JSON-String). Fehler → Temp-Ordner gelöscht.
+6. PaperRust-Felder (fehlen sie, gilt das ngx-Verhalten): `ai_ocr` (Boolean, KI-Texterkennung, docs/contract/pl-ai.md)
+   und `folder` (Ordner-id, Ordneransicht Stufe 2): Syntax wie PrimaryKeyRelatedField in `validate`, danach
+   `pl_api_v2::folders::check_upload_target` (sichtbarer Ordner mit Änderungsrecht, `change_document`) → sonst 400
+   `{"folder": [...]}`; Override `folder_id`, der Consumer legt das Dokument in diesen Ordner. Einzelheiten und
+   Known differences: docs/contract/pl-api-v2.md „Stufe 2“.
 
 ## WebSocket `/ws/status/` (`src/ws.rs`)
 

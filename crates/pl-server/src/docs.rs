@@ -82,6 +82,7 @@ pages!(
     "automatik",
     "firmen",
     "custom-fields",
+    "folders",
     "permissions",
     "storage-paths",
     "advanced",

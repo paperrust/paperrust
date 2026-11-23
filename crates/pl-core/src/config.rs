@@ -955,7 +955,8 @@ pub struct Config {
     pub product_name: Option<String>,
     /// `PAPERLESS_ENABLE_UPDATE_CHECK`: `None` = `"default"`, otherwise bool.
     pub enable_update_check: Option<bool>,
-    /// `PAPERLESS_TASK_WORKERS` (default 1).
+    /// `PAPERLESS_TASK_WORKERS` (default 1; `auto` = derived from cores and memory, see
+    /// `crate::resources::task_workers_from_env`).
     pub task_workers: i64,
     /// `PAPERLESS_WORKER_TIMEOUT` (time limit per task, default 1800).
     pub worker_timeout: i64,
@@ -1290,7 +1291,7 @@ impl Config {
             app_logo: env.get("PAPERLESS_APP_LOGO").map(String::from),
             product_name: None,
             enable_update_check,
-            task_workers: env.int_or("PAPERLESS_TASK_WORKERS", 1)?,
+            task_workers: crate::resources::task_workers_from_env(&env)?,
             worker_timeout: env.int_or("PAPERLESS_WORKER_TIMEOUT", 1800)?,
             tika_enabled: env.bool("PAPERLESS_TIKA_ENABLED", "NO")?,
             ai_enabled: env.bool("PAPERLESS_AI_ENABLED", "NO")?,
@@ -1341,14 +1342,20 @@ impl Config {
     }
 }
 
+/// Loopback names that are always allowed unless `ALLOWED_HOSTS` is `["*"]` (upstream 40598db44,
+/// #14846).
+pub const LOOPBACK_HOSTS: [&str; 3] = ["localhost", "127.0.0.1", "[::1]"];
+
 /// `ALLOWED_HOSTS` before the hostname from `PAPERLESS_URL`.
 ///
 /// upstream fix 00096e025 (#14735, paperless-ngx `dev` after v3.4.2),
 /// `paperless/settings/__init__.py::_get_allowed_hosts`: `["*"]` now only applies if **neither**
 /// `PAPERLESS_ALLOWED_HOSTS` is set **nor** `PAPERLESS_URL` (non-empty). If one of them is
-/// set, the list from `PAPERLESS_ALLOWED_HOSTS` (missing/empty → empty) plus `localhost`
-/// (Docker healthcheck) applies; v3.4.2 had `["*", host]` with only `PAPERLESS_URL` set and thus allowed
-/// every host. `allowed_hosts_env` is the raw value (`None` = not set).
+/// set, the list from `PAPERLESS_ALLOWED_HOSTS` (missing/empty → empty) plus the loopback
+/// names `localhost`, `127.0.0.1` and `[::1]` applies (upstream 40598db44, #14846, paperless-ngx
+/// `dev` after v3.5.1: local access and health checks also via the loopback addresses);
+/// v3.4.2 had `["*", host]` with only `PAPERLESS_URL` set and thus allowed every host.
+/// `allowed_hosts_env` is the raw value (`None` = not set).
 pub fn initial_allowed_hosts(allowed_hosts_env: Option<&str>, paperless_url_set: bool) -> Vec<String> {
     let mut hosts: Vec<String> = if allowed_hosts_env.is_some() || paperless_url_set {
         allowed_hosts_env.unwrap_or("").split(',').map(str::trim).filter(|s| !s.is_empty()).map(String::from).collect()
@@ -1356,7 +1363,7 @@ pub fn initial_allowed_hosts(allowed_hosts_env: Option<&str>, paperless_url_set:
         vec!["*".into()]
     };
     if hosts != ["*"] {
-        hosts.push("localhost".into());
+        hosts.extend(LOOPBACK_HOSTS.iter().map(|h| (*h).to_string()));
     }
     hosts
 }
@@ -1599,7 +1606,7 @@ mod tests {
             ("PAPERLESS_PROXY_SSL_HEADER", r#"["HTTP_X_FORWARDED_PROTO", "https"]"#),
         ])
         .unwrap();
-        assert_eq!(c.allowed_hosts, vec!["a.example", "b.example", "localhost", "paper.example.com"]);
+        assert_eq!(c.allowed_hosts, vec!["a.example", "b.example", "localhost", "127.0.0.1", "[::1]", "paper.example.com"]);
         assert_eq!(c.csrf_trusted_origins, vec!["https://paper.example.com"]);
         assert_eq!(c.csrf_cookie_name, "x_csrftoken");
         assert_eq!(c.base_url, "/paperless/");
@@ -1607,29 +1614,53 @@ mod tests {
         assert_eq!(c.secure_proxy_ssl_header, Some(("HTTP_X_FORWARDED_PROTO".into(), "https".into())));
         assert!(c.host_allowed("PAPER.example.com."));
         assert!(c.host_allowed("localhost:8000"));
+        assert!(c.host_allowed("127.0.0.1:8000"));
+        assert!(c.host_allowed("[::1]:8000"));
+        assert!(!c.host_allowed("127.0.0.2"));
         assert!(!c.host_allowed("evil.example"));
         assert!(!c.host_allowed("bad host"));
         assert!(cfg(&[("PAPERLESS_URL", "nohost")]).is_err());
     }
 
     /// upstream fix 00096e025 (#14735): `test_allowed_hosts_at_startup` (all nine cases) and
-    /// `test_paperless_url_without_valid_hostname_is_rejected`.
+    /// `test_paperless_url_without_valid_hostname_is_rejected`; expected lists with the loopback
+    /// hosts of 40598db44 (#14846).
     #[test]
     fn allowed_hosts_at_startup_upstream_00096e025() {
         type Case<'a> = (Option<&'a str>, Option<&'a str>, &'a [&'a str], &'a str, Option<&'a str>);
         let cases: &[Case] = &[
             (None, None, &["*"], "other.example.com", None),
-            (None, Some(""), &["localhost"], "localhost:8000", Some("other.example.com")),
-            (None, Some("lan.example.com"), &["lan.example.com", "localhost"], "lan.example.com", Some("other.example.com")),
+            (None, Some(""), &["localhost", "127.0.0.1", "[::1]"], "localhost:8000", Some("other.example.com")),
+            (None, Some(""), &["localhost", "127.0.0.1", "[::1]"], "127.0.0.1:8000", Some("other.example.com")),
+            (None, Some(""), &["localhost", "127.0.0.1", "[::1]"], "[::1]:8000", Some("other.example.com")),
+            (
+                None,
+                Some("lan.example.com"),
+                &["lan.example.com", "localhost", "127.0.0.1", "[::1]"],
+                "lan.example.com",
+                Some("other.example.com"),
+            ),
             (None, Some("*"), &["*"], "other.example.com", None),
-            (Some("https://example.com:8443"), None, &["localhost", "example.com"], "example.com:8443", Some("other.example.com")),
-            (Some("https://example.com."), Some(""), &["localhost", "example.com"], "example.com.", Some("other.example.com")),
-            (Some("http://[::1]:8000"), None, &["localhost", "[::1]"], "[::1]:8000", Some("other.example.com")),
+            (
+                Some("https://example.com:8443"),
+                None,
+                &["localhost", "127.0.0.1", "[::1]", "example.com"],
+                "example.com:8443",
+                Some("other.example.com"),
+            ),
+            (
+                Some("https://example.com."),
+                Some(""),
+                &["localhost", "127.0.0.1", "[::1]", "example.com"],
+                "example.com.",
+                Some("other.example.com"),
+            ),
+            (Some("http://[::1]:8000"), None, &["localhost", "127.0.0.1", "[::1]", "[::1]"], "[::1]:8000", Some("other.example.com")),
             (Some("https://example.com"), Some("*"), &["*", "example.com"], "other.example.com", None),
             (
                 Some("https://example.com"),
                 Some("lan.example.com"),
-                &["lan.example.com", "localhost", "example.com"],
+                &["lan.example.com", "localhost", "127.0.0.1", "[::1]", "example.com"],
                 "lan.example.com",
                 Some("other.example.com"),
             ),

@@ -227,7 +227,7 @@ pub static HELP_EN: &[(&str, &str)] = &[
         "Full-text search of the document list (legacy = rank all hits and intersect with SQL, native = permissions in the index, top-N only, hit count from tantivy)",
     ),
     // ---- 1.11 Tasks ----
-    ("PAPERLESS_TASK_WORKERS", "Parallel tasks"),
+    ("PAPERLESS_TASK_WORKERS", "Parallel tasks (number >= 1 or auto = from cores and memory)"),
     ("PAPERLESS_THREADS_PER_WORKER", "OCR threads per task (default automatic)"),
     ("PAPERLESS_WORKER_TIMEOUT", "Time limit per task (s)"),
     ("PAPERLESS_TRAIN_TASK_CRON", "Train the classifier"),

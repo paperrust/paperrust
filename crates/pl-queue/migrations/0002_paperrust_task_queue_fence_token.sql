@@ -1,0 +1,17 @@
+-- PaperRust: per-delivery fencing token for paperrust_task_queue (crate pl-queue,
+-- contract docs/contract/pl-queue.md B3.8, TLA+ finding F3 in verification/task-queue/).
+--
+-- fence_token is incremented by every claim and by every retry/release of a delivery and is
+-- never reset or lowered. Heartbeat, mark_started, complete/fail/revoke, retry and release only
+-- act when the row still carries the token of their delivery. Before, the fence was
+-- (attempts, locked_by); attempts goes back to 0 on retry and down on release, and locked_by is
+-- the process name shared by all job runners of a process, so an old delivery's late complete()
+-- could be accepted for a newer delivery in the same process.
+--
+-- * expand-only: adds one column with a default, no upstream table touched.
+-- * idempotent (IF NOT EXISTS), may run repeatedly; applied by pl_queue::migrations::apply()
+--   together with 0001 (worker start, `paperrust manage migrate`).
+-- * Upgrade: restart all worker processes together (an old worker does not bump the token and
+--   still fences on attempts).
+-- * Rollback: ALTER TABLE paperrust_task_queue DROP COLUMN fence_token; (old code ignores it).
+ALTER TABLE paperrust_task_queue ADD COLUMN IF NOT EXISTS fence_token bigint NOT NULL DEFAULT 0;

@@ -331,5 +331,35 @@ fn filter_names_cover_upstream_filterset() {
     ] {
         assert!(names.contains(&n), "{n}");
     }
-    assert_eq!(names.len(), 105);
+    // 105 upstream filters + 4 PaperRust folder filters (last)
+    assert_eq!(names.len(), 109);
+    assert_eq!(&names[105..], &["folder__id", "folder__id__in", "folder__id__tree", "folder__isnull"]);
+}
+
+/// PaperRust folder view: `folder__*` filters (legacy SQL path and AST).
+#[test]
+fn folder_filters() {
+    let s = filter_sql("folder__id=7").unwrap();
+    assert!(s.contains(r#"EXISTS(SELECT 1 FROM "paperrust_document_folder" AS "pdf" WHERE "pdf"."document_id" = "documents_document"."id" AND "pdf"."folder_id" IN (7))"#), "{s}");
+    let s = filter_sql("folder__isnull=1").unwrap();
+    assert!(s.starts_with(r#"WHERE NOT EXISTS(SELECT 1 FROM "paperrust_document_folder""#), "{s}");
+    let s = filter_sql("folder__isnull=false").unwrap();
+    assert!(s.starts_with(r#"WHERE EXISTS(SELECT 1 FROM "paperrust_document_folder""#), "{s}");
+    let s = filter_sql("folder__id__tree=3,4").unwrap();
+    assert!(
+        s.contains(r#"WITH RECURSIVE "pft"("id") AS (SELECT "pfr"."id" FROM "paperrust_folder" AS "pfr" WHERE "pfr"."id" IN (3, 4)"#),
+        "{s}"
+    );
+    assert!(filter_sql("folder__id__in=1,2").unwrap().contains(r#""pdf"."folder_id" IN (1, 2)"#));
+    assert_eq!(validation(filter_sql("folder__id=x")), json!({"folder__id": ["Enter a number."]}));
+    assert_eq!(validation(filter_sql("folder__id__in=1,x")), json!({"folder__id__in": ["Enter a number."]}));
+    // after all upstream filters in form order
+    let v = validation(filter_sql("folder__id=x&id=y"));
+    let keys: Vec<&String> = v.as_object().unwrap().keys().collect();
+    assert_eq!(keys, vec!["id", "folder__id"]);
+    // AST
+    let qp = pl_docfilter::QueryParams::parse("folder__id=7&folder__isnull=1");
+    let p = futures::executor::block_on(pl_docfilter::ast::parse_filters(&qp, &ctx(), &upstream_fields(), false)).unwrap();
+    use pl_domain::filter::{FolderCond, Pred};
+    assert_eq!(p, Pred::And(vec![Pred::Folder(FolderCond::In(vec![7])), Pred::Not(Box::new(Pred::Folder(FolderCond::Any)))]));
 }

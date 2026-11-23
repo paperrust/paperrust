@@ -49,6 +49,10 @@ pub struct DocumentMetadataOverrides {
     /// when set, so that `input_data` of the tasks stays like upstream.
     #[serde(skip_serializing_if = "is_false")]
     pub ai_ocr: bool,
+    /// PaperRust folder view (stage 2): file the new document into this folder (upload field `folder`; the
+    /// upload checked visibility and permission). Serialized only when set, like `ai_ocr`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub folder_id: Option<i64>,
     pub barcodes: Option<Vec<StoredBarcode>>,
 }
 
@@ -98,6 +102,9 @@ impl DocumentMetadataOverrides {
         }
         if other.ai_ocr {
             self.ai_ocr = true;
+        }
+        if other.folder_id.is_some() {
+            self.folder_id = other.folder_id;
         }
         if other.version_label.is_some() {
             self.version_label.clone_from(&other.version_label);
@@ -317,6 +324,16 @@ mod tests {
         assert_eq!(o.custom_fields.unwrap()[&3], Value::from("x"));
         let inp = DocumentMetadataOverrides { tag_ids: Some(vec![1]), ..Default::default() }.to_input_data();
         assert_eq!(Value::Object(inp), serde_json::json!({"tag_ids": [1], "skip_asn_if_exists": false, "remote_ocr": false}));
+        // PaperRust folder_id: absent from input_data unless set, round trip and update()
+        let mut o = DocumentMetadataOverrides::default();
+        assert!(!o.to_input_data().contains_key("folder_id"));
+        assert!(!serde_json::to_string(&o).unwrap().contains("folder_id"));
+        o.update(&DocumentMetadataOverrides { folder_id: Some(7), ..Default::default() });
+        assert_eq!(o.to_input_data().get("folder_id"), Some(&Value::from(7)));
+        let back: DocumentMetadataOverrides = serde_json::from_value(Value::Object(o.to_input_data())).unwrap();
+        assert_eq!(back.folder_id, Some(7));
+        o.update(&DocumentMetadataOverrides::default());
+        assert_eq!(o.folder_id, Some(7));
         // PaperRust ai_ocr: serialized only when set, round trip and update()
         let mut o = DocumentMetadataOverrides { ai_ocr: true, ..Default::default() };
         assert_eq!(o.to_input_data().get("ai_ocr"), Some(&Value::Bool(true)));

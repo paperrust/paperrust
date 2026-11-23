@@ -12,14 +12,16 @@
 //! transaction is enough. Writes to `documents_paperlesstask` go through sea-query
 //! ([`crate::paperless_task`]).
 //!
-//! **Fencing:** Every state change of a running job checks `(id, attempts)` and
-//! `state='running' AND locked_by=<me>` **or** `state='queued'` (lease expired and put back by the
-//! cleaner, but not yet claimed anew by anyone – `attempts` is then
-//! unchanged; the original worker may then still finish or take it back via heartbeat).
-//! As soon as another worker has claimed the job (`attempts + 1`), the old one
-//! can no longer overwrite anything → no double effect on queue/PaperlessTask state; the old
-//! worker aborts execution at the next heartbeat or at the latest after 80 % of the lease without a
-//! successful heartbeat (self-fencing in the worker).
+//! **Fencing:** Every state change of a running job (heartbeat, `mark_started`, complete/fail/revoke,
+//! retry, release) checks `(id, fence_token)` and `state='running' AND locked_by=<me>` **or**
+//! `state='queued'` (lease expired and put back by the cleaner, but not yet claimed anew by anyone –
+//! the token is then unchanged; the original worker may then still finish or take it back via
+//! heartbeat). `fence_token` (migration 0002) is incremented by every claim and by retry/release and
+//! never reset, so it identifies one delivery for ever (TLA+ finding F3: the former token
+//! `(attempts, locked_by)` repeated inside one process after a retry/release). As soon as another
+//! worker has claimed the job, the old one can no longer overwrite anything → no double effect on
+//! queue/PaperlessTask state; the old worker aborts execution when a heartbeat reports the loss or at
+//! the latest 80 % of the lease after its last successful heartbeat (self-fencing timer in the worker).
 
 use chrono::{DateTime, Duration, Utc};
 use futures::future::BoxFuture;
@@ -44,8 +46,10 @@ pub struct Job {
     pub args: Vec<Value>,
     pub kwargs: Map<String, Value>,
     pub headers: Map<String, Value>,
-    /// Deliveries since the last enqueue (fencing token).
+    /// Deliveries since the last enqueue/retry (`MAX_DELIVERIES`, coalescing).
     pub attempts: i32,
+    /// Fencing token of this delivery (`fence_token`, unique per delivery of the row).
+    pub fence_token: i64,
     /// `request.retries`.
     pub retries: i32,
     pub expires: Option<DateTime<Utc>>,
@@ -56,7 +60,8 @@ pub struct Job {
     pub group_id: Option<String>,
     pub group_index: Option<i32>,
     pub locked_by: String,
-    /// Time of the claim (start of the lease, local clock).
+    /// Start of the lease on the local clock: taken together with the `now` that the claim
+    /// writes as `locked_until - visibility` (before the query is sent).
     pub claimed_at: std::time::Instant,
 }
 
@@ -110,7 +115,7 @@ pub struct PgQueue {
     max_deliveries: i32,
 }
 
-const JOB_COLUMNS: &str = "q.id, q.task_id, q.task_name, q.queue, q.args, q.kwargs, q.headers, q.attempts, q.retries, \
+const JOB_COLUMNS: &str = "q.id, q.task_id, q.task_name, q.queue, q.args, q.kwargs, q.headers, q.attempts, q.fence_token, q.retries, \
      q.expires, q.time_limit, q.revoke_requested, q.link, q.link_error, q.group_id, q.group_index, q.locked_by";
 
 fn sigs(v: Value) -> Vec<Signature> {
@@ -134,6 +139,7 @@ fn job_from_row(r: &PgRow) -> Result<Job, sqlx::Error> {
         kwargs: obj(r.try_get("kwargs")?),
         headers: obj(r.try_get("headers")?),
         attempts: r.try_get("attempts")?,
+        fence_token: r.try_get("fence_token")?,
         retries: r.try_get("retries")?,
         expires: r.try_get("expires")?,
         time_limit: r.try_get("time_limit")?,
@@ -266,6 +272,8 @@ impl PgQueue {
             return Ok(Vec::new());
         }
         let now = Utc::now();
+        // Same moment as `now`: the lease written below starts here (not when the rows return).
+        let sent = std::time::Instant::now();
         // Raw SQL: SKIP LOCKED (see module comment). Ordering priority (0 first), eta, id.
         let sql = format!(
             "WITH next AS ( \
@@ -274,7 +282,7 @@ impl PgQueue {
                ORDER BY priority, eta, id LIMIT $4 FOR UPDATE SKIP LOCKED) \
              UPDATE paperrust_task_queue q SET state = 'running', locked_by = $5, \
                locked_until = $1 + ($6 * interval '1 second'), heartbeat_at = $1, attempts = q.attempts + 1, \
-               started_at = $1 \
+               fence_token = q.fence_token + 1, started_at = $1 \
              FROM next WHERE q.id = next.id RETURNING {JOB_COLUMNS}"
         );
         let rows = sqlx::query(&sql)
@@ -287,30 +295,50 @@ impl PgQueue {
             .fetch_all(&self.pool)
             .await?;
         let mut jobs = rows.iter().map(job_from_row).collect::<Result<Vec<_>, _>>()?;
+        for j in &mut jobs {
+            j.claimed_at = sent;
+        }
         jobs.sort_by_key(|j| j.id);
         Ok(jobs)
     }
 
-    /// `task_prerun`: `PaperlessTask` → `started` (only log errors).
-    pub async fn mark_started(&self, job: &Job) {
-        if let Err(e) = pt::mark_started(&self.pool, &job.task_name, &job.task_id, Utc::now()).await {
-            tracing::error!(error = %e, task_id = %job.task_id, "Setting PaperlessTask started failed");
+    /// `task_prerun`: `PaperlessTask` → `started`, **fenced** (TLA+ finding F2): one transaction
+    /// that first extends the lease with the heartbeat's fencing `UPDATE` (row lock, so it is
+    /// ordered with any complete/fail/revoke of another delivery) and only if this delivery still
+    /// owns the row sets the PaperlessTask. `Lost` = another delivery owns or finished the task:
+    /// nothing is written and the handler must not start.
+    pub async fn mark_started(&self, job: &Job, visibility_secs: f64) -> Result<Heartbeat, QueueError> {
+        let now = Utc::now();
+        let mut tx = self.pool.begin().await?;
+        let hb = Self::extend_lease(&mut tx, job, visibility_secs, now).await?;
+        if hb == Heartbeat::Lost {
+            tx.rollback().await?;
+            return Ok(hb);
         }
+        pt::mark_started(&mut *tx, &job.task_name, &job.task_id, now).await?;
+        tx.commit().await?;
+        Ok(hb)
     }
 
     /// Extend the lease.
     pub async fn heartbeat(&self, job: &Job, visibility_secs: f64) -> Result<Heartbeat, QueueError> {
-        let now = Utc::now();
+        let mut conn = self.pool.acquire().await?;
+        Self::extend_lease(&mut conn, job, visibility_secs, Utc::now()).await
+    }
+
+    /// Fenced lease extension shared by [`Self::heartbeat`] and [`Self::mark_started`]; also takes
+    /// back a row the cleaner put back (`queued`, token unchanged).
+    async fn extend_lease(conn: &mut PgConnection, job: &Job, visibility_secs: f64, now: DateTime<Utc>) -> Result<Heartbeat, QueueError> {
         let row = sqlx::query(
             "UPDATE paperrust_task_queue SET state = 'running', locked_by = $4, locked_until = $1 + ($2 * interval '1 second'), heartbeat_at = $1 \
-             WHERE id = $3 AND attempts = $5 AND ((state = 'running' AND locked_by = $4) OR state = 'queued') RETURNING terminate_requested",
+             WHERE id = $3 AND fence_token = $5 AND ((state = 'running' AND locked_by = $4) OR state = 'queued') RETURNING terminate_requested",
         )
         .bind(now)
         .bind(visibility_secs)
         .bind(job.id)
         .bind(&job.locked_by)
-        .bind(job.attempts)
-        .fetch_optional(&self.pool)
+        .bind(job.fence_token)
+        .fetch_optional(&mut *conn)
         .await?;
         Ok(match row {
             None => Heartbeat::Lost,
@@ -330,7 +358,7 @@ impl PgQueue {
     ) -> Result<bool, QueueError> {
         let n = sqlx::query(
             "UPDATE paperrust_task_queue SET state = $1, result = $2, error = $3, finished_at = $4, locked_by = NULL, locked_until = NULL \
-             WHERE id = $5 AND attempts = $7 AND ((state = 'running' AND locked_by = $6) OR state = 'queued')",
+             WHERE id = $5 AND fence_token = $7 AND ((state = 'running' AND locked_by = $6) OR state = 'queued')",
         )
         .bind(state)
         .bind(result)
@@ -338,7 +366,7 @@ impl PgQueue {
         .bind(now)
         .bind(job.id)
         .bind(&job.locked_by)
-        .bind(job.attempts)
+        .bind(job.fence_token)
         .execute(&mut *conn)
         .await?
         .rows_affected();
@@ -395,19 +423,21 @@ impl PgQueue {
 
     /// `task.retry(countdown=…)`: back into the queue, `retries + 1`. The `PaperlessTask`
     /// stays unchanged (upstream: `task_postrun` with `RETRY` is skipped → `started`).
+    /// `attempts = 0` (new delivery budget, coalescing may append again); `fence_token + 1` ends
+    /// this delivery's token so no late call of it matches the queued row.
     pub async fn retry(&self, job: &Job, countdown_secs: f64, failure: &Failure) -> Result<bool, QueueError> {
         let now = Utc::now();
         let eta = now + Duration::microseconds((countdown_secs.max(0.0) * 1e6) as i64);
         let n = sqlx::query(
             "UPDATE paperrust_task_queue SET state = 'queued', eta = $1, retries = retries + 1, attempts = 0, \
-             locked_by = NULL, locked_until = NULL, error = $2 \
-             WHERE id = $3 AND attempts = $5 AND ((state = 'running' AND locked_by = $4) OR state = 'queued')",
+             fence_token = fence_token + 1, locked_by = NULL, locked_until = NULL, error = $2 \
+             WHERE id = $3 AND fence_token = $5 AND ((state = 'running' AND locked_by = $4) OR state = 'queued')",
         )
         .bind(eta)
         .bind(failure.result_data())
         .bind(job.id)
         .bind(&job.locked_by)
-        .bind(job.attempts)
+        .bind(job.fence_token)
         .execute(&self.pool)
         .await?
         .rows_affected();
@@ -434,16 +464,17 @@ impl PgQueue {
     }
 
     /// On shutdown: release the running job (immediately available again, does not count as a
-    /// delivery).
+    /// delivery: `attempts - 1`; `fence_token + 1` ends this delivery's token).
     pub async fn release(&self, job: &Job) -> Result<bool, QueueError> {
         let n = sqlx::query(
             "UPDATE paperrust_task_queue SET state = 'queued', eta = $1, attempts = GREATEST(attempts - 1, 0), \
-             locked_by = NULL, locked_until = NULL WHERE id = $2 AND attempts = $4 AND ((state = 'running' AND locked_by = $3) OR state = 'queued')",
+             fence_token = fence_token + 1, locked_by = NULL, locked_until = NULL \
+             WHERE id = $2 AND fence_token = $4 AND ((state = 'running' AND locked_by = $3) OR state = 'queued')",
         )
         .bind(Utc::now())
         .bind(job.id)
         .bind(&job.locked_by)
-        .bind(job.attempts)
+        .bind(job.fence_token)
         .execute(&self.pool)
         .await?
         .rows_affected();

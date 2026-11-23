@@ -49,8 +49,8 @@ A database of paperless-ngx **2.20 or 3.0.0 to 3.4.2** is taken over directly; i
 source (a 2.x source is copied with its own schema, verified and converted in the target within the
 same transaction), on the same database after an automatic backup (pg_dump file or a copy of the
 database on the server). For 2.x give the media folder: the checksums are recomputed from the files
-(SHA-256) like paperless-ngx 3 does. A database with the known changes after 3.4.2 (upstream
-`documents.0028`/`0029`) is taken over. If it is older than 2.19.6 or has an unknown newer change,
+(SHA-256) like paperless-ngx 3 does. A database with the known changes after 3.4.2 – i.e. also
+paperless-ngx **3.5.0/3.5.1** (upstream `documents.0028`/`0029`/`0030`) – is taken over. If it is older than 2.19.6 or has an unknown newer change,
 the switch stops before writing anything and explains the way out: create an export in paperless-ngx
 and give that instead (exports of any recent version are read).
 

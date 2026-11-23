@@ -52,7 +52,8 @@ ohne die Quelle anzufassen (eine 2.x-Quelle wird mit ihrem eigenen Schema kopier
 Ziel in derselben Transaktion umgebaut), bei derselben Datenbank nach einer automatischen Sicherung
 (pg_dump-Datei oder Kopie der Datenbank auf dem Server). Bei 2.x den Medienordner angeben: die
 Prüfsummen werden wie in paperless-ngx 3 aus den Dateien neu berechnet (SHA-256). Eine Datenbank mit
-den bekannten Änderungen nach 3.4.2 (upstream `documents.0028`/`0029`) wird übernommen. Ist sie
+den bekannten Änderungen nach 3.4.2 – also auch paperless-ngx **3.5.0/3.5.1** (upstream
+`documents.0028`/`0029`/`0030`) – wird übernommen. Ist sie
 älter als 2.19.6 oder hat sie eine unbekannte neuere Änderung, bricht der Umstieg ab, bevor etwas
 geschrieben wird, und erklärt den Ausweg: in paperless-ngx einen Export machen und diesen angeben.
 

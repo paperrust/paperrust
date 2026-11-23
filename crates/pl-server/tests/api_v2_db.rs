@@ -51,6 +51,10 @@ async fn recreate_db() -> PgPool {
     for (_, sql) in pl_objects::migrations::ALL {
         sqlx::raw_sql(sql).execute(&pool).await.expect("pl_objects migration");
     }
+    // documents_note.format (paperless-ngx 3.5 #14626): the notes routes read and write it
+    for (_, sql) in pl_documents_write::migrations::ALL {
+        sqlx::raw_sql(sql).execute(&pool).await.expect("note format migration");
+    }
     pl_sync::migrations::apply(&pool).await.expect("sync migration (P2)");
     pl_authz::device::migrations::apply(&pool).await.expect("device token migration");
     pool

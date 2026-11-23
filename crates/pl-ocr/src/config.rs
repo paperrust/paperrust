@@ -234,7 +234,16 @@ impl OcrSettings {
         };
         let afg =
             choice("PAPERLESS_ARCHIVE_FILE_GENERATION", get("PAPERLESS_ARCHIVE_FILE_GENERATION"), &["auto", "always", "never"], "auto")?;
-        let task_workers = int_opt("PAPERLESS_TASK_WORKERS")?.unwrap_or(1);
+        // Unset: 1 (upstream), so one document uses all cores. `auto` (PaperRust opt-in): same
+        // automatic task count as the worker pool (pl-queue), so that tasks × threads matches
+        // the cores. Anything else: `int()` with the ngx error text.
+        let task_workers = match get("PAPERLESS_TASK_WORKERS") {
+            Some(v) if pl_core::resources::is_auto(&v) => {
+                pl_core::resources::task_workers_or_auto(None, int_opt("PAPERLESS_THREADS_PER_WORKER")?)
+            }
+            Some(v) => py_int("PAPERLESS_TASK_WORKERS", &v)?,
+            None => pl_core::resources::DEFAULT_TASK_WORKERS,
+        };
         let threads = match int_opt("PAPERLESS_THREADS_PER_WORKER")? {
             Some(t) => t,
             None => default_threads_per_worker(task_workers, available_cores()),
@@ -555,6 +564,32 @@ mod tests {
         assert_eq!(default_threads_per_worker(1, 12), 12);
         assert_eq!(default_threads_per_worker(5, 12), 2);
         assert_eq!(default_threads_per_worker(20, 12), 1);
+    }
+
+    #[test]
+    fn task_workers_default_auto_and_number() {
+        let env = |pairs: &'static [(&'static str, &'static str)]| {
+            move |k: &str| pairs.iter().find(|(a, _)| *a == k).map(|(_, v)| (*v).to_string())
+        };
+        let cores = available_cores();
+        // unset: 1 task -> all cores for one document
+        let s = OcrSettings::from_env(env(&[])).unwrap();
+        assert_eq!(s.threads_per_worker, default_threads_per_worker(1, cores));
+        // number: as before
+        let s = OcrSettings::from_env(env(&[("PAPERLESS_TASK_WORKERS", "2")])).unwrap();
+        assert_eq!(s.threads_per_worker, default_threads_per_worker(2, cores));
+        // `auto` (any case): same task count as pl-queue
+        let auto = pl_core::resources::task_workers_or_auto(None, None);
+        for v in ["auto", "AUTO"] {
+            let s = OcrSettings::from_env(|k| (k == "PAPERLESS_TASK_WORKERS").then(|| v.to_string())).unwrap();
+            assert_eq!(s.threads_per_worker, default_threads_per_worker(auto, cores));
+        }
+        // explicit threads win
+        let s = OcrSettings::from_env(env(&[("PAPERLESS_TASK_WORKERS", "auto"), ("PAPERLESS_THREADS_PER_WORKER", "3")])).unwrap();
+        assert_eq!(s.threads_per_worker, 3);
+        // other invalid values keep the ngx error text
+        let e = OcrSettings::from_env(env(&[("PAPERLESS_TASK_WORKERS", "autox")])).unwrap_err();
+        assert!(e.message().contains("invalid literal for int() with base 10: 'autox'"), "{}", e.message());
     }
 
     #[test]

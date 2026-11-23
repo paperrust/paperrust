@@ -87,8 +87,8 @@ und Ausgabe durch `***` ersetzt.
   schrittweise aktualisierte Installationen) oder (c) zu einer App gehören, die v3.4.2 nicht
   installiert (z. B. `django_q`; Warnung). Genau diese Zeilen ignoriert Django ebenfalls.
 - (d) bekannte Migrationen einer neueren paperless-ngx-Version (`schema::KNOWN_NEWER`:
-  `documents.0028_replace_tag_tree_fields`, `0029_alter_workflowrun_type_alter_workflowtrigger_type`
-  aus upstream `dev`) → `MigrationCheck.newer`, angenommen (siehe „Neuer als 3.4.2“).
+  `documents.0028_replace_tag_tree_fields`, `0029_alter_workflowrun_type_alter_workflowtrigger_type`,
+  `0030_note_format` – paperless-ngx 3.5.0/3.5.1) → `MigrationCheck.newer`, angenommen (siehe „Neuer als 3.4.2“).
 - alles andere (unbekannte Migration einer installierten App) → Abbruch mit Export-Weg
   (`catchup::newer_message`).
 
@@ -224,9 +224,15 @@ Django `MigrationExecutor.check_replacements` (Squash-Zeilen am Ende), `Migratio
 
 - gleiche Datenbank: `switch` → Schema „neuer als 3.4.2“, Hinweis, nichts zu tun; pl-cli
   `classify` zählt die Zeilen als „extra“ (Start wie bei 3.4.2, `pl_objects.0001` ist idempotent).
-- Kopie: `Shape::v342(drop_tag_tree)` – nach pre-data `ALTER TABLE documents_tag DROP COLUMN` der 13
-  treenode-Spalten (`schema::TREENODE_DERIVED`), Spaltenliste ohne sie; Daten und `django_migrations`
-  unverändert.
+- Kopie: `Shape::v342(drop_tag_tree, note_format)` – nach pre-data (`Shape::newer_ddl`)
+  `ALTER TABLE documents_tag DROP COLUMN` der 13 treenode-Spalten (`schema::TREENODE_DERIVED`),
+  Spaltenliste ohne sie; with documents.0030 (paperless-ngx 3.5) `ALTER TABLE documents_note ADD
+  COLUMN "format" varchar(16) DEFAULT 'plain' NOT NULL` + `DROP DEFAULT` (exactly Django's SQL; the
+  column is appended to the copy column list, `schema::note_format_column`). Daten und
+  `django_migrations` unverändert. The expected 3.5.1 schema is the v3.4.2 snapshot + 0028 + 0030
+  (`migrate::shape_tests`); no separate v3.5.1 snapshot file.
+- PaperRust's own `pl_documents_write.0001_paperrust_note_format` (on `manage migrate`) adds the
+  column on 3.4.2-and-older databases and sets the default `'plain'` where 3.5 left none.
 - unbekannt: `switch` FAIL („neueren paperless-ngx-Version … Export“), Ziel leer bzw. unverändert.
 
 ## Desktop: Abgleich im Erst-Start (apps/desktop, apps/desktop-shell)

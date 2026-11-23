@@ -1,6 +1,7 @@
-<!-- Port of chat/chat (ChatComponent): navbar dropdown "Questions about documents", POST /api/documents/chat/
-     (streamed, typewriter effect 10 ms/character), source links. Loaded lazily by AppFrame only with ai_enabled.
-     Host <pngx-chat> in the markup of AppFrame. Styles from chat.component.scss below (encapsulated under pngx-chat). -->
+<!-- Port of chat/chat (ChatComponent): navbar dropdown "ask about documents", POST /api/documents/chat/
+     (streamed; typewriter effect spreads each burst over 0.75-3 s with a 16 ms tick, as in upstream 3.5.1),
+     source links. Lazy-loaded by AppFrame only when ai_enabled. Host <pngx-chat> in AppFrame's markup.
+     Styles from chat.component.scss below (scoped under pngx-chat). -->
 <script lang="ts">
   import { t } from '../../lib/i18n'
   import { icon } from '../common/bootstrap-icon/icon'
@@ -13,6 +14,7 @@
   import { router } from '../../router.svelte'
   import { streamChat, parseChatResponse, type ChatMessage } from './chat-service'
   import { renderMarkdown } from './markdown'
+  import { TYPEWRITER_INTERVAL_MS, typewriterChunkSize, typewriterRevealDuration } from './typewriter'
 
   const SLOW_RESPONSE_DELAY_MS = 8000
 
@@ -40,6 +42,7 @@
   let typewriterBuffer: string[] = []
   let typewriterActive = false
   let typewriterTimeout: ReturnType<typeof setTimeout> | undefined
+  let typewriterDeadline = 0
   let abort: AbortController | undefined
   let streamingMessage: ChatMessage | undefined
   let streamFinished = false
@@ -70,7 +73,7 @@
         if (next.content.length < lastVisibleContent.length) {
           resetTypewriter(assistantMessage, next.content)
           lastVisibleContent = next.content
-        } else {
+        } else if (next.content.length > lastVisibleContent.length) {
           const visibleDelta = next.content.substring(lastVisibleContent.length)
           lastVisibleContent = next.content
           enqueueTypewriter(visibleDelta, assistantMessage)
@@ -143,6 +146,8 @@
   function enqueueTypewriter(chunk: string, message: ChatMessage) {
     if (!chunk) return
     typewriterBuffer.push(...chunk.split(''))
+    // longer bursts need more time to remain readable as the chat scrolls
+    typewriterDeadline = Date.now() + typewriterRevealDuration(typewriterBuffer.length)
     if (!typewriterActive) {
       typewriterActive = true
       playTypewriter(message)
@@ -150,15 +155,16 @@
   }
 
   function playTypewriter(message: ChatMessage) {
+    // spread the queued text across the updates left before the deadline
+    const n = typewriterChunkSize(typewriterBuffer.length, typewriterDeadline, Date.now())
+    message.content += typewriterBuffer.splice(0, n).join('')
+    scrollToBottom()
     if (typewriterBuffer.length === 0) {
       typewriterActive = false
       if (streamFinished) finishStreaming(message)
-      return
+    } else {
+      typewriterTimeout = setTimeout(() => playTypewriter(message), TYPEWRITER_INTERVAL_MS)
     }
-    message.content += typewriterBuffer.shift()
-    scrollToBottom()
-    // 10ms per character
-    typewriterTimeout = setTimeout(() => playTypewriter(message), 10)
   }
 
   function scrollToBottom() {

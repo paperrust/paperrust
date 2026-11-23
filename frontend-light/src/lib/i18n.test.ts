@@ -121,3 +121,15 @@ describe('Datumsformat wie Angular DatePipe', () => {
     expect(formatDate('kein Datum')).toBe('')
   })
 })
+
+describe('folder move toasts use plural forms', () => {
+  it('en, de, pl', async () => {
+    const en = (await import('../../i18n/en-US.json')).default as Record<string, string>
+    const de = (await import('../../i18n/de-DE.json')).default as Record<string, string>
+    const pl = (await import('../../i18n/pl-PL.json')).default as Record<string, string>
+    expect(format(en['m.folders.moved'], { VAR_PLURAL: 1, PH: 1, PH_1: 'Bills' })).toBe('1 document moved to "Bills"')
+    expect(format(en['m.folders.moved'], { VAR_PLURAL: 3, PH: 3, PH_1: 'Bills' })).toBe('3 documents moved to "Bills"')
+    expect(format(de['m.folders.deleted'], { VAR_PLURAL: 1, PH: 1 })).toBe('Ordner gelöscht, 1 Dokument verschoben')
+    expect(format(pl['m.folders.moved_unsorted'], { VAR_PLURAL: 5, PH: 5 }, 'pl-PL')).toBe('Przeniesiono 5 dokumentów do „Nieposortowane”')
+  })
+})

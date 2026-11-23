@@ -303,6 +303,13 @@ Seite + Zählung in einem Scan, `pl_core::pagination::fetch_page_windowed`).
      `{"custom_field_query": ["Ensure this value is between 1 and 9999."]}`.
    upstream: Django `ValueError`/`FieldError` → 500. Der Differenztest gegen Django zählt diese Fälle
    jetzt als „verschieden“ (500 vs. 400). Andere 500-Fälle oben (Operator kein String usw.) bleiben.
+10. **Ordner-Filter (nur PaperRust, 2026-11-22):** `folder__id`, `folder__id__in`, `folder__id__tree`,
+    `folder__isnull` (Ordneransicht, docs/contract/pl-api-v2.md „Ordner“). Kennt paperless-ngx nicht – dort
+    werden die Parameter ignoriert (ganze Liste), hier filtern sie. Sie stehen **nach** allen upstream-Filtern,
+    damit Formularfehler der upstream-Filter in gleicher Reihenfolge bleiben; Prüfung wie `NumberFilter`
+    („Enter a number.“) bzw. `BaseInFilter`/`BooleanWidget`. AST `Pred::Folder(FolderCond::{In,Tree,Any})`,
+    SQL `sql::folder_exists` (`EXISTS` auf `paperrust_document_folder`, `Tree` mit rekursivem CTE über
+    `paperrust_folder`). Ohne PaperRust-Migrationen fehlt die Tabelle → 500, nur wenn der Parameter benutzt wird.
 
 ## Tests
 

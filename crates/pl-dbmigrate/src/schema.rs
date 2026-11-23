@@ -70,8 +70,32 @@ pub mod v220 {
 ///   `pl_objects.0001_paperrust_tag_adjacency`.
 /// - documents.0029_alter_workflowrun_type_alter_workflowtrigger_type: only a new choice "Manual",
 ///   no database change (type smallint, nullability and CHECK unchanged).
-pub const KNOWN_NEWER: &[(&str, &str)] =
-    &[("documents", "0028_replace_tag_tree_fields"), ("documents", "0029_alter_workflowrun_type_alter_workflowtrigger_type")];
+/// - documents.0030_note_format (paperless-ngx 3.5.0, #14626): adds `documents_note.format
+///   varchar(16) NOT NULL` (values `plain`/`markdown`; Django drops the column default after the
+///   add) – PaperRust's own migration `pl_documents_write.0001_paperrust_note_format` adds the same
+///   column and sets the default `'plain'`.
+///
+/// paperless-ngx 3.5.1 has no further migrations (src/*/migrations@v3.5.1).
+pub const KNOWN_NEWER: &[(&str, &str)] = &[
+    ("documents", "0028_replace_tag_tree_fields"),
+    ("documents", "0029_alter_workflowrun_type_alter_workflowtrigger_type"),
+    ("documents", "0030_note_format"),
+];
+
+/// The column added by documents.0030_note_format: `format varchar(16) NOT NULL` (models.py
+/// `Note.format`, CharField(max_length=16)). Appended at the end of documents_note, as Django's
+/// `AddField` does.
+pub fn note_format_column() -> Column {
+    Column {
+        name: "format".into(),
+        udt: "varchar".into(),
+        max_len: Some(16),
+        nullable: false,
+        generated: false,
+        pk: false,
+        kind: Kind::Text { max: Some(16) },
+    }
+}
 
 /// The columns of documents_tag removed by documents.0028 (or pl_objects.0001).
 pub const TREENODE_DERIVED: &[&str] = &[
@@ -207,6 +231,11 @@ impl MigrationCheck {
     pub fn tag_tree_dropped(&self) -> bool {
         self.newer.iter().any(|(a, n)| a == "documents" && n == "0028_replace_tag_tree_fields")
     }
+
+    /// documents.0030 applied: documents_note has the `format` column (paperless-ngx 3.5).
+    pub fn note_format(&self) -> bool {
+        self.newer.iter().any(|(a, n)| a == "documents" && n == "0030_note_format")
+    }
 }
 
 impl MigrationCheck {
@@ -297,9 +326,10 @@ mod tests {
         }
         let r = check_migrations(&src);
         assert!(r.ok(), "{r:?}");
-        assert_eq!(r.newer.len(), 2);
+        assert_eq!(r.newer.len(), 3);
         assert!(r.tag_tree_dropped());
-        src.insert(("documents".into(), "0030_future".into()));
+        assert!(r.note_format());
+        src.insert(("documents".into(), "0031_future".into()));
         assert_eq!(check_migrations(&src).unknown.len(), 1);
         // embedded 2.20 schema
         let t = v220::tables().unwrap();

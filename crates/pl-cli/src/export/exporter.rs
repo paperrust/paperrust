@@ -5,6 +5,7 @@
 //! `_write_split_manifest`, `_encrypt_record_inline`), src/documents/export/sinks.py
 //! (`DirectoryExportSink`, `ZipExportSink`, `StreamingManifestWriter`, `_dumps`),
 //! src/documents/export/compression.py, src/documents/models.py (`get_public_filename`) – v3.4.2.
+//! Note `format` (paperless-ngx 3.5): only non-plain values are written, see [`super::noteformat`].
 
 use std::collections::{HashMap, HashSet};
 use std::io::Write;
@@ -703,6 +704,9 @@ async fn dump_records(
     // Tags without stored treenode fields (pl_objects.0001_paperrust_tag_adjacency): compute values for
     // the v3.4.2 manifest from the adjacency list (export::tagtree).
     let tag_tree = if super::tagtree::has_columns(&mut tx).await? { None } else { Some(super::tagtree::computed(&mut tx).await?) };
+    // documents_note.format (paperless-ngx 3.5 / PaperRust): note model with the extra field
+    let note_model = if super::noteformat::has_column(&mut tx).await? { super::noteformat::model(d) } else { None };
+    let mut markdown_notes: u64 = 0;
     for key in &d.keys {
         if key.audit_only && !c.cfg.audit_log_enabled {
             continue;
@@ -728,6 +732,18 @@ async fn dump_records(
                 .await?
             }
             "notes" | "custom_field_instances" | "document_barcodes" if o.split_manifest => {}
+            "notes" if note_model.is_some() => {
+                let Some(m) = note_model.as_ref() else { continue };
+                let sql = super::noteformat::sql(&key.sql);
+                for_each_record(&mut tx, m, &sql, &key.params, batch, |mut r| {
+                    if super::noteformat::strip_plain(&mut r) {
+                        markdown_notes += 1;
+                    }
+                    encrypt_inline(crypt, &mut r);
+                    writer.write_record(&Value::Object(r))
+                })
+                .await?
+            }
             _ if key.model == super::tagtree::TAG_MODEL && tag_tree.is_some() => {
                 let tree = tag_tree.as_ref();
                 let sql = super::tagtree::placeholder_sql(&key.sql);
@@ -844,11 +860,17 @@ async fn dump_records(
             let mut content = vec![Value::Object(rec)];
             for name in ["notes", "custom_field_instances", "document_barcodes"] {
                 let Some(sq) = d.split.get(name) else { continue };
-                let Some(model) = d.models.get(&sq.model) else { continue };
+                let notes = if name == "notes" { note_model.as_ref() } else { None };
+                let Some(model) = notes.or_else(|| d.models.get(&sq.model)) else { continue };
+                let sql = if notes.is_some() { super::noteformat::sql(&sq.sql) } else { sq.sql.clone() };
                 // text format like with the cursor (NUMERIC of the computed column value_monetary_amount)
-                let rows = sqlx::raw_sql(&inline_params(&sq.sql, &[Value::from(pk)])).fetch_all(&mut *tx).await?;
+                let rows = sqlx::raw_sql(&inline_params(&sql, &[Value::from(pk)])).fetch_all(&mut *tx).await?;
                 for r in &rows {
-                    content.push(Value::Object(build_record(&mut tx, model, r).await?));
+                    let mut rec = build_record(&mut tx, model, r).await?;
+                    if notes.is_some() && super::noteformat::strip_plain(&mut rec) {
+                        markdown_notes += 1;
+                    }
+                    content.push(Value::Object(rec));
                 }
             }
             let mut manifest_name = pypath::join(pypath::parent(&base_name), &format!("{}-manifest.json", pypath::stem(&base_name)));
@@ -889,6 +911,11 @@ async fn dump_records(
         writer.write_record(&Value::Object(b))?;
     }
     tx.rollback().await?;
+    if markdown_notes > 0 {
+        println!(
+            "{markdown_notes} note(s) use Markdown and are exported with \"format\": \"markdown\";              paperless-ngx before 3.5 cannot import this export"
+        );
+    }
     Ok(())
 }
 

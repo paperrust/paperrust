@@ -59,7 +59,8 @@ pub trait Repo: Send + Sync {
     fn get_document<'a>(&'a self, p: &'a Principal, uuid: Uuid, include: DocInclude) -> BoxFut<'a, Document>;
 
     fn notes<'a>(&'a self, p: &'a Principal, doc: Uuid) -> BoxFut<'a, Vec<Note>>;
-    fn add_note<'a>(&'a self, p: &'a Principal, doc: Uuid, text: &'a str) -> BoxFut<'a, Vec<Note>>;
+    /// `format`: `plain` or `markdown` (validated by the v1 route, paperless-ngx 3.5 `NoteCreateSerializer`).
+    fn add_note<'a>(&'a self, p: &'a Principal, doc: Uuid, text: &'a str, format: &'a str) -> BoxFut<'a, Vec<Note>>;
     fn delete_note<'a>(&'a self, p: &'a Principal, doc: Uuid, note: i64) -> BoxFut<'a, Vec<Note>>;
 
     /// Create tags, correspondents, document types.

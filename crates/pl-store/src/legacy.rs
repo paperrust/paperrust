@@ -292,10 +292,10 @@ pub(crate) async fn patch_document(
     documents::get_by_id(store, user, id).await
 }
 
-pub(crate) async fn add_note(store: &Store, p: &Principal, doc: Uuid, text: &str) -> DomainResult<Vec<Note>> {
+pub(crate) async fn add_note(store: &Store, p: &Principal, doc: Uuid, text: &str, format: &str) -> DomainResult<Vec<Note>> {
     let user = auth::user(p)?;
     let (id, _) = documents::visible_one(store, user, doc).await?;
-    call(store, p, Method::POST, &format!("/api/documents/{id}/notes/"), Some(json!({"note": text}))).await?;
+    call(store, p, Method::POST, &format!("/api/documents/{id}/notes/"), Some(json!({"note": text, "format": format}))).await?;
     documents::notes_by_id(store, id).await
 }
 

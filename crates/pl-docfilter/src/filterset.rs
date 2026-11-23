@@ -24,7 +24,7 @@ use crate::perms::{document_is_shared, visible_root_documents};
 use crate::pyval::{NUMBER_FILTER_MAX, PyDecimal, PyInt, RangeCheck, py_int, py_strip};
 use crate::sql::{
     CF, CFI, CORRESPONDENT, Cond, DOC, DOC_TAGS, DOCTYPE, STORAGEPATH, TAG, TextLookup, col, doc_col, effective_content, exists,
-    select_one_from, text_lookup,
+    folder_exists, select_one_from, text_lookup,
 };
 use crate::textfold::{UpperFold, folded_lookup};
 use crate::{FilterContext, User};
@@ -100,6 +100,12 @@ enum Spec {
     CustomFieldQuery,
     SharedBy,
     MimeType,
+    /// PaperRust folder view: `folder__id` (NumberFilter-like, one id)
+    FolderId,
+    /// PaperRust folder view: `folder__id__in` (`false`) / `folder__id__tree` (`true`, incl. subfolders)
+    FolderIn(bool),
+    /// PaperRust folder view: `folder__isnull` (`true` = "Unsorted")
+    FolderIsNull,
 }
 
 use CharTarget as CT;
@@ -237,6 +243,15 @@ fn filters() -> Vec<(&'static str, Spec)> {
         ("created__date__lt", DateCmp("created", Lt)),
         ("created__date__lte", DateCmp("created", Lte)),
     ]);
+    // PaperRust folder view (not in paperless-ngx, there unknown parameters are ignored;
+    // docs/contract/pl-docfilter.md "Known differences"). Last, so the form error order of the upstream
+    // filters stays unchanged.
+    v.extend([
+        ("folder__id", FolderId),
+        ("folder__id__in", FolderIn(false)),
+        ("folder__id__tree", FolderIn(true)),
+        ("folder__isnull", FolderIsNull),
+    ]);
     v
 }
 
@@ -288,14 +303,14 @@ fn clean_bool(v: Option<&str>) -> Cleaned {
 
 fn clean(spec: Spec, raw: Option<&str>, ctx: &FilterContext) -> Result<Cleaned, String> {
     Ok(match spec {
-        Num(..) | DatePart(..) => match raw {
+        Num(..) | DatePart(..) | FolderId => match raw {
             None => Cleaned::Skip,
             Some(v) => match clean_decimal(v)? {
                 None => Cleaned::Skip,
                 Some(i) => Cleaned::Int(i),
             },
         },
-        NumIn(_) => match raw {
+        NumIn(_) | FolderIn(_) => match raw {
             None | Some("") => Cleaned::Skip,
             Some(v) => {
                 let mut out = Vec::new();
@@ -318,7 +333,7 @@ fn clean(spec: Spec, raw: Option<&str>, ctx: &FilterContext) -> Result<Cleaned, 
                 }
             }
         },
-        IsNull(_) | HasDuplicates | IsTagged | HasCustomFields => clean_bool(raw),
+        IsNull(_) | HasDuplicates | IsTagged | HasCustomFields | FolderIsNull => clean_bool(raw),
         DateCmp(..) | DtDateCmp(..) => match raw {
             None => Cleaned::Skip,
             Some(v) => match django_form_date(v) {
@@ -640,6 +655,22 @@ async fn filter_cond<D: FilterDb>(
             }
         }
         (DtCmp(c, op), C::Dt(dt)) => Cond::Expr(cmp(doc_col(c), op, Expr::val(dt))),
+        (FolderId, C::Int(v)) => match v.range_check(i64::MIN, i64::MAX) {
+            RangeCheck::InRange(x) => Cond::Expr(folder_exists(&f::FolderCond::In(vec![x]))),
+            _ => Cond::False,
+        },
+        (FolderIn(tree), C::IntList(list)) => {
+            let vals = in_values(&list, (i64::MIN, i64::MAX));
+            if vals.is_empty() {
+                Cond::False
+            } else {
+                Cond::Expr(folder_exists(&if tree { f::FolderCond::Tree(vals) } else { f::FolderCond::In(vals) }))
+            }
+        }
+        (FolderIsNull, C::Bool(b)) => {
+            let e = folder_exists(&f::FolderCond::Any);
+            Cond::Expr(if b { e.not() } else { e })
+        }
         (HasDuplicates, C::Bool(b)) => {
             let e = duplicates_exists(user);
             // true: first candidates (superset, see duplicate_candidates), then the exact
@@ -1000,6 +1031,24 @@ async fn filter_pred<D: FilterDb>(spec: Spec, value: Cleaned, ctx: &FilterContex
         }
         (DtCmp(c, op), C::Dt(dt)) => P::Ts { col: ast_ts_col(c)?, op: ast_cmp(op), at: dt },
         (HasDuplicates, C::Bool(b)) => P::HasDuplicates(b),
+        (FolderId, C::Int(v)) => match v.range_check(i64::MIN, i64::MAX) {
+            RangeCheck::InRange(x) => P::Folder(f::FolderCond::In(vec![x])),
+            _ => P::False,
+        },
+        (FolderIn(tree), C::IntList(list)) => {
+            let vals = in_values(&list, (i64::MIN, i64::MAX));
+            if vals.is_empty() {
+                P::False
+            } else if tree {
+                P::Folder(f::FolderCond::Tree(vals))
+            } else {
+                P::Folder(f::FolderCond::In(vals))
+            }
+        }
+        (FolderIsNull, C::Bool(b)) => {
+            let e = P::Folder(f::FolderCond::Any);
+            if b { e.negate() } else { e }
+        }
         (IsTagged, C::Bool(b)) => {
             let e = P::Tag(f::TagCond::Any);
             if b { e } else { e.negate() }

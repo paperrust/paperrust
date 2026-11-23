@@ -669,6 +669,27 @@ ungültiges Token × v9/v10 × 8 Pfade mit Paginierung/`full_perms`): 112 vergli
 19. **`bulk_edit` mit Nicht-Objekt-Body** (B-313, 2026-11-16, bewusst): `[]`, Zahl, String usw. → 400
     `{"non_field_errors": ["Invalid data. Expected a dictionary, but got list."]}` (`null` → „No data
     provided“). upstream: `request.data.get("method")` → AttributeError → 500.
+20. **Notes as Markdown – matches paperless-ngx 3.5.1, not 3.4.2** (2026-11-22, deliberate step beyond
+    3.4.2 parity; upstream #14626, commits b63ea7754 + 694619c33). Source: v3.5.1
+    `src/documents/serialisers.py` (`NotesSerializer`, `NoteCreateSerializer`), `views.py`
+    (`DocumentViewSet.notes`), `models.py` (`Note.Format`), migration `documents.0030_note_format`.
+    - Schema: `documents_note.format varchar(16) NOT NULL DEFAULT 'plain'` via PaperRust migration
+      `pl_documents_write.0001_paperrust_note_format` (adds the column if missing; on databases from
+      paperless-ngx 3.5 the column exists without a default – the migration sets it). No CHECK (upstream
+      has none). `django_migrations` unchanged.
+    - `POST /api/documents/{id}/notes/` order as in 3.5.1: view permission → `change_document`
+      permission (403 „Insufficient permissions to create notes“) → validation → insert. Validation
+      `NoteCreateSerializer`: `note` CharField (required, trimmed, not blank/null, no NUL characters,
+      `Not a valid string.` for lists/objects/booleans), `format` ChoiceField `plain`/`markdown`
+      (optional, default `plain`, `"x" is not a valid choice.`, `This field may not be null.`).
+      Errors 400 `{field: [msg]}` in declaration order (`note`, `format`); non-object body →
+      `{"non_field_errors": ["Invalid data. Expected a dictionary, but got list."]}`.
+      v3.4.2 answered a missing/null `note` with 200 `{"error": "Error saving note, …"}` and stored
+      the text untrimmed – now as 3.5.1. The stored note is the **trimmed** text (DRF CharField).
+    - Response/auditlog: note objects are `id, note, format, created, user` (3.5.1 field order); the
+      auditlog create diff of a note lists `format` after `note`.
+    - Parity tests against the v3.4.2 reference (`tests/write_parity.rs`, `w23_parity.rs`) differ in
+      the `format` field and the validation cases above – accepted difference.
 
 ## Umsetzung (Rust)
 

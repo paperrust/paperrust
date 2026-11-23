@@ -24,6 +24,9 @@ Gotenberg. Apps and scripts written for paperless-ngx keep working.
 
 Platforms: `linux/amd64`, `linux/arm64`. The same image is also published as `ghcr.io/paperrust/paperrust`.
 
+> **Note:** Docker Hub receives release tags starting with the next release. Until then only `edge` is here; the
+> current stable release is `ghcr.io/paperrust/paperrust:0.1.1` (same image, use it in the compose file below).
+
 ## Quick start (docker compose)
 
 ```yaml

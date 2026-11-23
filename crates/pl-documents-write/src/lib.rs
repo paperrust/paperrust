@@ -7,6 +7,15 @@
 //! `documents.reprocess`. Worker tasks `documents.bulk_edit.delete`,
 //! `restore_archive_serial_numbers_task`, `documents.tasks.empty_trash`: [`tasks`].
 
+/// Own migrations (applied via `pl_cli::migrate::paperrust_migrations`).
+pub mod migrations {
+    /// `documents_note.format` like paperless-ngx 3.5 `documents.0030_note_format` (#14626):
+    /// added if missing, column default `'plain'` set if the column exists without one.
+    pub const NOTE_FORMAT: (&str, &str) =
+        ("pl_documents_write.0001_paperrust_note_format", include_str!("../migrations/0001_paperrust_note_format.sql"));
+    pub const ALL: &[(&str, &str)] = &[NOTE_FORMAT];
+}
+
 pub mod actions;
 pub mod audit;
 pub mod auditlog;

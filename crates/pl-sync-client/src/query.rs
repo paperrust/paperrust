@@ -213,6 +213,8 @@ pub(crate) fn build_where(q: &DocQuery) -> Result<Where> {
             Cond::CustomFieldQuery(_) => return Err(not_impl("custom_field_query")),
             Cond::SharedByMe(true) => return Err(not_impl("shared_by_me")),
             Cond::SharedByMe(false) => {}
+            // folders are not part of the offline replica yet (folder view stage 3)
+            Cond::Folder(_) => return Err(not_impl("folder")),
             Cond::Created(d) => date_cond(&mut w, "d.created", d),
             Cond::Added(d) => date_cond(&mut w, "substr(d.added, 1, 10)", d),
             Cond::Modified(d) => date_cond(&mut w, "substr(d.modified, 1, 10)", d),

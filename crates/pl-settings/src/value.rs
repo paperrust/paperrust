@@ -127,6 +127,17 @@ fn extra_checks(def: &SettingDef, p: &Parsed) -> Result<(), ValueError> {
     {
         return Err(err(def, "every entry must be a string"));
     }
+    // Number >= 1 or `auto` (pl_core::resources::task_workers_from_env); other values with the
+    // same `int()` error text as at startup.
+    if def.key == "PAPERLESS_TASK_WORKERS"
+        && let Parsed::Str(s) = p
+        && !pl_core::resources::is_auto(s)
+    {
+        let n = Env::from_pairs([(def.key, s.as_str())]).int(def.key).map_err(|e| err(def, e.to_string()))?.unwrap_or_default();
+        if n < 1 {
+            return Err(err(def, "must be >= 1 or auto"));
+        }
+    }
     if def.key == "PAPERLESS_ENABLE_UPDATE_CHECK"
         && let Parsed::Str(s) = p
         && s != "default"
@@ -158,6 +169,8 @@ pub fn from_json(def: &SettingDef, v: &Value) -> Result<String, ValueError> {
         (Ty::Bool, Value::Bool(b)) => if *b { "true" } else { "false" }.to_string(),
         (Ty::OnOff, Value::Bool(b)) => if *b { "on" } else { "off" }.to_string(),
         (Ty::Int { .. }, Value::Number(n)) if n.is_i64() || n.is_u64() => n.to_string(),
+        // number or `auto` (formerly an int setting; API clients may still send numbers)
+        (Ty::Str, Value::Number(n)) if def.key == "PAPERLESS_TASK_WORKERS" && (n.is_i64() || n.is_u64()) => n.to_string(),
         (Ty::Float { .. }, Value::Number(n)) => n.to_string(),
         (Ty::List, Value::Array(items)) => {
             let mut parts = Vec::new();
@@ -207,6 +220,17 @@ mod tests {
         assert!(parse(ch, "redo").is_ok() && parse(ch, "nope").is_err());
         let up = find("PAPERLESS_ENABLE_UPDATE_CHECK").unwrap();
         assert!(parse(up, "default").is_ok() && parse(up, "no").is_ok() && parse(up, "bla").is_err());
+        let tw = find("PAPERLESS_TASK_WORKERS").unwrap();
+        for ok in ["1", "4", "auto", "AUTO", " Auto "] {
+            assert!(parse(tw, ok).is_ok(), "{ok}");
+        }
+        for bad in ["0", "-1", "x", "autox", "1.5", ""] {
+            assert!(parse(tw, bad).is_err(), "{bad}");
+        }
+        assert!(parse(tw, "x").unwrap_err().message.contains("invalid literal for int() with base 10: 'x'"));
+        assert_eq!(from_json(tw, &Value::String("auto".into())).unwrap(), "auto");
+        assert_eq!(from_json(tw, &serde_json::json!(3)).unwrap(), "3");
+        assert!(from_json(tw, &serde_json::json!(0)).is_err());
     }
 
     #[test]

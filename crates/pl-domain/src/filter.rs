@@ -108,6 +108,18 @@ pub enum TagCond {
     Inbox,
 }
 
+/// Folder of the document (PaperRust folder view, side table `paperrust_document_folder`; no row =
+/// "Unsorted"). Always NULL-free (`EXISTS`), so `Not` is the plain complement.
+#[derive(Debug, Clone, PartialEq)]
+pub enum FolderCond {
+    /// document lies in one of these folders (`folder__id`, `folder__id__in`)
+    In(Vec<i64>),
+    /// document lies in one of these folders or one of their subfolders (`folder__id__tree`)
+    Tree(Vec<i64>),
+    /// document lies in any folder (`folder__isnull=false`; negated = "Unsorted")
+    Any,
+}
+
 /// Condition over any custom field instance of the document (incl. soft-deleted, like the
 /// JOIN in upstream).
 #[derive(Debug, Clone, PartialEq)]
@@ -313,6 +325,8 @@ pub enum Pred {
     HasDuplicates(bool),
     /// `owner = user_id` and any object share (`shared_by__id`).
     SharedBy(i64),
+    /// PaperRust folder view (`folder__*`, not in paperless-ngx).
+    Folder(FolderCond),
 }
 
 impl Pred {

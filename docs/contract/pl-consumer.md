@@ -490,6 +490,72 @@ Quelle fehlt, Ziel existiert), Rollback, leere Ordner löschen, Versionen der Wu
 
 23. **OCR-Sprache automatisch** (2026-11-21, `PAPERRUST_OCR_LANGUAGE_AUTO`, Standard aus; PaperRust-Erweiterung): nach der Texterkennung `langdetect` (jetzt in pl-parsers) auf den Text; bei ≥ 200 Buchstaben, Wahrscheinlichkeit ≥ 0,90, Sprache nicht eingestellt und installiert → zweite Erkennung mit dieser Sprache, deren Ergebnis zählt (Fehler → erstes Ergebnis). `native::auto_ocr_language`, Test `tests/ocr_language_auto.rs`. Messung: `results/benchmark/2026-11-21-ocr-lang`.
 
+24. **Several consume tasks in parallel** (2026-11-22; only with `PAPERLESS_TASK_WORKERS` > 1 or
+    `auto` – since 2026-11-23 the default is 1 again as upstream, pl-queue Known difference 16; the
+    fixes below stay active in every case). Upstream has the same windows with `TASK_WORKERS` > 1 but leaves
+    them open; PaperRust closes them:
+    - **ASN**: `AsnCheckPlugin` checks before parsing; two tasks with the same ASN could both pass.
+      The store transaction now starts with `claim_unique`: `pg_advisory_xact_lock` on
+      `paperrust:asn:<n>`, then the same lookup again. The second task waits for the first commit and
+      fails with the plugin's message/status (`asn_already_exists[_in_trash]`) instead of a raw
+      unique-constraint error (upstream: `IntegrityError`).
+    - **Duplicates** (only with `CONSUMER_DELETE_DUPLICATES`): same, lock on
+      `paperrust:checksum:<sha256 of the original>`; a duplicate found then is rejected exactly like
+      `pre_check_duplicate` (original deleted, `document_already_exists`). Without the setting
+      duplicates are stored anyway (upstream), so nothing is locked.
+    - **File names**: unchanged – unique names are chosen and written under `MEDIA_LOCK` (see
+      `medialock`), the DB columns are unique.
+    - **Tags from barcodes / sub-directories** (`db::get_or_create_tag`): lookup and insert in one
+      transaction under an advisory lock on `upper(name)` (upstream `get_or_create` can create the
+      tag twice under concurrency; `documents_tag` has no case-insensitive unique constraint).
+    - **Search index**: unchanged – every write takes the cross-process `.tantivy.lock` (pl-indexer);
+      a busy lock is retried and, when exhausted, deferred to `index_document` (countdown 60).
+    - **Classifier**: `FileClassifier` keeps the last loaded model (keyed by file mtime + size) and
+      shares it between tasks; upstream reads the file per document. Same predictions; one copy in
+      memory instead of one per task; reloaded as soon as training replaced the file.
+    - **Blocking file I/O** (working-copy copy, checksums, writing original/archive/thumbnail) runs
+      through `blocking_io` (`block_in_place` on the multi-threaded runtime) so that web requests in
+      the same process are moved to other runtime threads instead of waiting behind the disk.
+    Tests: `tests/e2e.rs` `e2e_concurrent_same_asn`, `e2e_concurrent_duplicates`,
+    `e2e_concurrent_same_filename`, `e2e_concurrent_get_or_create_tag` (database needed, `#[ignore]`);
+    unit tests `native::tests::classifier_cache_shares_and_reloads`,
+    `consumer::tests::blocking_io_all_runtimes`.
+
+25. **Duplicate check of shrunk files** (2026-11-23; PaperRust-only, upstream has no shrinking).
+    Upstream `ConsumerPreflightPlugin.pre_check_duplicate` compares the checksum of the *delivered*
+    file with `checksum`/`archive_checksum` of the existing documents, and `Document.checksum` is
+    the checksum of the *stored* file (`_store`: `unmodified_original` or `working_copy`). With
+    `PAPERRUST_SHRINK_ON_INGEST_MB` the stored file is the shrunk copy (`run_consumer`,
+    `o.shrunk` → `unmodified_original = None`), so its `checksum` differs from the delivered file and
+    uploading the same original again was **not** detected as a duplicate (also not by the
+    `claim_unique` re-check, whose lock key is the delivered file's checksum).
+    Fix: `documents_document.checksum` stays the checksum of the stored file (the sanity checker
+    compares them). Additionally, when the stored file is a shrunk copy with another checksum,
+    `store_all` writes the delivered file's checksum to the PaperRust table
+    `paperrust_source_checksum (document_id PK, checksum)` in the same transaction
+    (`source_checksum::record`, right after `_store`/version). `db::find_duplicates` (preflight and
+    `claim_unique`) matches `checksum = c OR archive_checksum = c` **UNION** documents with a
+    `paperrust_source_checksum` row for `c` (joined to `documents_document`, so trash counts as in
+    upstream and hard-deleted documents drop out); order and messages unchanged. The advisory-lock
+    protocol is unchanged (one key, `paperrust:checksum:<checksum of the delivered file>`, taken before
+    the lookup, held until COMMIT): concurrent tasks with the same original serialize on it and the
+    later one sees the committed source row. Table: migration `pl_consumer.0002_paperrust_source_checksum`
+    (expand-only, idempotent, in `workflow_ext::migrations::ALL`, which `paperrust manage migrate`
+    applies), also created on first use (`source_checksum::ensure_pool`, under an advisory lock). No
+    foreign key (from data model stage 1 on `documents_document` is a view); stale rows of hard-deleted
+    documents are ignored by the join and never match a new document (ids from a sequence).
+    Not changed, as upstream: a **pre-consume script** that modifies the working copy also makes the
+    stored `checksum` differ from the delivered file (upstream `pre_check_duplicate` has the same gap),
+    so the same original is not recognized as a duplicate then; no source row is written for it.
+    Limits: the table is not part of `document_exporter` yet (after export/import, shrunk documents are
+    found only by the checksum of the stored file); a file whose bytes equal another document's shrunk
+    copy *is* a duplicate of it (the stored checksum matches, as in upstream).
+    Tests: unit `source_checksum::tests::*`, `db::tests::duplicates_sql_matches_upstream_and_source_checksum`;
+    DB `tests/e2e.rs` `e2e_shrunk_original_is_duplicate` (real shrinking via `paperrust-pdftool`,
+    sequential re-upload → `Duplicate`, two identical originals at once → one stored, one duplicate;
+    fails without the fix). Formal model: `verification/parallel-ingest` (`Shrink`/`RecordSource`,
+    `Broken_shrink_no_source`).
+
 ## Tests
 
 - `cargo test -p pl-consumer -j 1` (lib, 23 Unit-Tests ohne DB): Overrides-`update`, JSON (B5),

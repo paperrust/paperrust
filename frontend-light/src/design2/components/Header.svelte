@@ -59,7 +59,7 @@
 
   <div class="actions">
     <input id="d2-upload-input" type="file" multiple class="d2-sr" tabindex="-1" aria-hidden="true" bind:this={fileInput} onchange={onFiles} />
-    <button class="d2-btn primary" id="d2-upload" onclick={() => fileInput.click()} aria-keyshortcuts="u">
+    <button class="d2-btn primary" id="d2-upload" onclick={() => fileInput.click()} aria-keyshortcuts="u" title={consumerStatus.folder ? t('m.folders.upload_into', { PH: consumerStatus.folder.name }) : undefined}>
       <Icon name="cloud-arrow-up" />{#if !ui.mobile}<span>{t('common.upload')}</span>{/if}
       {#if busy}<span class="d2-badge" aria-label={t('m.ui.in_progress', { PH: busy })}>{busy}</span>{/if}
     </button>

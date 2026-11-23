@@ -47,14 +47,21 @@ pub struct Shape {
     pub tables: Vec<Table>,
     /// documents_tag without the treenode columns (source with documents.0028 from paperless-ngx > 3.4.2)
     pub drop_tag_tree: bool,
+    /// documents_note with the `format` column (source with documents.0030 from paperless-ngx 3.5)
+    pub note_format: bool,
 }
 
 impl Shape {
-    pub fn v342(drop_tag_tree: bool) -> Result<Shape> {
+    pub fn v342(drop_tag_tree: bool, note_format: bool) -> Result<Shape> {
         let mut tables = schema::tables().map_err(|e| anyhow!(e))?;
         if drop_tag_tree {
             for t in tables.iter_mut().filter(|t| t.name == "documents_tag") {
                 t.columns.retain(|c| !schema::TREENODE_DERIVED.contains(&c.name.as_str()));
+            }
+        }
+        if note_format {
+            for t in tables.iter_mut().filter(|t| t.name == "documents_note") {
+                t.columns.push(schema::note_format_column());
             }
         }
         Ok(Shape {
@@ -64,7 +71,25 @@ impl Shape {
             post_raw: schema::POST_DATA,
             tables,
             drop_tag_tree,
+            note_format,
         })
+    }
+
+    /// DDL applied right after pre-data for sources newer than v3.4.2 (known migrations only).
+    pub fn newer_ddl(&self) -> Vec<String> {
+        let mut out = Vec::new();
+        if self.drop_tag_tree {
+            // like documents.0028 (paperless-ngx > 3.4.2) or PaperRust pl_objects.0001
+            let cols: Vec<String> = schema::TREENODE_DERIVED.iter().map(|c| format!("DROP COLUMN \"{c}\"")).collect();
+            out.push(format!("ALTER TABLE public.documents_tag {}", cols.join(", ")));
+        }
+        if self.note_format {
+            // exactly like documents.0030 on PostgreSQL (AddField with default, then the default is
+            // dropped); PaperRust's own migration sets the default again on `manage migrate`
+            out.push("ALTER TABLE public.documents_note ADD COLUMN \"format\" varchar(16) DEFAULT 'plain' NOT NULL".into());
+            out.push("ALTER TABLE public.documents_note ALTER COLUMN \"format\" DROP DEFAULT".into());
+        }
+        out
     }
 
     pub fn v220() -> Result<Shape> {
@@ -75,6 +100,7 @@ impl Shape {
             post_raw: schema::v220::POST_DATA,
             tables: schema::v220::tables().map_err(|e| anyhow!(e))?,
             drop_tag_tree: false,
+            note_format: false,
         })
     }
 }
@@ -246,7 +272,13 @@ async fn precheck_source(opts: &Options, report: &mut Report, src: &mut Source) 
             "Quelle stammt aus einer neueren paperless-ngx-Version als {} mit bekannten Migrationen {:?}: wird übernommen{}",
             schema::VERSION,
             mc.newer.iter().map(|(a, n)| format!("{a}.{n}")).collect::<Vec<_>>(),
-            if mc.tag_tree_dropped() { "; documents_tag ohne die treenode-Spalten (wie PaperRust pl_objects.0001)" } else { "" }
+            match (mc.tag_tree_dropped(), mc.note_format()) {
+                (true, true) =>
+                    "; documents_tag ohne die treenode-Spalten (wie PaperRust pl_objects.0001), documents_note mit Spalte format",
+                (true, false) => "; documents_tag ohne die treenode-Spalten (wie PaperRust pl_objects.0001)",
+                (false, true) => "; documents_note mit Spalte format",
+                (false, false) => "",
+            }
         ));
     }
     if v2 && mc.foreign_apps.iter().all(|(a, _)| a == "django_celery_results") {
@@ -283,7 +315,7 @@ async fn precheck_source(opts: &Options, report: &mut Report, src: &mut Source) 
     if v2 {
         return precheck_v2(opts, report, src, std::mem::take(&mut plan)).await;
     }
-    let shape = Shape::v342(mc.tag_tree_dropped())?;
+    let shape = Shape::v342(mc.tag_tree_dropped(), mc.note_format())?;
     let tables: &[Table] = &shape.tables;
     if !plan.is_empty() {
         report.catchup = plan.names();
@@ -635,10 +667,8 @@ async fn migrate(
         eprintln!("Schema v{} anlegen (Tabellen, Sequenzen) …", prep.shape.version);
     }
     sqlx::raw_sql(prep.shape.pre).execute(&mut *tx).await.context("Anlegen des Schemas (pre-data) fehlgeschlagen")?;
-    if prep.shape.drop_tag_tree {
-        // like documents.0028 (paperless-ngx > 3.4.2) or PaperRust pl_objects.0001
-        let cols: Vec<String> = schema::TREENODE_DERIVED.iter().map(|c| format!("DROP COLUMN \"{c}\"")).collect();
-        sqlx::raw_sql(&format!("ALTER TABLE public.documents_tag {}", cols.join(", "))).execute(&mut *tx).await?;
+    for ddl in prep.shape.newer_ddl() {
+        sqlx::raw_sql(&ddl).execute(&mut *tx).await?;
     }
     check_target_structure(&mut tx, tables, report).await?;
     if !report.problems.is_empty() {
@@ -923,5 +953,45 @@ mod tests {
         let (c, i) = super::post_data_objects();
         assert!(c.iter().any(|x| x == "documents_document_pkey"), "PK-Constraint fehlt in post-data");
         assert!(!i.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod shape_tests {
+    use super::*;
+
+    /// paperless-ngx 3.5.x source (documents.0028–0030): the expected copy schema is the v3.4.2
+    /// snapshot with documents.0028 and documents.0030 applied.
+    #[test]
+    fn v351_shape_is_v342_plus_0028_and_0030() {
+        let base = Shape::v342(false, false).unwrap();
+        assert!(base.newer_ddl().is_empty());
+        let s = Shape::v342(true, true).unwrap();
+        let note = s.tables.iter().find(|t| t.name == "documents_note").unwrap();
+        let last = note.columns.last().unwrap();
+        assert_eq!((last.name.as_str(), last.udt.as_str(), last.max_len, last.nullable), ("format", "varchar", Some(16), false));
+        assert_eq!(note.copy_columns().len(), base.tables.iter().find(|t| t.name == "documents_note").unwrap().copy_columns().len() + 1);
+        let tag = s.tables.iter().find(|t| t.name == "documents_tag").unwrap();
+        assert!(tag.columns.iter().all(|c| !schema::TREENODE_DERIVED.contains(&c.name.as_str())));
+        assert!(tag.columns.iter().any(|c| c.name == "tn_parent_id"));
+        let ddl = s.newer_ddl();
+        assert_eq!(ddl.len(), 3);
+        assert!(ddl[0].starts_with("ALTER TABLE public.documents_tag DROP COLUMN \"tn_ancestors_pks\""));
+        assert!(ddl[1].contains("ADD COLUMN \"format\" varchar(16) DEFAULT 'plain' NOT NULL"));
+        assert!(ddl[2].ends_with("DROP DEFAULT"));
+        // the pre-data snapshot itself is v3.4.2 (no format column yet)
+        assert!(!schema::PRE_DATA.contains("format character varying(16)"));
+    }
+
+    #[test]
+    fn v351_migration_set_is_accepted() {
+        let mut src = schema::expected_migrations();
+        for (a, n) in schema::KNOWN_NEWER {
+            src.insert((a.to_string(), n.to_string()));
+        }
+        let mc = schema::check_migrations(&src);
+        assert!(mc.ok() && mc.tag_tree_dropped() && mc.note_format(), "{mc:?}");
+        let s = Shape::v342(mc.tag_tree_dropped(), mc.note_format()).unwrap();
+        assert!(s.note_format && s.drop_tag_tree);
     }
 }

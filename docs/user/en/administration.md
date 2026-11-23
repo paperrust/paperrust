@@ -342,7 +342,9 @@ PaperRust needs no extra services for background work – no Celery, no Redis. W
 - When PaperRust restarts, no task is lost; open tasks are worked off afterwards.
 - If a worker stops in the middle of a task, the task is handed out again – at most
   `PAPERRUST_QUEUE_MAX_DELIVERIES` times (default 3). After that it counts as failed.
-- `PAPERRUST_TASK_WORKERS` sets how many tasks run at the same time (default 1); a single task may
+- `PAPERRUST_TASK_WORKERS` sets how many tasks run at the same time (default 1, so a single
+  document gets all cores; `auto` picks from cores and memory, e.g. 2 on 4 cores; the startup log
+  shows the value); a single task may
   take at most `PAPERRUST_WORKER_TIMEOUT` seconds (default 1800).
 
 Running and finished tasks are shown under *Tasks* and in the *System status* dialog.

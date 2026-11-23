@@ -9,7 +9,7 @@
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::Arc;
-use std::time::Duration as StdDuration;
+use std::time::{Duration as StdDuration, Instant};
 
 use chrono::Utc;
 use futures::future::BoxFuture;
@@ -135,6 +135,61 @@ impl Handlers {
     }
 }
 
+/// `Duration` from seconds without panicking on NaN/negative/huge values (falls back to `min`).
+fn secs_or(v: f64, min: f64) -> StdDuration {
+    StdDuration::try_from_secs_f64(v.max(min)).unwrap_or(StdDuration::from_secs_f64(min))
+}
+
+/// Lease timing of one running job (pure; `Instant`s are passed in so it is unit-testable).
+///
+/// The lease lasts `visibility` from the moment a claim/heartbeat/`mark_started` was **sent** (the
+/// SQL writes `locked_until = <client now> + visibility`). The runner may only execute while it can
+/// prove its lease with a margin: until `fence` = 80 % of the visibility after the send time of the
+/// last successful lease write (`last_ok`). The remaining 20 % cover clock skew between worker hosts
+/// (contract B3.8). TLA+ finding F1: this deadline is enforced by its own timer, independent of
+/// heartbeat attempts (before, it was only checked after an attempt, i.e. every visibility/3, so a
+/// heartbeat failing at once let the runner live until 100 %).
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct LeaseTiming {
+    /// Self-fence: 0.8 × visibility after `last_ok`.
+    fence: StdDuration,
+    /// Heartbeat period after a successful lease write: visibility/3.
+    every: StdDuration,
+    /// Next attempt after a failed/timed-out heartbeat: visibility/15 (several retries fit into the
+    /// fence budget; the fence timer still stops the runner when none succeeds).
+    retry: StdDuration,
+}
+
+impl LeaseTiming {
+    fn new(visibility_secs: f64) -> Self {
+        Self {
+            fence: secs_or(visibility_secs * 0.8, 0.08),
+            every: secs_or(visibility_secs / 3.0, 0.1),
+            retry: secs_or(visibility_secs / 15.0, 0.05),
+        }
+    }
+    /// When the runner must stop at the latest.
+    fn fence_at(&self, last_ok: Instant) -> Instant {
+        last_ok + self.fence
+    }
+    /// The lease is provably valid (with margin) at `now`.
+    fn valid(&self, last_ok: Instant, now: Instant) -> bool {
+        now < self.fence_at(last_ok)
+    }
+    /// Time left for a lease write started at `now` (its `timeout`).
+    fn budget(&self, last_ok: Instant, now: Instant) -> StdDuration {
+        self.fence_at(last_ok).saturating_duration_since(now)
+    }
+    /// Next heartbeat after a successful lease write sent at `sent`.
+    fn next_after_ok(&self, sent: Instant) -> Instant {
+        sent + self.every
+    }
+    /// Next heartbeat after a failed attempt that returned at `now`.
+    fn next_after_fail(&self, now: Instant) -> Instant {
+        now + self.retry
+    }
+}
+
 /// Python `repr` of a number for `TimeLimitExceeded(<n>,)`.
 fn py_num(v: f64) -> String {
     if v.fract() == 0.0 && v.abs() < 1e15 { format!("{}", v as i64) } else { pl_core::json::python_float_repr(v) }
@@ -228,7 +283,7 @@ impl Worker {
                 if crate::backoff::is_undefined_table(&e) {
                     // Table missing (DB recreated?): the migration is idempotent → apply it again.
                     match crate::migrations::apply(self.queue.pool()).await {
-                        Ok(()) => tracing::warn!("task queue tables were missing; migration 0001 applied again"),
+                        Ok(()) => tracing::warn!("task queue tables were missing; task queue migrations applied again"),
                         Err(me) => tracing::error!(error = %me, "re-applying the task queue migration failed"),
                     }
                 }
@@ -362,7 +417,49 @@ impl JobRunner {
             self.queue.release(job).await?;
             return Ok(());
         };
-        self.queue.mark_started(job).await;
+        // Lease timing (F1/F2): `last_ok` = send time of the last successful lease write, starting
+        // with the claim's.
+        let timing = LeaseTiming::new(self.cfg.visibility_timeout_secs);
+        let vis = self.cfg.visibility_timeout_secs;
+        let mut last_ok = job.claimed_at;
+        let sent = Instant::now();
+        if !timing.valid(last_ok, sent) {
+            // Paused between claim and start (pool wait, suspended VM, ...): another worker may own
+            // the task already. Do not start; the cleaner hands it out again (at-least-once).
+            tracing::warn!(task_id = %job.task_id, "lease not provable before start; task not executed");
+            return Ok(());
+        }
+        // F2: `mark_started` is fenced and extends the lease; the handler only starts if this
+        // delivery still owns the row.
+        let mut next_hb = match tokio::time::timeout(timing.budget(last_ok, sent), self.queue.mark_started(job, vis)).await {
+            Ok(Ok(Heartbeat::Ok)) => {
+                last_ok = sent;
+                timing.next_after_ok(sent)
+            }
+            Ok(Ok(Heartbeat::Terminate)) => {
+                // revoke(terminate=True) arrived between claim and start: do not run.
+                self.queue.revoke_job(job, RevokeReason::Terminated).await?;
+                return Ok(());
+            }
+            Ok(Ok(Heartbeat::Lost)) => {
+                tracing::warn!(task_id = %job.task_id, "lease lost before start (another worker owns the task now); task not executed");
+                return Ok(());
+            }
+            Ok(Err(e)) => {
+                // Nothing written (or a fenced write that held the lease); the claim's lease still
+                // counts, the fence timer below stops the run if no heartbeat succeeds.
+                tracing::error!(error = %e, task_id = %job.task_id, "Setting PaperlessTask started failed");
+                timing.next_after_fail(Instant::now())
+            }
+            Err(_) => {
+                tracing::warn!(task_id = %job.task_id, "lease not provable before start (mark_started timed out); task not executed");
+                return Ok(());
+            }
+        };
+        if !timing.valid(last_ok, Instant::now()) {
+            tracing::warn!(task_id = %job.task_id, "lease not provable before start; task not executed");
+            return Ok(());
+        }
         let ctx = TaskContext {
             task_id: job.task_id.clone(),
             task_name: job.task_name.clone(),
@@ -375,17 +472,14 @@ impl JobRunner {
         };
         let mut handle = tokio::spawn(reg.handler.call(ctx));
         let limit = job.time_limit.filter(|t| t.is_finite() && *t > 0.0).unwrap_or(self.cfg.time_limit_secs);
-        let deadline = tokio::time::sleep(StdDuration::from_secs_f64(limit));
+        let deadline = tokio::time::sleep(secs_or(limit, 0.0));
         tokio::pin!(deadline);
-        let mut hb = tokio::time::interval(StdDuration::from_secs_f64((self.cfg.visibility_timeout_secs / 3.0).max(0.1)));
-        hb.tick().await;
         let mut abort = self.abort.clone();
-        // Self-fencing: without a successful heartbeat within 80 % of the lease the
-        // worker aborts itself before another worker can take over the job (e.g. DB not
-        // reachable) – otherwise the task would run twice.
-        let lease = StdDuration::from_secs_f64(self.cfg.visibility_timeout_secs * 0.8);
-        let mut last_ok = job.claimed_at;
         let outcome = loop {
+            // Self-fencing (F1): own timer at `last_ok + 80 %`, armed anew whenever `last_ok`
+            // moves; it fires even while heartbeats keep failing at once.
+            let fence_at = tokio::time::Instant::from_std(timing.fence_at(last_ok));
+            let hb_at = tokio::time::Instant::from_std(next_hb);
             tokio::select! {
                 r = &mut handle => {
                     break match r {
@@ -401,17 +495,27 @@ impl JobRunner {
                     };
                 }
                 _ = &mut deadline => { handle.abort(); break Outcome::TimeLimit(limit); }
-                _ = hb.tick() => {
-                    let sent = std::time::Instant::now();
-                    let budget = lease.saturating_sub(last_ok.elapsed());
-                    match tokio::time::timeout(budget, self.queue.heartbeat(job, self.cfg.visibility_timeout_secs)).await {
-                        Ok(Ok(Heartbeat::Ok)) => last_ok = sent,
+                _ = tokio::time::sleep_until(fence_at) => { handle.abort(); break Outcome::Lost; }
+                _ = tokio::time::sleep_until(hb_at) => {
+                    let sent = Instant::now();
+                    // A hanging heartbeat ends exactly at the fence deadline.
+                    match tokio::time::timeout(timing.budget(last_ok, sent), self.queue.heartbeat(job, vis)).await {
+                        Ok(Ok(Heartbeat::Ok)) => {
+                            last_ok = sent;
+                            next_hb = timing.next_after_ok(sent);
+                        }
                         Ok(Ok(Heartbeat::Terminate)) => { handle.abort(); break Outcome::Terminated; }
                         Ok(Ok(Heartbeat::Lost)) => { handle.abort(); break Outcome::Lost; }
-                        Ok(Err(e)) => tracing::warn!(error = %e, task_id = %job.task_id, "heartbeat failed"),
-                        Err(_) => tracing::warn!(task_id = %job.task_id, "heartbeat timed out"),
+                        Ok(Err(e)) => {
+                            tracing::warn!(error = %e, task_id = %job.task_id, "heartbeat failed");
+                            next_hb = timing.next_after_fail(Instant::now());
+                        }
+                        Err(_) => {
+                            tracing::warn!(task_id = %job.task_id, "heartbeat timed out");
+                            next_hb = timing.next_after_fail(Instant::now());
+                        }
                     }
-                    if last_ok.elapsed() >= lease {
+                    if !timing.valid(last_ok, Instant::now()) {
                         handle.abort();
                         break Outcome::Lost;
                     }
@@ -472,6 +576,67 @@ impl JobRunner {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn timing60() -> LeaseTiming {
+        LeaseTiming::new(60.0)
+    }
+
+    #[test]
+    fn lease_timing_defaults() {
+        let t = timing60();
+        assert_eq!(t.fence, StdDuration::from_secs(48));
+        assert_eq!(t.every, StdDuration::from_secs(20));
+        assert_eq!(t.retry, StdDuration::from_secs(4));
+        // Degenerate values never panic and stay positive.
+        for v in [0.0, -1.0, f64::NAN, f64::INFINITY, 1e300] {
+            let t = LeaseTiming::new(v);
+            assert!(t.fence > StdDuration::ZERO && t.every > StdDuration::ZERO && t.retry > StdDuration::ZERO, "{v}");
+        }
+    }
+
+    #[test]
+    fn fence_deadline_is_80_percent_after_last_success() {
+        let t = timing60();
+        let claim = Instant::now();
+        assert!(t.valid(claim, claim + StdDuration::from_secs(47)));
+        assert!(!t.valid(claim, claim + StdDuration::from_secs(48)));
+        assert_eq!(t.budget(claim, claim + StdDuration::from_secs(40)), StdDuration::from_secs(8));
+        assert_eq!(t.budget(claim, claim + StdDuration::from_secs(50)), StdDuration::ZERO);
+        // A success moves the deadline to its send time + 80 %.
+        let hb = claim + StdDuration::from_secs(20);
+        assert_eq!(t.fence_at(hb), claim + StdDuration::from_secs(68));
+        assert_eq!(t.next_after_ok(hb), claim + StdDuration::from_secs(40));
+    }
+
+    /// F1 regression: heartbeats that fail at once (t = 20 s, 40 s) must not let the runner live
+    /// past 80 % of the lease; the old code checked only after attempts (20/40/60 s) and stopped at
+    /// 60 s = 100 %. Simulates the select loop: the runner stops at the first event at which the
+    /// fence timer is due.
+    #[test]
+    fn fast_failing_heartbeats_stop_at_the_fence_not_at_lease_end() {
+        let t = timing60();
+        let claim = Instant::now();
+        let last_ok = claim;
+        let mut next_hb = t.next_after_ok(claim);
+        let mut attempts = Vec::new();
+        let stop = loop {
+            let fence_at = t.fence_at(last_ok);
+            if fence_at <= next_hb {
+                break fence_at;
+            }
+            let now = next_hb; // attempt fails at once
+            attempts.push(now - claim);
+            next_hb = t.next_after_fail(now);
+        };
+        assert_eq!(stop - claim, StdDuration::from_secs(48));
+        // Retries every 4 s after the first failure: 20, 24, ..., 44 s.
+        assert_eq!(attempts.first(), Some(&StdDuration::from_secs(20)));
+        assert_eq!(attempts.last(), Some(&StdDuration::from_secs(44)));
+        assert_eq!(attempts.len(), 7);
+        // Another host may reap only after 60 s minus its clock skew; with skew < 20 % (12 s) that
+        // is strictly after 48 s.
+        assert!(stop - claim < StdDuration::from_secs(60 - 12) + StdDuration::from_millis(1));
+    }
 
     #[test]
     fn time_limit_text() {

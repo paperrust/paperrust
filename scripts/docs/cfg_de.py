@@ -138,7 +138,7 @@ D = {
  "PAPERLESS_OCR_MAX_IMAGE_PIXELS": ("– (Pillow-Standard)", "Pixelgrenze: darüber Warnung, ab der doppelten Grenze keine OCR des Bildes; `0` schaltet die Grenze ab (Schutz vor bösartigen Dateien)."),
  "PAPERLESS_OCR_COLOR_CONVERSION_STRATEGY": ("–", "Ghostscript-Farbumwandlung beim Erzeugen eines PDF/A-Archivs: `CMYK`, `Gray`, `LeaveColorUnchanged`, `RGB` oder `UseDeviceIndependentColor`."),
  "PAPERLESS_OCR_USER_ARGS": ("–", "Zusätzliche OCRmyPDF-Optionen als JSON (Unterstriche statt Bindestrichen). Nur für vertrauenswürdige Benutzer."),
- "PAPERLESS_TASK_WORKERS": ("`1`", "Anzahl paralleler Hintergrundaufgaben (Einlesen, Mail, Index, Klassifikator)."),
+ "PAPERLESS_TASK_WORKERS": ("`1`", "Anzahl paralleler Hintergrundaufgaben (Einlesen, Mail, Index, Klassifikator); Standard 1 wie paperless-ngx (ein Dokument bekommt alle Kerne). `auto`: Kerne ÷ 2 (aufgerundet; mit gesetztem `PAPERLESS_THREADS_PER_WORKER`: Kerne ÷ diesem Wert), höchstens 4, bei wenig freiem Speicher weniger – schneller bei großen Stapeln, langsamer für ein einzelnes Dokument."),
  "PAPERLESS_THREADS_PER_WORKER": ("`max(floor(CPU-Kerne / TASK_WORKERS), 1)`", "Seiten, die beim Einlesen eines Dokuments parallel per OCR erkannt werden. Produkt mit `PAPERLESS_TASK_WORKERS` ≤ Anzahl Kerne halten."),
  "PAPERLESS_WORKER_TIMEOUT": ("`1800` s", "Zeitlimit einer Aufgabe in Sekunden; auf schwacher Hardware erhöhen."),
  "PAPERLESS_TIME_ZONE": ("`UTC`", "Zeitzone der Installation (z. B. `Europe/Zurich`)."),
