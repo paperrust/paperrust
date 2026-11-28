@@ -31,7 +31,7 @@ passt, hängt davon ab, ob schon ein paperless-ngx läuft.
   Dateien für Anmeldeseiten und API-Ansicht (siehe [Statische Dateien](#static-files)).
 - Nicht nötig: Python, Redis/Valkey, Celery, Tika, Gotenberg, OCRmyPDF, Ghostscript.
 
-Arbeitsspeicher (gemessen am 2026-11-20, Docker auf einem Jetson Orin Nano, mit Worker): frisch
+Arbeitsspeicher (gemessen am 2026-11-20, Docker auf einem kleinen arm64-Rechner, mit Worker): frisch
 gestartet 74 MiB für PaperRust plus 64 MiB für PostgreSQL; im Leerlauf nach dem Einlesen von
 230 Dokumenten 420 + 74 MiB; Spitze beim Einlesen 800 MiB für PaperRust. Für ein kleines Archiv
 reichen 2 GB RAM für das ganze Gerät; Einzelheiten in den
@@ -187,7 +187,7 @@ paperless-ngx werden danach nicht mehr gebraucht und können weg.
 
 Ein Container-Image wird aus diesem Repository gebaut (`docker/Dockerfile`); veröffentlicht ist
 es **noch nicht** (geplant: `paperrust/paperrust`). Stand: für Linux arm64 gebaut und auf einem
-Jetson Orin geprüft und gemessen; amd64 wird gleich gebaut und wurde eigens im Rauchtest geprüft (Start, Upload, Texterkennung, Suche, Export, Konsistenz; 2026-11-20).
+arm64-Testgerät geprüft und gemessen; amd64 wird gleich gebaut und wurde eigens im Rauchtest geprüft (Start, Upload, Texterkennung, Suche, Export, Konsistenz; 2026-11-20).
 
 ```sh
 git submodule update --init

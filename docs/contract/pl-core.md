@@ -489,7 +489,7 @@ Known difference: keine (Django hat keinen Pool).
 
 ## Speicher-Befund 2026-11-18: Pool-Verbindungen schließen
 
-Quelle: Jetson-Benchmark `results/benchmark/2026-11-18-jetson` (PostgreSQL nach dem Einlesen 147 MiB PSS,
+Quelle: arm64-Benchmark `results/benchmark/2026-11-18-arm64` (PostgreSQL nach dem Einlesen 147 MiB PSS,
 davon 95,6 MiB anon, gegen 50 / 11,6 MiB bei paperless-ngx). Ursache: jede offene Verbindung ist ein
 PostgreSQL-Prozess, der nach Arbeit Katalog-/Plan-Caches und vorbereitete Anweisungen behält (~8 MiB);
 Django schließt nach jeder Anfrage (`CONN_MAX_AGE=0`). Lokal nach dem Einlesen 11–12 Backends, die nie

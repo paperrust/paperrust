@@ -943,7 +943,7 @@ impl NativeOcrmypdf {
                 }
             },
             // OCR on our own grayscale (ITU-R 601 luma) like PDF pages, not on color: Tesseract's
-            // internal color→gray weighting made photos fragile (Jetson check 2026-11-21: deskewed
+            // internal color→gray weighting made photos fragile (photo check 2026-11-21: deskewed
             // phone photo lost the umlaut dots of one word on color input, gray input was stable at
             // every angle). Visible/archive image stays in color; gray is also less data to recognize.
             |i, (engine, shown)| self.ocr_raster(engine, opts, shown, &format!("page-{:04}", i + 1), true),

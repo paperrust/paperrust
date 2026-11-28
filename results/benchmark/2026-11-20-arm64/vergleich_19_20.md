@@ -1,6 +1,6 @@
 # PaperRust 19.11. (5f5de7c) gegen 20.11. (e546b8f)
 
-Gleiches Gerät und Messprogramm, je eine Runde. Werte aus `../2026-11-19-jetson/tabellen.md` und `tabellen.md`
+Gleiches Gerät und Messprogramm, je eine Runde. Werte aus `../2026-11-19-arm64/tabellen.md` und `tabellen.md`
 (PaperRust-Spalte), Zusatzwerte aus `rohdaten.json` (19.11.) bzw. `raw/run_1_rs.json` (20.11.). Änderung in %
 bezogen auf den 19.11.; bei Zeiten und Speicher ist **minus besser**. Mehr als 10 % schlechter ist als
 **Regression** markiert. Commits dazwischen: 15 (`git log 5f5de7c..e546b8f`), leistungsrelevant davon vor allem

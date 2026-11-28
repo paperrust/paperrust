@@ -29,7 +29,7 @@ one fits depends on whether a paperless-ngx installation already exists.
   repair, Office→PDF ([PDF tools](pdf-tools.md)). Without it these functions are unavailable.
 - Not needed: Python, Redis/Valkey, Celery, Tika, Gotenberg, OCRmyPDF, Ghostscript.
 
-Memory (measured on 2026-11-20, Docker on a Jetson Orin Nano, with worker): right after starting
+Memory (measured on 2026-11-20, Docker on a small arm64 board, with worker): right after starting
 74 MiB for PaperRust plus 64 MiB for PostgreSQL; idle after consuming 230 documents 420 + 74 MiB;
 peak while consuming 800 MiB for PaperRust. For a small archive, 2 GB RAM for the whole device is
 enough; details in the [release notes](../../RELEASE-NOTES-0.1.0.en.md#performance).
@@ -182,8 +182,8 @@ paperless-ngx Celery workers are no longer needed afterwards and can be removed.
 ## Docker
 
 A container image is built from this repository (`docker/Dockerfile`); it is **not published
-yet** (planned: `paperrust/paperrust`). Status: built for Linux arm64 and checked and measured on a
-Jetson Orin; amd64 was built the same way and smoke-tested on its own (start, upload, OCR, search, export, sanity check; 2026-11-20).
+yet** (planned: `paperrust/paperrust`). Status: built for Linux arm64 and checked and measured on an
+arm64 test board; amd64 was built the same way and smoke-tested on its own (start, upload, OCR, search, export, sanity check; 2026-11-20).
 
 ```sh
 git submodule update --init

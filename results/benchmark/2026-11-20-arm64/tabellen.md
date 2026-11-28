@@ -68,7 +68,7 @@
 | RAM-Spitze Datenbank [MiB] | 51 | 52 | 115 | 2.3× schlechter | 2.2× schlechter |
 | CPU-Spitze [Kerne, 10-s-Mittel, max. 4] | 1.69 | 1.31 | 1.07 | 1.6× besser | 1.2× besser |
 | CPU-Zeit Import, Dienste [CPU-s] | 1389 | 1611 | 98 | 14.2× besser | 16.4× besser |
-| Kleinster freier RAM des Jetson [MB] | 5146 | 5580 | 5547 | ≈ gleich (1.08×) | ≈ gleich (0.99×) |
+| Kleinster freier RAM des Testgeräts [MB] | 5146 | 5580 | 5547 | ≈ gleich (1.08×) | ≈ gleich (0.99×) |
 | OCR-Wortquote der 30 Scans, Median [%] | 100.0 | 100.0 | 100.0 | ≈ gleich (1.00×) | ≈ gleich (1.00×) |
 | Massenbearbeitung: Tag an alle, Median [ms] | 674 | 661 | 177 | 3.8× besser | 3.7× besser |
 | Massenbearbeitung: p95 [ms] | 750 | 694 | 192 | 3.9× besser | 3.6× besser |

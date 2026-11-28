@@ -1,6 +1,6 @@
-# Benchmark paperless-ngx 3.4.2 gegen PaperRust (Jetson Orin Nano)
+# Benchmark paperless-ngx 3.4.2 gegen PaperRust (kleiner arm64-Rechner)
 
-Ergebnis vom 2026-11-18: `results/benchmark/2026-11-18-jetson/bericht.md` (Rohdaten daneben).
+Ergebnis vom 2026-11-18: `results/benchmark/2026-11-18-arm64/bericht.md` (Rohdaten daneben).
 
 ## Aufstellungen
 
@@ -26,7 +26,7 @@ frische Volumes je Lauf, Container auf Kernen 0–3, Messprogramm auf 4–5.
 | `run_all.sh` | Warteschlange aller Runden mit wechselnder Reihenfolge, hält die Sperre, wartet auf fremde Rechenjobs |
 | `summarize.py` | Tabellen (Median, Spannweite, Faktor gegen jede ngx-Aufstellung) und `rohdaten.json` |
 
-## Wiederholen (auf dem Jetson, Arbeitsordner `~/prbench`)
+## Wiederholen (auf dem Testgerät, Arbeitsordner `~/prbench`)
 
 ```sh
 # Quelle: git archive <commit> + upstream/{LICENSE,src/documents/static,src/documents/resources} nach ~/prbench/src

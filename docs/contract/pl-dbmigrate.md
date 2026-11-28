@@ -301,7 +301,7 @@ KI-Vektorindex.
 
 ## Known differences
 
-00. **Export aus paperless-ngx 1.x wird vorab abgelehnt** (Jetson-Prüfung B2, 2026-11-19): Version
+00. **Export aus paperless-ngx 1.x wird vorab abgelehnt** (arm64-Prüfung B2, 2026-11-19): Version
     `1.*`/`0.*` in `metadata.json` oder (ohne Version) Feld `storage_type` im Manifest → Schritt FAIL
     „Version“, nichts verändert, Hinweis auf den Weg über ngx 2.20. Upstream warnt nur („Version
     mismatch“) und bricht dann im Import ab (`document has no field named 'storage_type'`). Test

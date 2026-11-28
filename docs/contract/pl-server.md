@@ -783,7 +783,7 @@ Quelle: tests/stress/BEFUNDE.md.
 - **B8:** `bulk_update_documents` schreibt den Index über `Indexer::add_or_update_ids_task`
   (mit Wiederholung); vorübergehende Index-Fehler werden zu `retry` (OSError, 60 s) statt endgültig.
 
-## Speicher-Befund 2026-11-18 (Jetson-Benchmark)
+## Speicher-Befund 2026-11-18 (arm64-Benchmark)
 
 - `search_sync`: prüft die Migration `pl_indexer.0001_paperrust_search_dirty` nur noch bis zum ersten
   Erfolg (vorher jede Sekunde `to_regclass`), nach einem Fehler von `drain_once` wieder. Halbiert die
@@ -795,7 +795,7 @@ Quelle: tests/stress/BEFUNDE.md.
 
 ## Grundspeicher nach dem ersten Einlesen (2026-11-18)
 
-Frage: Was hält der Prozess nach dem ersten Einlesen fest (Jetson: 103 MiB frisch, ~170–200 MiB danach)?
+Frage: Was hält der Prozess nach dem ersten Einlesen fest (Testgerät: 103 MiB frisch, ~170–200 MiB danach)?
 Messung (a) Rust-Heap je Baustein mit zählendem Allokator (Hilfsprogramm, Debug-Build, Windows; lebende
 Bytes nach dem Aufruf), (b) ganzer Prozess (Debug-Build, Windows, `serve --worker`, Ablauf: frisch →
 Text-PDF + Textdatei mit Datumsangaben einlesen → 40 s Leerlauf → Dokument, Metadaten, Vorschläge, Suche,
@@ -833,9 +833,9 @@ Geändert:
 
 Bewusst behalten (Geschwindigkeit vor Speicher): übersetzte Sprachdaten je benutzter Sprache (sonst je
 Dokument neu übersetzen, ~0,1–0,5 s), das zwischengespeicherte Klassifikator-Modell der Vorschläge, der
-Suchindex-Leser, geladene PDFium-Bibliothek. Nicht gemessen: Release-Build, Linux/Jetson (PSS), Tesseract
-(hier nicht installiert; wird nach `PAPERRUST_OCR_ENGINE_IDLE_SECS` freigegeben). Die Jetson-Zahl
-170–200 MiB ist mit einem Lauf von `tools/bench-jetson` auf dem neuen Stand nachzuprüfen.
+Suchindex-Leser, geladene PDFium-Bibliothek. Nicht gemessen: Release-Build, Linux/arm64 (PSS), Tesseract
+(hier nicht installiert; wird nach `PAPERRUST_OCR_ENGINE_IDLE_SECS` freigegeben). Die arm64-Zahl
+170–200 MiB ist mit einem Lauf von `tools/bench-arm64` auf dem neuen Stand nachzuprüfen.
 
 ## Ausfall-Befund C1 (tests/chaos, 2026-11-18)
 

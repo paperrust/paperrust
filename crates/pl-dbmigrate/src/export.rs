@@ -92,7 +92,7 @@ impl ExportSource {
         }
     }
 
-    /// Does the export come from paperless-ngx 1.x (or paperless-ng)? Jetson check B2: such exports
+    /// Does the export come from paperless-ngx 1.x (or paperless-ng)? migration check B2: such exports
     /// contain fields that no longer exist from ngx 2.0 on (`storage_type`); the import then aborts
     /// in the middle of loading (upstream ngx 3.x likewise). Detection via the version in `metadata.json`,
     /// without a version via the field in the manifest.
@@ -288,7 +288,7 @@ mod tests {
   "__exported_file_name__":"originals/0000007.pdf","__exported_thumbnail_name__":"thumbnails/0000007.webp"}
 ]"#;
 
-    /// Jetson check B2: detect an export from ngx 1.x (with and without metadata.json).
+    /// migration check B2: detect an export from ngx 1.x (with and without metadata.json).
     #[test]
     fn detects_v1_exports() {
         let d = tempfile::tempdir().unwrap();

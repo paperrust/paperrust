@@ -22,8 +22,8 @@ Rohdaten: `rohdaten.json` (Zusammenfassung aller Läufe) und `raw/` (Dateiliste 
 - **Bedienen:** 1, 5 und 10 Personen gleichzeitig: Median 5–6 ms (ngx 53–61 ms), 95 % schneller als 20 / 19 /
   43 ms (ngx minimal 441 / 181 / 292 ms). Keine Fehler.
 - **Schwächer als erwartet:** Während des Stapel-Imports antwortete PaperRust zwar im Median schneller (10 statt
-  104 ms), aber 95 % erst unter **439 ms** (ngx 146–151 ms; Jetson am 20.11.: 32 ms). Auch der langsamste 1 % mit
-  5 und 10 Personen (256 / 345 ms) liegt deutlich über dem Jetson. Ursache nicht untersucht (Verdacht: Schreiben
+  104 ms), aber 95 % erst unter **439 ms** (ngx 146–151 ms; Testgerät am 20.11.: 32 ms). Auch der langsamste 1 % mit
+  5 und 10 Personen (256 / 345 ms) liegt deutlich über dem Testgerät. Ursache nicht untersucht (Verdacht: Schreiben
   auf die microSD-Karte), siehe „Auffälligkeiten“.
 
 ## Gerät und Aufbau
@@ -53,7 +53,7 @@ Word-Unterstützung, spart sich aber das Säubern und ist deshalb bei Scans schn
 
 ## Methode
 
-- Messprogramm `results/release/tools/bench.py` (gleich wie bei den Jetson-Messungen), Testdokumente gleich erzeugt
+- Messprogramm `results/release/tools/bench.py` (gleich wie bei den arm64-Messungen), Testdokumente gleich erzeugt
   (`gen_docs.py`): 200 PDFs mit Text, 30 Bild-Scans (200 dpi, leichtes Rauschen, 1–4,5° schief), 25 Einzeldokumente.
 - Ablauf je System: Erststart → 3 Neustarts → S1 Leerlauf 10 min → S7 Einzeldokumente nacheinander → S4 Import von
   230 Dokumenten auf einmal (dabei jede Sekunde Liste/Suche) → Massenbearbeitung → S6 Leerlauf mit Dokumenten
@@ -119,7 +119,7 @@ Suche (ein „Prüfnutzer“).
 | Fehler (Serverfehler, Zeitüberschreitung) | 0 | 0 | 0 | |
 | Aufgaben laut Server | 256 erfolgreich, 1 „REVOKED“ | 260 erfolgreich, 1 „REVOKED“ | 259 erfolgreich | |
 
-Die „REVOKED“-Aufgabe bei ngx gab es auch auf dem Jetson; es fehlte kein Dokument.
+Die „REVOKED“-Aufgabe bei ngx gab es auch auf dem Testgerät; es fehlte kein Dokument.
 
 ### Massenbearbeitung (nach dem Import, 255 Dokumente, je 30 Wiederholungen)
 
@@ -215,14 +215,14 @@ es ist nur eine Veranschaulichung, keine Zusage.
 
 1. **Prüfnutzer während des Stapel-Imports bei PaperRust langsamer als bei ngx (p95 439 ms):** 58 von 186 Anfragen
    dauerten über 100 ms, 51 davon zwischen Sekunde 95 und 185 – also in der Phase, in der die 200 Text-PDFs schnell
-   hintereinander gespeichert werden (die Scans kommen zuerst). Auf dem Jetson (NVMe) war p95 32 ms. Verdacht:
+   hintereinander gespeichert werden (die Scans kommen zuerst). Auf dem Testgerät (NVMe) war p95 32 ms. Verdacht:
    viele Schreibvorgänge auf die microSD-Karte; **nicht untersucht**. Der Median bleibt bei 10 ms.
-2. **Langsamste 1 % mit 5 und 10 Personen** bei PaperRust 256 / 345 ms (Jetson 30–34 ms): 10 von 842 bzw. 38 von
+2. **Langsamste 1 % mit 5 und 10 Personen** bei PaperRust 256 / 345 ms (Testgerät 30–34 ms): 10 von 842 bzw. 38 von
    1 628 Anfragen über 200 ms, vor allem Dokumentliste und Öffnen. Vermutlich dieselbe Ursache, nicht untersucht.
 3. **Massenbearbeitung bei PaperRust zweigeteilt:** die meisten Wiederholungen 85–310 ms, die Wiederholungen 18–28
    aber 700–1 570 ms (daher p95 1 097 ms). Ursache unklar.
 4. **Geringe Kernauslastung beim Import** bei allen (siehe oben). `THREADS_PER_WORKER=2` kam vom Messprogramm, weil
-   nur 3 Kerne zugeteilt waren – bei den Jetson-Läufen waren es 4.
+   nur 3 Kerne zugeteilt waren – bei den arm64-Läufen waren es 4.
 5. **Erster Neustart von PaperRust 2,9 s**, die beiden folgenden 0,87 und 0,91 s (Median 0,91 s).
 6. `memory.stat`/`memory.current` waren in allen Proben 0 (auf Raspberry Pi OS ist die Speicher-Abrechnung der
    cgroups offenbar aus). PSS kommt aus `/proc/<pid>/smaps_rollup` und ist davon nicht betroffen; die Spalten

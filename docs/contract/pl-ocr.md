@@ -192,7 +192,7 @@ ImageOps ── FsImageOps (Pillow-Semantik)
   - `clean` (unpaper-Ersatz, nur Erkennungsbild): dunkle Randflächen/Scannerkanten vom Bildrand aus,
     Lochungen (4–10 mm, rund, äußere 8 %), schwach graue Kacheln (dunkelster Punkt ≥ 192) und kleine
     Flecken (≤ 6 Punkte bei 300 dpi, skaliert mit dpi²) werden weiß.
-    **Fotos werden nicht gesäubert** (`looks_like_photo`, Jetson-Prüfung L1, 2026-11-19): Median der
+    **Fotos werden nicht gesäubert** (`looks_like_photo`, arm64-Prüfung L1, 2026-11-19): Median der
     hellen Punkte (≥ 128) unter 225 = graues, ungleich beleuchtetes Papier → leere Maske,
     `CleanReport.skipped_photo`, Log info „page looks like a photo (grey paper); not cleaned“. Auf Fotos
     löschte das Säubern i-/Umlaut-Punkte als Flecken und zerlegte den Grund in Kacheln (0/6 statt 6/6
@@ -492,7 +492,7 @@ ITU-R 601.
 
 21. **Bilddateien in Graustufen erkennen** (2026-11-21): PNG/JPEG/TIFF … gehen wie PDF-Seiten als eigenes
    Graustufenbild (ITU-R-601-Helligkeit) an die Texterkennung, nicht farbig (OCRmyPDF/Tesseract wandeln selbst um).
-   Anlass: Jetson-Prüfung, geradegerichtetes Handyfoto `c_photo_00.png` – farbig verlor ein Wort die Umlaut-Punkte
+   Anlass: arm64-Prüfung, geradegerichtetes Handyfoto `c_photo_00.png` – farbig verlor ein Wort die Umlaut-Punkte
    (Wortquote 97,4 %, paperless-ngx 100 %), in Graustufen bei allen Winkeln 2,5–4,5° richtig. Archiv-/Anzeigebild
    bleibt farbig. Test: `tests/image_ocr_gray.rs`.
 

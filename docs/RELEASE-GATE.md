@@ -45,14 +45,14 @@ geprüft, nicht grob.** Firmen sollen PaperRust einsetzen können. Eine Version 
 - [ ] Last-Suite `tests/stress` ohne einen einzigen Fehler (5xx, Zeitüberschreitung, Inkonsistenz):
       Massenänderungen während der Verarbeitung, 10–30 Nutzer parallel, gleiches Dokument gleichzeitig,
       parallele Uploads, kaputte/riesige Dateien.
-- [ ] **Dauerlauf 24 h** mit gemischter Last (Jetson oder NAS-ähnlich): Speicher stabil, keine
+- [ ] **Dauerlauf 24 h** mit gemischter Last (arm64-Kleinrechner oder NAS-ähnlich): Speicher stabil, keine
       wachsenden Handles/Verbindungen, keine Fehler im Log.
 - [ ] Ausfälle: Server-Abbruch mitten im Einlesen, Datenbank weg/zurück, Platte voll, Netz weg beim
       Mail-Abruf, KI-Dienst nicht erreichbar → nichts verloren, nichts doppelt, klare Meldungen, Erholung
       ohne Handarbeit.
 - [ ] Großes Archiv (≥ 100 000 Dokumente, Stichprobe 1 Mio.): Liste/Suche/Filter/Massenaktionen in den
       Zielzeiten (`docs/PERF-SCALE.md`).
-- [ ] **Leistungsvergleich gegen paperless-ngx** (`tools/bench-jetson`, gleiche Hardware, Release-Stand):
+- [ ] **Leistungsvergleich gegen paperless-ngx** (`tools/bench-arm64`, gleiche Hardware, Release-Stand):
       Rangfolge des Besitzers: **1. Geschwindigkeit, 2. Speicher.** Geschwindigkeit in allen Szenarien besser
       als ngx (Start, Bedienung, Einlesen je Art, Last, viele Nutzer); Speicher im Leerlauf **mit** Dokumenten
       (Dienste + Datenbank) und Plattenbedarf **mindestens so gut wie ngx minimal**; keine Speicher-Optimierung,

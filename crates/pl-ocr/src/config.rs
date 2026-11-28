@@ -103,7 +103,7 @@ pub struct OcrSettings {
 }
 
 /// OCR languages when `PAPERLESS_OCR_LANGUAGE` is not set. paperless-ngx uses `eng`; PaperRust
-/// `deu+eng` (Jetson measurement 2026-11-21, results/benchmark/2026-11-21-ocr-lang: German pages
+/// `deu+eng` (arm64 measurement 2026-11-21, results/benchmark/2026-11-21-ocr-lang: German pages
 /// with `eng` only 88.6 % of the words – umlauts/ß lost; `deu+eng` 100 % for German and English at
 /// +3–7 % time). All PaperRust packages ship `deu` and `eng`.
 pub const DEFAULT_OCR_LANGUAGE: &str = "deu+eng";

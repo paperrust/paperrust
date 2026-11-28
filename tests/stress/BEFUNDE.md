@@ -17,7 +17,7 @@ PostgreSQL-Log bzw. `pg_stat_activity` während des Fehlers belegt.
 | B1 | **kritisch** | Verklemmung Dateisperre (MEDIA_LOCK) ↔ DB-Zeilensperre: Anfragen/Aufgaben hängen, bis ein Client aufgibt (sonst unbegrenzt) | s3, s1 | s3 mit Versionen: jeder Lauf; s1: mehrfach je Lauf |
 | B2 | **kritisch** | Verbindungspool erschöpft sich selbst: 4 von 10 Verbindungen sind dauerhaft LISTEN-Verbindungen, PATCH (u. a.) hält eine Verbindung und holt eine zweite → ab ~6 gleichzeitigen Änderungen 30 s Stillstand und HTTP 500 für **alle** Anfragen; Worker verliert Heartbeat/Lease | s3, s2 | s3 mit ≥ 6 Clients: jeder Lauf; s2 mit 30 Nutzern: 35× 500 in 2 min |
 | B3 | **hoch** | Falsche Parametertypen aus dem Statement-Cache: gleiches SQL mit `int4` (Consumer) und `int8` (bulk_edit) → `insufficient data left in message` (Import schlägt fehl) bzw. `incorrect binary data format in bind parameter 1` (bulk_edit 400) | s1 | Lauf 0: 11 Importe (Hauptlauf: 1) fehlgeschlagen, 19× bulk_edit 400 |
-| B4 | **hoch** | **Ursache der 6 Fehler „Tag an alle“ (Jetson):** Deadlock zwischen `bulk_edit` (Trigger sperrt Dokumentzeilen nach id) und der Nacharbeit `bulk_update_documents` des vorigen Aufrufs (`UPDATE … SET modified … WHERE id = ANY($1)` sperrt in Tabellenreihenfolge) → PostgreSQL bricht nach `deadlock_timeout` (1 s) ab → HTTP 400 | s1 | Jetson 6/30; Laptop: Lauf 0 1×, Hauptlauf 4× (davon 1 in den 30 seriellen Aufrufen) |
+| B4 | **hoch** | **Ursache der 6 Fehler „Tag an alle“ (Testgerät):** Deadlock zwischen `bulk_edit` (Trigger sperrt Dokumentzeilen nach id) und der Nacharbeit `bulk_update_documents` des vorigen Aufrufs (`UPDATE … SET modified … WHERE id = ANY($1)` sperrt in Tabellenreihenfolge) → PostgreSQL bricht nach `deadlock_timeout` (1 s) ab → HTTP 400 | s1 | Testgerät 6/30; Laptop: Lauf 0 1×, Hauptlauf 4× (davon 1 in den 30 seriellen Aufrufen) |
 | B5 | mittel | Parallele `add_tag` auf dieselben Dokumente: `duplicate key … paperrust_document_tag_pkey` → HTTP 400; im Hintergrundweg (≥ 500 Dokumente) **stilles** Scheitern nach HTTP 200 | s1 | Lauf 0: 52 von 991 bulk_edit; Hauptlauf: 47, davon 10 als fehlgeschlagene Hintergrundaufgabe |
 | B10 | **hoch** | Bricht der Client ab (Timeout, Seite verlassen, Proxy-Timeout), verwirft der Server die laufende Anfrage mitten im Handler: Änderung gespeichert, aber Workflow „Geändert“, Suchindex, WebSocket nicht ausgeführt | s3 | Zusatzlauf: 1 von 1 (Workflow-Tag fehlt) |
 | B6 | mittel | Jede Massenänderung erzeugt eine eigene `bulk_update_documents`-Aufgabe über alle Dokumente; zusammen mit Workflows „Dokument geändert“ (Webhook je Dokument) wächst die Warteschlange schneller, als sie abgearbeitet wird | s1 | Lauf 0: 697 + 3463 wartend; Hauptlauf (ohne Workflows): 129 bzw. 391 wartend |
@@ -156,9 +156,9 @@ Kandidaten suchen: gleiche sea-query-Konstrukte in mehreren Crates mit `i64` vs 
 (z. B. `id IN (…)`-Listen, `documents_document_tags`, `paperrust_document`-Updates). Ein Test, der
 alle über `build_sqlx` erzeugten Anweisungen zweier Pfade auf derselben Verbindung ausführt, findet das.
 
-## B4 – Deadlock „Tag an alle“ nach dem Import (hoch, Ursache der 6 Jetson-Fehler)
+## B4 – Deadlock „Tag an alle“ nach dem Import (hoch, Ursache der 6 arm64-Fehler)
 
-**Beobachtung Jetson** (`results/benchmark/2026-11-18-jetson/raw/auffaellig_bulk_edit_rs_runde1.txt`):
+**Beobachtung Testgerät** (`results/benchmark/2026-11-18-arm64/raw/auffaellig_bulk_edit_rs_runde1.txt`):
 30× `bulk_edit` add/remove abwechselnd über 255 Dokumente; 6× `status=400 ms≈1013`, jeweils
 `An error occurred performing bulk edit: Uncaught("database: … deadlock detected")`, zeitgleich
 `slow statement … UPDATE paperrust_document SET modified = $2 WHERE id = ANY($1) AND deleted_at IS NULL
@@ -247,7 +247,7 @@ Warteschlange über eine Stunde voll, Suchindex/Dateinamen entsprechend lange ve
 ein (upstream genauso); jede führt die Workflows „Dokument geändert“ je Dokument aus (hier: Webhook
 an `127.0.0.1:9` mit Wiederholungen). Kein Zusammenfassen gleicher, noch nicht gestarteter Aufgaben.
 **Vorschlag.** Noch wartende `bulk_update_documents` mit überlappenden ids zusammenführen (Debounce);
-Fortschritt in der Oberfläche anzeigen. Kein Upstream-Fehler, aber auf dem Jetson spürbar.
+Fortschritt in der Oberfläche anzeigen. Kein Upstream-Fehler, aber auf dem Testgerät spürbar.
 
 ## B7 – Nach hartem Abbruch: Einlese-Aufgabe „fehlgeschlagen“, obwohl das Dokument da ist (mittel)
 
@@ -277,7 +277,7 @@ scheitern mit `tantivy: An IO error occurred: 'Zugriff verweigert (os error 5)'`
 (`pl-indexer/src/lock.rs`), aber jede Batch öffnet einen frischen Index/Writer (`writer.rs:120-135`),
 während Leser (Suche, `searcher`) Segment- und `.del`-Dateien geöffnet bzw. gemappt halten. Unter
 Windows kann eine geöffnete Datei weder gelöscht noch neu angelegt werden → Garbage-Collection bzw. das
-Schreiben einer neuen `.del`-Datei mit derselben Opstamp scheitert. Unter Linux (Docker/Jetson)
+Schreiben einer neuen `.del`-Datei mit derselben Opstamp scheitert. Unter Linux (Docker/arm64)
 vermutlich nicht. Folge: Änderungen fehlen im Suchindex, bis die Aufgabe wiederholt wird
 (`index_document` wird nicht automatisch wiederholt) oder neu indexiert wird.
 **Vorschlag.** `index_document` bei IO-Fehlern mit Backoff wiederholen; einen langlebigen Writer je
@@ -292,7 +292,7 @@ private Bytes 356 MB (Mittel erste 5 min) → 449 MB (letzte 5 min), Steigung 3,
 schwanken ohne Trend, DB-Verbindungen konstant 10. In derselben Zeit wuchs der Bestand von 728 auf
 982 Dokumente; ob das Wachstum Caches mit dem Bestand sind oder ein Leck, ist mit 30 min nicht zu
 trennen. **Vorschlag:** Dauerlauf 2–4 h mit festem Bestand (ohne Uploads: Option in s6 nachrüsten)
-bzw. Release-Build auf dem Jetson; erst dann bewerten.
+bzw. Release-Build auf dem Testgerät; erst dann bewerten.
 
 ## Ohne Befund geprüft
 
@@ -314,9 +314,9 @@ bzw. Release-Build auf dem Jetson; erst dann bewerten.
 
 ## Nicht geprüft / Grenzen
 
-- Debug-Build auf Windows (kein frischer Build möglich, siehe oben); Zeiten sind nicht mit dem Jetson
-  vergleichbar. B4 und B3 hängen vom Timing ab und treten auf dem langsamen Jetson eher häufiger auf.
-- Keine Prüfung gegen ngx im selben Lauf; Vergleich nur über den Jetson-Bericht.
+- Debug-Build auf Windows (kein frischer Build möglich, siehe oben); Zeiten sind nicht mit dem Testgerät
+  vergleichbar. B4 und B3 hängen vom Timing ab und treten auf dem langsamen Testgerät eher häufiger auf.
+- Keine Prüfung gegen ngx im selben Lauf; Vergleich nur über den arm64-Bericht.
 - Mail-Abruf, OCR schwerer Scans, Office-Dateien, KI-Funktionen, Sync, Freigabelinks, WebSocket-Last
   nicht belastet. `s6` nur 30 min (Auftrag: 30–60 min).
 - Die Testdaten-Workflows wurden für die Läufe abgeschaltet (sie senden je Änderung Webhooks an
@@ -441,7 +441,7 @@ LISTEN (4) und die Nebenpools der Worker-Steuerung/des Sync-Sequenzers (B2). Bei
 
 ### Weiterhin nicht geprüft
 
-- Release-Build und Linux/Jetson (B8 ist Windows-spezifisch; B3/B4 hängen vom Timing ab – auf dem Jetson
+- Release-Build und Linux/arm64 (B8 ist Windows-spezifisch; B3/B4 hängen vom Timing ab – auf dem Testgerät
   erneut laufen lassen: `stress.py --url … s1 s3 s8`).
 - Gegenprobe für s8 mit einem Build ohne `detach` (B10 war im Erstlauf 1/1 reproduziert; die Wirksamkeit
   belegt der Unit-Test, nicht ein zweiter Lastlauf ohne die Middleware).

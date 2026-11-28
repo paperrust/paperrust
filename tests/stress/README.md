@@ -15,7 +15,7 @@ Nur Python-Standardbibliothek (≥ 3.10), kein `pip install`.
 
 | Kürzel | Inhalt | wichtige Optionen |
 |---|---|---|
-| `s1` | 200+ Dateien (Text-PDFs, jedes 40. ein PNG) hochladen; **während** des Einlesens und **direkt danach** `bulk_edit` über alle Dokumente: `add_tag`, `remove_tag`, `modify_tags`, `set_correspondent`, `set_permissions`, seriell schnell hintereinander und 2/4/8 gleichzeitig; „Tag an alle“ 30× abwechselnd add/remove (wie der Jetson-Leistungstest); `delete` + Wiederherstellen aus dem Papierkorb parallel zu einem `add_tag`; am Ende „add_tag an alle“ und Prüfung, dass wirklich jedes Dokument den Tag hat | `--docs` |
+| `s1` | 200+ Dateien (Text-PDFs, jedes 40. ein PNG) hochladen; **während** des Einlesens und **direkt danach** `bulk_edit` über alle Dokumente: `add_tag`, `remove_tag`, `modify_tags`, `set_correspondent`, `set_permissions`, seriell schnell hintereinander und 2/4/8 gleichzeitig; „Tag an alle“ 30× abwechselnd add/remove (wie der arm64-Leistungstest); `delete` + Wiederherstellen aus dem Papierkorb parallel zu einem `add_tag`; am Ende „add_tag an alle“ und Prüfung, dass wirklich jedes Dokument den Tag hat | `--docs` |
 | `s2` | 10–30 Nutzer gleichzeitig, gemischt: Liste, tiefe Seiten, Filter, Volltextsuche, globale Suche, Autocomplete, Detail, Vorschaubild, Vorschau, Metadaten, Notizen, Statistik, `selection_data`, PATCH Titel/Tags, Notiz anlegen, Upload | `--users`, `--duration`, `--think` |
 | `s3` | ein frisch eingelesenes Dokument wird von mehreren Clients gleichzeitig per PATCH geändert (Titel, Tags, Korrespondent/Typ, Notizen), ein Workflow „Dokument geändert“ setzt einen Tag, parallel werden neue Versionen hochgeladen (`update_version`) | `--same-doc-clients`, `--same-doc-seconds`, `--versions` |
 | `s4` | 20 Uploads gleichzeitig, dieselbe Datei dreifach, große Datei (Standard 60 MB), kaputtes und abgeschnittenes PDF, leere Datei, `.exe` – keine 5xx, jede Aufgabe endet, Fehlschläge mit Grund | `--parallel-uploads`, `--big-mb` |
@@ -74,14 +74,14 @@ Nur gegen Testinstanzen: die Suite legt Dokumente, Tags, Korrespondenten und ein
 Titel/Tags/Rechte vieler Dokumente und löscht/restauriert Dokumente.
 
 ```sh
-python tests/stress/stress.py --url http://jetson.local:8000 --token <API-Token> s1 s2 s3 s4
-python tests/stress/stress.py --url http://jetson.local:8000 --user admin --password <testpasswort> s1
+python tests/stress/stress.py --url http://testgeraet.local:8000 --token <API-Token> s1 s2 s3 s4
+python tests/stress/stress.py --url http://testgeraet.local:8000 --user admin --password <testpasswort> s1
 ```
 
 Ohne `--local` gibt es keine Datei-/DB-Prüfung, keinen Server-Log-Auszug und kein `s5`. Nachrüsten:
 `--log-dir` (Ordner mit `paperrust.log`), `--media` (Medienordner), `--psql <psql> --dsn "host=… dbname=…"`
 (nur lesende Abfragen), `--pid` (Speicherproben, nur auf demselben Rechner), `--kill-cmd`/`--start-cmd`
-(z. B. `"ssh jetson docker kill pr"` / `"ssh jetson docker start pr"`) für `s5`.
+(z. B. `"ssh testgeraet docker kill pr"` / `"ssh testgeraet docker start pr"`) für `s5`.
 
 Belastung dosieren: `--docs 100 --users 10 --duration 120` für einen schnellen Lauf; die Standardwerte
 sind für einen geteilten Laptop gewählt (20 Nutzer, 4 parallele Uploads im Import, 2 Task-Worker).

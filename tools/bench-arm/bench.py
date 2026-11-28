@@ -90,7 +90,7 @@ def sh_out(cmd):
 
 def conditions():
     return {"time": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "free_m": sh_out("free -m"), "uptime": sh_out("uptime"),
-            "nvpmodel": sh_out("cat /var/lib/nvpmodel/status"), "thermo": sh_out("cat /run/mpc_thermo.status"),
+            "cpu_governor": sh_out("cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"), "thermo": sh_out("cat /sys/class/thermal/thermal_zone0/temp"),
             "locks": sh_out("ls ~/jobs/*.lock 2>/dev/null"),
             "containers": sh_out("sudo -n docker ps --format '{{.Names}}'").split("\n")}
 

@@ -70,7 +70,7 @@ Duplikate.
 
 ## Wie viel Speicher braucht PaperRust? Läuft es auf einem Raspberry Pi?
 
-Gemessen auf einem ARM-Kleinrechner (NVIDIA Jetson Orin Nano, 6 Kerne, 8 GB RAM, Docker): frisch
+Gemessen auf einem ARM-Kleinrechner (6 Kerne, 8 GB RAM, Docker): frisch
 gestartet rund 100 MiB für PaperRust plus rund 70 MiB für PostgreSQL. Nach dem Einlesen mit
 Texterkennung hielt PaperRust in dieser Messung rund 900 MiB fest; das wurde inzwischen verbessert
 (Sprachmodelle werden nach Leerlauf freigegeben), eine neue Messung folgt. Die Datenbank braucht
