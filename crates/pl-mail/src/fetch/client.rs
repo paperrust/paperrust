@@ -86,6 +86,13 @@ pub struct MailBox {
     pub transcript: Vec<String>,
     /// `_current_folder`
     pub current_folder: Option<String>,
+    /// Capabilities announced after authentication (`[CAPABILITY ...]` in the tagged LOGIN/
+    /// AUTHENTICATE reply or an untagged `CAPABILITY`). Not used by imaplib; PaperRust only
+    /// consults it for `UIDPLUS`/`MOVE` so the safe commands are found on servers that list
+    /// them post-login only (Dovecot).
+    pub auth_capabilities: Vec<String>,
+    /// `UIDVALIDITY` from the untagged `OK [UIDVALIDITY n]` of the last successful SELECT.
+    pub selected_uidvalidity: Option<i64>,
 }
 
 const MAX_LITERAL: usize = 512 * 1024 * 1024;
@@ -265,6 +272,17 @@ fn untagged_re_type(line: &[u8]) -> Option<(String, Vec<u8>)> {
     None
 }
 
+/// `[UIDVALIDITY n]` response code of an untagged `OK` after SELECT (RFC 3501 7.1).
+fn select_uidvalidity(item: &Item) -> Option<i64> {
+    let Item::Line(l) = item else { return None };
+    let text = String::from_utf8_lossy(l);
+    let upper = text.to_ascii_uppercase();
+    let start = upper.find("[UIDVALIDITY ")? + "[UIDVALIDITY ".len();
+    let rest = &upper[start..];
+    let end = rest.find(']')?;
+    rest[..end].trim().parse().ok()
+}
+
 /// `Literal = br'.*{(?P<size>\d+)}$'`
 fn literal_size(dat: &[u8]) -> Option<usize> {
     let s = dat.strip_suffix(b"}")?;
@@ -310,6 +328,8 @@ impl MailBox {
             timeout: opts.timeout,
             transcript: Vec::new(),
             current_folder: None,
+            auth_capabilities: Vec::new(),
+            selected_uidvalidity: None,
         };
         mb.greeting().await?;
         mb.load_capabilities().await?;
@@ -549,6 +569,41 @@ impl MailBox {
     }
 
     async fn login_inner(&mut self, username: &str, password: &str, is_token: bool) -> Result<(), ImapError> {
+        let r = self.authenticate(username, password, is_token).await?;
+        self.authenticated = true;
+        self.auth_capabilities = self.post_auth_capabilities(&r);
+        // initial_folder='INBOX'
+        self.folder_set("INBOX").await
+    }
+
+    /// Capabilities from `[CAPABILITY ...]` in the tagged reply or an untagged `CAPABILITY`
+    /// that arrived with the login.
+    fn post_auth_capabilities(&mut self, r: &CmdResult) -> Vec<String> {
+        let mut lines: Vec<String> = Vec::new();
+        if let Some(Some(Item::Line(l))) = r.data.first() {
+            let text = String::from_utf8_lossy(l).to_uppercase();
+            if let Some(rest) = text.strip_prefix("[CAPABILITY ")
+                && let Some(end) = rest.find(']')
+            {
+                lines.push(rest[..end].to_string());
+            }
+        }
+        if let Some(items) = self.untagged.remove("CAPABILITY") {
+            for it in items {
+                if let Item::Line(l) = it {
+                    lines.push(String::from_utf8_lossy(&l).to_uppercase());
+                }
+            }
+        }
+        lines.iter().flat_map(|l| l.split_whitespace().map(str::to_string)).collect()
+    }
+
+    /// Server capability, before or after authentication.
+    pub fn has_capability(&self, name: &str) -> bool {
+        self.capabilities.iter().chain(self.auth_capabilities.iter()).any(|c| c == name)
+    }
+
+    async fn authenticate(&mut self, username: &str, password: &str, is_token: bool) -> Result<CmdResult, ImapError> {
         let b64 = |b: &[u8]| base64::engine::general_purpose::STANDARD.encode(b).into_bytes();
         if is_token {
             self.need_nonauth("AUTHENTICATE")?;
@@ -558,6 +613,7 @@ impl MailBox {
             if r.typ != "OK" {
                 return Err(ImapError::Status { kind: "MailboxLoginError", message: "AUTHENTICATE failed".into() });
             }
+            Ok(r)
         } else if password.is_ascii() {
             self.need_nonauth("LOGIN")?;
             if !username.is_ascii() {
@@ -569,6 +625,7 @@ impl MailBox {
             if r.typ != "OK" {
                 return Err(ImapError::Status { kind: "MailboxLoginError", message: "LOGIN failed".into() });
             }
+            Ok(r)
         } else {
             tracing::debug!(target: "paperless_mail", "Falling back to AUTH=PLAIN");
             self.need_nonauth("AUTHENTICATE")?;
@@ -581,10 +638,8 @@ impl MailBox {
             if r.typ != "OK" {
                 return Err(ImapError::Status { kind: "MailboxLoginError", message: "AUTHENTICATE failed".into() });
             }
+            Ok(r)
         }
-        self.authenticated = true;
-        // initial_folder='INBOX'
-        self.folder_set("INBOX").await
     }
 
     // ---------------------------------------------------------------------------------------
@@ -594,9 +649,12 @@ impl MailBox {
     pub async fn folder_set(&mut self, folder: &str) -> Result<(), ImapError> {
         self.untagged.clear();
         self.read_only = false;
+        self.selected_uidvalidity = None;
         let enc = encode_folder(folder);
         let r = self.simple("SELECT", &[&enc], None).await?;
+        self.selected_uidvalidity = self.untagged.get("OK").and_then(|items| items.iter().find_map(select_uidvalidity));
         if r.typ != "OK" {
+            self.selected_uidvalidity = None;
             self.current_folder = None;
             return Err(ImapError::Status {
                 kind: "MailboxFolderSelectError",
@@ -713,13 +771,29 @@ impl MailBox {
         Ok(())
     }
 
-    /// `delete(uid)`: `UID STORE uid +FLAGS (\Deleted)` + `EXPUNGE`.
+    /// `UID EXPUNGE uid` (RFC 4315, needs `UIDPLUS`): removes only this message.
+    pub async fn uid_expunge(&mut self, uid: &str) -> Result<(), ImapError> {
+        let r = self.uid("EXPUNGE", &[uid.as_bytes()]).await?;
+        if r.typ != "OK" {
+            return Err(ImapError::Status { kind: "MailboxExpungeError", message: format!("\"{}\" received", r.typ) });
+        }
+        Ok(())
+    }
+
+    /// `delete(uid)`: `UID STORE uid +FLAGS (\Deleted)`, then `UID EXPUNGE uid` when the server
+    /// has `UIDPLUS`. Without it only the folder-wide `EXPUNGE` exists (imap_tools behaviour);
+    /// that also removes messages other clients marked `\Deleted` (Known differences).
     pub async fn delete(&mut self, uid: &str) -> Result<(), ImapError> {
         let r = self.uid("STORE", &[uid.as_bytes(), b"+FLAGS", b"(\\Deleted)"]).await?;
         if r.typ != "OK" {
             return Err(ImapError::Status { kind: "MailboxDeleteError", message: format!("\"{}\" received", r.typ) });
         }
-        self.expunge().await
+        if self.has_capability("UIDPLUS") {
+            self.uid_expunge(uid).await
+        } else {
+            tracing::warn!(target: "paperless_mail", "Server lacks UIDPLUS; deleting mail {uid} with a folder-wide EXPUNGE");
+            self.expunge().await
+        }
     }
 
     /// `copy(uid, folder)`.
@@ -732,9 +806,10 @@ impl MailBox {
         Ok(())
     }
 
-    /// `move(uid, folder)`: `UID MOVE` with capability `MOVE`, otherwise COPY + delete.
+    /// `move(uid, folder)`: `UID MOVE` with capability `MOVE` (also when only announced after
+    /// login), otherwise COPY + [`Self::delete`].
     pub async fn move_to(&mut self, uid: &str, folder: &str) -> Result<(), ImapError> {
-        if self.capabilities.iter().any(|c| c == "MOVE") {
+        if self.has_capability("MOVE") {
             let enc = encode_folder(folder);
             let r = self.uid("MOVE", &[uid.as_bytes(), &enc]).await?;
             if r.typ != "OK" {
@@ -747,7 +822,9 @@ impl MailBox {
         }
     }
 
-    /// `flag(uid, flags, value)`: `UID STORE uid ±FLAGS (…)` + `EXPUNGE`.
+    /// `flag(uid, flags, value)`: `UID STORE uid ±FLAGS (…)`. imap_tools sends a folder-wide
+    /// `EXPUNGE` afterwards; PaperRust does not, because that would permanently remove every
+    /// message in the folder that any client marked `\Deleted` (Known differences).
     pub async fn flag(&mut self, uid: &str, flags: &[String], value: bool) -> Result<(), ImapError> {
         clean_flags(flags)?;
         let op = if value { "+FLAGS" } else { "-FLAGS" };
@@ -756,17 +833,22 @@ impl MailBox {
         if r.typ != "OK" {
             return Err(ImapError::Status { kind: "MailboxFlagError", message: format!("\"{}\" received", r.typ) });
         }
-        self.expunge().await
+        Ok(())
     }
 
-    /// Gmail: `client.uid("STORE", uid, "+X-GM-LABELS", keyword)` (without status check;
-    /// `None` makes imaplib omit the argument).
+    /// Gmail: `client.uid("STORE", uid, "+X-GM-LABELS", keyword)` (`None` makes imaplib omit
+    /// the argument). upstream ignores the reply status; here `NO` is an error (`BAD` already
+    /// is one in [`Self::simple`]) so a rejected label is not recorded as SUCCESS
+    /// (Known differences).
     pub async fn gmail_label(&mut self, uid: &str, keyword: Option<&str>) -> Result<(), ImapError> {
         let mut args: Vec<&[u8]> = vec![uid.as_bytes(), b"+X-GM-LABELS"];
         if let Some(k) = keyword {
             args.push(k.as_bytes());
         }
-        let _ = self.uid("STORE", &args).await?;
+        let r = self.uid("STORE", &args).await?;
+        if r.typ != "OK" {
+            return Err(ImapError::Status { kind: "MailboxTaggingError", message: format!("\"{}\" received", r.typ) });
+        }
         Ok(())
     }
 
@@ -840,6 +922,14 @@ mod tests {
         assert_eq!(untagged_re_type(b"* SEARCH"), Some(("SEARCH".into(), Vec::new())));
         assert_eq!(literal_size(b"3 (UID 5 BODY[] {123}"), Some(123));
         assert_eq!(literal_size(b"3 (UID 5)"), None);
+    }
+
+    #[test]
+    fn select_uidvalidity_code() {
+        assert_eq!(select_uidvalidity(&Item::Line(b"[UIDVALIDITY 3857529045] UIDs valid".to_vec())), Some(3_857_529_045));
+        assert_eq!(select_uidvalidity(&Item::Line(b"[uidvalidity 7]".to_vec())), Some(7));
+        assert_eq!(select_uidvalidity(&Item::Line(b"[UIDNEXT 4] Predicted next UID".to_vec())), None);
+        assert_eq!(select_uidvalidity(&Item::Line(b"[UIDVALIDITY x]".to_vec())), None);
     }
 
     #[test]

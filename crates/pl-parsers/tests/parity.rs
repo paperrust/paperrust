@@ -137,8 +137,8 @@ fn text_reading_matches_upstream() {
     assert!(bad.is_empty(), "{}", bad.join("\n"));
 }
 
-fn fake_tika(html: &str, _max: usize) -> pl_parsers::Result<String> {
-    Ok(format!("TIKAHTML{}", html.chars().count()))
+fn fake_tika(html: &str, _max: usize) -> pl_parsers::Result<(String, Option<pl_parsers::limits::Truncation>)> {
+    Ok((format!("TIKAHTML{}", html.chars().count()), None))
 }
 
 #[test]

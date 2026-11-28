@@ -8,7 +8,7 @@ else. Periodic tasks come from a scheduler (beat) that every worker process runs
 small TLA+ models of that code. The TLC model checker tries **every interleaving** within the
 bounds below.
 
-Last checked against commit `83f18906` (exact files and functions: the skill
+Last checked against commit `83f18906` plus the uncommitted working tree of 2026-11-27 (`BeatStore::run_due`, capped durations / `checked_add` / `force_reap` in `worker.rs`) (exact files and functions: the skill
 `.claude/skills/verify-task-queue/SKILL.md`), then updated for the fixes of F1-F3 (2026-11-23,
 uncommitted at the time of writing; the sync commit in the skill moves to the commit that contains
 them).
@@ -25,6 +25,7 @@ Promises from `docs/contract/pl-queue.md` B3 (points 2, 5, 7, 8) and Known diffe
 | P4 | No task is lost: after any crash, shutdown or lost lease it ends as done, failed (`WorkerLostError` after `MAX_DELIVERIES`) or revoked, and its PaperlessTask ends with that result. | A document that never gets consumed and a task that shows "pending"/"started" forever. | `Finishes`, `StatusSettles` (liveness, `QueueLifecycle`) |
 | P5 | Ids that a document edit appends to a waiting `bulk_update_documents` task (coalescing, `pl-documents-write/src/coalesce.rs`) are processed. | Workflows, file names or index not updated for some documents. | `NoLostMerge` (`QueueLifecycle`) |
 | P6 | Several schedulers (one per worker process / instance) enqueue each due time of a periodic task once. | Mail fetched twice, classifier trained twice, empty-trash run twice. | `NoSlotTwice` (`BeatReserve`) |
+| P7 | A due time that is recorded as run (`last_run_at`) was really enqueued: an enqueue error or a crash never loses a scheduled run. | Mail not fetched, trash not emptied, classifier not trained until the next slot. | `NoLostSlot` (`BeatReserve`) |
 
 Delivery is **at-least-once** by design (contract Known difference 1): after a crash or a lost
 lease the task runs again, so handlers must be idempotent. The models check that the queue *state*
@@ -34,7 +35,7 @@ is exactly-once, not the handlers' side effects.
 
 Holds for the code (configs `Lease_code_hang`, `Lease_code_fast_fail`, `Lease_code_fast_fail_no_skew`,
 `Life_code`, `Life_code_same_process`, `Coalesce_code`, `Life_code_unbounded_prestart`,
-`Life_code_same_process_unbounded`, `Coalesce_code_unbounded`, `Beat_code`; with `--deep` also
+`Life_code_same_process_unbounded`, `Coalesce_code_unbounded`, `Beat_code`, `Beat_code_fallback` (P7 only); with `--deep` also
 `Deep_*`), **under the assumptions named in each config**. The `*_unbounded*` configs drop the two
 timing assumptions the code needed before the fixes (`BoundedPrestart`, `BoundedStale`): state,
 status and coalescing are now safe without them.
@@ -99,12 +100,14 @@ Each property has been seen **failing** on a broken variant:
 | `finish_row`/`retry`/`release` without the fencing `WHERE` (`Broken_finish_no_fence`) | `TerminalOnce` |
 | heartbeat without the fencing `WHERE` - a stale heartbeat sets a revoked task back to `running` (`Broken_hb_no_fence`) | `StatusConsistent` |
 | reaper without its second statement (no `WorkerLostError`) (`Broken_reaper_no_fail`) | liveness (`Finishes`) |
-| beat `reserve` without `FOR UPDATE` (`Beat_broken_no_for_update`) | `NoSlotTwice` |
+| beat `run_due` without `FOR UPDATE` (`Beat_broken_no_for_update`) | `NoSlotTwice` |
+| beat records `last_run_at` and commits, then enqueues; error only logged - old code before 2026-11-27 (`Beat_broken_record_before_enqueue`) | `NoLostSlot` |
+| documented, not a bug: queue without `enqueue_in_conn` (fallback), crash between the separate enqueue and the beat's COMMIT repeats the run (`Beat_fallback_crash_repeats`) | `NoSlotTwice` |
 
 ## Run it
 
 ```bash
-bash verification/task-queue/run.sh          # 21 checks, about 4-6 minutes
+bash verification/task-queue/run.sh          # 24 checks, about 8-12 minutes
 bash verification/task-queue/run.sh --deep   # plus deeper bounds (several minutes more)
 bash verification/task-queue/run.sh --trace Broken_fence_only_after_heartbeat   # one counterexample
 ```
@@ -128,7 +131,10 @@ checks the hash. TLC runs with `-Xmx2g` and 2 workers. Exit code 0 = every check
   `MAX_DELIVERIES`, coalescing, and the PaperlessTask row. Bounds: 2 runners (separate processes or
   one process), 2 deliveries (3 deep), 2 crashes/shutdowns, 1 retry.
 - `BeatReserve.tla` - 3 schedulers with clocks up to 1 unit apart, one entry due every 2 units,
-  time 4; every interleaving of their `reserve` transactions.
+  time 4; every interleaving of their `run_due` transactions (SELECT FOR UPDATE, enqueue, UPDATE,
+  COMMIT), with enqueue errors (rollback) and crashes at any step. `Mode`: `intx` = code with
+  `PgQueue::enqueue_in_conn` (enqueue in the beat's transaction), `fallback` = queue without it
+  (separate enqueue while the row lock is held), `old` = record first, enqueue after the commit.
 
 A pass covers the model within these bounds.
 
@@ -167,6 +173,11 @@ A pass covers the model within these bounds.
   priorities/queues, `purge_finished` and the status read from `documents_paperlesstask` after purge,
   LISTEN/NOTIFY wake-ups, DB error backoff, `already_pending` in `pl-documents-write/src/index.rs`.
 - The beat's time-zone reset branch (two instances with different `PAPERLESS_TIME_ZONE` - a
-  misconfiguration) and runs lost when `enqueue` fails after the reservation (documented, like Celery).
+  misconfiguration; sets `last_run_at = now` on purpose, like Celery), the first-start `INSERT`
+  (sets `last_run_at = now`), `MemoryBeatStore::run_due` (single process, ticks sequential).
+- Worker duration caps (`secs_or` capped at `MAX_DURATION_SECS`, `checked_add` in `fence_at` /
+  `next_after_*`, config limit 1 year) only matter beyond the modelled ratios: within the config
+  limits nothing overflows and `fence_at = last_ok + 0.8 V` as modelled; on overflow the fence fires
+  at once (safe side for P1). `force_reap` keeps "the reaper may run at any time".
 - More than one task row (tasks are independent in the claim; ordering/fairness between tasks is not
   a promise here).

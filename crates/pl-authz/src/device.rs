@@ -13,7 +13,7 @@
 use chrono::{DateTime, Utc};
 use rand::RngCore as _;
 use sha2::{Digest, Sha256};
-use sqlx::PgPool;
+use sqlx::{Connection as _, PgConnection, PgPool};
 use uuid::Uuid;
 
 /// Prefix of all device tokens.
@@ -165,21 +165,36 @@ pub async fn revoke(db: &PgPool, user_id: i64, uuid: Uuid) -> Result<bool, Devic
     Ok(n > 0)
 }
 
+/// Statement of [`revoke_all_for_user`] / [`revoke_all_for_user_tx`] (one text, one bind type:
+/// `i64` cast to `int4`, for the sqlx statement cache).
+const REVOKE_ALL_FOR_USER_SQL: &str =
+    "UPDATE paperrust_device_token SET revoked_at = now() WHERE user_id = $1::int4 AND revoked_at IS NULL";
+
 /// Revoke all active device tokens of a user (after password reset/change,
 /// security review 2026-11-19 F13: a stolen device should not be able to keep
 /// accessing after the password change). DRF `authtoken` stays untouched, as upstream. If the table is missing
 /// (migration not applied), there are no tokens: `Ok(0)`. Returns: number revoked.
 pub async fn revoke_all_for_user(db: &PgPool, user_id: i64) -> Result<u64, sqlx::Error> {
-    let r = sqlx::query(
-        "UPDATE paperrust_device_token SET revoked_at = now()
-         WHERE user_id = $1::int4 AND revoked_at IS NULL",
-    )
-    .bind(user_id)
-    .execute(db)
-    .await;
-    match r {
-        Ok(done) => Ok(done.rows_affected()),
-        Err(e) if is_undefined_table(&e) => Ok(0),
+    let mut conn = db.acquire().await?;
+    revoke_all_for_user_tx(&mut conn, user_id).await
+}
+
+/// [`revoke_all_for_user`] on the caller's connection, typically inside its transaction, so that a
+/// password change and the revocation commit together. The statement runs in a savepoint (or its
+/// own transaction on an autocommit connection): a missing `paperrust_device_token` table counts as
+/// "nothing to revoke" (`Ok(0)`) and does not abort the caller's transaction. Never commits the
+/// caller's transaction.
+pub async fn revoke_all_for_user_tx(conn: &mut PgConnection, user_id: i64) -> Result<u64, sqlx::Error> {
+    let mut sp = conn.begin().await?;
+    match sqlx::query(REVOKE_ALL_FOR_USER_SQL).bind(user_id).execute(&mut *sp).await {
+        Ok(done) => {
+            sp.commit().await?;
+            Ok(done.rows_affected())
+        }
+        Err(e) if is_undefined_table(&e) => {
+            sp.rollback().await?;
+            Ok(0)
+        }
         Err(e) => Err(e),
     }
 }

@@ -403,6 +403,9 @@ PaperlessObjectPermissions)` → globales Modellrecht nach Methode (POST `add_do
   `{"Version Deleted": ["None", id]}` + `{"reason": "Version deleted", "version_id": id}` (Akteur
   explizit), `document_updated` (Workflows + Hook). Antwort `{"result": "OK", "current_version_id":
   <neueste lebende Version nach version_index DESC NULLS LAST, id DESC, sonst Wurzel>}`.
+  PaperRust: Sperren (Wurzel, dann Version), Soft-Delete, Wurzel `modified` und LogEntry in **einer**
+  Transaktion (`versions::delete_version_tx`) – scheitert der LogEntry, ist auch nichts gelöscht
+  (upstream: kein `ATOMIC_REQUESTS`, Löschung bleibt trotz 500; Review 2026-11-27).
 * **PATCH `versions/{version_id}/`**: zuerst `DocumentVersionLabelSerializer` (`version_label` Pflicht,
   blank/null erlaubt, max 64, strip → leer = None), dann Wurzel/Rechte (`change_document`)/Version wie
   oben; `version.save(update_fields=["version_label"])` (auditlog-Diff der Version + Dateinamen-
@@ -410,6 +413,11 @@ PaperlessObjectPermissions)` → globales Modellrecht nach Methode (POST `add_do
   `{"reason": "Version label updated", "version_id": id}`, `document_updated`. Antwort `{"id", "added"
   (DRF-JSONEncoder: ISO in UTC mit `Z`, Mikrosekunden nur wenn ≠ 0), "version_label", "checksum",
   "is_root"}`.
+  PaperRust (`versions::rename_version_tx`, Review 2026-11-27): Sperren (Wurzel, dann Version), Version
+  **unter der Zeilensperre** neu lesen (alter Name daher korrekt auch bei gleichzeitigen Umbenennungen;
+  upstream liest ihn vorher), speichern, Wurzel `modified`, LogEntry – alles in einer Transaktion
+  (scheitert der LogEntry, bleibt der alte Name). Version inzwischen im Papierkorb → 404 (upstream
+  würde die gelöschte Zeile umbenennen).
 * **POST `update_version/`** (`parser_classes=[MultiPartParser]`; anderer Content-Type mit Körper → 415,
   leerer Körper → leere Daten): `DocumentVersionSerializer` (`document` FileField + `validate_document`
   wie `post_document`: leer → `The submitted file is empty.`, MIME nicht unterstützt → `File type <mime>
@@ -698,7 +706,7 @@ ungültiges Token × v9/v10 × 8 Pfade mit Paginierung/`full_perms`): 112 vergli
 | `update.rs` | PUT/PATCH (View + `DocumentSerializer.update`), DELETE, `log_ctx` |
 | `serializer.rs` | Eingabevalidierung DocumentSerializer / CustomFieldInstanceSerializer, `uri_validator`, Datum |
 | `docs.rs` | Dokument-Instanzen: `save(update_fields)` mit auditlog + Dateiname, Tags add/remove/clear/set |
-| `cfi.rs` | CustomFieldInstance: update_or_create, create, save, soft/hard delete, restore, doclinks |
+| `cfi.rs` | CustomFieldInstance: update_or_create, create, save, soft/hard delete, restore, doclinks; `update_or_create_deferred`/`soft_delete_deferred` = same DB/auditlog part without the `post_save` file move (`files::after_custom_field_saved`), for callers that run `update_filename_and_move_files` after their commit (pl-server `ConsumerDocWriter`, 2026-11-28) |
 | `softdelete.rs` | Soft-Delete-Kaskade, Restore, `empty_trash` |
 | `files.rs` | `update_filename_and_move_files`, `cleanup_document_deletion`, `MediaLock` |
 | `workflows.rs` | Trigger „Dokument geändert“ |
@@ -825,3 +833,17 @@ Bricht die Datenbank während `bulk_edit` weg, antwortete die Route mit 400 „E
 check logs for more detail.“ (Transaktion zurückgerollt, nichts geändert). Jetzt 503 „The database is
 temporarily not reachable…“ (pl-core `ApiError::db_unavailable`). `ApiError::Database` wird über
 `From<sqlx::Error> for pl_core::ApiError` gerendert (503 bei nicht erreichbarer DB, sonst 500 wie bisher).
+
+## Review 2026-11-27: Umbenennen bei fehlgeschlagenem Commit (`files.rs`)
+
+- `move_under_lock` verschiebt Original/Archiv auf der Platte, bevor die Transaktion (bzw. der
+  Sicherungspunkt) von `update_one` committet. Bisher wurde ein Commit-Fehler nur geloggt; die Dateien
+  blieben am neuen Pfad, die Zeile zeigte auf den alten, leeren. Jetzt liefert `move_under_lock` die
+  durchgeführten Verschiebungen mit (`FileMove`), `commit_or_undo` schiebt sie bei Commit-Fehler in
+  umgekehrter Reihenfolge zurück (alten Ordner neu anlegen, neuen leeren Ordner entfernen), überschreibt
+  nie eine Datei am alten Pfad und loggt `error`, wenn das Zurückschieben scheitert; danach keine
+  Versions-Rekursion (wie upstream nur geloggt, kein Fehler an den Aufrufer). Tests ohne DB über die
+  Commit-Naht: `files::tests::failed_commit_moves_files_back`, `failed_commit_never_overwrites_old_path`.
+- **Offen:** läuft `update_one` in einem Sicherungspunkt einer Aufrufer-Transaktion und scheitert erst
+  deren Commit, bleiben die Dateien verschoben (der Sicherungspunkt war schon freigegeben). Das braucht
+  eine Änderung bei den Aufrufern (`update.rs`, Stapel-Aktionen).

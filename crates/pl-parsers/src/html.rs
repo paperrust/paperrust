@@ -10,8 +10,8 @@
 
 use std::path::Path;
 
-use crate::limits::TextSink;
-use crate::{DocumentParser, MetadataEntry, ParseContext, ParsedDocument, Result, read_limited};
+use crate::limits::{TextSink, Truncation};
+use crate::{DocumentParser, MetadataEntry, ParseContext, ParseError, ParsedDocument, Result, read_limited};
 
 const BLOCK: &[&str] = &[
     "p",
@@ -186,14 +186,45 @@ impl Out {
 }
 
 /// HTML → text. Malformed markup is tolerated (like TagSoup in Tika).
+///
+/// Fails with [`ParseError::LimitExceeded`] when the text exceeds `max_chars`; see
+/// [`html_to_text_report`] for keeping the part read so far.
 pub fn html_to_text(html: &str, max_chars: usize) -> Result<String> {
+    let (text, truncated) = html_to_text_report(html, max_chars)?;
+    match truncated {
+        Some(_) => Err(ParseError::LimitExceeded(format!("extracted text > {max_chars} bytes"))),
+        None => Ok(text),
+    }
+}
+
+/// [`html_to_text`] that keeps the text read so far when `max_chars` is reached and reports
+/// that as [`Truncation::Text`] (PaperRust: "some text beats no document", never silently).
+pub fn html_to_text_report(html: &str, max_chars: usize) -> Result<(String, Option<Truncation>)> {
     let mut out = Out { sink: TextSink::new(max_chars), at_line_start: true, pending_space: false };
     let mut title = String::new();
     let mut body = Out { sink: TextSink::new(max_chars), at_line_start: true, pending_space: false };
+    let walked = walk(html, &mut body, &mut title);
+    let mut truncated = body.sink.truncation(walked)?;
+    let title = crate::pystr::py_strip(&title).to_owned();
+    let mut assemble = || -> Result<()> {
+        if !title.is_empty() {
+            out.sink.push_str(&title)?;
+            out.newline()?;
+        }
+        out.sink.push_str(&body.sink.buf)
+    };
+    let assembled = assemble();
+    if let Some(t) = out.sink.truncation(assembled)? {
+        truncated = Some(t);
+    }
+    Ok((out.sink.buf, truncated))
+}
+
+/// Walks the markup: the title into `title`, the visible text into `body`.
+fn walk(s: &str, body: &mut Out, title: &mut String) -> Result<()> {
     let mut pre_depth = 0usize;
     let mut in_head = false;
     let mut i = 0usize;
-    let s = html;
     let b = s.as_bytes();
     while i < b.len() {
         if b[i] == b'<' {
@@ -268,7 +299,7 @@ pub fn html_to_text(html: &str, max_chars: usize) -> Result<String> {
                     let after = &s[i..];
                     let end = find_ci(after, "</title").unwrap_or(after.len());
                     if title.is_empty() {
-                        title = crate::pystr::collapse_whitespace(&decode_entities(&after[..end]));
+                        *title = crate::pystr::collapse_whitespace(&decode_entities(&after[..end]));
                     }
                     i += end;
                     continue;
@@ -295,13 +326,7 @@ pub fn html_to_text(html: &str, max_chars: usize) -> Result<String> {
         }
         i = next;
     }
-    let title = crate::pystr::py_strip(&title).to_owned();
-    if !title.is_empty() {
-        out.sink.push_str(&title)?;
-        out.newline()?;
-    }
-    out.sink.push_str(&body.sink.buf)?;
-    Ok(out.sink.buf)
+    Ok(())
 }
 
 /// Extension: `text/html` as a document (upstream: not supported → "Unsupported mime type").
@@ -332,8 +357,13 @@ impl DocumentParser for HtmlDocumentParser {
     fn parse(&self, path: &Path, _m: &str, ctx: &ParseContext) -> Result<ParsedDocument> {
         let raw = read_limited(path, &ctx.limits)?;
         let html = crate::text::decode_text_bytes(&raw);
-        let text = html_to_text(&html, ctx.limits.max_text_chars)?;
-        Ok(ParsedDocument { text: crate::pystr::py_strip(&text).to_owned(), date: None, archive_path: None })
+        let (text, truncated) = html_to_text_report(&html, ctx.limits.max_text_chars)?;
+        Ok(ParsedDocument {
+            text: crate::pystr::py_strip(&text).to_owned(),
+            date: None,
+            archive_path: None,
+            truncated: truncated.into_iter().collect(),
+        })
     }
     fn page_count(&self, _p: &Path, _m: &str, _c: &ParseContext) -> Option<u32> {
         None
@@ -361,5 +391,35 @@ mod tests {
         let t = html_to_text("a < b <p class=\"x>y\">c", 1000).unwrap();
         assert_eq!(t, "a < b\nc");
         assert!(html_to_text("<p>xxxxxxxxxx</p>", 4).is_err());
+    }
+
+    #[test]
+    fn text_size_limit_keeps_prefix_and_reports_truncation() {
+        let h = "<title>T</title><p>Hallo Welt \u{e4}\u{f6}\u{fc} und noch viel mehr</p>";
+        let (t, tr) = html_to_text_report(h, 1 << 20).unwrap();
+        assert_eq!(t, "T\nHallo Welt \u{e4}\u{f6}\u{fc} und noch viel mehr\n");
+        assert_eq!(tr, None, "complete text: nothing reported");
+        // 15 bytes end inside the 2-byte "\u{f6}": cut at the character boundary before it
+        let (t, tr) = html_to_text_report(h, 15).unwrap();
+        assert_eq!(t, "T\nHallo Welt \u{e4}");
+        assert_eq!(tr, Some(Truncation::Text { limit: 15 }));
+        // the strict variant still fails
+        assert!(matches!(html_to_text(h, 15), Err(ParseError::LimitExceeded(_))));
+    }
+
+    #[test]
+    fn html_parser_sets_truncated() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("a.html");
+        std::fs::write(&p, "<p>eins zwei drei vier</p>").unwrap();
+        let mut ctx = ParseContext::default();
+        let full = HtmlDocumentParser.parse(&p, "text/html", &ctx).unwrap();
+        assert!(full.truncated.is_empty());
+        assert_eq!(full.truncation_message(), None);
+        ctx.limits.max_text_chars = 9;
+        let d = HtmlDocumentParser.parse(&p, "text/html", &ctx).unwrap();
+        assert_eq!(d.text, "eins zwei");
+        assert_eq!(d.truncated, vec![Truncation::Text { limit: 9 }]);
+        assert!(d.truncation_message().is_some_and(|m| m.contains("text size limit (9 bytes)")));
     }
 }

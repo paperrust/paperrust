@@ -412,9 +412,14 @@ async fn crashed_worker_task_is_redelivered_and_fenced() {
     });
     let (stop1, h1) = start(&pool, slow, cfg(&q, &[("PAPERRUST_WORKER_NAME", "dies")]));
     let p = pool.clone();
+    // Wait for the handler itself, not only the `running` state: the claim sets `running` before
+    // mark_started/handler start, so aborting right then could kill the worker before the first run
+    // (flaky `runs == 1`).
+    let r0 = runs.clone();
     wait_for("running", 10, || {
         let p = p.clone();
-        async move { queue_state(&p, id3).await == "running" }
+        let r0 = r0.clone();
+        async move { queue_state(&p, id3).await == "running" && *r0.lock().unwrap() >= 1 }
     })
     .await;
     h1.abort(); // hard crash: no release, no heartbeat any more
@@ -824,5 +829,65 @@ async fn beat_reserves_each_slot_once_across_processes() {
         }
     }
     assert_eq!(due, 1);
+    sqlx::query("DELETE FROM paperrust_beat_state WHERE name = $1").bind(&entry.name).execute(&pool).await.unwrap();
+}
+
+/// Queue that always fails to enqueue (also in a transaction).
+struct DownQueue;
+impl TaskQueue for DownQueue {
+    fn enqueue<'a>(
+        &'a self,
+        _n: &'a str,
+        _k: Map<String, Value>,
+        _o: EnqueueOptions,
+    ) -> futures::future::BoxFuture<'a, Result<Uuid, pl_queue::QueueError>> {
+        Box::pin(async { Err(pl_queue::QueueError::Invalid("queue down".into())) })
+    }
+    fn status(&self, _id: Uuid) -> futures::future::BoxFuture<'_, Result<Option<pl_queue::TaskInfo>, pl_queue::QueueError>> {
+        Box::pin(async { Ok(None) })
+    }
+}
+
+/// Regression: the beat records a run only together with a successful enqueue (same transaction
+/// for PgQueue); after an enqueue error the slot is still due.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[ignore = "needs PAPERRUST_QUEUE_TEST_DATABASE_URL (own test database)"]
+async fn beat_records_run_only_with_enqueue() {
+    let pool = pool().await;
+    let store = PgBeatStore::new(pool.clone());
+    let queue = PgQueue::new(pool.clone(), 3);
+    let entry = BeatEntry {
+        name: format!("test entry {}", Uuid::new_v4()),
+        task: "documents.tasks.train_classifier".into(),
+        schedule: Crontab::from_paperless("5 */1 * * *").unwrap(),
+        expires: 3540.0,
+        headers: Map::new(),
+    };
+    let tz: chrono_tz::Tz = "UTC".parse().unwrap();
+    let t = |s: &str| chrono::DateTime::parse_from_rfc3339(s).unwrap().with_timezone(&chrono::Utc);
+    assert!(store.run_due(&entry, t("2024-01-01T10:00:00Z"), tz, &queue).await.unwrap().0.is_none());
+    let (sent, _) = store.run_due(&entry, t("2024-01-01T10:05:01Z"), tz, &DownQueue).await.unwrap();
+    assert!(matches!(sent, Some(Err(_))));
+    let count: i32 = sqlx::query_scalar("SELECT total_run_count FROM paperrust_beat_state WHERE name = $1")
+        .bind(&entry.name)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 0, "failed enqueue is not recorded");
+    let (sent, _) = store.run_due(&entry, t("2024-01-01T10:05:03Z"), tz, &queue).await.unwrap();
+    let id = sent.unwrap().unwrap();
+    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM paperrust_task_queue WHERE task_id = $1")
+        .bind(id.to_string())
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(n, 1);
+    let count: i32 = sqlx::query_scalar("SELECT total_run_count FROM paperrust_beat_state WHERE name = $1")
+        .bind(&entry.name)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 1);
+    assert!(store.run_due(&entry, t("2024-01-01T10:06:00Z"), tz, &queue).await.unwrap().0.is_none());
     sqlx::query("DELETE FROM paperrust_beat_state WHERE name = $1").bind(&entry.name).execute(&pool).await.unwrap();
 }

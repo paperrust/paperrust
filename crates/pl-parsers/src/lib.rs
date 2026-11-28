@@ -112,6 +112,17 @@ pub struct ParsedDocument {
     /// Path to a generated PDF version. This crate generates no PDFs → always `None`,
     /// unless a [`registry::PdfConverter`] is plugged in.
     pub archive_path: Option<PathBuf>,
+    /// PaperRust: limits that cut `text` short while the part read so far was kept (empty =
+    /// complete text). The consumer turns them into a document note ([`Self::truncation_message`]).
+    pub truncated: Vec<limits::Truncation>,
+}
+
+impl ParsedDocument {
+    /// One description of all truncations (`Truncation::message`, joined by `; `), `None` when
+    /// the text is complete.
+    pub fn truncation_message(&self) -> Option<String> {
+        limits::Truncation::join(&self.truncated)
+    }
 }
 
 /// Parser interface (upstream `ParserProtocol`). Stateless: `parse` returns the result
@@ -147,4 +158,23 @@ pub(crate) fn read_limited(path: &Path, limits: &Limits) -> Result<Vec<u8>> {
         return Err(ParseError::LimitExceeded(format!("file size {} > {}", meta.len(), limits.max_file_size)));
     }
     Ok(std::fs::read(path)?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use limits::Truncation;
+
+    #[test]
+    fn truncations_join_into_one_message() {
+        let mut d = ParsedDocument::default();
+        assert_eq!(d.truncation_message(), None);
+        d.truncated = vec![
+            Truncation::MsgProperty { stream: "/__substg1.0_1000001F".into(), size: 10, limit: 4 },
+            Truncation::PdfPages { read: 1, total: 2, limit: 1 },
+        ];
+        let m = d.truncation_message().unwrap();
+        assert!(m.starts_with("MSG property /__substg1.0_1000001F is 10 bytes"), "{m}");
+        assert!(m.contains("; Text extraction stopped at the page limit (1)"), "{m}");
+    }
 }

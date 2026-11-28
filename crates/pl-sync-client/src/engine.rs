@@ -21,7 +21,7 @@ use crate::error::{Error, Result};
 use crate::files::FileCache;
 use crate::remote::{ChangePage, PaperRustRemote, ServerInfo};
 use crate::secret::{SecretStore, target_for};
-use crate::selection::{Limits, Plan, Wants, plan};
+use crate::selection::{Limits, Plan, SkippedEntry, Wants, plan};
 use crate::store::{META_KINDS, Replica, SelectionItem, now};
 use crate::tls::TlsOptions;
 
@@ -37,6 +37,8 @@ pub const RESOLVE_THROTTLE: Duration = Duration::from_secs(30);
 pub const FULL_SYNC_EVERY: chrono::Duration = chrono::Duration::hours(24);
 /// Documents no longer selected stay for 7 days.
 pub const UNSELECTED_RETENTION: chrono::Duration = chrono::Duration::days(7);
+/// Orphan sweep of the file cache at most this often (listing the cache folder costs time).
+pub const ORPHAN_SWEEP_EVERY: Duration = Duration::from_secs(3600);
 /// Parallel file downloads.
 pub const FILE_PARALLEL: usize = 4;
 /// UUIDs per `objects/batch`.
@@ -94,10 +96,17 @@ pub struct SyncReport {
     pub objects_upserted: u64,
     pub objects_deleted: u64,
     pub documents_fetched: u64,
+    /// Documents removed locally with all their files gone from disk.
     pub documents_removed: u64,
+    /// Documents removed locally whose files could not (yet) be deleted (kept as `pending_delete`,
+    /// retried by the housekeeping) – not counted in `documents_removed`.
+    pub documents_pending_delete: u64,
     pub files_downloaded: u64,
     pub file_errors: u64,
     pub resolved: bool,
+    /// Selection entries that the server cannot resolve (e.g. saved view with a full-text rule →
+    /// 501), as `type key: reason`; they were skipped, the rest of the selection was synced.
+    pub skipped_entries: Vec<String>,
 }
 
 struct Inner {
@@ -116,6 +125,9 @@ struct Inner {
     resolve_throttle: std::sync::Mutex<Duration>,
     /// paperless-ngx: interval of the fingerprint check (default 15 min)
     fingerprint_every: std::sync::Mutex<Duration>,
+    /// last orphan sweep of the file cache + minimum interval
+    last_sweep: std::sync::Mutex<Option<Instant>>,
+    sweep_every: std::sync::Mutex<Duration>,
     wake: Notify,
 }
 
@@ -187,6 +199,8 @@ impl SyncClient {
                 has_feed: AtomicBool::new(true),
                 resolve_throttle: std::sync::Mutex::new(RESOLVE_THROTTLE),
                 fingerprint_every: std::sync::Mutex::new(ngx::FINGERPRINT_EVERY),
+                last_sweep: std::sync::Mutex::new(None),
+                sweep_every: std::sync::Mutex::new(ORPHAN_SWEEP_EVERY),
                 wake: Notify::new(),
             }),
         })
@@ -241,6 +255,14 @@ impl SyncClient {
     /// Minimum interval between two `resolve` runs (default [`RESOLVE_THROTTLE`]; tests 0).
     pub fn set_resolve_throttle(&self, d: Duration) {
         if let Ok(mut t) = self.inner.resolve_throttle.lock() {
+            *t = d;
+        }
+    }
+
+    /// Minimum interval between two orphan sweeps of the file cache (default
+    /// [`ORPHAN_SWEEP_EVERY`]; tests 0).
+    pub fn set_orphan_sweep_interval(&self, d: Duration) {
+        if let Ok(mut t) = self.inner.sweep_every.lock() {
             *t = d;
         }
     }
@@ -329,6 +351,8 @@ impl SyncClient {
         let grant = self.inner.remote.create_device(username, &password, code, &self.inner.cfg.device_name).await;
         drop(password);
         let grant = grant?;
+        // another account than the replica's owner → purge before anything is unlocked
+        self.switch_owner(username).await?;
         // Keychain: token + device UUID (for revocation even without a replica)
         let secret = Zeroizing::new(format!("{}\n{}", grant.token.as_str(), grant.device_uuid));
         self.inner.secrets.set(&target_for(&self.inner.cfg.profile_id), &secret)?;
@@ -373,6 +397,39 @@ impl SyncClient {
         Ok(revoked)
     }
 
+    /// Login as `username`: if the replica belongs to another account (or to none), discard its
+    /// documents, files, selection and response cache **before** local access is unlocked. Runs under
+    /// the reconciliation lock (a running long poll is woken up first).
+    pub(crate) async fn switch_owner(&self, username: &str) -> Result<()> {
+        let prev = self.inner.replica.remote().await?.and_then(|r| r.user_name);
+        if prev.as_deref() == Some(username) {
+            return Ok(());
+        }
+        self.set_status(|s| s.logged_in = false);
+        self.wake();
+        let _g = self.inner.run_lock.lock().await;
+        if prev.is_some() {
+            tracing::info!("another account logs in on this profile; discarding the local data of the previous one");
+        }
+        self.inner.replica.purge_account_data().await?;
+        self.inner.resolve_dirty.store(true, Ordering::SeqCst);
+        if let Ok(mut l) = self.inner.last_resolve.lock() {
+            *l = None;
+        }
+        let root = self.inner.files.root().to_path_buf();
+        if root.is_dir()
+            && let Err(e) = tokio::fs::remove_dir_all(&root).await
+        {
+            // rows are gone, so nothing is served from these files; the orphan sweep removes them
+            tracing::warn!("could not remove the file cache of the previous account: {e}");
+            if let Ok(mut l) = self.inner.last_sweep.lock() {
+                *l = None;
+            }
+        }
+        self.set_status(|s| s.documents = 0);
+        Ok(())
+    }
+
     async fn wipe_data(&self) -> Result<()> {
         self.inner.replica.reset_data().await?;
         self.inner.resolve_dirty.store(true, Ordering::SeqCst);
@@ -406,6 +463,7 @@ impl SyncClient {
         // Resolve individual documents together (one request per ≤ 5,000), tags/views individually
         let doc_keys: Vec<String> = items.iter().filter(|i| i.kind == "document").map(|i| i.key.clone()).collect();
         let mut by_uuid: HashMap<String, crate::remote::ResolvedDoc> = HashMap::new();
+        let mut skipped = Vec::new();
         for chunk in doc_keys.chunks(5_000).map(<[String]>::to_vec).collect::<Vec<_>>() {
             let r = self.inner.remote.resolve(&chunk, &[], &[], Some("any")).await?;
             as_of = as_of.max(r.as_of_seq);
@@ -418,14 +476,40 @@ impl SyncClient {
                 kind => {
                     let one = vec![it.key.clone()];
                     let (tags, views): (&[String], &[String]) = if kind == "tag" { (&one, &[]) } else { (&[], &one) };
-                    let r = self.inner.remote.resolve(&[], tags, views, Some("any")).await?;
-                    as_of = as_of.max(r.as_of_seq);
-                    r.documents
+                    match self.inner.remote.resolve(&[], tags, views, Some("any")).await {
+                        // Defensive: the server answers 501 when only unsupported views are
+                        // requested, but if it reports this view in `skipped_saved_views`
+                        // instead, treat it the same way.
+                        Ok(r) if kind == "saved_view" && r.skipped_saved_views.iter().any(|v| v.eq_ignore_ascii_case(&it.key)) => {
+                            as_of = as_of.max(r.as_of_seq);
+                            let message = "Saved view cannot be resolved on the server (skipped_saved_views).".to_string();
+                            tracing::warn!(view = it.key.as_str(), "selection: saved view cannot be resolved, skipped: {message}");
+                            skipped.push(SkippedEntry { item: it, reason: message });
+                            continue;
+                        }
+                        Ok(r) => {
+                            as_of = as_of.max(r.as_of_seq);
+                            if !r.skipped_saved_views.is_empty() {
+                                tracing::warn!(skipped = ?r.skipped_saved_views, "selection: server skipped saved views");
+                            }
+                            r.documents
+                        }
+                        // The server cannot evaluate this saved view (full-text rule, unknown rule
+                        // type): skip only this entry and report it, keep the rest of the selection.
+                        Err(Error::Api { status: 501, message, .. }) if kind == "saved_view" => {
+                            tracing::warn!(view = it.key.as_str(), "selection: saved view cannot be resolved, skipped: {message}");
+                            skipped.push(SkippedEntry { item: it, reason: message });
+                            continue;
+                        }
+                        Err(e) => return Err(e),
+                    }
                 }
             };
             resolved.push((it, docs));
         }
-        Ok(plan(resolved, self.limits().await?, as_of))
+        let mut p = plan(resolved, self.limits().await?, as_of);
+        p.skipped = skipped;
+        Ok(p)
     }
 
     /// Adopt the selection; over the limit → [`Error::LimitExceeded`] (nothing changed).
@@ -658,9 +742,11 @@ impl SyncClient {
             rep.feed_changes += 1;
             match (ch.kind.as_str(), ch.op.as_str()) {
                 ("document", "delete") => {
-                    let paths = r.delete_document(&ch.uuid).await?;
-                    FileCache::remove_paths(&paths).await;
-                    rep.documents_removed += 1;
+                    if self.inner.files.purge_document(r, &ch.uuid).await? {
+                        rep.documents_removed += 1;
+                    } else {
+                        rep.documents_pending_delete += 1;
+                    }
                 }
                 ("document", _) => {
                     let local = r.document_state(&ch.uuid).await?;
@@ -735,9 +821,11 @@ impl SyncClient {
         for (key, rev, _sel, _) in r.document_states().await? {
             match remote.get(&key) {
                 None => {
-                    let paths = r.delete_document(&key).await?;
-                    FileCache::remove_paths(&paths).await;
-                    rep.documents_removed += 1;
+                    if self.inner.files.purge_document(r, &key).await? {
+                        rep.documents_removed += 1;
+                    } else {
+                        rep.documents_pending_delete += 1;
+                    }
                 }
                 Some(rv) if *rv != rev => self.inner.resolve_dirty.store(true, Ordering::SeqCst),
                 _ => {}
@@ -757,6 +845,7 @@ impl SyncClient {
         if !p.within_limits {
             return Err(Error::LimitExceeded(p.message.unwrap_or_default()));
         }
+        rep.skipped_entries = p.skipped.iter().map(SkippedEntry::describe).collect();
         // deselected
         let at = now();
         let states = r.document_states().await?;
@@ -797,8 +886,9 @@ impl SyncClient {
             r.upsert_documents(&b.items, true, true).await?;
             rep.documents_fetched += b.items.len() as u64;
             for m in b.missing {
-                let paths = r.delete_document(&m).await?;
-                FileCache::remove_paths(&paths).await;
+                if !self.inner.files.purge_document(r, &m).await? {
+                    rep.documents_pending_delete += 1;
+                }
             }
             done += chunk.len() as u64;
             self.set_status(|s| s.done = done);
@@ -844,8 +934,7 @@ impl SyncClient {
             // delete variants no longer wanted
             for f in self.inner.replica.files_of(key).await? {
                 if f.variant != "thumb" && !variants.contains(&f.variant.as_str()) {
-                    let _ = tokio::fs::remove_file(&f.path).await;
-                    self.inner.replica.delete_file(key, &f.variant).await?;
+                    self.inner.files.drop_file(&self.inner.replica, &f).await?;
                 }
             }
             for v in variants {
@@ -879,7 +968,7 @@ impl SyncClient {
         while let Some((key, v, res)) = stream.next().await {
             done += 1;
             match res {
-                Ok(crate::files::Fetched::Unchanged) => {}
+                Ok(crate::files::Fetched::Unchanged | crate::files::Fetched::Removed) => {}
                 Ok(_) => rep.files_downloaded += 1,
                 // Network gone → abort the run (resume next time)
                 Err(e @ (Error::Offline(_) | Error::Unauthenticated | Error::PinMismatch)) => {
@@ -903,13 +992,35 @@ impl SyncClient {
         }
     }
 
+    /// Retention of deselected documents (files first, then rows), retry of pending file
+    /// deletions, orphan sweep of the cache folder (throttled, [`ORPHAN_SWEEP_EVERY`]).
     async fn housekeeping(&self) -> Result<()> {
+        let r = &self.inner.replica;
         let before = (chrono::Utc::now() - UNSELECTED_RETENTION).to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
-        let gone = self.inner.replica.purge_unselected(&before).await?;
-        for k in gone {
-            self.inner.files.remove_doc(&self.inner.replica, &k).await?;
+        for k in r.unselected_before(&before).await? {
+            self.inner.files.purge_document(r, &k).await?;
+        }
+        let left = self.inner.files.retry_pending(r).await?;
+        if left > 0 {
+            tracing::warn!(files = left, "cache files still waiting for deletion");
+        }
+        if self.take_sweep_due() {
+            let n = self.inner.files.sweep_orphans(r).await?;
+            if n > 0 {
+                tracing::info!(files = n, "removed orphan cache files");
+            }
         }
         Ok(())
+    }
+
+    fn take_sweep_due(&self) -> bool {
+        let every = self.inner.sweep_every.lock().map(|t| *t).unwrap_or(ORPHAN_SWEEP_EVERY);
+        let Ok(mut last) = self.inner.last_sweep.lock() else { return true };
+        if last.is_some_and(|t| t.elapsed() < every) {
+            return false;
+        }
+        *last = Some(Instant::now());
+        true
     }
 
     // ------------------------------------------------------------------ continuous operation

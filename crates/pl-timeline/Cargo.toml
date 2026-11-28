@@ -21,3 +21,7 @@ thiserror.workspace = true
 # upstream date detection (DATE_REGEX + dateparser) for content detection
 pl-matching.workspace = true
 
+[dev-dependencies]
+# tests/backfill_lock.rs (advisory lock of the backfill, against a local test DB)
+tokio.workspace = true
+

@@ -49,6 +49,10 @@ Standard `*/10` mit SECRET_KEY-Offset, `expires` 540 s) steht in `pl_queue::beat
    Log `No rules enabled for account …. Skipping.`
 3. Je Konto `handle_mail_account`; `MailError` → Log, weiter.
 4. Ergebnis `"Added N document(s)."` bzw. `"No new documents were added."` (N = eingereihte Dateien).
+   Abweichung (pl-mail.md Known difference 26): Konto-Fehler (MailError, Verbindungs-/Postfachfehler,
+   OAuth-Erneuerung gescheitert, alle aktiven Regeln gescheitert) werden mitgezählt. Alle versuchten
+   Konten gescheitert → Task FAILURE `MailError: All N mail account(s) failed: <konto>: <fehler>; …`;
+   nur einige → upstream-Text + ` K of N mail account(s) failed: …`. Ohne Fehler Texte unverändert.
 
 ## `handle_mail_account(account)`
 
@@ -101,19 +105,32 @@ MailError. Regeln nach `order` (dann `id`), deaktivierte übersprungen, Fehler j
   Datei `sanitize(NFC(filename))` bzw. `no-name-attachment`. Overrides: title, filename,
   correspondent, document_type, tag_ids, `owner_id` nur mit `assign_owner_from_rule`.
   Keine Datei → `PROCESSED_WO_CONSUMPTION`.
-- Einreihen: `chord([consume_file…] (trigger_source=email_consume), apply_mail_action.s(rule_id,
-  message_uid, message_subject, message_date, uid_validity)).on_error(error_callback.s(…))`
-  (`message_date` als ISO-Text, aware in TIME_ZONE). `consume_file`-kwargs wie pl-queue B5.
+- Einreihen: **ein** `chord([consume_file…] (trigger_source=email_consume), apply_mail_action.s(rule_id,
+  message_uid, message_subject, message_date, uid_validity, folder, account_id)).on_error(error_callback.s(…))`
+  je Mail – bei Scope 3 (EVERYTHING) eml zuerst, dann die Anhänge in Mail-Reihenfolge im selben Chord
+  (upstream: zwei Chords mit derselben Aktion; pl-mail.md Known difference 25).
+  `PROCESSED_WO_CONSUMPTION` nur, wenn gar nichts eingereiht wurde. `folder`/`account_id` sind
+  PaperRust-kwargs (Known difference 24). `message_date` als ISO-Text, aware in TIME_ZONE.
+  `consume_file`-kwargs wie pl-queue B5.
 
 ## `apply_mail_action` / `error_callback`
 
-`apply_mail_action`: neue Verbindung, Login (`SELECT "INBOX"`), `SELECT <regel-ordner>`, Aktion:
-DELETE `UID STORE u +FLAGS (\Deleted)` + `EXPUNGE`; MARK_READ/FLAG `UID STORE u +FLAGS (\Seen|\Flagged)`
-+ `EXPUNGE` (imap_tools `flag()` löscht immer); MOVE `UID MOVE u "<ziel>"` bzw. ohne `MOVE`-Fähigkeit
-COPY + STORE + EXPUNGE; TAG Gmail `UID STORE u +X-GM-LABELS kw` (ohne Statusprüfung; Apple-Farbe mit
-Gmail → ohne Argument, wie upstream), Apple `-FLAGS ($MailFlagBit0 $MailFlagBit1 $MailFlagBit2)`,
-`+FLAGS (<bits>)`, `+FLAGS (\Flagged)` (jeweils + EXPUNGE), sonst `+FLAGS (kw)`. `LOGOUT` ohne `BYE` →
-Fehler. Ergebnis `ProcessedMail` `SUCCESS` bzw. `FAILED` mit Fehlertext, danach Aufgabenfehler.
+`apply_mail_action`: Regel laden; zeigt sie inzwischen auf ein anderes Konto oder einen anderen Ordner
+als in den kwargs `account_id`/`folder` → überspringen ohne Verbindung (pl-mail.md Known difference 24).
+Sonst neue Verbindung, Login (`SELECT "INBOX"`), `SELECT <regel-ordner>`; UIDVALIDITY aus
+`OK [UIDVALIDITY n]` (sonst `STATUS`) ≠ gespeicherter Wert → überspringen. Überspringen = Warnung im
+Log, `ProcessedMail` `FAILED` mit Grund in `error`, Task-Ergebnis SUCCESS mit dem Grund als Text.
+Unbekannte UIDVALIDITY oder Tasks ohne die neuen kwargs → keine Prüfung, wie upstream.
+Aktionen (Known difference 23 – **kein** ordnerweites `EXPUNGE` nach Markier-Aktionen):
+DELETE `UID STORE u +FLAGS (\Deleted)` + `UID EXPUNGE u` (mit `UIDPLUS`, auch nach der Anmeldung
+gemeldet); MARK_READ/FLAG `UID STORE u +FLAGS (\Seen|\Flagged)` ohne `EXPUNGE`; MOVE `UID MOVE u "<ziel>"`
+bzw. ohne `MOVE`-Fähigkeit `UID COPY` + DELETE wie eben; TAG Gmail `UID STORE u +X-GM-LABELS kw`
+(Antwortstatus geprüft: `NO` → `MailboxTaggingError: "NO" received` → FAILED, Known difference 27;
+Apple-Farbe mit Gmail → ohne Argument, wie upstream), Apple `-FLAGS ($MailFlagBit0 $MailFlagBit1
+$MailFlagBit2)`, `+FLAGS (<bits>)`, `+FLAGS (\Flagged)`, sonst `+FLAGS (kw)` – jeweils ohne `EXPUNGE`.
+Rückfall ohne `UIDPLUS` (nur DELETE und MOVE ohne `MOVE`): ordnerweites `EXPUNGE` wie upstream,
+Warnung im Log. `LOGOUT` ohne `BYE` → Fehler. Ergebnis `ProcessedMail` `SUCCESS` bzw. `FAILED` mit
+Fehlertext, danach Aufgabenfehler.
 `error_callback`: `ProcessedMail` `FAILED` per `get_or_create` (idempotent; pl-queue ruft je
 fehlgeschlagenem Kopf + einmal `ChordError`).
 
@@ -159,7 +176,8 @@ fehlgeschlagenem Kopf + einmal `ChordError`).
 
 1. **Abrufsperre** per PostgreSQL-Advisory-Lock statt Django-Cache-Schlüssel (kein TTL nötig, löst sich
    beim Verbindungsabbruch). Nicht mit einem gleichzeitig laufenden paperless-ngx/Celery-Worker geteilt (Mischbetrieb
-   gibt es seit 2026-11-14 nicht mehr).
+   gibt es seit 2026-11-14 nicht mehr; dasselbe gilt für die Warteschlange – deshalb dürfen die
+   Mail-Aufgaben PaperRust-kwargs tragen, pl-mail.md Known difference 28).
 2. **GPG-Entschlüsselung** (M1, 2026-11-18, `fetch/gpg.rs`): `PAPERRUST_/PAPERLESS_ENABLE_GPG_DECRYPTOR`
    und `PAPERRUST_/PAPERLESS_EMAIL_GNUPG_HOME` wie upstream; Nachrichten mit `multipart/encrypted`
    werden mit dem Programm `gpg` (`--batch --decrypt`, wie python-gnupg) entschlüsselt, fehlende
@@ -203,6 +221,11 @@ fehlgeschlagenem Kopf + einmal `ChordError`).
 12. **`fnmatch`** wie POSIX (`normcase` unverändert); die Referenz unter Windows ersetzt zusätzlich `/`.
 13. **Mehrdeutige Korrespondenten** (`get` liefert mehrere): Fehler der Nachricht wie upstream
     (`MultipleObjectsReturned`), Text anders.
+14. **Mail-Abruf-Review 2026-11-27**: kein ordnerweites `EXPUNGE` nach Markier-Aktionen, Prüfung von
+    Konto/Ordner/UIDVALIDITY vor der verzögerten Aktion, ein Chord je Mail, Konto-Fehler im Ergebnis,
+    geprüfter Gmail-Label-Status – Einzelheiten und Tests in `pl-mail.md`, Known differences 23–27
+    (maßgeblich; die Abschnitte oben fassen sie nur zusammen). Neue kwargs ohne Rücksicht auf
+    Python-Worker: Known difference 28.
 
 ## Paritätsstand / Tests
 
@@ -230,15 +253,26 @@ fehlgeschlagenem Kopf + einmal `ChordError`).
     `process_mail_accounts` (eigene DB `pl_w6_test_up`, Overlay `pl_w6_settings`, `consume_file`
     aufzeichnend ersetzt, da die Referenz kein OCR hat): Ergebnistexte, eingereihte Dateien
     (Name, SHA-256, MIME, Overrides), ProcessedMail, angelegte Korrespondenten + Audit-Einträge,
-    IMAP-Befehlsfolge des Abrufs, IMAP-Aktionen, Postfachzustand danach –
-    **8 Vergleichsgruppen, 0 Abweichungen** (15 Dateien, 28 ProcessedMail, 14 Aktionsverbindungen).
-    Einzige Normalisierung: die Referenz unter Windows liefert für Pfade mit Umlauten statt des
+    IMAP-Befehlsfolge des Abrufs, IMAP-Aktionen, Postfachzustand danach.
+    Upstream läuft live (`run_upstream.sh`, keine Aufzeichnung). Die gewollten Abweichungen werden
+    in `apply_known_differences` auf die upstream-Beobachtung angewandt und **gezählt**; die Zähler
+    sind eine eigene Vergleichsgruppe (exakt): Known difference 23 – 6× `EXPUNGE` nach
+    `UID STORE ±FLAGS` entfernt (das `EXPUNGE` nach `+FLAGS (\Deleted)` bleibt: der Fake-Server meldet
+    kein `UIDPLUS` → Rückfall wie upstream); Known difference 25 – Regel 203 (EVERYTHING), Archiv
+    UID 3: 1 doppelte `ProcessedMail`-SUCCESS-Zeile und 1 doppelte `UID MOVE 3 "Done"`-Verbindung
+    entfernt, 0 zusätzliche `PROCESSED_WO_CONSUMPTION`. Known difference 24 wird auf der Rust-Seite
+    geprüft (jede eingereihte `apply_mail_action` trägt `folder` und `account_id`); 26 und 27 zeigen
+    sich im Szenario nicht (kein Konto scheitert ganz; Gmail-Label ohne Argument scheitert auf beiden
+    Seiten), werden daher nicht umgeschrieben und müssen gleich sein. Jede andere Abweichung
+    schlägt fehl. Stand 2026-11-28: **9 Vergleichsgruppen, 0 Abweichungen** (15 Dateien,
+    27 ProcessedMail, 13 Aktionsverbindungen).
+    Weitere Normalisierung: die Referenz unter Windows liefert für Pfade mit Umlauten statt des
     MIME-Typs eine libmagic-Fehlermeldung (Referenz-Artefakt).
   - `mail_worker_queue_e2e`: derselbe Ablauf über `PgQueue` + `Worker` (echte Chords, Errbacks,
-    FAILED-Jobs) und die Abrufsperre (zweiter Lauf → „Skipped …“). Mit asynchronen Aktionen
-    entstehen – wie mit einem echten Celery-Worker – zusätzliche `PROCESSED_WO_CONSUMPTION`-Zeilen
-    bei EVERYTHING (Aktion läuft nach der Anhangsprüfung) und spätere Löschungen im zweiten Lauf;
-    eager-upstream sieht diese nicht.
+    FAILED-Jobs) und die Abrufsperre (zweiter Lauf → „Skipped …“). Mit asynchronen Aktionen laufen
+    Verschieben/Löschen erst nach dem Abruf (z. B. Löschungen im zweiten Lauf); geprüft werden nur
+    Invarianten (fehlgeschlagene Aktionen = FAILED-Zeilen, Gmail-Label gesetzt, ≥ 3 Mails in
+    `Done`, gelöschte Mail weg), kein Vergleich mit upstream.
 
 ## Upstream-Fixes nach v3.4.2 (paperless-ngx `dev`)
 

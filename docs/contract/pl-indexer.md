@@ -114,10 +114,17 @@ ix.optimize()                                                       // no-op wie
 
 - `remove` = `delete_query(TermQuery(id))` (wie `delete_documents_by_query(term_query)`).
 - `add_or_update*` = `remove(pk)` + `add_document`.
-- `rebuild`: (Sperre, s. u.) → `wipe_index` → `.rebuilding` anlegen → Index anlegen → Sentinels →
-  Writer(512 MB) → Dokumente in Blöcken zu 1000 (`ORDER BY created DESC`, je Block 8 feste
-  Abfragen, kein N+1) → `commit` → `wait_merging_threads` → Marker entfernen. Fehler: Writer
-  verworfen, Marker bleibt (nächstes `needs_rebuild` → true), wie upstream.
+- `rebuild`: (Sperre, s. u.) → neuer Index in `INDEX_DIR/.rebuild-staging/` (lebender Index
+  unberührt) → Writer(512 MB) → Dokumente in Blöcken zu 1000 (`ORDER BY created DESC`, je Block 8 feste
+  Abfragen, kein N+1) → `commit` → `wait_merging_threads` → **Tausch** (`writer::swap_in`):
+  `.rebuilding` im lebenden Ordner anlegen → Segmentdateien (UUID-Namen, keine Kollision)
+  hineinverschieben → Sentinels → `meta.json` per rename ersetzen (= Umschalten für Leser/Writer;
+  ein offener pl-search-Leser lädt neu) → `.managed.json` ersetzen → alte Dateien löschen (best
+  effort, unter Windows noch gemappte Dateien bleiben bis zum nächsten Rebuild) → Marker entfernen →
+  Staging-Ordner weg. Fehler vor dem Tausch: Staging verworfen, **alter Index bleibt nutzbar** und
+  sein Marker-Zustand unverändert (Known differences 8). Absturz mitten im Tausch: Marker bleibt →
+  nächster Start baut neu.
+- `--if-needed`: Zählfehler der DB (`count_root_docs`) wird weitergereicht (Known differences 9).
 - DB-Zugriff nur lesend (sqlx, gebundene Parameter; `$n`-Platzhalterlisten für `IN`).
 
 ## Sperren (Kompatibilität mit dem Python-Writer)
@@ -194,6 +201,25 @@ ix.optimize()                                                       // no-op wie
    (Feld übersprungen).
 7. Ungültige Werte, die tantivy-py ablehnen würde (negatives u64, Datum außerhalb i64-ns bei
    modified/added), führen wie upstream zum Abbruch der Batch (`IndexerError::InvalidValue`).
+8. **Rebuild baut daneben und tauscht** (Review 2026-11-27): upstream (`rebuild_in_progress`) wischt den
+   Ordner zuerst; scheitert der Neuaufbau (DB-Fehler, ungültiger Wert, Absturz), gibt es bis zum nächsten
+   erfolgreichen Lauf keinen nutzbaren Index. PaperRust baut in `.rebuild-staging/` und schaltet erst
+   über das Ersetzen von `meta.json` um; bei Fehlern bleibt der alte Index. `--recreate` wischt daher
+   nicht mehr vorab (der Tausch entfernt ohnehin alle alten Dateien). Kurzzeitig liegen alter und neuer
+   Index nebeneinander (doppelter Platz). Tests `writer::tests::failed_rebuild_keeps_the_old_index`,
+   `rebuild_swaps_in_the_new_index`.
+9. **`reindex --if-needed` mit DB-Fehler beim Zählen** (Review 2026-11-27): vorher als 0 Dokumente
+   gewertet → „Search index is up to date.“ trotz Fehler. Jetzt Fehler `database: …` (CLI:
+   `index rebuild failed: database: …`, Server-Start: Log „Search index rebuild at startup failed“).
+   Test `writer::tests::if_needed_propagates_db_count_error`.
+10. **`reindex --if-needed` erkennt ein fremdes Archiv** (dritte Review 2026-11-27): Die Zählprüfung (2.)
+   ließ nach einem Datenbankwechsel auf ein anderes, ähnlich großes Archiv den alten Index aktiv. Jetzt
+   zusätzlich: bis zu 64 gleichmäßig verteilte `(id, checksum)`-Paare aus dem Index (`indexed_sample`)
+   werden mit den lebenden Wurzeldokumenten der DB verglichen; findet sich weniger als die Hälfte mit
+   gleicher id **und** Prüfsumme → Neuaufbau (`index_from_other_archive`). Keine zusätzliche
+   Metadatendatei: der Vergleich nutzt die gespeicherten Felder `id`/`checksum` und bleibt bei normalem
+   Betrieb (inkrementelle Updates) stabil. Ein DB-Fehler dabei wird weitergereicht wie in 9. Test
+   `writer::tests::index_of_another_archive_with_similar_count_is_detected`.
 
 ## Nicht durch die Referenzdaten abgedeckt
 

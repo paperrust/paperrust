@@ -30,7 +30,7 @@ fn page_count(p: &Path) -> usize {
 }
 
 async fn search(pdf: &Path, term: &str) -> usize {
-    match run_with(&tool(), Op::Search { input: s(pdf), terms: vec![term.into()], max_hits: 50 }, limits()).await {
+    match run_with(&tool(), Op::Search { input: s(pdf), terms: vec![term.into()], max_hits: 50, ocr_input: None }, limits()).await {
         Ok(Reply::Hits { hits, .. }) => hits.len(),
         other => panic!("search failed: {other:?}"),
     }
@@ -102,7 +102,14 @@ async fn pdf_tools_work_on_the_converted_pdf() {
     let red = t.path().join("redacted.pdf");
     let r = run_with(
         &tool(),
-        Op::Redact { input: s(&pdf), output: s(&red), areas: vec![], terms: vec!["Geheimnummer".into()], remove_metadata: true },
+        Op::Redact {
+            input: s(&pdf),
+            output: s(&red),
+            areas: vec![],
+            terms: vec!["Geheimnummer".into()],
+            remove_metadata: true,
+            ocr_input: None,
+        },
         limits(),
     )
     .await

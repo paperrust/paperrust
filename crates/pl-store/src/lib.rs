@@ -84,12 +84,16 @@ impl Store {
 /// their object permissions. If the model permission `view_<kind>` is missing (or the user is inactive), the
 /// set is empty. The values are inlined into the SQL (sea-query), no placeholders.
 pub fn visible_ids_sql(p: &Principal, kind: Kind) -> Result<String, DomainError> {
-    let user = auth::user(p)?;
+    Ok(visible_ids_sql_for(auth::user(p)?, kind))
+}
+
+/// [`visible_ids_sql`] for a user object, e.g. one re-read inside a transaction under lock.
+pub fn visible_ids_sql_for(user: &pl_authz::User, kind: Kind) -> String {
     let spec = perm::spec(kind);
     if perm::require(user, spec.view_perm).is_err() {
-        return Ok("SELECT NULL::int4 WHERE false".into());
+        return "SELECT NULL::int4 WHERE false".into();
     }
-    Ok(sync::visible_sql(user, kind))
+    sync::visible_sql(user, kind)
 }
 
 pub(crate) fn db_err(e: sqlx::Error) -> DomainError {
@@ -184,7 +188,7 @@ impl Repo for Store {
         Box::pin(sync::ids(self, p, kind))
     }
 
-    fn resolve<'a>(&'a self, p: &'a Principal, sel: &'a Selection) -> BoxFut<'a, Vec<ResolvedDoc>> {
+    fn resolve<'a>(&'a self, p: &'a Principal, sel: &'a Selection) -> BoxFut<'a, Resolution> {
         Box::pin(sync::resolve(self, p, sel))
     }
 

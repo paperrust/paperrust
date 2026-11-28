@@ -39,6 +39,9 @@ pub struct ParsedOutput {
     pub text: Option<String>,
     pub date: Option<DateTime<FixedOffset>>,
     pub archive_path: Option<PathBuf>,
+    /// PaperRust: a parser limit cut the extracted text short (English description from
+    /// `pl_parsers::limits::Truncation::message`); stored as a system note ([`crate::system_note`]).
+    pub truncation: Option<String>,
 }
 
 /// Error of a building block: `Parse` = upstream `ParseError` (text = `str(e)`), `Other` = other exception.
@@ -85,11 +88,17 @@ pub trait DocumentParsing: Send + Sync {
     }
     /// `parser.get_page_count(path, mime)`.
     fn page_count(&self, parser: &ParserInfo, req: &ParseRequest<'_>, archive: Option<&Path>) -> Option<i64>;
-    /// PaperRust: at most `max_pages` page images (PNG/JPEG/WebP, ≤ 8 MiB, ~170 dpi) for the
-    /// AI text recognition (pl-core `vision`). Default: none (AI text recognition is skipped).
-    fn page_images(&self, path: &Path, mime_type: &str, max_pages: usize) -> Result<Vec<pl_core::vision::PageImage>, StageError> {
-        let _ = (path, mime_type, max_pages);
-        Ok(Vec::new())
+    /// PaperRust: page images (downscaled to `max_side`) and line crops for the AI transcription
+    /// (pl-core `vision`, selection from pl-ocr `uncertain`). Default: none (AI transcription is skipped).
+    fn vision_request(
+        &self,
+        src: &pl_ocr::uncertain::RequestSources<'_>,
+        sel: &pl_ocr::uncertain::Selection,
+        lines: Option<&pl_ocr::uncertain::LinesFile>,
+        max_side: u32,
+    ) -> Result<pl_core::vision::VisionRequest, StageError> {
+        let _ = (src, sel, lines, max_side);
+        Ok(pl_core::vision::VisionRequest::default())
     }
 }
 

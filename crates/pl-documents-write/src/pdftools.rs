@@ -209,26 +209,23 @@ pub(crate) fn s(p: &FsPath) -> String {
 }
 
 fn hit_json(h: &Hit) -> Value {
-    json!({"page": h.page + 1, "term": h.term, "context": h.context, "rects": h.rects})
+    json!({"page": h.page + 1, "term": h.term, "context": h.context, "rects": h.rects, "from_ocr": h.from_ocr})
 }
 
-/// Search: first in the original; if nothing is found there and there is an archive PDF (OCR text layer
-/// of a scan), then there. Page geometry of original and archive is the same (OCRmyPDF).
-async fn search_both(
-    src: &FsPath,
-    archive: Option<&FsPath>,
-    terms: &[String],
-    max_hits: usize,
-) -> Result<(Vec<Hit>, bool, &'static str), RunError> {
-    let r = pl_pdftools::runner::run(Op::Search { input: s(src), terms: terms.to_vec(), max_hits }).await?;
-    let Reply::Hits { hits, truncated } = r else { return Err(RunError::Protocol("unexpected reply".into())) };
-    if !hits.is_empty() || archive.is_none() {
-        return Ok((hits, truncated, "original"));
+/// `source` of the search answer: `archive` as soon as a hit comes only from the OCR text layer
+/// (the UI then says the hits come from text recognition), otherwise `original`.
+pub fn search_source(hits: &[Hit]) -> &'static str {
+    if hits.iter().any(|h| h.from_ocr) { "archive" } else { "original" }
+}
+
+/// Search per page in the original **and** in the archive PDF (OCR text layer of scanned pages),
+/// merged in the child process (archive hits mapped onto the original's pages, duplicates once).
+async fn search_both(src: &FsPath, archive: Option<&FsPath>, terms: &[String], max_hits: usize) -> Result<(Vec<Hit>, bool), RunError> {
+    let op = Op::Search { input: s(src), terms: terms.to_vec(), max_hits, ocr_input: archive.map(s) };
+    match pl_pdftools::runner::run(op).await? {
+        Reply::Hits { hits, truncated } => Ok((hits, truncated)),
+        _ => Err(RunError::Protocol("unexpected reply".into())),
     }
-    let Some(a) = archive else { return Ok((hits, truncated, "original")) };
-    let r = pl_pdftools::runner::run(Op::Search { input: s(a), terms: terms.to_vec(), max_hits }).await?;
-    let Reply::Hits { hits, truncated } = r else { return Err(RunError::Protocol("unexpected reply".into())) };
-    Ok((hits, truncated, "archive"))
 }
 
 /// `consume_file` with `root_document_id` (new version), returns the task id.
@@ -303,10 +300,10 @@ async fn redact_search(state: &AppState, ctx: &RequestContext, auth: &AuthUser, 
     }
     let t = target(state, auth, pk).await?;
     let (src, archive) = paths(state, &t.source)?;
-    let (hits, truncated, from) = search_both(&src, archive.as_deref(), &terms, 500).await.map_err(run_error)?;
+    let (hits, truncated) = search_both(&src, archive.as_deref(), &terms, 500).await.map_err(run_error)?;
     Ok(ok(
         ctx,
-        json!({"document": t.root.id, "version": t.source.id, "source": from, "truncated": truncated, "hits": hits.iter().map(hit_json).collect::<Vec<_>>()}),
+        json!({"document": t.root.id, "version": t.source.id, "source": search_source(&hits), "truncated": truncated, "hits": hits.iter().map(hit_json).collect::<Vec<_>>()}),
     ))
 }
 
@@ -329,7 +326,7 @@ pub async fn redact_handler(
 async fn redact(state: &AppState, ctx: &RequestContext, auth: &AuthUser, pk: &str, body: &axum::body::Bytes) -> ApiResult<Response> {
     let m = body_map(ctx, body)?;
     let mut errors = Errors::default();
-    let mut areas = parse_areas(m.get("areas")).unwrap_or_else(|e| {
+    let areas = parse_areas(m.get("areas")).unwrap_or_else(|e| {
         errors.add("areas", e);
         Vec::new()
     });
@@ -347,25 +344,11 @@ async fn redact(state: &AppState, ctx: &RequestContext, auth: &AuthUser, pk: &st
     }
     let t = target(state, auth, pk).await?;
     let (src, archive) = paths(state, &t.source)?;
-    let mut tool_terms = terms.clone();
-    if !terms.is_empty() {
-        // Terms only in the archive (scan with OCR text): hits there as areas on the original
-        let (hits, truncated, from) = search_both(&src, archive.as_deref(), &terms, 10_000).await.map_err(run_error)?;
-        if truncated {
-            return Err(detail(StatusCode::BAD_REQUEST, "Too many matches for the search terms; nothing was changed."));
-        }
-        if from == "archive" {
-            for h in &hits {
-                areas.extend(h.rects.iter().map(|r| Area { page: h.page, rect: *r }));
-            }
-            tool_terms.clear();
-            if areas.is_empty() && !remove_metadata {
-                return Err(detail(StatusCode::BAD_REQUEST, "The search terms were not found; nothing was changed."));
-            }
-        }
-    }
     let out = scratch_file(state, &output_name(t.source.original_filename.as_deref(), t.root.id, "redacted"))?;
-    let op = Op::Redact { input: s(&src), output: s(&out), areas, terms: tool_terms, remove_metadata };
+    // The child searches the terms per page in the original and in the archive PDF (OCR text of
+    // scanned pages), redacts every hit and verifies both text layers (fail-closed).
+    let ocr_input = if terms.is_empty() { None } else { archive.as_deref().map(s) };
+    let op = Op::Redact { input: s(&src), output: s(&out), areas, terms, remove_metadata, ocr_input };
     let report = match pl_pdftools::runner::run(op).await {
         Ok(Reply::Redacted(r)) => r,
         Ok(_) => {
@@ -495,6 +478,19 @@ mod tests {
         assert!(detail.contains("not installed") && detail.contains("paperrust-pdftool"), "{detail}");
         let ApiError::Core(e) = run_error(RunError::Timeout(5)) else { panic!("expected core error") };
         assert_eq!(e.status(), StatusCode::GATEWAY_TIMEOUT);
+    }
+
+    /// Review finding 2026-11-27: hits of the original and of the OCR archive are reported together;
+    /// `source` says `archive` as soon as one comes from text recognition, each hit says it itself.
+    #[test]
+    fn search_answer_marks_ocr_hits() {
+        let h = |page, from_ocr| Hit { page, term: "x".into(), context: String::new(), rects: vec![], from_ocr };
+        assert_eq!(search_source(&[h(0, false)]), "original");
+        assert_eq!(search_source(&[]), "original");
+        let both = [h(0, false), h(1, true)];
+        assert_eq!(search_source(&both), "archive");
+        assert_eq!(hit_json(&both[1])["from_ocr"], json!(true));
+        assert_eq!(hit_json(&both[1])["page"], json!(2));
     }
 
     #[test]

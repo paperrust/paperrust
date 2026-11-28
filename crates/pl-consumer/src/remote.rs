@@ -14,6 +14,7 @@
 //! The run with `produce_archive` is done by `NativeParsing::parse` (the trait does not know the
 //! switch); thumbnail from the archive or the PDF original like `get_thumbnail`.
 
+use std::cell::RefCell;
 use std::path::Path;
 
 use pl_ocr::config::{REMOTE_SUPPORTED_MIME_TYPES, RemoteOcrConfig};
@@ -27,7 +28,9 @@ pub struct RemoteDocumentParser {
 }
 
 impl RemoteDocumentParser {
-    /// `parse(document_path, mime_type, produce_archive=…)` → text and archive PDF.
+    /// `parse(document_path, mime_type, produce_archive=…)` → text and archive PDF, plus the
+    /// truncation of the local text extraction (born-digital PDF without archive) in
+    /// [`ParsedDocument::truncated`], if a parser limit cut it short (same single pass).
     pub fn run(
         &self,
         path: &Path,
@@ -36,11 +39,16 @@ impl RemoteDocumentParser {
         tempdir: &Path,
         ctx: &ParseContext,
     ) -> Result<ParsedDocument, ParseError> {
-        let extract = |p: &Path| pl_parsers::pdf::extract_pdf_text(p, ctx);
+        let truncated = RefCell::new(Vec::new());
+        let extract = |p: &Path| {
+            let r = pl_parsers::pdf::extract_pdf_text_report(p, ctx)?;
+            truncated.borrow_mut().extend(r.truncated);
+            r.text
+        };
         let out = pl_ocr::remote::parse(&self.cfg, tempdir, path, mime_type, produce_archive, &extract)
             .map_err(|e| ParseError::Upstream(e.message()))?;
         // get_date() is always None
-        Ok(ParsedDocument { text: out.text, date: None, archive_path: out.archive_path })
+        Ok(ParsedDocument { text: out.text, date: None, archive_path: out.archive_path, truncated: truncated.into_inner() })
     }
 }
 

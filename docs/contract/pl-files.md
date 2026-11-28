@@ -204,9 +204,20 @@ Temp-Datei `*-compressed-archive` in `SCRATCH_DIR` an und löscht sie.
    (`share_i18n.rs`, generiert aus `src/locale/*/LC_MESSAGES/django.po`, nicht-fuzzy) für die aktive Sprache
    (`Accept-Language`/`django_language`-Cookie); ohne Übersetzung Englisch wie Djangos gettext. Vorher bei
    anderer Sprache als Englisch 404 „nicht unterstützt“.
-7. **Conditional vor Objektrecht** (preview/thumb): wie upstream übernommen – ein Nutzer mit
-   globalem `view_document`, aber ohne Objektrecht, erhält bei passendem `If-None-Match` 304
-   (ohne Body). Upstream-Verhalten, bewusst nicht geändert.
+7. **Objektrecht vor Conditional** (preview/thumb, seit 2026-11-27, bewusste Sicherheitsverbesserung
+   gegenüber upstream): upstream (`@method_decorator(condition(etag_func=…, last_modified_func=…))`
+   auf `DocumentViewSet.preview`/`thumb`) berechnet ETag/Last-Modified über
+   `resolve_effective_document_by_pk` **vor** der Objektrechtsprüfung; ein Nutzer mit globalem
+   `view_document`, aber ohne Objektrecht, erhielt so bei passendem `If-None-Match` 304 bzw. bei
+   `If-Match` 412 und an der 403-Antwort die Prüfsumme als `ETag` und `Last-Modified`
+   (Orakel für Existenz/Inhalt). PaperRust prüft zuerst Dokument + Objektrecht
+   (`_resolve_request_and_root_doc`, 404/403), erst danach ETag/Last-Modified und die
+   Vorbedingungen (304/412), dann die Auslieferung (`files.rs::guarded_conditional_view`).
+   Außerdem hängt `conditional::finish` `ETag`/`Last-Modified` nur an 2xx- und 304-Antworten (Django:
+   an jede GET/HEAD-Antwort, auch 403/404/412); `Cache-Control: no-cache` bleibt an zurückgegebenen
+   Antworten wie upstream. Folgen: nicht existierendes Dokument mit `If-Match` → 404 statt 412;
+   403/404/412 ohne Validatoren. Regressionstests `files::tests::refused_request_never_sees_validators_or_304`,
+   `conditional::tests::finish_skips_validators_on_errors`.
 8. **libmagic** (Logo): eigener Sniffer für PNG/JPEG/GIF/WebP/SVG/ICO/BMP, sonst
    `application/octet-stream`; libmagic kann für exotische Dateien andere Typen liefern.
 9. **bulk_download unter Windows (nur Referenz):** upstream öffnet die temporäre ZIP-Datei und

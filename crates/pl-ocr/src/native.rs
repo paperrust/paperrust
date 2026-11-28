@@ -152,6 +152,9 @@ pub struct NativeOcrmypdf {
     /// Page-work permits shared with all other documents of the process ([`crate::permits`]);
     /// `None`: fixed `jobs` page tasks without sharing (previous behaviour; benchmarks).
     pub page_pool: Option<std::sync::Arc<crate::permits::PagePool>>,
+    /// Parser limits (pages, time, text size) for reading the text of the original/archive PDF
+    /// ([`OcrBackend::extract_pdf_text_report`]); the consumer passes its configured limits.
+    pub limits: pl_parsers::Limits,
 }
 
 /// Evaluated OCRmyPDF options.
@@ -739,7 +742,21 @@ pub fn page_dpi(opts: &Options, a: &pdfwrite::PageAnalysis) -> f64 {
 
 impl NativeOcrmypdf {
     pub fn new(engine: Option<Box<dyn OcrEngine>>, renderer: Box<dyn PdfRenderer>, workdir: PathBuf) -> Self {
-        Self { engine, renderer, meta: OutputMeta::default(), max_render_dpi: 600.0, workdir, page_pool: Some(crate::permits::global()) }
+        Self {
+            engine,
+            renderer,
+            meta: OutputMeta::default(),
+            max_render_dpi: 600.0,
+            workdir,
+            page_pool: Some(crate::permits::global()),
+            limits: pl_parsers::Limits::default(),
+        }
+    }
+
+    /// Sets the parser limits for the PDF text extraction (see [`Self::limits`]).
+    pub fn with_limits(mut self, limits: pl_parsers::Limits) -> Self {
+        self.limits = limits;
+        self
     }
 
     fn engine(&self, languages: &str, checked: &mut bool) -> Result<&dyn OcrEngine> {
@@ -769,15 +786,32 @@ impl NativeOcrmypdf {
             let mut rot = 0;
             let as_gray = |r: &Raster| -> Raster { crate::preprocess::to_gray(r) };
             let gray_needed = |r: &Raster| ocr_gray && r.channels != 1;
-            let orientation = if !opts.rotate_pages {
-                None
-            } else if gray_needed(&raster) {
-                engine.orientation_raster(&as_gray(&raster), &path, opts.non_ocr_timeout.or(opts.tesseract_timeout))?
-            } else {
-                engine.orientation_raster(&raster, &path, opts.non_ocr_timeout.or(opts.tesseract_timeout))?
-            };
+            // Page orientation as a separate step before recognition (docs/OCR-NEXT.md stage 1):
+            // `PAPERRUST_OCR_ORIENTATION` = model (classifier, for every engine) | engine (as before) | off.
+            let (mode, classifier) =
+                if opts.rotate_pages { crate::ppocr::OrientationMode::resolve() } else { (crate::ppocr::OrientationMode::Off, None) };
+            let mut threshold = opts.rotate_threshold;
+            let mut orientation = None;
+            let mut model_used = false;
+            if let Some(cls) = classifier.as_deref() {
+                match crate::ppocr::model_orientation(cls, &raster) {
+                    Ok(o) => {
+                        orientation = o;
+                        threshold = crate::ppocr::ORIENTATION_MIN_PROB;
+                        model_used = true;
+                    }
+                    Err(e) => tracing::warn!("{name}: orientation model failed ({e}); asking the OCR engine"),
+                }
+            }
+            if !model_used && mode != crate::ppocr::OrientationMode::Off {
+                orientation = if gray_needed(&raster) {
+                    engine.orientation_raster(&as_gray(&raster), &path, opts.non_ocr_timeout.or(opts.tesseract_timeout))?
+                } else {
+                    engine.orientation_raster(&raster, &path, opts.non_ocr_timeout.or(opts.tesseract_timeout))?
+                };
+            }
             if let Some(o) = orientation {
-                if o.rotate != 0 && o.confidence >= opts.rotate_threshold {
+                if o.rotate != 0 && o.confidence >= threshold {
                     tracing::info!("{name}: page is facing ⇒ rotating {} degrees (confidence {})", o.rotate, o.confidence);
                     rot = o.rotate;
                     raster = raster.rotate_cw(rot);
@@ -882,12 +916,20 @@ impl NativeOcrmypdf {
         let (pdf, sidecar) = if is_pdf(&data) { self.run_pdf(&opts, &data, &meta)? } else { self.run_image(&opts, &data, &meta)? };
         std::fs::write(&opts.output, pdf)?;
         if let Some(sc) = &opts.sidecar {
-            std::fs::write(sc, merge_sidecars(&sidecar))?;
+            let texts: Vec<Option<String>> = sidecar.iter().map(|p| p.as_ref().map(|o| o.text.clone())).collect();
+            std::fs::write(sc, merge_sidecars(&texts))?;
+            // Per-line text/boxes/confidence next to the sidecar, for the AI pass on uncertain lines.
+            let pages: Vec<Option<&PageOcr>> = sidecar.iter().map(Option::as_ref).collect();
+            let ppocr = self.engine.as_deref().is_some_and(|e| e.name().starts_with("ppocr")) && crate::ppocr::latin_only(&opts.language);
+            let engine = if ppocr { "ppocr" } else { "tesseract" };
+            if let Err(e) = crate::uncertain::write_for_sidecar(sc, engine, &pages) {
+                tracing::warn!("could not write OCR line data next to the sidecar: {e}");
+            }
         }
         Ok(())
     }
 
-    fn run_image(&self, opts: &Options, data: &[u8], meta: &OutputMeta) -> Result<(Vec<u8>, Vec<Option<String>>)> {
+    fn run_image(&self, opts: &Options, data: &[u8], meta: &OutputMeta) -> Result<(Vec<u8>, Vec<Option<PageOcr>>)> {
         let info = imageinfo::probe(data).map_err(|_| OcrError::InputFile("UnsupportedImageFormatError".into()))?;
         info.decompression_bomb_check(pixel_limit(opts.max_image_mpixels))?;
         // triage_image_file
@@ -955,14 +997,14 @@ impl NativeOcrmypdf {
                 Some(res) if res.visible_changed => {
                     // Straightened/cleaned: the displayed (rotated) image replaces the original,
                     // without `/Rotate` (OCRmyPDF: visible page image from preprocessing).
-                    sidecar.push(Some(res.ocr.text.clone()));
+                    sidecar.push(Some(res.ocr.clone()));
                     let turned = (exif_rot + res.rotate) % 180 == 90;
                     let (dx, dy) = if turned { (dpi.1, dpi.0) } else { dpi };
                     let image = visible_page_image(res.visible, info.format == ImageFormat::Jpeg);
                     specs.push(ImagePageSpec { image, dpi_x: dx, dpi_y: dy, rotate: 0, ocr: Some(res.ocr) });
                 }
                 Some(res) => {
-                    sidecar.push(Some(res.ocr.text.clone()));
+                    sidecar.push(Some(res.ocr.clone()));
                     // OCR coordinates refer to the image rotated by `exif_rot + rot`.
                     let rotate = (exif_rot + res.rotate) % 360;
                     specs.push(ImagePageSpec { image, dpi_x: dpi.0, dpi_y: dpi.1, rotate, ocr: Some(res.ocr) });
@@ -976,7 +1018,7 @@ impl NativeOcrmypdf {
         Ok((pdfwrite::build_from_images(&specs, meta)?, sidecar))
     }
 
-    fn run_pdf(&self, opts: &Options, data: &[u8], meta: &OutputMeta) -> Result<(Vec<u8>, Vec<Option<String>>)> {
+    fn run_pdf(&self, opts: &Options, data: &[u8], meta: &OutputMeta) -> Result<(Vec<u8>, Vec<Option<PageOcr>>)> {
         let doc = pdfwrite::load_pdf_for_ocr(data)?;
         let info = pdfwrite::doc_info(&doc);
         if info.needs_rendering {
@@ -1107,7 +1149,7 @@ impl NativeOcrmypdf {
                 sidecar.push(None);
                 continue;
             };
-            sidecar.push(Some(ocr.text.clone()));
+            sidecar.push(Some(ocr.clone()));
             let action = match plan {
                 // Raster is RGB and already in the new display orientation (incl. `rot`).
                 PagePlan::Rasterize => PageAction::Replace { image: PageImage::Raw(visible), ocr },
@@ -1168,16 +1210,23 @@ impl NativeOcrmypdf {
 
 impl OcrBackend for NativeOcrmypdf {
     fn extract_pdf_text(&self, pdf: &Path) -> Option<String> {
+        self.extract_pdf_text_report(pdf).text
+    }
+
+    fn extract_pdf_text_report(&self, pdf: &Path) -> pl_parsers::pdf::PdfText {
         // E14: like upstream `pdftotext -layout` (reading order via text positions, pl-parsers
-        // `pdftext`); if pl-parsers cannot load the file, the simple text via lopdf.
-        let t = pl_parsers::pdf::extract_pdf_text(pdf, &pl_parsers::ParseContext::default()).or_else(|| {
-            let data = std::fs::read(pdf).ok()?;
-            pdfwrite::extract_text(&data)
-        });
-        if t.is_none() {
+        // `pdftext`) with the configured limits; if pl-parsers cannot load the file, the simple
+        // text via lopdf. A limit that stopped extraction before any text is kept as is (the
+        // unlimited lopdf fallback would contradict the reported truncation).
+        let ctx = pl_parsers::ParseContext { limits: self.limits.clone(), ..Default::default() };
+        let mut r = pl_parsers::pdf::extract_pdf_text_report(pdf, &ctx).unwrap_or_default();
+        if r.text.is_none() && r.truncated.is_none() {
+            r.text = std::fs::read(pdf).ok().and_then(|data| pdfwrite::extract_text(&data));
+        }
+        if r.text.is_none() {
             tracing::warn!("Error while getting text from PDF document");
         }
-        t
+        r
     }
 
     fn is_tagged_pdf(&self, pdf: &Path) -> bool {
@@ -1225,6 +1274,71 @@ pub fn parse_document(
 mod tests {
     use super::*;
     use crate::pdfwrite::PageAnalysis;
+
+    /// Born-digital PDF with one text line (> 50 characters) per page.
+    fn text_pdf(path: &Path, pages: usize) {
+        use lopdf::{Document, Object, Stream, dictionary};
+        let mut d = Document::with_version("1.5");
+        let pages_id = d.new_object_id();
+        let font = d.add_object(dictionary! {
+            "Type" => "Font", "Subtype" => "Type1", "BaseFont" => "Helvetica", "Encoding" => "WinAnsiEncoding",
+        });
+        let mut kids = Vec::new();
+        for i in 0..pages {
+            let t = format!("Page {i} with enough born digital text to pass the minimum length check");
+            let c = d.add_object(Stream::new(dictionary! {}, format!("BT /F1 10 Tf 72 700 Td ({t}) Tj ET").into_bytes()));
+            let page = d.add_object(dictionary! {
+                "Type" => "Page", "Parent" => pages_id, "MediaBox" => vec![0.into(), 0.into(), 595.into(), 842.into()],
+                "Resources" => dictionary! { "Font" => dictionary! { "F1" => font } }, "Contents" => c,
+            });
+            kids.push(Object::Reference(page));
+        }
+        let n = kids.len() as i64;
+        d.objects.insert(pages_id, Object::Dictionary(dictionary! { "Type" => "Pages", "Kids" => kids, "Count" => n }));
+        let cat = d.add_object(dictionary! { "Type" => "Catalog", "Pages" => pages_id });
+        d.trailer.set("Root", cat);
+        d.save(path).unwrap();
+    }
+
+    fn text_backend(dir: &Path) -> NativeOcrmypdf {
+        NativeOcrmypdf::new(None, Box::new(crate::render::UnavailableRenderer { reason: "test".into() }), dir.join("pages"))
+    }
+
+    /// Regression: the PDF text pass used the default limits and dropped the truncation, so a
+    /// configured page limit was ignored and no note could follow.
+    #[test]
+    fn pdf_text_pass_uses_configured_limits_and_reports_truncation() {
+        let dir = tempfile::tempdir().unwrap();
+        let pdf = dir.path().join("three.pdf");
+        text_pdf(&pdf, 3);
+        let full = text_backend(dir.path()).extract_pdf_text_report(&pdf);
+        assert_eq!(full.truncated, None);
+        assert!(full.text.as_deref().is_some_and(|t| t.contains("Page 2")));
+        let limits = pl_parsers::Limits { max_pdf_pages: 2, ..pl_parsers::Limits::default() };
+        let cut = text_backend(dir.path()).with_limits(limits).extract_pdf_text_report(&pdf);
+        assert_eq!(cut.truncated, Some(pl_parsers::limits::Truncation::PdfPages { read: 2, total: 3, limit: 2 }));
+        let text = cut.text.unwrap_or_default();
+        assert!(text.contains("Page 1") && !text.contains("Page 2"), "{text}");
+    }
+
+    /// End to end through `parse_document` (born-digital PDF, no archive: OCR is skipped and the
+    /// stored text is the limited extraction).
+    #[test]
+    fn parse_document_reports_truncation_with_configured_limits() {
+        let dir = tempfile::tempdir().unwrap();
+        let pdf = dir.path().join("three.pdf");
+        text_pdf(&pdf, 3);
+        let cfg = OcrConfig::defaults();
+        let limits = pl_parsers::Limits { max_pdf_pages: 2, ..pl_parsers::Limits::default() };
+        let b = text_backend(dir.path()).with_limits(limits);
+        let out = parse_document(&b, &cfg, &dir.path().join("work"), &pdf, "application/pdf", false).unwrap();
+        assert!(out.text.contains("Page 1") && !out.text.contains("Page 2"), "{}", out.text);
+        assert_eq!(out.truncated, Some(pl_parsers::limits::Truncation::PdfPages { read: 2, total: 3, limit: 2 }));
+        let b = text_backend(dir.path());
+        let out = parse_document(&b, &cfg, &dir.path().join("work2"), &pdf, "application/pdf", false).unwrap();
+        assert!(out.text.contains("Page 2"));
+        assert_eq!(out.truncated, None);
+    }
 
     #[test]
     fn sidecar_merge_like_ocrmypdf() {

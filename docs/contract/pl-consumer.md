@@ -358,6 +358,12 @@ Worker-Aufgaben sofort (Autocommit).
 vollständig (wie pl-documents-write `files.rs`, hier ohne dessen Abhängigkeit): Original + Archiv,
 Kollision `_01`, „schon verschoben“ per Prüfsumme, Längengrenze 1024, `validate_move` (Wurzel,
 Quelle fehlt, Ziel existiert), Rollback, leere Ordner löschen, Versionen der Wurzel nachziehen.
+*Known difference (2026-11-27):* Scheitert das Festschreiben (Commit der Transaktion bzw. des
+Sicherungspunkts) nach dem Verschieben, werden Original/Archiv an den alten Pfad zurückverschoben
+(`finish_move`/`undo_moves`; die Zeile nennt weiter die alten Namen). Gelingt das Zurückverschieben nicht,
+Error-Log mit beiden Pfaden. upstream (Autocommit, `on_commit` nicht genutzt) loggt nur. Test:
+`files::tests::failed_commit_moves_files_back`. Grenze: rollt eine äußere Aufrufer-Transaktion nach
+erfolgreichem Sicherungspunkt zurück, wird nicht zurückverschoben.
 `Consumer::update_filename_and_move_files` (Einlese-Fall mit Aufräumliste) ist jetzt `pub`.
 
 ### Bausteine (neu in `Consumer`)
@@ -555,6 +561,31 @@ Quelle fehlt, Ziel existiert), Rollback, leere Ordner löschen, Versionen der Wu
     sequential re-upload → `Duplicate`, two identical originals at once → one stored, one duplicate;
     fails without the fix). Formal model: `verification/parallel-ingest` (`Shrink`/`RecordSource`,
     `Broken_shrink_no_source`).
+26. **Incomplete search text is noted** (2026-11-27; PaperRust-only, upstream has no parser limits).
+    When a parser limit (`pl_parsers::Limits`: PDF pages, time, text size; MSG property stream size) cut
+    the extracted text short, ingestion adds one system note (`documents_note`, `user_id = NULL`,
+    `format = 'plain'` if the column exists) starting with `Search text incomplete:` plus
+    `Truncation::message()` (several joined by `; `), in the store transaction (`system_note::set_truncation`;
+    same rule as the pl-ai "KI-Abschrift" note: one per document, updated instead of duplicated).
+    Reprocessing (`update_document_content_maybe_archive_file`) sets it again, or soft-deletes it when the
+    new text is complete. `ParsedOutput::truncation` carries the text. The truncation always comes from
+    the pass that produced the stored text (2026-11-28; before, the Tesseract path guessed it from the
+    born-digital check and pl-ocr re-read the PDF with default limits):
+    - Tesseract parser (`RasterisedDocumentParser`): `pl_ocr::ParseOutcome::truncated`. `NativeParsing`
+      builds the pl-ocr backend with its configured `limits` (`NativeOcrmypdf::with_limits`), so pl-ocr's
+      own PDF text pass (original or archive PDF) honours them and reports the limit that cut the text it
+      returns; text from the OCR sidecar is never cut. Also for the second recognition of the OCR
+      language automatic. `should_produce_archive` only decides (no remembered state).
+    - Remote OCR, local text of a born-digital PDF (`remote::RemoteDocumentParser::run`,
+      `extract_pdf_text_report`) → `ParsedDocument::truncated`.
+    - All registry parsers (Office, HTML, mail, Outlook MSG, text): `pl_parsers::ParsedDocument::truncated`
+      → `ParsedDocument::truncation_message()` (pl-parsers keeps the text read up to `max_text_chars` and
+      reports `Truncation::Text`; MSG reports oversized property streams). The former MSG special path
+      (`NativeParsing::parse_msg`) is gone, MSG goes through `MsgDocumentParser::parse` like the others.
+    Tests (no DB): `native::tests::rasterised_truncation_comes_from_pl_ocr_with_configured_limits`,
+    `native::tests::registry_parser_truncation_becomes_the_note`,
+    `system_note::tests::note_starts_with_marker_and_keeps_message`; the note SQL itself:
+    `tests/system_note_db.rs` (reference DB).
 
 ## Tests
 
@@ -637,6 +668,19 @@ Quelle: tests/stress/BEFUNDE.md.
   Abbruch davor lag), Suchindex nachziehen, Erfolg mit dieser Dokument-id melden. Das
   Nach-Einlese-Skript läuft dabei nicht erneut (unbekannt, ob es schon lief).
   *Known difference:* upstream (Celery `acks_late`) hätte dieselbe Lücke und meldet „File not found“.
+  *Nachtrag 2026-11-27:* Der Pfad der Aufgabe kann inzwischen eine **neue** Datei gleichen Namens
+  enthalten (Eingangsordner). Gelöscht wird nur, wenn die SHA-256-Prüfsumme der Datei gleich
+  `documents_document.checksum` des gespeicherten Dokuments ist (bzw. gleich der Quell-Prüfsumme in
+  `paperrust_source_checksum` bei verkleinerten Originalen). Sonst – oder wenn die Prüfsumme nicht
+  lesbar ist – bleibt die Datei liegen (Info-Log) und wird vom Watcher als neues Dokument eingelesen.
+  Grenzfall: hat ein Vor-Einlese-Skript die Arbeitskopie verändert, bleibt auch das echte Original
+  liegen und wird erneut eingelesen (Duplikatprüfung greift dann nicht). Test:
+  `consumer::tests::redelivered_original_deleted_only_on_matching_checksum`.
+- **Vermerkte Dateien eines ungewissen Speicherversuchs (`.pending-<task>.json`,
+  `resolve_pending_files`):** gezählt und als entfernt protokolliert werden nur wirklich gelöschte
+  Dateien. Scheitert das Löschen (außer „nicht vorhanden“) oder die Prüfung, ob ein Dokument auf die
+  Datei verweist (DB-Fehler), bleibt der Pfad im Vermerk für die nächste Zustellung; der Vermerk wird
+  nur gelöscht, wenn nichts mehr offen ist. Test: `consumer::tests::pending_files_only_real_deletions_counted`.
 - **B8:** `add_to_index`: auch ein Fehler des Index (nicht nur belegte Sperre) reiht
   `index_document` ein (belegte Sperre: countdown 60 wie upstream; Fehler: countdown 5), statt die Änderung nur zu protokollieren. Scheitert auch das
   Einreihen (Datenbank weg, tests/chaos c1, Gesamtprüfung 2026-11-18), versucht ein Hintergrund-Task

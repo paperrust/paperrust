@@ -93,6 +93,10 @@ pub struct Resolved {
     pub documents: Vec<ResolvedDoc>,
     #[serde(default)]
     pub as_of_seq: Option<i64>,
+    /// Requested saved views the server skipped because it cannot evaluate their rules
+    /// (full-text rules, unknown rule types). Missing on older servers → empty.
+    #[serde(default)]
+    pub skipped_saved_views: Vec<String>,
 }
 
 /// `POST /objects/batch`.

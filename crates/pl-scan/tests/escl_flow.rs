@@ -11,7 +11,7 @@ use std::time::Duration;
 use futures::future::BoxFuture;
 use pl_scan::escl::{Client, ColorMode, ScanError, ScanSettings, Source, normalize_base};
 use pl_scan::intake::{Intake, IntakeDoc};
-use pl_scan::job::{JobSpec, JobState, Registry};
+use pl_scan::job::{JobSpec, JobState, Limits, Registry};
 use support::{Fake, start_fake};
 
 /// Records hand-overs (instead of the queue).
@@ -36,6 +36,16 @@ async fn run_job(
     color: Option<ColorMode>,
     resolution: Option<u32>,
 ) -> (Arc<Fake>, Arc<Captured>, pl_scan::job::JobView, tempfile::TempDir) {
+    run_job_limited(f, source, color, resolution, Limits::default()).await
+}
+
+async fn run_job_limited(
+    f: Fake,
+    source: Source,
+    color: Option<ColorMode>,
+    resolution: Option<u32>,
+    limits: Limits,
+) -> (Arc<Fake>, Arc<Captured>, pl_scan::job::JobView, tempfile::TempDir) {
     let (fake, client) = start_fake(f).await;
     let caps = client.capabilities().await.unwrap();
     let settings = ScanSettings::resolve(&caps, source, color, resolution).unwrap();
@@ -51,6 +61,7 @@ async fn run_job(
             title: Some("Post".into()),
             scratch: scratch.path().to_path_buf(),
             intake: cap.clone(),
+            limits,
         })
         .unwrap();
     let view = wait(&job).await;
@@ -162,6 +173,7 @@ async fn cancel_while_scanning() {
             title: None,
             scratch: scratch.path().to_path_buf(),
             intake: cap.clone(),
+            limits: Limits::default(),
         })
         .unwrap();
     // second job on the same scanner: busy (without a request to the device)
@@ -173,6 +185,7 @@ async fn cancel_while_scanning() {
         title: None,
         scratch: scratch.path().to_path_buf(),
         intake: cap.clone(),
+        limits: Limits::default(),
     });
     assert!(matches!(second, Err(ScanError::Busy)));
     tokio::time::sleep(Duration::from_millis(300)).await;
@@ -195,4 +208,134 @@ async fn unreachable_scanner() {
     // port 9 (discard) on 127.0.0.1 is closed → connection fails
     let client = Client::new(normalize_base("http://127.0.0.1:9/eSCL/").unwrap()).unwrap();
     assert!(matches!(client.capabilities().await, Err(ScanError::Unreachable(_))));
+}
+
+// ------------------------------------------------------------------ limits and late cancel
+
+/// Review item 1: more pages than allowed must fail the job (DELETE to the device), never
+/// import a silently truncated batch.
+#[tokio::test]
+async fn page_limit_fails_instead_of_truncating() {
+    let limits = Limits { max_pages: 3, ..Limits::default() };
+    let (fake, cap, view, _t) = run_job_limited(Fake { sheets: 5, ..Default::default() }, Source::Adf, None, None, limits).await;
+    assert_eq!(view.state, JobState::Failed, "{view:?}");
+    let err = view.error.as_ref().expect("error set");
+    assert_eq!(err.code, "too_many_pages");
+    assert!(err.message.contains("more than 3 pages"), "{}", err.message);
+    assert!(cap.docs.lock().unwrap().is_empty(), "no truncated document handed over");
+    assert!(fake.cancelled.load(Ordering::SeqCst), "DELETE sent to the scanner");
+}
+
+/// Exactly the limit is fine (the device answers 404 after the last allowed page).
+#[tokio::test]
+async fn page_limit_exactly_reached_is_ok() {
+    let limits = Limits { max_pages: 3, ..Limits::default() };
+    let (fake, cap, view, _t) = run_job_limited(Fake { sheets: 3, ..Default::default() }, Source::Adf, None, None, limits).await;
+    assert_eq!(view.state, JobState::Done, "{view:?}");
+    assert_eq!(view.pages, 3);
+    assert_eq!(cap.docs.lock().unwrap().len(), 1);
+    assert!(!fake.cancelled.load(Ordering::SeqCst));
+}
+
+/// Review item 3: total byte budget per job (pages are held in memory until the PDF is built).
+#[tokio::test]
+async fn job_byte_budget_fails_the_job() {
+    // room for two test pages, not for three
+    let budget = (support::page_jpeg(0).len() + support::page_jpeg(1).len() + 10) as u64;
+    let limits = Limits { max_job_bytes: budget, ..Limits::default() };
+    let (fake, cap, view, _t) = run_job_limited(Fake { sheets: 5, ..Default::default() }, Source::Adf, None, None, limits).await;
+    assert_eq!(view.state, JobState::Failed, "{view:?}");
+    let err = view.error.as_ref().expect("error set");
+    assert_eq!(err.code, "job_too_large");
+    assert!(err.message.contains("MiB"), "{}", err.message);
+    assert!(cap.docs.lock().unwrap().is_empty());
+    assert!(fake.cancelled.load(Ordering::SeqCst), "DELETE sent to the scanner");
+    assert!(fake.delivered.load(Ordering::SeqCst) <= 3, "stopped right after the budget was exceeded");
+}
+
+/// Review item 2: a cancel confirmed while the last NextDocument request is still running must
+/// not end with an imported document.
+#[tokio::test]
+async fn cancel_after_last_page_discards_the_scan() {
+    let (_fake, client) = start_fake(Fake { sheets: 2, done_delay_ms: 800, ..Default::default() }).await;
+    let caps = client.capabilities().await.unwrap();
+    let settings = ScanSettings::resolve(&caps, Source::Adf, None, None).unwrap();
+    let cap = Arc::new(Captured::default());
+    let scratch = tempfile::tempdir().unwrap();
+    let reg = Registry::default();
+    let job = reg
+        .start(JobSpec {
+            scanner_id: 3,
+            client,
+            settings,
+            user_id: 1,
+            title: None,
+            scratch: scratch.path().to_path_buf(),
+            intake: cap.clone(),
+            limits: Limits::default(),
+        })
+        .unwrap();
+    // both pages are in; the final NextDocument (404) is delayed by the device
+    for _ in 0..200 {
+        if job.view().pages == 2 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert_eq!(job.view().pages, 2);
+    assert!(job.cancel(), "cancel accepted while the job runs");
+    let view = wait(&job).await;
+    assert_eq!(view.state, JobState::Cancelled, "{view:?}");
+    assert!(cap.docs.lock().unwrap().is_empty(), "no document after a confirmed cancel");
+    assert!(view.task_id.is_none());
+    // nothing left behind in the scratch directory
+    assert_eq!(std::fs::read_dir(scratch.path()).map(|d| d.count()).unwrap_or(0), 0);
+}
+
+/// Hand-over that waits until the test releases it.
+struct Gate {
+    entered: tokio::sync::Notify,
+    release: tokio::sync::Notify,
+    inner: Captured,
+}
+
+impl Intake for Gate {
+    fn submit(&self, doc: IntakeDoc) -> BoxFuture<'_, Result<String, String>> {
+        Box::pin(async move {
+            self.entered.notify_one();
+            self.release.notified().await;
+            self.inner.submit(doc).await
+        })
+    }
+}
+
+/// Once the hand-over has started, a cancel is refused (`cancel_requested: false`), so the API
+/// never confirms a cancel for a document that gets imported.
+#[tokio::test]
+async fn cancel_during_handover_is_refused() {
+    let (_fake, client) = start_fake(Fake { sheets: 1, ..Default::default() }).await;
+    let caps = client.capabilities().await.unwrap();
+    let settings = ScanSettings::resolve(&caps, Source::Adf, None, None).unwrap();
+    let gate = Arc::new(Gate { entered: Default::default(), release: Default::default(), inner: Captured::default() });
+    let scratch = tempfile::tempdir().unwrap();
+    let reg = Registry::default();
+    let job = reg
+        .start(JobSpec {
+            scanner_id: 4,
+            client,
+            settings,
+            user_id: 1,
+            title: None,
+            scratch: scratch.path().to_path_buf(),
+            intake: gate.clone(),
+            limits: Limits::default(),
+        })
+        .unwrap();
+    tokio::time::timeout(Duration::from_secs(10), gate.entered.notified()).await.expect("hand-over started");
+    assert_eq!(job.view().state, JobState::Processing);
+    assert!(!job.cancel(), "too late: the document is being queued");
+    gate.release.notify_one();
+    let view = wait(&job).await;
+    assert_eq!(view.state, JobState::Done, "{view:?}");
+    assert_eq!(gate.inner.docs.lock().unwrap().len(), 1);
 }

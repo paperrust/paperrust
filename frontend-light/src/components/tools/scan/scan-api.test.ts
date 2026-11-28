@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '../../../api/v1'
-import { choices, defaultResolution, effectiveSource, errorCode, fieldMessage, isFinished, smtpHost, type Capabilities } from './scan-api'
+import en from '../../../../i18n/en-US.json'
+import { choices, defaultResolution, effectiveSource, ERROR_KEYS, errorCode, fieldMessage, isFinished, smtpHost, type Capabilities } from './scan-api'
 
 const caps: Capabilities = {
   scanner: 1,
@@ -43,6 +44,15 @@ describe('scan helpers', () => {
     expect(errorCode(new Error('x'))).toBe('protocol')
     expect(fieldMessage(new ApiError(400, '/x', { url: ['No eSCL scanner found.'] }))).toBe('No eSCL scanner found.')
     expect(isFinished('done') && isFinished('failed') && isFinished('cancelled') && !isFinished('scanning')).toBe(true)
+  })
+
+  it('maps every server error code (ScanError::code) to an existing text', () => {
+    const codes = ['unreachable', 'busy', 'adf_empty', 'jam', 'cancelled', 'unsupported', 'protocol', 'too_large', 'too_many_pages', 'job_too_large', 'pdf', 'intake']
+    const catalog = en as Record<string, string>
+    for (const c of codes) {
+      expect(ERROR_KEYS[c], c).toBeDefined()
+      expect(catalog[ERROR_KEYS[c]], ERROR_KEYS[c]).toBeTruthy()
+    }
   })
 
   it('formats the SMTP address', () => {

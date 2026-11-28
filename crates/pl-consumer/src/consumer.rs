@@ -223,57 +223,104 @@ impl Consumer {
         })
     }
 
-    /// PaperRust: AI text recognition (pl-core `vision`) after the normal recognition. Replaces `text`
-    /// with the AI text if the service is attached, the rules (`plan`) want it and the AI
-    /// returns non-empty text -> `true`. Errors are logged, never passed on (the
-    /// normal text stays). Page images: original for PDF/PNG/JPEG/WebP, otherwise archive PDF.
+    /// PaperRust: AI transcription ("KI-Abschrift", pl-core `vision`, docs/OCR-NEXT.md 2.8) after the
+    /// normal recognition. The service decides mode/sensitivity/limits (`VisionOcr::plan`); pl-ocr
+    /// `uncertain` selects whole pages and/or uncertain line crops from the classic OCR line data
+    /// (`ocr-lines.json` in `parser_dir`, written by the OCR pipeline; without it the old rule "fewer
+    /// than 50 characters per page" applies to the whole document). Accepted texts replace the page
+    /// (whole pages) or the line at its place (crops); loops/token-limit hits keep the classic text.
+    /// Without line data, whole-page texts only replace the content if every page was accepted.
+    ///
+    /// Returns the transcript (for `VisionOcr::record` after storing) if anything was sent; `text` is
+    /// changed only if AI text went into it (`Transcript::accepted() > 0`). Errors are logged, never
+    /// passed on. Page images: original for PDF/PNG/JPEG/WebP, otherwise archive PDF; crops preferably
+    /// from the archive PDF (rotation/deskew as the OCR saw it).
+    #[allow(clippy::too_many_arguments)]
     pub async fn apply_vision(
         &self,
         requested: bool,
         path: &Path,
         mime_type: &str,
         archive: Option<&Path>,
+        parser_dir: Option<&Path>,
         text: &mut Option<String>,
         page_count: Option<i64>,
-    ) -> bool {
-        let Some(vision) = self.vision.clone() else { return false };
+    ) -> Option<pl_core::vision::Transcript> {
+        use pl_core::vision::Transcript;
+        let vision = self.vision.clone()?;
+        let plan = vision.plan(requested).await?;
         let chars = pl_core::vision::text_chars(text.as_deref());
         let pages = page_count.and_then(|p| usize::try_from(p).ok()).filter(|p| *p > 0).unwrap_or(1);
-        let Some(max_pages) = vision.plan(requested, Some(chars), pages).await else { return false };
+        let lines = parser_dir.and_then(pl_ocr::uncertain::read_for_dir);
+        let sel = pl_ocr::uncertain::select(plan.mode, plan.sensitivity, lines.as_ref(), chars, pages, plan.max_pages);
+        if sel.is_empty() {
+            return None;
+        }
+        if sel.skipped_pages > 0 {
+            tracing::info!(target: "paperless.consumer", "AI transcription: {} page(s) over the page limit not sent", sel.skipped_pages);
+        }
         let direct = matches!(mime_type, "application/pdf" | "image/png" | "image/jpeg" | "image/webp");
-        let (src, src_mime) = match archive {
-            Some(a) if !direct && a.is_file() => (a.to_path_buf(), "application/pdf".to_string()),
+        let archive_file = archive.filter(|a| a.is_file()).map(Path::to_path_buf);
+        let (page_src, page_mime) = match &archive_file {
+            Some(a) if !direct => (a.clone(), "application/pdf".to_string()),
             _ => (path.to_path_buf(), mime_type.to_string()),
         };
+        let (crop_src, crop_mime) = match &archive_file {
+            Some(a) => (a.clone(), "application/pdf".to_string()),
+            None => (path.to_path_buf(), mime_type.to_string()),
+        };
         let parsing = self.parsing.clone();
-        let images = match tokio::task::spawn_blocking(move || parsing.page_images(&src, &src_mime, max_pages)).await {
-            Ok(Ok(i)) if !i.is_empty() => i,
+        let (sel_c, lines_c) = (sel.clone(), lines.clone());
+        let built = tokio::task::spawn_blocking(move || {
+            let src = pl_ocr::uncertain::RequestSources { pages: (&page_src, &page_mime), crops: (&crop_src, &crop_mime) };
+            parsing.vision_request(&src, &sel_c, lines_c.as_ref(), plan.max_side)
+        })
+        .await;
+        let request = match built {
+            Ok(Ok(r)) if !(r.pages.is_empty() && r.crops.is_empty()) => r,
             Ok(Ok(_)) => {
-                tracing::info!(target: "paperless.consumer", "AI text recognition skipped: no page images for {mime_type}");
-                return false;
+                tracing::info!(target: "paperless.consumer", "AI transcription skipped: no page images for {mime_type}");
+                return None;
             }
             Ok(Err(e)) => {
-                tracing::warn!(target: "paperless.consumer", "AI text recognition skipped: page images failed: {e}");
-                return false;
+                tracing::warn!(target: "paperless.consumer", "AI transcription skipped: page images failed: {e}");
+                return None;
             }
             Err(e) => {
-                tracing::warn!(target: "paperless.consumer", "AI text recognition skipped: {e}");
-                return false;
+                tracing::warn!(target: "paperless.consumer", "AI transcription skipped: {e}");
+                return None;
             }
         };
-        let sent = images.len();
-        match vision.recognize(images).await {
-            Ok(Some(t)) if !t.trim().is_empty() => {
-                let new_chars = pl_core::vision::text_chars(Some(&t));
-                tracing::info!(target: "paperless.consumer", "AI text recognition replaced the text ({sent} page(s), {chars} -> {new_chars} characters)");
-                *text = Some(t);
-                true
-            }
-            Ok(_) => false,
+        let (n_pages, n_crops) = (request.pages.len(), request.crops.len());
+        let resp = match vision.recognize(request).await {
+            Ok(Some(r)) => r,
+            Ok(None) => return None,
             Err(e) => {
-                tracing::warn!(target: "paperless.consumer", "AI text recognition failed, keeping the OCR text: {e}");
-                false
+                tracing::warn!(target: "paperless.consumer", "AI transcription failed, keeping the OCR text: {e}");
+                return None;
             }
+        };
+        if resp.remote {
+            tracing::info!(target: "paperless.consumer", "AI transcription: page images/crops were sent to a non-local service");
+        }
+        let (entries, merged) = merge_vision_result(lines.as_ref(), &resp.items, pages);
+        if let Some(t) = merged {
+            *text = Some(t);
+        }
+        let transcript = Transcript { model: resp.model, mode: plan.mode, entries };
+        let new_chars = pl_core::vision::text_chars(text.as_deref());
+        tracing::info!(
+            target: "paperless.consumer",
+            "AI transcription: {n_pages} page(s), {n_crops} crop(s) sent, {} accepted ({chars} -> {new_chars} characters)",
+            transcript.accepted()
+        );
+        Some(transcript)
+    }
+
+    /// PaperRust: keeps the AI transcript of a stored document (`VisionOcr::record`).
+    pub async fn record_vision(&self, document_id: i64, transcript: Option<pl_core::vision::Transcript>) {
+        if let (Some(v), Some(t)) = (self.vision.clone(), transcript) {
+            v.record(document_id, t).await;
         }
     }
 
@@ -480,7 +527,7 @@ impl Consumer {
         let Some(files) = std::fs::read(&p).ok().and_then(|b| serde_json::from_slice::<Vec<String>>(&b).ok()) else {
             return;
         };
-        let mut kept = 0;
+        let mut entries = Vec::with_capacity(files.len());
         for f in &files {
             let path = PathBuf::from(f);
             let rel = path
@@ -488,30 +535,46 @@ impl Consumer {
                 .or_else(|_| path.strip_prefix(&self.settings.archive_dir))
                 .ok()
                 .map(|r| r.to_string_lossy().replace('\\', "/"));
-            let referenced = match rel {
+            let check = match rel {
                 Some(r) => {
-                    sqlx::query_scalar::<_, i32>("SELECT 1 FROM documents_document WHERE filename = $1 OR archive_filename = $1 LIMIT 1")
-                        .bind(&r)
-                        .fetch_optional(&self.pool)
-                        .await
-                        .map(|x| x.is_some())
-                        .unwrap_or(true)
+                    match sqlx::query_scalar::<_, i32>(
+                        "SELECT 1 FROM documents_document WHERE filename = $1 OR archive_filename = $1 LIMIT 1",
+                    )
+                    .bind(&r)
+                    .fetch_optional(&self.pool)
+                    .await
+                    {
+                        Ok(Some(_)) => PendingCheck::Referenced,
+                        Ok(None) => PendingCheck::Unreferenced,
+                        Err(e) => {
+                            tracing::warn!(target: "paperless.consumer", "Task {task_id}: could not check noted file {f}: {e}");
+                            PendingCheck::Unknown
+                        }
+                    }
                 }
-                None => false,
+                None => PendingCheck::Unreferenced,
             };
-            if referenced {
-                kept += 1;
-            } else {
-                let _ = std::fs::remove_file(&path);
-            }
+            entries.push((f.clone(), check));
         }
+        let (removed, remaining) = blocking_io(|| remove_unreferenced(&entries));
         tracing::info!(
             target: "paperless.consumer",
-            "Task {task_id}: previous attempt was not stored; removed {} of {} noted file(s)",
-            files.len() - kept,
-            files.len()
+            "Task {task_id}: previous attempt was not stored; removed {removed} of {} noted file(s), {} kept for a later retry",
+            files.len(),
+            remaining.len()
         );
-        let _ = std::fs::remove_file(&p);
+        if remaining.is_empty() {
+            let _ = std::fs::remove_file(&p);
+        } else {
+            match serde_json::to_vec(&remaining) {
+                Ok(b) => {
+                    if let Err(e) = std::fs::write(&p, b) {
+                        tracing::warn!(target: "paperless.consumer", "Task {task_id}: could not update the note of pending files: {e}");
+                    }
+                }
+                Err(e) => tracing::warn!(target: "paperless.consumer", "Task {task_id}: could not update the note of pending files: {e}"),
+            }
+        }
     }
 
     /// FINDINGS B7: completion of a redelivered task whose document is already saved:
@@ -523,9 +586,34 @@ impl Consumer {
             "Task {task_id} was delivered again, but document {doc_id} from it is already stored; not consuming {} again",
             st.filename()
         );
-        if st.input.original_file.is_file() {
-            tracing::debug!(target: "paperless.consumer", "Deleting original file {}", st.input.original_file.display());
-            let _ = std::fs::remove_file(&st.input.original_file);
+        // The path may meanwhile hold a NEW file with the same name (consume folder): delete only
+        // when its bytes are those of the stored document, otherwise leave it to the watcher.
+        let path = st.input.original_file.clone();
+        if path.is_file() {
+            let stored = match stored_checksums(&self.pool, doc_id).await {
+                Ok(s) => s,
+                Err(e) => {
+                    tracing::warn!(target: "paperless.consumer", "Could not read the checksum of document {doc_id}: {e}");
+                    Vec::new()
+                }
+            };
+            let p = path.clone();
+            match blocking_io(move || redelivered_original_action(&p, &stored)) {
+                RedeliveredOriginal::Delete => {
+                    tracing::debug!(target: "paperless.consumer", "Deleting original file {}", path.display());
+                    if let Err(e) = std::fs::remove_file(&path)
+                        && e.kind() != std::io::ErrorKind::NotFound
+                    {
+                        tracing::warn!(target: "paperless.consumer", "Could not delete original file {}: {e}", path.display());
+                    }
+                }
+                RedeliveredOriginal::Missing => {}
+                RedeliveredOriginal::Keep(why) => tracing::info!(
+                    target: "paperless.consumer",
+                    "Not deleting {}: {why}; it is consumed as a new document",
+                    path.display()
+                ),
+            }
         }
         self.add_to_index(doc_id).await;
         self.send_progress(st, 100, 100, ProgressStatus::Success, msg::FINISHED, Some(doc_id));
@@ -1048,9 +1136,18 @@ impl Consumer {
 
         // PaperRust: AI text recognition after the normal recognition (chosen, "always" or little text)
         let archive = parsed.archive_path.clone();
-        if self.apply_vision(st.metadata.ai_ocr, &working_copy, &mime_type, archive.as_deref(), &mut parsed.text, page_count).await
-            && date_from_text
-        {
+        let transcript = self
+            .apply_vision(
+                st.metadata.ai_ocr,
+                &working_copy,
+                &mime_type,
+                archive.as_deref(),
+                Some(&parser_tmp),
+                &mut parsed.text,
+                page_count,
+            )
+            .await;
+        if transcript.as_ref().is_some_and(|t| t.accepted() > 0) && date_from_text {
             parsed.date = self.dates.detect(&filename, parsed.text.as_deref().unwrap_or(""));
         }
 
@@ -1122,6 +1219,8 @@ impl Consumer {
         // document_consumption_finished receivers that registered at the ingestion trigger
         // (W1 "remove password"); the document is committed.
         self.effects.consumption_finished(doc_id, &st.input.original_file);
+        // PaperRust: AI transcript (original OCR lines, "KI-Abschrift" label) for the committed document.
+        self.record_vision(doc_id, transcript).await;
 
         // After the commit: delete original (upstream still in the transaction), index, script.
         tracing::debug!(target: "paperless.consumer", "Deleting original file {}", st.input.original_file.display());
@@ -1289,6 +1388,10 @@ impl Consumer {
         // redelivery recognizes the document (instead of "File not found" or a duplicate).
         if let Some(task_id) = st.task_id.as_deref() {
             record_task_document(&mut tx, task_id, doc.row.id).await.map_err(store_err)?;
+        }
+        // PaperRust: a parser limit cut the text short → system note (same transaction, indexed with it)
+        if let Some(m) = parsed.truncation.as_deref() {
+            crate::system_note::set_truncation(&mut tx, doc.row.id, m).await.map_err(store_err)?;
         }
         tx.commit().await.map_err(store_err)?;
         Ok((doc.row.id, outcome))
@@ -2465,6 +2568,82 @@ pub async fn task_document(pool: &PgPool, task_id: &str) -> Result<Option<i64>, 
     Ok(id.map(i64::from))
 }
 
+/// Checksums under which document `doc_id` counts as "this file": the stored `checksum` and, for a
+/// shrunk original, the delivered file's checksum (`paperrust_source_checksum`).
+async fn stored_checksums(pool: &PgPool, doc_id: i64) -> Result<Vec<String>, sqlx::Error> {
+    crate::source_checksum::ensure_pool(pool).await?;
+    let id = i32::try_from(doc_id).map_err(|e| sqlx::Error::Protocol(format!("document id {doc_id}: {e}")))?;
+    let row: Option<(Option<String>, Option<String>)> = sqlx::query_as(
+        "SELECT d.checksum, s.checksum FROM documents_document d \
+         LEFT JOIN paperrust_source_checksum s ON s.document_id = d.id WHERE d.id = $1",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(row.map(|(a, b)| a.into_iter().chain(b).filter(|c| !c.is_empty()).collect()).unwrap_or_default())
+}
+
+/// What to do with the input path of a redelivered task whose document is already stored.
+#[derive(Debug, PartialEq, Eq)]
+enum RedeliveredOriginal {
+    /// Same bytes as the stored document: the leftover original, delete it.
+    Delete,
+    /// No file at the path (any more).
+    Missing,
+    /// Different or unknown content: keep it (reason for the log).
+    Keep(String),
+}
+
+/// Compares the file at `path` (SHA-256, as [`compute_checksum`] / `documents_document.checksum`)
+/// with the stored checksums. Without a known checksum nothing is deleted.
+fn redelivered_original_action(path: &Path, stored: &[String]) -> RedeliveredOriginal {
+    if !path.is_file() {
+        return RedeliveredOriginal::Missing;
+    }
+    if stored.is_empty() {
+        return RedeliveredOriginal::Keep("checksum of the stored document unknown".into());
+    }
+    match compute_checksum(path) {
+        Ok(c) if stored.iter().any(|s| s.eq_ignore_ascii_case(&c)) => RedeliveredOriginal::Delete,
+        Ok(_) => RedeliveredOriginal::Keep("content differs from the stored document".into()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => RedeliveredOriginal::Missing,
+        Err(e) => RedeliveredOriginal::Keep(format!("could not read it ({e})")),
+    }
+}
+
+/// Outcome of one noted file of an unsaved earlier attempt (see [`Consumer::resolve_pending_files`]).
+#[derive(Debug)]
+enum PendingCheck {
+    /// A stored document refers to the file: keep the file, drop it from the note.
+    Referenced,
+    /// No document refers to it: delete it.
+    Unreferenced,
+    /// The reference check failed: keep file and note entry for a later delivery.
+    Unknown,
+}
+
+/// Deletes the unreferenced noted files. Returns (number really deleted, entries that must stay in
+/// the note for a later retry: failed reference checks and failed deletions).
+fn remove_unreferenced(entries: &[(String, PendingCheck)]) -> (usize, Vec<String>) {
+    let mut removed = 0;
+    let mut remaining = Vec::new();
+    for (f, check) in entries {
+        match check {
+            PendingCheck::Referenced => {}
+            PendingCheck::Unknown => remaining.push(f.clone()),
+            PendingCheck::Unreferenced => match std::fs::remove_file(f) {
+                Ok(()) => removed += 1,
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                Err(e) => {
+                    tracing::warn!(target: "paperless.consumer", "Could not remove noted file {f}: {e}");
+                    remaining.push(f.clone());
+                }
+            },
+        }
+    }
+    (removed, remaining)
+}
+
 /// Options of the deferred index task (`index_document` with countdown).
 fn index_retry_opts(target: i64, countdown: f64) -> pl_queue::EnqueueOptions {
     pl_queue::EnqueueOptions { args: vec![Value::from(target)], countdown: Some(countdown), ..Default::default() }
@@ -2502,8 +2681,185 @@ pub(crate) async fn retry_schedule_index(q: Arc<dyn pl_queue::TaskQueue>, target
     false
 }
 
+/// PaperRust: merges checked AI results into the content (see [`Consumer::apply_vision`]). Returns the
+/// transcript entries (statuses adjusted: line texts not found in the page text and whole-page texts
+/// that could not be placed become `Skipped`) and the new content if any AI text went into it.
+fn merge_vision_result(
+    lines: Option<&pl_ocr::uncertain::LinesFile>,
+    items: &[pl_core::vision::ItemResult],
+    pages: usize,
+) -> (Vec<pl_core::vision::TranscriptEntry>, Option<String>) {
+    use pl_core::vision::{ItemStatus, TranscriptEntry};
+    use std::collections::BTreeMap;
+    let mut new_text: Option<String> = None;
+    let page_lines = |p: usize| lines.and_then(|f| f.pages.get(p.wrapping_sub(1))).and_then(Option::as_ref);
+    let mut entries: Vec<TranscriptEntry> = items
+        .iter()
+        .map(|it| {
+            let pl = page_lines(it.page);
+            let line = it.line.and_then(|j| pl.and_then(|p| p.lines.get(j)));
+            TranscriptEntry {
+                page: it.page,
+                line: it.line,
+                bbox: line.map(|l| l.bbox),
+                ocr_text: match (it.line, line) {
+                    (Some(_), Some(l)) => l.text.clone(),
+                    (Some(_), None) => String::new(),
+                    (None, _) => pl.map(|p| p.text.clone()).unwrap_or_default(),
+                },
+                ai_text: it.text.clone(),
+                status: it.status,
+            }
+        })
+        .collect();
+    let mut page_ai: BTreeMap<usize, String> = BTreeMap::new();
+    let mut line_ai: BTreeMap<usize, Vec<(String, String)>> = BTreeMap::new();
+    let mut line_idx: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+    let mut order: Vec<usize> = (0..entries.len()).filter(|&i| entries[i].status == ItemStatus::Accepted).collect();
+    order.sort_by_key(|&i| (entries[i].page, entries[i].line));
+    for i in order {
+        let e = &entries[i];
+        match e.line {
+            None => {
+                page_ai.insert(e.page, e.ai_text.clone());
+            }
+            Some(_) => {
+                line_ai.entry(e.page).or_default().push((e.ocr_text.clone(), e.ai_text.clone()));
+                line_idx.entry(e.page).or_default().push(i);
+            }
+        }
+    }
+    let merged = lines.and_then(|f| pl_ocr::uncertain::merge_content(f, &page_ai, &line_ai));
+    match merged {
+        Some((content, applied)) => {
+            // line replacements whose OCR text was not found in the page text did not go in
+            let applied: std::collections::BTreeSet<usize> =
+                applied.into_iter().filter_map(|(p, j)| line_idx.get(&p).and_then(|v| v.get(j)).copied()).collect();
+            for v in line_idx.values() {
+                for &i in v {
+                    if !applied.contains(&i) {
+                        entries[i].status = ItemStatus::Skipped;
+                    }
+                }
+            }
+            if entries.iter().any(|e| e.status == ItemStatus::Accepted) {
+                new_text = Some(content);
+            }
+        }
+        None => {
+            // no per-page classic text: whole-page texts only if every page was read
+            let complete = (1..=pages).all(|p| page_ai.contains_key(&p)) && line_ai.is_empty();
+            if complete {
+                new_text = Some(page_ai.values().cloned().collect::<Vec<_>>().join("\n\n"));
+            } else {
+                for e in entries.iter_mut().filter(|e| e.status == ItemStatus::Accepted) {
+                    e.status = ItemStatus::Skipped;
+                }
+            }
+        }
+    }
+    if !entries.iter().any(|e| e.status == ItemStatus::Accepted) {
+        new_text = None;
+    }
+    (entries, new_text)
+}
+
 #[cfg(test)]
 mod tests {
+    // --- PaperRust: KI-Abschrift merge (merge_vision_result) ---------------------------------------
+    fn vision_lines() -> pl_ocr::uncertain::LinesFile {
+        use pl_ocr::uncertain::{LinesFile, OcrLine, PageLines};
+        let line = |t: &str, conf: f32, y: f32| OcrLine { text: t.into(), bbox: [10.0, y, 300.0, y + 30.0], conf, chars: t.len() };
+        let p1 = PageLines {
+            width: 1000,
+            height: 1400,
+            text: "Sehr geehrte Damen und Herren
+Bifte anrufen!
+"
+            .into(),
+            lines: vec![line("Sehr geehrte Damen und Herren", 95.0, 100.0), line("Bifte anrufen!", 20.0, 200.0)],
+            has_confidence: true,
+        };
+        let p2 = PageLines {
+            width: 1000,
+            height: 1400,
+            text: "Eirkaufe
+"
+            .into(),
+            lines: vec![line("Eirkaufe", 15.0, 100.0)],
+            has_confidence: true,
+        };
+        LinesFile { version: 1, engine: "tesseract".into(), pages: vec![Some(p1), Some(p2)] }
+    }
+
+    fn item(page: usize, line: Option<usize>, status: pl_core::vision::ItemStatus, text: &str) -> pl_core::vision::ItemResult {
+        pl_core::vision::ItemResult { page, line, status, text: text.into() }
+    }
+
+    #[test]
+    fn vision_merge_lines_and_pages() {
+        use pl_core::vision::ItemStatus::*;
+        let f = vision_lines();
+        let items = [item(1, Some(1), Accepted, "Bitte anrufen!"), item(2, None, Accepted, "Einkaufen")];
+        let (entries, text) = merge_vision_result(Some(&f), &items, 2);
+        assert_eq!(
+            text.as_deref(),
+            Some(
+                "Sehr geehrte Damen und Herren
+Bitte anrufen!
+
+Einkaufen"
+            )
+        );
+        // the original OCR line is kept in the transcript
+        assert_eq!(entries[0].ocr_text, "Bifte anrufen!");
+        assert_eq!(entries[0].bbox, Some([10.0, 200.0, 300.0, 230.0]));
+        assert_eq!(
+            entries[1].ocr_text,
+            "Eirkaufe
+"
+        );
+    }
+
+    #[test]
+    fn vision_merge_keeps_ocr_on_loop() {
+        use pl_core::vision::ItemStatus::*;
+        let f = vision_lines();
+        // page 2 looped → classic text of page 2 stays; nothing accepted → content unchanged
+        let (entries, text) = merge_vision_result(Some(&f), &[item(2, None, Loop, "Eink")], 2);
+        assert_eq!(text, None);
+        assert_eq!(entries[0].status, Loop);
+        // a line whose OCR text is not in the page text is not applied (status skipped)
+        let mut g = vision_lines();
+        if let Some(Some(p)) = g.pages.get_mut(0) {
+            p.text = "anderer Text".into();
+        }
+        let (entries, text) = merge_vision_result(Some(&g), &[item(1, Some(1), Accepted, "Bitte anrufen!")], 2);
+        assert_eq!(text, None);
+        assert_eq!(entries[0].status, Skipped);
+    }
+
+    #[test]
+    fn vision_merge_without_line_data() {
+        use pl_core::vision::ItemStatus::*;
+        // all pages read → AI text replaces the content (previous behavior)
+        let items = [item(1, None, Accepted, "Seite eins"), item(2, None, Accepted, "Seite zwei")];
+        let (_, text) = merge_vision_result(None, &items, 2);
+        assert_eq!(
+            text.as_deref(),
+            Some(
+                "Seite eins
+
+Seite zwei"
+            )
+        );
+        // one page missing (limit/loop) → classic text stays for the whole document
+        let items = [item(1, None, Accepted, "Seite eins"), item(2, None, Skipped, "")];
+        let (entries, text) = merge_vision_result(None, &items, 2);
+        assert_eq!(text, None);
+        assert_eq!(entries[0].status, Skipped);
+    }
+
     use super::*;
 
     /// Queue that rejects the first `fail` calls like a dropped DB.
@@ -2701,6 +3057,53 @@ mod tests {
         assert_eq!(w, vec![target.clone()]);
         let leftovers: Vec<_> = std::fs::read_dir(target.parent().unwrap()).unwrap().collect();
         assert_eq!(leftovers.len(), 1);
+    }
+
+    /// Regression: a redelivered task must not delete a NEW file that meanwhile sits at the same
+    /// inbox path; only the stored document's own bytes may be removed.
+    #[test]
+    fn redelivered_original_deleted_only_on_matching_checksum() {
+        let t = tempfile::tempdir().unwrap();
+        let f = t.path().join("scan.pdf");
+        std::fs::write(&f, b"abc").unwrap();
+        let same = compute_checksum(&f).unwrap();
+        let other = "0".repeat(64);
+        assert_eq!(redelivered_original_action(&f, std::slice::from_ref(&same)), RedeliveredOriginal::Delete);
+        assert_eq!(redelivered_original_action(&f, &[other.clone(), same.to_uppercase()]), RedeliveredOriginal::Delete);
+        assert!(matches!(redelivered_original_action(&f, std::slice::from_ref(&other)), RedeliveredOriginal::Keep(_)));
+        assert!(matches!(redelivered_original_action(&f, &[]), RedeliveredOriginal::Keep(_)), "unknown checksum: keep");
+        assert_eq!(redelivered_original_action(&t.path().join("gone.pdf"), &[same]), RedeliveredOriginal::Missing);
+        assert!(f.is_file(), "the decision itself never deletes");
+    }
+
+    /// Regression: failed deletions and failed reference checks stay in the note; only real
+    /// deletions are counted.
+    #[test]
+    fn pending_files_only_real_deletions_counted() {
+        let t = tempfile::tempdir().unwrap();
+        let s = |p: &Path| p.to_string_lossy().into_owned();
+        let del = t.path().join("del.pdf");
+        std::fs::write(&del, b"x").unwrap();
+        let referenced = t.path().join("ref.pdf");
+        std::fs::write(&referenced, b"x").unwrap();
+        let unknown = t.path().join("unknown.pdf");
+        std::fs::write(&unknown, b"x").unwrap();
+        let missing = t.path().join("missing.pdf");
+        // a non-empty directory cannot be removed with remove_file: stands for a failed delete
+        let undeletable = t.path().join("dir");
+        std::fs::create_dir_all(undeletable.join("inner")).unwrap();
+        let entries = vec![
+            (s(&del), PendingCheck::Unreferenced),
+            (s(&referenced), PendingCheck::Referenced),
+            (s(&unknown), PendingCheck::Unknown),
+            (s(&missing), PendingCheck::Unreferenced),
+            (s(&undeletable), PendingCheck::Unreferenced),
+        ];
+        let (removed, remaining) = remove_unreferenced(&entries);
+        assert_eq!(removed, 1);
+        assert_eq!(remaining, vec![s(&unknown), s(&undeletable)]);
+        assert!(!del.exists());
+        assert!(referenced.exists() && unknown.exists() && undeletable.exists());
     }
 
     #[test]

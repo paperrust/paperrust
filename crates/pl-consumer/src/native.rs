@@ -129,6 +129,95 @@ impl NativeParsing {
         }
     }
 
+    /// pl-ocr backend with the configured parser limits for its PDF text pass, so the reported
+    /// truncation belongs to the stored text.
+    fn ocr_backend(&self, language: &str, workdir: PathBuf) -> pl_ocr::native::NativeOcrmypdf {
+        let engine = pl_ocr::engine_select::engine_from_env(self.tesseract.clone(), language);
+        pl_ocr::native::NativeOcrmypdf::new(engine, self.renderer(), workdir).with_limits(self.limits.clone())
+    }
+
+    /// `parse()` per parser class (see `DocumentParsing::parse`).
+    fn parse_inner(&self, parser: &ParserInfo, req: &ParseRequest<'_>, produce_archive: bool) -> Result<ParsedOutput, StageError> {
+        if parser.class_name == RASTERISED {
+            let backend = self.ocr_backend(&self.ocr.language, req.tempdir.join("pages"));
+            // Gap E8: HEIC first to PNG (child process, craft-heif), then like any other image
+            let heic = if req.mime_type == "image/heic" { self.heic_png(req.path, req.tempdir) } else { None };
+            let (path, mime_type) = match &heic {
+                Some(png) => (png.as_path(), "image/png"),
+                None => (req.path, req.mime_type),
+            };
+            let to_stage = |e: pl_ocr::OcrError| match e {
+                pl_ocr::OcrError::Parse(m) => StageError::Parse(m),
+                other => StageError::Parse(format!("{}: {}", other.class_name(), other.message())),
+            };
+            let out =
+                pl_ocr::native::parse_document(&backend, &self.ocr, req.tempdir, path, mime_type, produce_archive).map_err(to_stage)?;
+            if self.ocr_language_auto {
+                use pl_ocr::engine::OcrEngine as _;
+                let installed = self.tesseract.as_ref().and_then(|t| t.languages().ok()).unwrap_or_default();
+                if let Some(lang) = auto_ocr_language(&out.text, &self.ocr.language, &installed) {
+                    tracing::info!(target: "paperless.parsing", "OCR language automatic: text looks like '{lang}', recognizing again with it");
+                    let mut cfg = self.ocr.clone();
+                    cfg.language = lang.to_string();
+                    let dir = req.tempdir.join("auto-language");
+                    let again = std::fs::create_dir_all(&dir).map_err(|e| e.to_string()).and_then(|()| {
+                        let backend = self.ocr_backend(&cfg.language, dir.join("pages"));
+                        pl_ocr::native::parse_document(&backend, &cfg, &dir, path, mime_type, produce_archive).map_err(|e| e.to_string())
+                    });
+                    match again {
+                        Ok(o) => {
+                            let truncation = o.truncated.map(|t| t.message());
+                            return Ok(ParsedOutput { text: Some(o.text), date: None, archive_path: o.archive_path, truncation });
+                        }
+                        Err(e) => {
+                            tracing::warn!(target: "paperless.parsing", "OCR language automatic: second recognition failed ({e}); keeping the first result")
+                        }
+                    }
+                }
+            }
+            // pl-ocr reports the truncation of the text it returns (its own PDF text pass with
+            // the configured limits), never a guess from an earlier pass
+            let truncation = out.truncated.map(|t| t.message());
+            return Ok(ParsedOutput { text: Some(out.text), date: None, archive_path: out.archive_path, truncation });
+        }
+        if parser.class_name == crate::remote::CLASS_NAME {
+            // RemoteDocumentParser.parse(…, produce_archive=…) – Azure bzw. lokaler Text
+            let Some(cfg) = &self.remote else {
+                return Err(StageError::Other("remote OCR is not configured".into()));
+            };
+            let p = crate::remote::RemoteDocumentParser { cfg: cfg.clone() };
+            let ctx = self.ctx(req.mailrule_id);
+            return match p.run(req.path, req.mime_type, produce_archive, req.tempdir, &ctx) {
+                Ok(d) => {
+                    let truncation = d.truncation_message();
+                    Ok(ParsedOutput { text: Some(d.text), date: None, archive_path: d.archive_path, truncation })
+                }
+                Err(pl_parsers::ParseError::Upstream(m)) => Err(StageError::Parse(m)),
+                Err(e) => Err(StageError::Parse(e.to_string())),
+            };
+        }
+        let Some(p) = self.find(parser, req.mime_type, req.filename, req.path) else {
+            return Err(StageError::Other(format!("parser {} not available", parser.class_name)));
+        };
+        let mut ctx = self.ctx(req.mailrule_id);
+        // generated files (archive PDF) into the parser folder, never next to the original (reprocessing
+        // reads directly from ORIGINALS_DIR)
+        ctx.work_dir = Some(req.tempdir.to_path_buf());
+        if parser.class_name == "MailDocumentParser" && p.requires_pdf_rendition() {
+            ctx.mail_pdf_layout = Some(self.mail_pdf_layout(req.mailrule_id));
+        }
+        match p.parse(req.path, req.mime_type, &ctx) {
+            // Office/HTML/mail/MSG: limits that kept a partial text (ParsedDocument::truncated)
+            Ok(d) => {
+                let truncation = d.truncation_message();
+                Ok(ParsedOutput { text: Some(d.text), date: d.date, archive_path: d.archive_path, truncation })
+            }
+            Err(pl_parsers::ParseError::Upstream(m)) => Err(StageError::Parse(m)),
+            Err(pl_parsers::ParseError::Io(e)) => Err(StageError::Other(e.to_string())),
+            Err(e) => Err(StageError::Parse(e.to_string())),
+        }
+    }
+
     fn ctx(&self, mailrule_id: Option<i64>) -> pl_parsers::ParseContext {
         pl_parsers::ParseContext {
             mailrule_id,
@@ -257,18 +346,16 @@ impl NativeParsing {
 }
 
 impl DocumentParsing for NativeParsing {
-    fn page_images(&self, path: &Path, mime_type: &str, max_pages: usize) -> Result<Vec<pl_core::vision::PageImage>, StageError> {
+    fn vision_request(
+        &self,
+        src: &pl_ocr::uncertain::RequestSources<'_>,
+        sel: &pl_ocr::uncertain::Selection,
+        lines: Option<&pl_ocr::uncertain::LinesFile>,
+        max_side: u32,
+    ) -> Result<pl_core::vision::VisionRequest, StageError> {
         let r = self.renderer();
-        pl_ocr::vision_pages::page_images(
-            r.as_ref(),
-            path,
-            mime_type,
-            max_pages,
-            pl_core::vision::PAGE_IMAGE_DPI,
-            pl_core::vision::MAX_PAGE_IMAGE_BYTES,
-        )
-        .map(|v| v.into_iter().map(|(mime, data)| pl_core::vision::PageImage { mime, data }).collect())
-        .map_err(|e| StageError::Other(e.to_string()))
+        pl_ocr::uncertain::build_request(r.as_ref(), src, sel, lines, max_side, pl_core::vision::MAX_PAGE_IMAGE_BYTES)
+            .map_err(|e| StageError::Other(e.to_string()))
     }
 
     fn parser_for(&self, mime_type: &str, filename: &str, path: &Path, allow_remote: bool) -> Option<ParserInfo> {
@@ -284,6 +371,8 @@ impl DocumentParsing for NativeParsing {
 
     fn should_produce_archive(&self, parser: &ParserInfo, mime_type: &str, path: &Path) -> bool {
         let ctx = self.ctx(None);
+        // Decision only: the truncation note comes from the pass that produces the stored text
+        // (pl-ocr / remote parser report it themselves).
         pl_ocr::parser::should_produce_archive(
             parser.requires_pdf_rendition,
             parser.can_produce_archive,
@@ -294,73 +383,7 @@ impl DocumentParsing for NativeParsing {
     }
 
     fn parse(&self, parser: &ParserInfo, req: &ParseRequest<'_>, produce_archive: bool) -> Result<ParsedOutput, StageError> {
-        if parser.class_name == RASTERISED {
-            let engine = pl_ocr::engine_select::engine_from_env(self.tesseract.clone(), &self.ocr.language);
-            let backend = pl_ocr::native::NativeOcrmypdf::new(engine, self.renderer(), req.tempdir.join("pages"));
-            // Gap E8: HEIC first to PNG (child process, craft-heif), then like any other image
-            let heic = if req.mime_type == "image/heic" { self.heic_png(req.path, req.tempdir) } else { None };
-            let (path, mime_type) = match &heic {
-                Some(png) => (png.as_path(), "image/png"),
-                None => (req.path, req.mime_type),
-            };
-            let to_stage = |e: pl_ocr::OcrError| match e {
-                pl_ocr::OcrError::Parse(m) => StageError::Parse(m),
-                other => StageError::Parse(format!("{}: {}", other.class_name(), other.message())),
-            };
-            let out =
-                pl_ocr::native::parse_document(&backend, &self.ocr, req.tempdir, path, mime_type, produce_archive).map_err(to_stage)?;
-            if self.ocr_language_auto {
-                use pl_ocr::engine::OcrEngine as _;
-                let installed = self.tesseract.as_ref().and_then(|t| t.languages().ok()).unwrap_or_default();
-                if let Some(lang) = auto_ocr_language(&out.text, &self.ocr.language, &installed) {
-                    tracing::info!(target: "paperless.parsing", "OCR language automatic: text looks like '{lang}', recognizing again with it");
-                    let mut cfg = self.ocr.clone();
-                    cfg.language = lang.to_string();
-                    let dir = req.tempdir.join("auto-language");
-                    let again = std::fs::create_dir_all(&dir).map_err(|e| e.to_string()).and_then(|()| {
-                        let engine = pl_ocr::engine_select::engine_from_env(self.tesseract.clone(), &cfg.language);
-                        let backend = pl_ocr::native::NativeOcrmypdf::new(engine, self.renderer(), dir.join("pages"));
-                        pl_ocr::native::parse_document(&backend, &cfg, &dir, path, mime_type, produce_archive).map_err(|e| e.to_string())
-                    });
-                    match again {
-                        Ok(o) => return Ok(ParsedOutput { text: Some(o.text), date: None, archive_path: o.archive_path }),
-                        Err(e) => {
-                            tracing::warn!(target: "paperless.parsing", "OCR language automatic: second recognition failed ({e}); keeping the first result")
-                        }
-                    }
-                }
-            }
-            return Ok(ParsedOutput { text: Some(out.text), date: None, archive_path: out.archive_path });
-        }
-        if parser.class_name == crate::remote::CLASS_NAME {
-            // RemoteDocumentParser.parse(…, produce_archive=…) – Azure bzw. lokaler Text
-            let Some(cfg) = &self.remote else {
-                return Err(StageError::Other("remote OCR is not configured".into()));
-            };
-            let p = crate::remote::RemoteDocumentParser { cfg: cfg.clone() };
-            let ctx = self.ctx(req.mailrule_id);
-            return match p.run(req.path, req.mime_type, produce_archive, req.tempdir, &ctx) {
-                Ok(d) => Ok(ParsedOutput { text: Some(d.text), date: None, archive_path: d.archive_path }),
-                Err(pl_parsers::ParseError::Upstream(m)) => Err(StageError::Parse(m)),
-                Err(e) => Err(StageError::Parse(e.to_string())),
-            };
-        }
-        let Some(p) = self.find(parser, req.mime_type, req.filename, req.path) else {
-            return Err(StageError::Other(format!("parser {} not available", parser.class_name)));
-        };
-        let mut ctx = self.ctx(req.mailrule_id);
-        // generated files (archive PDF) into the parser folder, never next to the original (reprocessing
-        // reads directly from ORIGINALS_DIR)
-        ctx.work_dir = Some(req.tempdir.to_path_buf());
-        if parser.class_name == "MailDocumentParser" && p.requires_pdf_rendition() {
-            ctx.mail_pdf_layout = Some(self.mail_pdf_layout(req.mailrule_id));
-        }
-        match p.parse(req.path, req.mime_type, &ctx) {
-            Ok(d) => Ok(ParsedOutput { text: Some(d.text), date: d.date, archive_path: d.archive_path }),
-            Err(pl_parsers::ParseError::Upstream(m)) => Err(StageError::Parse(m)),
-            Err(pl_parsers::ParseError::Io(e)) => Err(StageError::Other(e.to_string())),
-            Err(e) => Err(StageError::Parse(e.to_string())),
-        }
+        self.parse_inner(parser, req, produce_archive)
     }
 
     fn thumbnail(&self, parser: &ParserInfo, req: &ParseRequest<'_>, archive: Option<&Path>) -> Result<PathBuf, StageError> {
@@ -769,6 +792,97 @@ impl ScriptRunner for CommandScripts {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Born-digital PDF with one text line (> 50 characters) per page.
+    fn text_pdf(path: &Path, pages: usize) {
+        use lopdf::{Document, Object, Stream, dictionary};
+        let mut d = Document::with_version("1.5");
+        let pages_id = d.new_object_id();
+        let font = d.add_object(dictionary! {
+            "Type" => "Font", "Subtype" => "Type1", "BaseFont" => "Helvetica", "Encoding" => "WinAnsiEncoding",
+        });
+        let mut kids = Vec::new();
+        for i in 0..pages {
+            let t = format!("Page {i} with enough born digital text to pass the minimum length check");
+            let c = d.add_object(Stream::new(dictionary! {}, format!("BT /F1 10 Tf 72 700 Td ({t}) Tj ET").into_bytes()));
+            let page = d.add_object(dictionary! {
+                "Type" => "Page", "Parent" => pages_id, "MediaBox" => vec![0.into(), 0.into(), 595.into(), 842.into()],
+                "Resources" => dictionary! { "Font" => dictionary! { "F1" => font } }, "Contents" => c,
+            });
+            kids.push(Object::Reference(page));
+        }
+        let n = kids.len() as i64;
+        d.objects.insert(pages_id, Object::Dictionary(dictionary! { "Type" => "Pages", "Kids" => kids, "Count" => n }));
+        let cat = d.add_object(dictionary! { "Type" => "Catalog", "Pages" => pages_id });
+        d.trailer.set("Root", cat);
+        d.save(path).expect("save pdf");
+    }
+
+    fn rasterised() -> ParserInfo {
+        ParserInfo {
+            class_name: RASTERISED.into(),
+            name: "t".into(),
+            can_produce_archive: true,
+            requires_pdf_rendition: false,
+            uses_remote_service: false,
+        }
+    }
+
+    fn parse_pdf(p: &NativeParsing, path: &Path, tempdir: &Path) -> ParsedOutput {
+        let req = ParseRequest { path, mime_type: "application/pdf", filename: "a.pdf", mailrule_id: None, tempdir };
+        let produce = p.should_produce_archive(&rasterised(), "application/pdf", path);
+        assert!(!produce, "born-digital → no archive");
+        p.parse(&rasterised(), &req, produce).expect("parse")
+    }
+
+    /// The Tesseract parser path takes the truncation from pl-ocr, whose PDF text pass uses the
+    /// configured limits (regression: it used the default limits and the note was a guess from
+    /// the born-digital check).
+    #[test]
+    fn rasterised_truncation_comes_from_pl_ocr_with_configured_limits() {
+        let dir = tempfile::tempdir().unwrap();
+        let (long, short) = (dir.path().join("long.pdf"), dir.path().join("short.pdf"));
+        text_pdf(&long, 3);
+        text_pdf(&short, 2);
+        let mut p = NativeParsing::new(pl_ocr::OcrConfig::defaults(), chrono_tz::UTC);
+        p.ocr.archive_file_generation = pl_ocr::config::ArchiveFileGeneration::Auto;
+        p.ocr.mode = pl_ocr::config::Mode::Auto;
+        p.limits.max_pdf_pages = 2;
+        let out = parse_pdf(&p, &long, &dir.path().join("t1"));
+        let text = out.text.unwrap_or_default();
+        assert!(text.contains("Page 1") && !text.contains("Page 2"), "stored text honours the limit: {text}");
+        let note = out.truncation.expect("truncation reported");
+        assert!(note.contains("only 2 of 3 pages"), "{note}");
+        let out = parse_pdf(&p, &short, &dir.path().join("t2"));
+        assert_eq!(out.truncation, None, "complete text: nothing to note");
+        // a limit above the page count: complete text, no note (the default limits would agree)
+        p.limits.max_pdf_pages = 10;
+        let out = parse_pdf(&p, &long, &dir.path().join("t3"));
+        assert_eq!(out.truncation, None);
+        assert!(out.text.unwrap_or_default().contains("Page 2"));
+    }
+
+    /// Registry parsers (here the Office parser with RTF) hand their `ParsedDocument::truncated`
+    /// on as the note text.
+    #[test]
+    fn registry_parser_truncation_becomes_the_note() {
+        let dir = tempfile::tempdir().unwrap();
+        let f = dir.path().join("a.rtf");
+        std::fs::write(&f, br"{\rtf1\ansi Erster Absatz\par Zweiter Absatz\par}").unwrap();
+        let mut p = NativeParsing::new(pl_ocr::OcrConfig::defaults(), chrono_tz::UTC);
+        let req = ParseRequest { path: &f, mime_type: "text/rtf", filename: "a.rtf", mailrule_id: None, tempdir: dir.path() };
+        let parser = p.parser_for("text/rtf", "a.rtf", &f, false).expect("office parser");
+        assert_eq!(parser.class_name, "TikaDocumentParser");
+        let out = p.parse(&parser, &req, false).unwrap();
+        assert_eq!(out.truncation, None);
+        p.limits.max_text_chars = 6;
+        let out = p.parse(&parser, &req, false).unwrap();
+        assert_eq!(out.text.as_deref(), Some("Erster"));
+        let msg = out.truncation.expect("truncation reported");
+        assert!(msg.contains("text size limit (6 bytes)"), "{msg}");
+        let note = crate::system_note::truncation_note(&msg);
+        assert!(note.starts_with(crate::system_note::TRUNCATION_MARKER), "{note}");
+    }
 
     fn save_model(path: &Path, key: &[u8]) {
         pl_classifier::DocumentClassifier::new().save(path, key).expect("save model");

@@ -188,37 +188,12 @@ async fn delete_version(
         let mut attempt = 0u32;
         loop {
             attempt += 1;
-            let r: ApiResult<()> = async {
-                let mut tx = sqlx::Connection::begin(&mut *conn).await?;
-                crate::update::lock_root_then_version(&mut tx, root.id, version.id).await?;
-                crate::softdelete::soft_delete_document(&mut tx, &lctx, &media, version.id, None).await?;
-                touch_root(&mut tx, root.id).await?;
-                tx.commit().await?;
-                Ok(())
-            }
-            .await;
-            match r {
+            match delete_version_tx(&mut conn, &lctx, &media, &actor, &root, version.id).await {
                 Err(e) if e.is_retryable() && attempt < pl_consumer::db::MAX_ATTEMPTS => {
                     tokio::time::sleep(pl_consumer::db::retry_backoff(attempt)).await;
                 }
                 r => break r?,
             }
-        }
-        if actor.enabled {
-            let r = docs::repr(&mut conn, &root).await?;
-            let mut ch = Map::new();
-            ch.insert("Version Deleted".into(), json!(["None", version.id]));
-            auditlog::write(
-                &mut conn,
-                &actor,
-                "document",
-                root.id,
-                &r,
-                auditlog::UPDATE,
-                ch,
-                Some(json!({"reason": "Version deleted", "version_id": version.id})),
-            )
-            .await?;
         }
         // versions_newest_first(Document.objects.filter(Q(id=root) | Q(root_document=root))).first()
         let current: Option<i32> = sqlx::query_scalar(
@@ -234,6 +209,83 @@ async fn delete_version(
     crate::index::add_or_update(state, &[root.id]).await;
     document_updated_finish(state, &outcome, root.id).await;
     Ok(drf_ok(ctx, json!({"result": "OK", "current_version_id": current.map(i64::from).unwrap_or(root.id)})))
+}
+
+/// One attempt of the version delete: lock root then version, soft-delete the version, touch the
+/// root and write the "Version Deleted" audit entry, all in ONE transaction. Upstream writes the
+/// entry after the delete (no `ATOMIC_REQUESTS`), so a failing audit write answered 500 although
+/// the version was gone; here the delete is rolled back with it (contract "Known differences").
+async fn delete_version_tx(
+    conn: &mut PgConnection,
+    lctx: &auditlog::LogCtx,
+    media: &MediaCfg,
+    actor: &auditlog::LogCtx,
+    root: &DocRow,
+    version_id: i64,
+) -> ApiResult<()> {
+    let mut tx = sqlx::Connection::begin(&mut *conn).await?;
+    crate::update::lock_root_then_version(&mut tx, root.id, version_id).await?;
+    crate::softdelete::soft_delete_document(&mut tx, lctx, media, version_id, None).await?;
+    touch_root(&mut tx, root.id).await?;
+    if actor.enabled {
+        let r = docs::repr(&mut tx, root).await?;
+        let mut ch = Map::new();
+        ch.insert("Version Deleted".into(), json!(["None", version_id]));
+        auditlog::write(
+            &mut tx,
+            actor,
+            "document",
+            root.id,
+            &r,
+            auditlog::UPDATE,
+            ch,
+            Some(json!({"reason": "Version deleted", "version_id": version_id})),
+        )
+        .await?;
+    }
+    tx.commit().await?;
+    Ok(())
+}
+
+/// One attempt of the label change: lock root then version, read the version (and so the OLD
+/// label) under the row lock, save the new label, touch the root and write the "Version Label"
+/// audit entry, all in ONE transaction. Reading the old label before the lock (as before) could
+/// log a wrong old name when two renames ran concurrently. Returns the saved version and the old
+/// label. A version trashed meanwhile → 404.
+async fn rename_version_tx(
+    conn: &mut PgConnection,
+    lctx: &auditlog::LogCtx,
+    media: &MediaCfg,
+    actor: &auditlog::LogCtx,
+    root: &DocRow,
+    version_id: i64,
+    new_label: &Option<String>,
+) -> ApiResult<(DocRow, Option<String>)> {
+    let mut tx = sqlx::Connection::begin(&mut *conn).await?;
+    crate::update::lock_root_then_version(&mut tx, root.id, version_id).await?;
+    let Some(mut v) = docs::load_live(&mut tx, version_id).await? else { return Err(not_found()) };
+    let old_label = v.version_label.clone();
+    v.version_label = new_label.clone();
+    docs::save(&mut tx, lctx, Some(media), &mut v, Some(&["version_label"])).await?;
+    touch_root(&mut tx, root.id).await?;
+    if actor.enabled && old_label != *new_label {
+        let r = docs::repr(&mut tx, root).await?;
+        let mut ch = Map::new();
+        ch.insert("Version Label".into(), json!([old_label, new_label]));
+        auditlog::write(
+            &mut tx,
+            actor,
+            "document",
+            root.id,
+            &r,
+            auditlog::UPDATE,
+            ch,
+            Some(json!({"reason": "Version label updated", "version_id": v.id})),
+        )
+        .await?;
+    }
+    tx.commit().await?;
+    Ok((v, old_label))
 }
 
 // ------------------------------------------------------------------ PATCH versions/{id}/
@@ -331,47 +383,19 @@ async fn update_version_label(
     let actor = explicit_actor(state, auth.user().id, &meta);
     let (version, outcome) = {
         let mut conn = state.db().acquire().await?;
-        let mut version = version_for_root(&mut conn, &root, version_id).await?;
-        let old_label = version.version_label.clone();
-        version.version_label = new_label.clone();
+        let found = version_for_root(&mut conn, &root, version_id).await?;
         // Lock order as when ingesting a version: root document, then version (s3 follow-up
         // to FINDINGS B1); complete transaction, retried on 40P01/40001.
         let mut attempt = 0u32;
-        loop {
+        let version = loop {
             attempt += 1;
-            let r: ApiResult<()> = async {
-                let mut tx = sqlx::Connection::begin(&mut *conn).await?;
-                crate::update::lock_root_then_version(&mut tx, root.id, version.id).await?;
-                let mut v = version.clone();
-                docs::save(&mut tx, &lctx, Some(&media), &mut v, Some(&["version_label"])).await?;
-                touch_root(&mut tx, root.id).await?;
-                tx.commit().await?;
-                Ok(())
-            }
-            .await;
-            match r {
+            match rename_version_tx(&mut conn, &lctx, &media, &actor, &root, found.id, &new_label).await {
                 Err(e) if e.is_retryable() && attempt < pl_consumer::db::MAX_ATTEMPTS => {
                     tokio::time::sleep(pl_consumer::db::retry_backoff(attempt)).await;
                 }
-                r => break r?,
+                r => break r?.0,
             }
-        }
-        if actor.enabled && old_label != new_label {
-            let r = docs::repr(&mut conn, &root).await?;
-            let mut ch = Map::new();
-            ch.insert("Version Label".into(), json!([old_label, new_label]));
-            auditlog::write(
-                &mut conn,
-                &actor,
-                "document",
-                root.id,
-                &r,
-                auditlog::UPDATE,
-                ch,
-                Some(json!({"reason": "Version label updated", "version_id": version.id})),
-            )
-            .await?;
-        }
+        };
         let outcome = document_updated(state, &mut conn, &lctx, root.id).await?;
         (version, outcome)
     };
@@ -684,6 +708,196 @@ mod tests {
         assert_eq!(sanitize_upload_name("C:\\x\\a.pdf").as_deref(), Some("a.pdf"));
         assert_eq!(sanitize_upload_name("../.."), None);
         assert_eq!(sanitize_upload_name("dir/f\u{0}.txt").as_deref(), Some("f.txt"));
+    }
+
+    /// Version delete/rename + audit entry atomicity and the old label under the row lock, against
+    /// a throwaway copy of the migrated test template (same setup as `tests/concurrency_db.rs`):
+    ///
+    /// ```sh
+    /// PAPERRUST_FIX2_SERVER=postgres://paperless:paperless@127.0.0.1:54329 \
+    ///   cargo test -p pl-documents-write -j 2 --lib versions::tests::db -- --ignored --test-threads 1
+    /// ```
+    mod db {
+        use super::super::*;
+        use sqlx::{Executor, PgPool};
+
+        const TEMPLATE: &str = "pl_fix2_tpl";
+
+        fn server() -> Option<String> {
+            let s = std::env::var("PAPERRUST_FIX2_SERVER").ok()?;
+            assert!(s.contains("127.0.0.1") || s.contains("localhost"), "local servers only");
+            Some(s)
+        }
+
+        async fn fresh_db(server: &str, name: &str) -> PgPool {
+            assert!(name.starts_with("pl_fix2_") && name != TEMPLATE);
+            pl_authz::grants::set_native(true);
+            let admin = PgPool::connect(&format!("{server}/postgres")).await.expect("admin");
+            admin.execute(format!("DROP DATABASE IF EXISTS {name} WITH (FORCE)").as_str()).await.expect("drop");
+            admin.execute(format!("CREATE DATABASE {name} TEMPLATE {TEMPLATE}").as_str()).await.expect("create");
+            admin.close().await;
+            let pool = PgPool::connect(&format!("{server}/{name}")).await.expect("connect");
+            // The template may predate this crate's own migrations (e.g. documents_note.format);
+            // they are idempotent, so apply them to the throwaway copy.
+            for (_, sql) in crate::migrations::ALL {
+                pool.execute(*sql).await.expect("crate migration");
+            }
+            pool
+        }
+
+        async fn drop_db(server: &str, pool: PgPool, name: &str) {
+            pool.close().await;
+            let admin = PgPool::connect(&format!("{server}/postgres")).await.expect("admin");
+            let _ = admin.execute(format!("DROP DATABASE IF EXISTS {name} WITH (FORCE)").as_str()).await;
+            admin.close().await;
+        }
+
+        fn media() -> MediaCfg {
+            let env = pl_core::config::Env::from_pairs([("PAPERRUST_SECRET_KEY", "fix2-test-secret-key-local-only-0123456789")]);
+            MediaCfg::from_config(&pl_core::Config::from_env_map(env).expect("config"))
+        }
+
+        fn quiet() -> auditlog::LogCtx {
+            auditlog::LogCtx::middleware(false, None, None, None, None)
+        }
+
+        fn actor() -> auditlog::LogCtx {
+            auditlog::LogCtx::middleware(true, Some((&1, None)), None, None, None)
+        }
+
+        /// A live root document plus a new version of it (label `old`, no files). The version index is
+        /// the next free one: the reference data already has versions of documents 1 and 2. In the
+        /// migrated template `documents_document` is a view, so the id sequence is the one of
+        /// `paperrust_document`.
+        async fn root_with_version(pool: &PgPool) -> (DocRow, i64) {
+            let mut c = pool.acquire().await.expect("conn");
+            let root_id: i32 = sqlx::query_scalar(
+                "SELECT id FROM documents_document WHERE deleted_at IS NULL AND root_document_id IS NULL ORDER BY id LIMIT 1",
+            )
+            .fetch_one(&mut *c)
+            .await
+            .expect("root");
+            (&mut *c)
+                .execute(
+                    format!(
+                        "CREATE TEMP TABLE v AS SELECT * FROM documents_document WHERE id = {root_id}; \
+                     UPDATE v SET id = nextval(coalesce(pg_get_serial_sequence('documents_document', 'id'), \
+                     pg_get_serial_sequence('paperrust_document', 'id'))), root_document_id = {root_id}, \
+                     checksum = md5(random()::text), archive_checksum = NULL, archive_serial_number = NULL, filename = NULL, \
+                     archive_filename = NULL, version_label = 'old', version_index = (SELECT coalesce(max(version_index), 0) + 1 \
+                     FROM documents_document WHERE root_document_id = {root_id}); \
+                     INSERT INTO documents_document SELECT * FROM v;"
+                    )
+                    .as_str(),
+                )
+                .await
+                .expect("version");
+            let vid: i32 = sqlx::query_scalar("SELECT id FROM v").fetch_one(&mut *c).await.expect("vid");
+            let root = docs::load_live(&mut c, i64::from(root_id)).await.expect("load").expect("root row");
+            (root, i64::from(vid))
+        }
+
+        async fn is_deleted(c: &mut sqlx::PgConnection, id: i64) -> bool {
+            sqlx::query_scalar("SELECT deleted_at IS NOT NULL FROM documents_document WHERE id = $1")
+                .bind(id as i32)
+                .fetch_one(&mut *c)
+                .await
+                .expect("row")
+        }
+
+        async fn break_audit(pool: &PgPool, on: bool) {
+            let sql = if on {
+                "CREATE OR REPLACE FUNCTION pl_fail_audit() RETURNS trigger LANGUAGE plpgsql AS \
+                 $$ BEGIN RAISE EXCEPTION 'audit log unavailable'; END $$; \
+                 CREATE TRIGGER pl_fail_audit BEFORE INSERT ON auditlog_logentry FOR EACH ROW EXECUTE FUNCTION pl_fail_audit();"
+            } else {
+                "DROP TRIGGER IF EXISTS pl_fail_audit ON auditlog_logentry;"
+            };
+            pool.execute(sql).await.expect("trigger");
+        }
+
+        /// Review: delete committed before the audit entry; a failing audit write answered an
+        /// error although the version was gone.
+        #[tokio::test]
+        #[ignore = "needs the local test template (PAPERRUST_FIX2_SERVER)"]
+        async fn delete_rolls_back_when_audit_fails() {
+            let Some(server) = server() else { return };
+            let name = "pl_fix2_version_delete";
+            let pool = fresh_db(&server, name).await;
+            let (root, vid) = root_with_version(&pool).await;
+            break_audit(&pool, true).await;
+            let mut c = pool.acquire().await.expect("conn");
+            assert!(delete_version_tx(&mut c, &quiet(), &media(), &actor(), &root, vid).await.is_err());
+            let gone = is_deleted(&mut c, vid).await;
+            assert!(!gone, "version must survive a failed audit write");
+            drop(c);
+            break_audit(&pool, false).await;
+            let mut c = pool.acquire().await.expect("conn");
+            delete_version_tx(&mut c, &quiet(), &media(), &actor(), &root, vid).await.expect("delete");
+            let gone = is_deleted(&mut c, vid).await;
+            assert!(gone);
+            drop(c);
+            drop_db(&server, pool, name).await;
+        }
+
+        /// Review: label change committed before the audit entry; old label read before the row
+        /// lock, so a concurrent rename made the entry show a wrong old name.
+        #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+        #[ignore = "needs the local test template (PAPERRUST_FIX2_SERVER)"]
+        async fn rename_is_atomic_and_logs_old_label_read_under_lock() {
+            let Some(server) = server() else { return };
+            let name = "pl_fix2_version_rename";
+            let pool = fresh_db(&server, name).await;
+            let (root, vid) = root_with_version(&pool).await;
+
+            break_audit(&pool, true).await;
+            let mut c = pool.acquire().await.expect("conn");
+            let r = rename_version_tx(&mut c, &quiet(), &media(), &actor(), &root, vid, &Some("x".into())).await;
+            assert!(r.is_err());
+            let label: Option<String> = sqlx::query_scalar("SELECT version_label FROM documents_document WHERE id = $1")
+                .bind(vid as i32)
+                .fetch_one(&mut *c)
+                .await
+                .expect("row");
+            assert_eq!(label.as_deref(), Some("old"), "label must not change when the audit write fails");
+            drop(c);
+            break_audit(&pool, false).await;
+
+            // A concurrent rename holds the version row and changes the label to "mid".
+            let mut a = pool.acquire().await.expect("conn a");
+            (&mut *a).execute("BEGIN").await.expect("begin");
+            // documents_document is a view with an outer join in the migrated template (FOR UPDATE
+            // not allowed there); lock the base row in paperrust_document.
+            sqlx::query("SELECT id FROM paperrust_document WHERE id = $1 FOR UPDATE")
+                .bind(vid as i32)
+                .execute(&mut *a)
+                .await
+                .expect("lock");
+            sqlx::query("UPDATE documents_document SET version_label = 'mid' WHERE id = $1")
+                .bind(vid as i32)
+                .execute(&mut *a)
+                .await
+                .expect("mid");
+            let (p, r2) = (pool.clone(), root.clone());
+            let b = tokio::spawn(async move {
+                let mut c = p.acquire().await.expect("conn b");
+                rename_version_tx(&mut c, &quiet(), &media(), &actor(), &r2, vid, &Some("new".into())).await.map(|(_, old)| old).ok()
+            });
+            tokio::time::sleep(std::time::Duration::from_millis(400)).await;
+            (&mut *a).execute("COMMIT").await.expect("commit");
+            drop(a);
+            let old = b.await.expect("join");
+            assert_eq!(old, Some(Some("mid".to_string())), "old label read under the row lock");
+            let changes: String =
+                sqlx::query_scalar("SELECT changes::text FROM auditlog_logentry WHERE object_id = $1 ORDER BY id DESC LIMIT 1")
+                    .bind(root.id)
+                    .fetch_one(&pool)
+                    .await
+                    .expect("entry");
+            let v: Value = serde_json::from_str(&changes).expect("json");
+            assert_eq!(v["Version Label"], json!(["mid", "new"]));
+            drop_db(&server, pool, name).await;
+        }
     }
 
     #[test]

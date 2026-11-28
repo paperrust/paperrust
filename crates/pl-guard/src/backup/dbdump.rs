@@ -108,9 +108,29 @@ fn read_line(r: &mut impl BufRead) -> Result<String, String> {
     Ok(s.trim_end_matches('\n').to_string())
 }
 
+/// Tables of the dump that do not exist in the target database (in dump order).
+pub fn missing_tables(in_dump: &[String], existing: &[String]) -> Vec<String> {
+    in_dump.iter().filter(|t| !existing.contains(t)).cloned().collect()
+}
+
+/// Missing tables mean lost data (e.g. the target was migrated with an older version):
+/// refuse unless the caller explicitly allows skipping them.
+pub fn check_missing_tables(missing: &[String], allow_missing: bool) -> Result<(), String> {
+    if missing.is_empty() || allow_missing {
+        return Ok(());
+    }
+    Err(format!(
+        "{} table(s) of the dump do not exist in the target database: {}. Run `paperrust manage migrate` with the same          version first, or pass --allow-missing-tables to skip them (their rows are not restored)",
+        missing.len(),
+        missing.join(", ")
+    ))
+}
+
 /// Restore a dump into a **migrated** database. Existing rows of the backed-up
-/// tables are replaced.
-pub async fn restore(pool: &PgPool, dump_file: &Path) -> Result<RestoreStats, String> {
+/// tables are replaced. Tables of the dump missing in the target fail the restore
+/// (before anything is changed) unless `allow_missing` is set; then they are skipped
+/// and listed in [`RestoreStats::skipped`].
+pub async fn restore(pool: &PgPool, dump_file: &Path, allow_missing: bool) -> Result<RestoreStats, String> {
     let f = std::fs::File::open(dump_file).map_err(|e| format!("{}: {e}", dump_file.display()))?;
     let mut r = BufReader::new(flate2::read::GzDecoder::new(f));
     if read_line(&mut r)? != MAGIC {
@@ -121,6 +141,10 @@ pub async fn restore(pool: &PgPool, dump_file: &Path) -> Result<RestoreStats, St
         .fetch_all(&mut *tx)
         .await
         .map_err(|e| e.to_string())?;
+    // 0. check before TRUNCATE (pre-scan of the dump, without holding it in memory)
+    let p = dump_file.to_path_buf();
+    let in_dump = tokio::task::spawn_blocking(move || tables_in_dump(&p)).await.map_err(|e| e.to_string())??;
+    check_missing_tables(&missing_tables(&in_dump, &existing), allow_missing)?;
     // 1. own triggers off while no checks are pending yet
     //    (PostgreSQL forbids ALTER TABLE with deferred trigger events).
     for t in &existing {
@@ -250,8 +274,46 @@ pub fn tables_in_dump(dump_file: &Path) -> Result<Vec<String>, String> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
     fn quoting() {
         assert_eq!(super::qi("a\"b"), "\"a\"\"b\"");
+    }
+
+    /// Regression: tables missing in the target schema were skipped silently (only a count
+    /// was printed); now the restore fails with their names unless explicitly allowed.
+    #[test]
+    fn missing_tables_fail_unless_allowed() {
+        let dump: Vec<String> = ["documents_tag", "paperrust_new", "auth_user"].iter().map(|s| s.to_string()).collect();
+        let existing: Vec<String> = ["auth_user", "documents_tag"].iter().map(|s| s.to_string()).collect();
+        let missing = missing_tables(&dump, &existing);
+        assert_eq!(missing, vec!["paperrust_new".to_string()]);
+        let e = check_missing_tables(&missing, false).unwrap_err();
+        assert!(e.contains("paperrust_new") && e.contains("--allow-missing-tables"), "{e}");
+        assert!(check_missing_tables(&missing, true).is_ok());
+        assert!(check_missing_tables(&[], false).is_ok());
+    }
+
+    /// The pre-scan reads table names from a dump file without a database.
+    #[test]
+    fn tables_in_dump_file() {
+        let t = tempfile::tempdir().unwrap();
+        let p = t.path().join("d.gz");
+        let mut gz = flate2::write::GzEncoder::new(std::fs::File::create(&p).unwrap(), flate2::Compression::fast());
+        gz.write_all(
+            b"PAPERRUST-DBDUMP 1
+T {\"table\":\"a\",\"columns\":[\"id\"]}
+D 2
+1
+E
+T {\"table\":\"b\",\"columns\":[\"id\"]}
+E
+Z
+",
+        )
+        .unwrap();
+        gz.finish().unwrap();
+        assert_eq!(tables_in_dump(&p).unwrap(), vec!["a".to_string(), "b".to_string()]);
     }
 }

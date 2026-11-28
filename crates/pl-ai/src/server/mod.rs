@@ -12,6 +12,7 @@ pub mod mcp_index;
 pub mod review;
 pub mod store;
 pub mod suggest;
+pub mod vision;
 pub mod workflow;
 
 use pl_core::{ApiError, AppState};
@@ -28,12 +29,19 @@ pub mod migrations {
     pub const M0002_PAPERRUST_AI_MCP_SCOPE: &str = include_str!("../../migrations/0002_paperrust_ai_mcp_scope.sql");
     /// `migrations/0003_paperrust_ai_prompts_jobs.sql` (own prompts, AI options, post-processing).
     pub const M0003_PAPERRUST_AI_PROMPTS_JOBS: &str = include_str!("../../migrations/0003_paperrust_ai_prompts_jobs.sql");
+    /// `migrations/0004_paperrust_ai_transcript.sql` (KI-Abschrift: original OCR next to the AI text).
+    pub const M0004_PAPERRUST_AI_TRANSCRIPT: &str = include_str!("../../migrations/0004_paperrust_ai_transcript.sql");
+    /// `migrations/0005_paperrust_ai_job_lease.sql` (job lease + persisted new-object budget, one active job,
+    /// all audit ids of a review entry). Lives in `src/server/` until it is moved to `migrations/`.
+    pub const M0005_PAPERRUST_AI_JOB_LEASE: &str = include_str!("../../migrations/0005_paperrust_ai_job_lease.sql");
 
     /// All migrations in order `(name, sql)`.
     pub const ALL: &[(&str, &str)] = &[
         ("0001_paperrust_ai", M0001_PAPERRUST_AI),
         ("0002_paperrust_ai_mcp_scope", M0002_PAPERRUST_AI_MCP_SCOPE),
         ("0003_paperrust_ai_prompts_jobs", M0003_PAPERRUST_AI_PROMPTS_JOBS),
+        ("0004_paperrust_ai_transcript", M0004_PAPERRUST_AI_TRANSCRIPT),
+        ("0005_paperrust_ai_job_lease", M0005_PAPERRUST_AI_JOB_LEASE),
     ];
 
     /// Applies all migrations (idempotent, `CREATE … IF NOT EXISTS`).

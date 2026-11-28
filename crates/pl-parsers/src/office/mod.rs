@@ -138,6 +138,9 @@ pub struct OfficeContent {
     pub metadata: Vec<(String, String)>,
     /// Value of `dcterms:created` (Tika `parsed.created`).
     pub created: Option<String>,
+    /// PaperRust: `text` stopped at the text-size limit (`max_text_chars`); `text` holds the part
+    /// read so far instead of failing the whole document.
+    pub truncated: Option<crate::limits::Truncation>,
 }
 
 /// Extracts text and metadata of an office document from bytes.
@@ -249,7 +252,12 @@ impl DocumentParser for OfficeDocumentParser {
             }
             None => None,
         };
-        Ok(ParsedDocument { text: crate::pystr::py_strip(&c.text).to_owned(), date, archive_path })
+        Ok(ParsedDocument {
+            text: crate::pystr::py_strip(&c.text).to_owned(),
+            date,
+            archive_path,
+            truncated: c.truncated.into_iter().collect(),
+        })
     }
     fn page_count(&self, _p: &Path, _m: &str, _c: &ParseContext) -> Option<u32> {
         // upstream: pages of the archive PDF; without archive None

@@ -41,10 +41,21 @@ pub enum ScanError {
     Protocol(String),
     #[error("page too large")]
     TooLarge,
+    /// The device delivered more pages than allowed per job (limit in the field).
+    #[error("scan has more than {0} pages; nothing was imported")]
+    TooManyPages(usize),
+    /// The pages of one job together exceed the byte budget (limit in bytes in the field).
+    #[error("scan is larger than {} MiB in total; nothing was imported", mib(*.0))]
+    JobTooLarge(u64),
     #[error("could not build the PDF: {0}")]
     Pdf(String),
     #[error("could not hand the scan to the consumer: {0}")]
     Intake(String),
+}
+
+/// Bytes → MiB for messages (at least 1, so that tiny test limits do not read as "0 MiB").
+fn mib(bytes: u64) -> u64 {
+    bytes.div_ceil(1024 * 1024).max(1)
 }
 
 impl ScanError {
@@ -59,6 +70,8 @@ impl ScanError {
             ScanError::Unsupported(_) => "unsupported",
             ScanError::Protocol(_) => "protocol",
             ScanError::TooLarge => "too_large",
+            ScanError::TooManyPages(_) => "too_many_pages",
+            ScanError::JobTooLarge(_) => "job_too_large",
             ScanError::Pdf(_) => "pdf",
             ScanError::Intake(_) => "intake",
         }
@@ -558,6 +571,13 @@ impl Client {
     }
 
     pub async fn next_document(&self, job: &Url) -> Result<Next, ScanError> {
+        self.next_document_limited(job, MAX_PAGE_BYTES).await
+    }
+
+    /// Like [`Client::next_document`], but the page may be at most `limit` bytes
+    /// (≤ [`MAX_PAGE_BYTES`]); larger → [`ScanError::TooLarge`] without reading the rest.
+    pub async fn next_document_limited(&self, job: &Url, limit: usize) -> Result<Next, ScanError> {
+        let limit = limit.min(MAX_PAGE_BYTES);
         let base = job.as_str().trim_end_matches('/');
         let url = Url::parse(&format!("{base}/NextDocument")).map_err(|e| ScanError::Protocol(e.to_string()))?;
         let resp = self.http.get(url).send().await.map_err(net_err)?;
@@ -570,7 +590,7 @@ impl Client {
                     .and_then(|v| v.to_str().ok())
                     .map(|v| v.split(';').next().unwrap_or("").trim().to_ascii_lowercase())
                     .unwrap_or_default();
-                let data = Self::read_limited(resp, MAX_PAGE_BYTES).await?;
+                let data = Self::read_limited(resp, limit).await?;
                 if data.is_empty() {
                     return Ok(Next::Failed(204));
                 }

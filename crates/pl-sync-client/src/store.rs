@@ -17,7 +17,41 @@ use crate::error::{Error, Result};
 pub const MIGRATIONS: &[(&str, &str)] = &[
     ("0001_replica", include_str!("../migrations/0001_replica.sql")),
     ("0002_http_cache", include_str!("../migrations/0002_http_cache.sql")),
+    ("0003_pending_delete", include_str!("../migrations/0003_pending_delete.sql")),
+    ("0004_http_cache_owner", include_str!("../migrations/0004_http_cache_owner.sql")),
 ];
+
+/// Separator between the owning account and the path in `http_cache.key` (ASCII unit separator,
+/// cannot occur in a username sent by the login form or in a request path).
+const OWNER_SEP: &str = "\u{1f}";
+
+/// JSON keys never stored in the response cache (credentials; e.g. `auth_token` of `/api/profile/`).
+const SECRET_KEYS: [&str; 8] = ["auth_token", "token", "access_token", "refresh_token", "password", "secret", "totp_secret", "api_key"];
+
+/// Response body without credential fields; `None` = do not cache (a body that may contain a
+/// credential but is not JSON).
+pub fn sanitize_cached_body(body: &[u8]) -> Option<Vec<u8>> {
+    let mentions = |k: &str| {
+        let needle = format!("\"{k}\"");
+        body.windows(needle.len()).any(|w| w == needle.as_bytes())
+    };
+    if !SECRET_KEYS.iter().any(|k| mentions(k)) {
+        return Some(body.to_vec());
+    }
+    let mut v: Value = serde_json::from_slice(body).ok()?;
+    fn strip(v: &mut Value) {
+        match v {
+            Value::Object(m) => {
+                m.retain(|k, _| !SECRET_KEYS.contains(&k.to_ascii_lowercase().as_str()));
+                m.values_mut().for_each(strip);
+            }
+            Value::Array(a) => a.iter_mut().for_each(strip),
+            _ => {}
+        }
+    }
+    strip(&mut v);
+    serde_json::to_vec(&v).ok()
+}
 
 /// Metadata kinds that are always mirrored completely (docs/SYNC.md §4.2).
 pub const META_KINDS: [&str; 8] = ["tag", "correspondent", "document_type", "storage_path", "custom_field", "saved_view", "user", "group"];
@@ -247,11 +281,28 @@ impl Replica {
     /// settings stay; file rows are deleted (the caller deletes the files).
     pub async fn reset_data(&self) -> Result<()> {
         let mut tx = self.pool.begin().await?;
-        for t in ["object", "document_tag", "document", "file", "http_cache"] {
+        // pending_delete: the caller removes the whole cache folder; leftovers are caught by the
+        // orphan sweep of the housekeeping
+        for t in ["object", "document_tag", "document", "file", "http_cache", "pending_delete"] {
             sqlx::query(&format!("DELETE FROM {t}")).execute(&mut *tx).await?;
         }
         sqlx::query("INSERT INTO fts (fts) VALUES ('rebuild')").execute(&mut *tx).await?;
         sqlx::query("UPDATE remote SET cursor = NULL, perm_epoch = NULL, last_full_sync = NULL WHERE id = 1").execute(&mut *tx).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Another account logs in on this profile: discard everything of the previous account (server
+    /// data like [`Self::reset_data`], plus selection, profile/UI settings, ngx state and the owner).
+    /// Limits stay (device settings). The caller removes the cache folder.
+    pub async fn purge_account_data(&self) -> Result<()> {
+        self.reset_data().await?;
+        let mut tx = self.pool.begin().await?;
+        sqlx::query("DELETE FROM selection").execute(&mut *tx).await?;
+        sqlx::query("DELETE FROM setting WHERE key LIKE 'ngx\\_%' ESCAPE '\\'").execute(&mut *tx).await?;
+        sqlx::query("UPDATE remote SET user_name = NULL, me_json = NULL, ui_settings = NULL, ngx_watermark = NULL WHERE id = 1")
+            .execute(&mut *tx)
+            .await?;
         tx.commit().await?;
         Ok(())
     }
@@ -340,16 +391,17 @@ impl Replica {
         Ok(())
     }
 
-    /// Delete a document (row, tags, file rows). Returns: paths of the cache files.
-    pub async fn delete_document(&self, key: &str) -> Result<Vec<String>> {
+    /// Delete a document (row, tags, file rows) in one transaction. The caller deletes the cache
+    /// files **before** (see `FileCache::purge_document`); paths it could not delete are passed in
+    /// `undeleted` as `(path, size)` and kept as `pending_delete` records in the same transaction.
+    pub async fn delete_document(&self, key: &str, undeleted: &[(String, i64)]) -> Result<()> {
         let mut tx = self.pool.begin().await?;
-        let paths: Vec<String> =
-            sqlx::query_scalar("SELECT path FROM file WHERE doc = ?").bind(key.to_string()).fetch_all(&mut *tx).await?;
+        insert_pending_on(&mut tx, Some(key), undeleted).await?;
         sqlx::query("DELETE FROM file WHERE doc = ?").bind(key.to_string()).execute(&mut *tx).await?;
         sqlx::query("DELETE FROM document_tag WHERE doc = ?").bind(key.to_string()).execute(&mut *tx).await?;
         sqlx::query("DELETE FROM document WHERE key = ?").bind(key.to_string()).execute(&mut *tx).await?;
         tx.commit().await?;
-        Ok(paths)
+        Ok(())
     }
 
     /// Is the document present locally? → (rev, in_selection, has_detail)
@@ -377,16 +429,13 @@ impl Replica {
         Ok(())
     }
 
-    /// Remove documents no longer selected older than `before` (RFC 3339).
-    pub async fn purge_unselected(&self, before: &str) -> Result<Vec<String>> {
-        let keys: Vec<String> = sqlx::query_scalar("SELECT key FROM document WHERE in_selection = 0 AND left_selection < ?")
+    /// Documents no longer selected that left the selection before `before` (RFC 3339); the caller
+    /// removes them via `FileCache::purge_document` (files first, then rows).
+    pub async fn unselected_before(&self, before: &str) -> Result<Vec<String>> {
+        Ok(sqlx::query_scalar("SELECT key FROM document WHERE in_selection = 0 AND left_selection < ? ORDER BY key")
             .bind(before.to_string())
             .fetch_all(&self.pool)
-            .await?;
-        for k in &keys {
-            self.delete_document(k).await?;
-        }
-        Ok(keys)
+            .await?)
     }
 
     pub async fn document_json(&self, key: &str) -> Result<Option<Value>> {
@@ -458,22 +507,34 @@ impl Replica {
 
     // ------------------------------------------------------------------ Antwort-Cache (v1)
 
+    /// Cached response of the **current account** (`remote.user_name`) for `key` (path + query).
     pub async fn cache_get(&self, key: &str) -> Result<Option<(u16, Option<String>, Vec<u8>)>> {
-        let r = sqlx::query("SELECT status, content_type, body FROM http_cache WHERE key = ?")
-            .bind(key.to_string())
-            .fetch_optional(&self.pool)
-            .await?;
+        let r = sqlx::query(
+            "SELECT status, content_type, body FROM http_cache \
+             WHERE key = coalesce((SELECT user_name FROM remote WHERE id = 1), '') || ? || ?",
+        )
+        .bind(OWNER_SEP)
+        .bind(key.to_string())
+        .fetch_optional(&self.pool)
+        .await?;
         Ok(r.map(|r| (r.get::<i64, _>(0) as u16, r.get(1), r.get(2))))
     }
 
+    /// Store a response for the current account; credential fields are removed first, a body that
+    /// cannot be cleaned is not stored.
     pub async fn cache_put(&self, key: &str, status: u16, content_type: Option<&str>, body: &[u8]) -> Result<()> {
+        let Some(body) = sanitize_cached_body(body) else { return Ok(()) };
         sqlx::query(
-            "INSERT INTO http_cache (key, status, content_type, body, stored) VALUES (?, ?, ?, ?, ?)              ON CONFLICT (key) DO UPDATE SET status = excluded.status, content_type = excluded.content_type,              body = excluded.body, stored = excluded.stored",
+            "INSERT INTO http_cache (key, status, content_type, body, stored) \
+             VALUES (coalesce((SELECT user_name FROM remote WHERE id = 1), '') || ? || ?, ?, ?, ?, ?) \
+             ON CONFLICT (key) DO UPDATE SET status = excluded.status, content_type = excluded.content_type, \
+             body = excluded.body, stored = excluded.stored",
         )
+        .bind(OWNER_SEP)
         .bind(key.to_string())
         .bind(status as i64)
         .bind(content_type.map(str::to_string))
-        .bind(body.to_vec())
+        .bind(body)
         .bind(now())
         .execute(&self.pool)
         .await?;
@@ -532,6 +593,44 @@ impl Replica {
         Ok(())
     }
 
+    /// Delete a file row; paths that could not be deleted (`(path, size)`) become `pending_delete`
+    /// records in the same transaction.
+    pub async fn delete_file_keep_pending(&self, doc: &str, variant: &str, undeleted: &[(String, i64)]) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        insert_pending_on(&mut tx, Some(doc), undeleted).await?;
+        sqlx::query("DELETE FROM file WHERE doc = ? AND variant = ?")
+            .bind(doc.to_string())
+            .bind(variant.to_string())
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Record paths that could not be deleted (`(path, size)`).
+    pub async fn add_pending_deletes(&self, doc: Option<&str>, undeleted: &[(String, i64)]) -> Result<()> {
+        if undeleted.is_empty() {
+            return Ok(());
+        }
+        let mut conn = self.pool.acquire().await?;
+        insert_pending_on(&mut conn, doc, undeleted).await
+    }
+
+    /// Paths still waiting for deletion.
+    pub async fn pending_deletes(&self) -> Result<Vec<String>> {
+        Ok(sqlx::query_scalar("SELECT path FROM pending_delete ORDER BY since, path").fetch_all(&self.pool).await?)
+    }
+
+    pub async fn clear_pending_delete(&self, path: &str) -> Result<()> {
+        sqlx::query("DELETE FROM pending_delete WHERE path = ?").bind(path.to_string()).execute(&self.pool).await?;
+        Ok(())
+    }
+
+    /// Paths of all file rows (for the orphan sweep).
+    pub async fn file_paths(&self) -> Result<Vec<String>> {
+        Ok(sqlx::query_scalar("SELECT path FROM file").fetch_all(&self.pool).await?)
+    }
+
     pub async fn delete_file(&self, doc: &str, variant: &str) -> Result<()> {
         sqlx::query("DELETE FROM file WHERE doc = ? AND variant = ?")
             .bind(doc.to_string())
@@ -557,20 +656,41 @@ impl Replica {
         Ok(())
     }
 
-    /// Used bytes (all states).
+    /// Used bytes (all states, plus files still waiting for deletion – they are on disk).
     pub async fn cache_bytes(&self) -> Result<i64> {
-        Ok(sqlx::query_scalar("SELECT coalesce(sum(size), 0) FROM file").fetch_one(&self.pool).await?)
+        Ok(sqlx::query_scalar("SELECT coalesce((SELECT sum(size) FROM file), 0) + coalesce((SELECT sum(size) FROM pending_delete), 0)")
+            .fetch_one(&self.pool)
+            .await?)
     }
 
-    /// Evictable files (not selected), oldest use first.
+    /// Evictable files (not selected, complete – a partial row may belong to a running download),
+    /// oldest use first.
     pub async fn evictable(&self) -> Result<Vec<FileRow>> {
         let rows = sqlx::query(
-            "SELECT doc, variant, path, etag, checksum, size, state, pinned FROM file WHERE pinned = 0 ORDER BY last_access, doc",
+            "SELECT doc, variant, path, etag, checksum, size, state, pinned FROM file \
+             WHERE pinned = 0 AND state = 'complete' ORDER BY last_access, doc",
         )
         .fetch_all(&self.pool)
         .await?;
         Ok(rows.into_iter().map(file_row).collect())
     }
+}
+
+async fn insert_pending_on(conn: &mut SqliteConnection, doc: Option<&str>, undeleted: &[(String, i64)]) -> Result<()> {
+    let at = now();
+    for (path, size) in undeleted {
+        sqlx::query(
+            "INSERT INTO pending_delete (path, doc, size, since) VALUES (?, ?, ?, ?) \
+             ON CONFLICT (path) DO UPDATE SET size = max(pending_delete.size, excluded.size), attempts = pending_delete.attempts + 1",
+        )
+        .bind(path.clone())
+        .bind(doc.map(str::to_string))
+        .bind(*size)
+        .bind(at.clone())
+        .execute(&mut *conn)
+        .await?;
+    }
+    Ok(())
 }
 
 fn file_row(r: sqlx::sqlite::SqliteRow) -> FileRow {
@@ -778,10 +898,61 @@ mod tests {
         assert_eq!(full["content"], "Betrag fällig");
         assert_eq!(full["notes"][0]["note"], "bezahlt per Überweisung");
         // deleting cleans FTS
-        r.delete_document("d1").await.unwrap();
+        r.delete_document("d1", &[]).await.unwrap();
         assert_eq!(hit("februar").await, 0);
         let n: i64 = sqlx::query_scalar("SELECT count(*) FROM document_tag").fetch_one(r.pool()).await.unwrap();
         assert_eq!(n, 0);
+    }
+
+    /// Regression (review B): `/api/profile/` carries `auth_token`; it was stored verbatim in SQLite
+    /// next to the OS keychain.
+    #[tokio::test]
+    async fn response_cache_strips_credentials() {
+        let r = Replica::open_in_memory().await.unwrap();
+        r.ensure_remote("http://127.0.0.1/", "paperrust").await.unwrap();
+        r.set_remote_field("user_name", Some("alice")).await.unwrap();
+        let body = br#"{"email":"a@x","auth_token":"0123456789abcdef","social_accounts":[{"token":"t","provider":"p"}]}"#;
+        r.cache_put("/api/profile/", 200, Some("application/json"), body).await.unwrap();
+        let (_, _, got) = r.cache_get("/api/profile/").await.unwrap().unwrap();
+        let v: Value = serde_json::from_slice(&got).unwrap();
+        assert_eq!(v, json!({"email": "a@x", "social_accounts": [{"provider": "p"}]}));
+        let raw: Vec<Vec<u8>> = sqlx::query_scalar("SELECT body FROM http_cache").fetch_all(r.pool()).await.unwrap();
+        assert!(!raw.iter().any(|b| String::from_utf8_lossy(b).contains("0123456789abcdef")));
+        // bodies without such fields stay byte-identical; non-JSON with a credential is not stored
+        assert_eq!(sanitize_cached_body(br#"{"settings":{"a":1}}"#).unwrap(), br#"{"settings":{"a":1}}"#.to_vec());
+        assert!(sanitize_cached_body(b"auth \"auth_token\" garbage").is_none());
+    }
+
+    /// Regression (review A): the response cache was keyed by path only → visible to the next account.
+    #[tokio::test]
+    async fn response_cache_is_per_account_and_old_entries_are_purged() {
+        let r = Replica::open_in_memory().await.unwrap();
+        r.ensure_remote("http://127.0.0.1/", "paperrust").await.unwrap();
+        r.set_remote_field("user_name", Some("alice")).await.unwrap();
+        r.cache_put("/api/statistics/", 200, None, b"{\"documents_total\":5}").await.unwrap();
+        assert!(r.cache_get("/api/statistics/").await.unwrap().is_some());
+        r.set_remote_field("user_name", Some("bob")).await.unwrap();
+        assert!(r.cache_get("/api/statistics/").await.unwrap().is_none(), "other account sees nothing");
+        // migration 0004 drops unowned entries of older versions
+        sqlx::query("INSERT INTO http_cache (key, status, body, stored) VALUES ('/api/profile/', 200, x'00', 'x')")
+            .execute(r.pool())
+            .await
+            .unwrap();
+        sqlx::query("PRAGMA user_version = 3").execute(r.pool()).await.unwrap();
+        r.migrate().await.unwrap();
+        let n: i64 = sqlx::query_scalar("SELECT count(*) FROM http_cache").fetch_one(r.pool()).await.unwrap();
+        assert_eq!(n, 0);
+        // account purge: data, selection, profile fields gone, limits stay
+        r.set_setting("max_documents", "7").await.unwrap();
+        r.set_setting("ngx_users", "{}").await.unwrap();
+        r.upsert_documents(&[doc("d1", "A", &[], None)], false, true).await.unwrap();
+        r.set_selection(&[SelectionItem { kind: "tag".into(), key: "t".into(), files: "none".into() }]).await.unwrap();
+        r.purge_account_data().await.unwrap();
+        assert_eq!(r.count_documents(false).await.unwrap(), 0);
+        assert!(r.selection().await.unwrap().is_empty());
+        assert!(r.remote().await.unwrap().unwrap().user_name.is_none());
+        assert_eq!(r.setting("max_documents").await.unwrap().as_deref(), Some("7"));
+        assert!(r.setting("ngx_users").await.unwrap().is_none());
     }
 
     #[tokio::test]
@@ -794,7 +965,8 @@ mod tests {
         r.upsert_documents(&[doc("a", "A", &[], None)], false, true).await.unwrap();
         assert_eq!(r.count_documents(true).await.unwrap(), 2);
         r.mark_unselected("a", "2020-01-01T00:00:00Z").await.unwrap();
-        assert_eq!(r.purge_unselected("2020-01-02T00:00:00Z").await.unwrap(), vec!["a".to_string()]);
+        assert_eq!(r.unselected_before("2020-01-02T00:00:00Z").await.unwrap(), vec!["a".to_string()]);
+        r.delete_document("a", &[]).await.unwrap();
         assert_eq!(r.count_documents(false).await.unwrap(), 1);
     }
 }

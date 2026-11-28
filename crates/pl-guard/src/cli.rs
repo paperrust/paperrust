@@ -19,8 +19,8 @@ pub enum Outcome {
 }
 
 pub const GUARD_USAGE: &str = "usage: manage guard status | lift [--note TEXT] | scan";
-pub const BACKUP_USAGE: &str = "usage: manage backup init [--show-key] | run | list | check [--snapshot ID] [--key-file FILE] | \
-restore [--snapshot ID|latest] [--media DIR] [--database] [--overwrite] [--key-file FILE]\n\
+pub const BACKUP_USAGE: &str = "usage: manage backup init [--show-key] | run | list | check [--snapshot ID] [--deep] [--key-file FILE] | \
+restore [--snapshot ID|latest] [--media DIR] [--database] [--allow-missing-tables] [--overwrite] [--key-file FILE]\n\
 The passphrase is read from PAPERRUST_BACKUP_PASSPHRASE or --passphrase-file FILE.";
 
 fn opt(args: &[String], name: &str) -> Option<String> {
@@ -141,6 +141,23 @@ fn passphrase(args: &[String]) -> Result<Option<String>, String> {
     Ok(crate::config::passphrase_from_env())
 }
 
+/// Text of `manage backup check` and whether everything is fine.
+fn check_text(snap: &str, r: &backup::CheckReport, deep: bool) -> (bool, String) {
+    if r.is_ok() {
+        let how = if deep { "present, sizes plausible, decrypted and checksums verified" } else { "present with plausible sizes" };
+        return (true, format!("Snapshot {snap}: all {} object(s) {how}.", r.objects));
+    }
+    let mut parts = Vec::new();
+    for (list, what) in
+        [(&r.missing, "missing"), (&r.size_mismatch, "with a wrong size"), (&r.damaged, "damaged (decryption or checksum failed)")]
+    {
+        if let Some(first) = list.first() {
+            parts.push(format!("{} {what}, e.g. {}", list.len(), backup::short(first)));
+        }
+    }
+    (false, format!("Snapshot {snap}: {} object(s) checked; {}", r.objects, parts.join("; ")))
+}
+
 /// `manage backup …`. `restore_db`: database pool for `restore --database` (after `migrate`).
 pub async fn backup_command(args: &[String], pool: &PgPool, media_root: &Path, data_dir: &Path) -> Outcome {
     let Some(sub) = args.first().cloned() else { return Outcome::Usage(BACKUP_USAGE.into()) };
@@ -196,12 +213,10 @@ pub async fn backup_command(args: &[String], pool: &PgPool, media_root: &Path, d
                 let pass = passphrase(args)?;
                 let id = backup::identity(&target, pass.as_deref(), key.as_deref()).await?;
                 let snap = opt(args, "--snapshot").unwrap_or_else(|| "latest".into());
-                let (n, missing) = backup::check(&target, &id, &snap).await?;
-                if missing.is_empty() {
-                    Ok(format!("Snapshot {snap}: all {n} object(s) present."))
-                } else {
-                    Err(format!("Snapshot {snap}: {} of {n} object(s) missing, e.g. {}", missing.len(), backup::short(&missing[0])))
-                }
+                let deep = flag(args, "--deep");
+                let r = backup::check(&target, &id, &snap, deep).await?;
+                let (ok, s) = check_text(&snap, &r, deep);
+                if ok { Ok(s) } else { Err(s) }
             }
             "restore" => {
                 let key = opt(args, "--key-file").map(PathBuf::from);
@@ -216,7 +231,13 @@ pub async fn backup_command(args: &[String], pool: &PgPool, media_root: &Path, d
                 let r = backup::restore(
                     &target,
                     &id,
-                    &backup::RestoreOptions { snapshot: &snap, media_dir: media.as_deref(), db: with_db.then_some(pool), overwrite: flag(args, "--overwrite") },
+                    &backup::RestoreOptions {
+                        snapshot: &snap,
+                        media_dir: media.as_deref(),
+                        db: with_db.then_some(pool),
+                        overwrite: flag(args, "--overwrite"),
+                        allow_missing_tables: flag(args, "--allow-missing-tables"),
+                    },
                 )
                 .await?;
                 let mut s = format!("Restored snapshot {}: {} file(s), {} bytes", r.snapshot, r.files, r.bytes);
@@ -227,6 +248,13 @@ pub async fn backup_command(args: &[String], pool: &PgPool, media_root: &Path, d
                     s.push_str(&format!(", database: {t} table(s)"));
                 }
                 s.push_str(". All checksums verified.");
+                if !r.db_skipped_tables.is_empty() {
+                    s.push_str(&format!(
+                        "\nSkipped {} table(s) missing in the target database (their rows were NOT restored): {}",
+                        r.db_skipped_tables.len(),
+                        r.db_skipped_tables.join(", ")
+                    ));
+                }
                 Ok(s)
             }
             _ => Err(String::new()),

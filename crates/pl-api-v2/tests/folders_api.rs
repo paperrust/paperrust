@@ -56,6 +56,9 @@ async fn cleanup(pool: &sqlx::PgPool) {
          UPDATE paperrust_folder SET parent_id = NULL; DELETE FROM paperrust_folder;
          DELETE FROM authtoken_token WHERE key LIKE 'plfoldersapitest%';
          DELETE FROM auth_user_user_permissions WHERE user_id IN (SELECT id FROM auth_user WHERE username LIKE 'pl_folders_api_%');
+         DELETE FROM auth_user_groups WHERE user_id IN (SELECT id FROM auth_user WHERE username LIKE 'pl_folders_api_%');
+         DELETE FROM auth_group_permissions WHERE group_id IN (SELECT id FROM auth_group WHERE name LIKE 'pl_folders_api_%');
+         DELETE FROM auth_group WHERE name LIKE 'pl_folders_api_%';
          DELETE FROM auth_user WHERE username LIKE 'pl_folders_api_%';",
     )
     .execute(pool)
@@ -227,4 +230,276 @@ async fn upload_target_rules() {
     assert_eq!(check_upload_target(&pool, &rd, open_id).await.unwrap(), Err(UPLOAD_FOLDER_FORBIDDEN.to_string()), "no change_document");
     assert_eq!(check_upload_target(&pool, &su, 999_999_999).await.unwrap(), Err(upload_folder_missing(999_999_999)));
     cleanup(&pool).await;
+}
+
+async fn doc_table(pool: &sqlx::PgPool) -> &'static str {
+    let native: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+         WHERE n.nspname = current_schema() AND c.relname = 'paperrust_document' AND c.relkind = 'r')",
+    )
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    if native { "paperrust_document" } else { "documents_document" }
+}
+
+async fn folder_of(pool: &sqlx::PgPool, doc: i64) -> Option<i64> {
+    sqlx::query_scalar("SELECT folder_id FROM paperrust_document_folder WHERE document_id = $1")
+        .bind(doc as i32)
+        .fetch_optional(pool)
+        .await
+        .unwrap()
+}
+
+async fn user_id(pool: &sqlx::PgPool, name: &str) -> i64 {
+    sqlx::query_scalar("SELECT id::int8 FROM auth_user WHERE username = $1").bind(name).fetch_one(pool).await.unwrap()
+}
+
+/// First live root document with (`owned`) or without an owner.
+async fn some_doc(pool: &sqlx::PgPool, owned: bool) -> i64 {
+    let cond = if owned { "IS NOT NULL" } else { "IS NULL" };
+    sqlx::query_scalar(&format!(
+        "SELECT id::int8 FROM documents_document WHERE root_document_id IS NULL AND deleted_at IS NULL AND owner_id {cond} ORDER BY id LIMIT 1"
+    ))
+    .fetch_one(pool)
+    .await
+    .unwrap()
+}
+
+/// Review finding 1: deleting a folder moves its contents, so it needs the same rights as moving them
+/// directly (change on every document and subfolder, change on the parent for `contents=parent`).
+/// Before the fix the owner of the folder could delete it and thereby re-file documents and subfolders
+/// it may not change (200).
+#[tokio::test]
+#[ignore = "needs the reference PostgreSQL (copy pl_folders_api_test of paperless_snapshot), see the module comment"]
+async fn delete_needs_change_rights_on_contents() {
+    use pl_api_v2::folders::{DELETE_FORBIDDEN_DOCUMENTS, DELETE_FORBIDDEN_FOLDERS, DELETE_FORBIDDEN_PARENT};
+    let (r, pool) = setup().await;
+    let ed = user_id(&pool, "pl_folders_api_ed").await;
+    // owned document: the fresh editor (no groups, no object grants) cannot change it
+    let foreign = some_doc(&pool, true).await;
+    // ownerless document: every user with change_document may change it
+    let open = some_doc(&pool, false).await;
+
+    // the editor's own folder; the superuser files a document the editor may not change into it
+    let (s, bx) = call(&r, "POST", "/folders", EDIT_TOKEN, Some(json!({"name": "Box"}))).await;
+    assert_eq!(s, StatusCode::CREATED, "{bx}");
+    let box_id = bx["id"].as_i64().unwrap();
+    let (s, m) = call(&r, "POST", "/folders/move-documents", SU_TOKEN, Some(json!({"documents": [foreign], "folder": box_id}))).await;
+    assert_eq!(s, StatusCode::OK, "{m}");
+    for contents in ["parent", "unsorted"] {
+        let (s, e) = call(&r, "DELETE", &format!("/folders/{box_id}?contents={contents}"), EDIT_TOKEN, None).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{contents}: {e}");
+        assert!(e.to_string().contains(DELETE_FORBIDDEN_DOCUMENTS), "{e}");
+    }
+    assert_eq!(folder_of(&pool, foreign).await, Some(box_id), "document stays");
+    // the direct move is refused as well
+    let (s, _) = call(&r, "POST", "/folders/move-documents", EDIT_TOKEN, Some(json!({"documents": [foreign], "folder": null}))).await;
+    assert_ne!(s, StatusCode::OK);
+
+    // subfolder of the superuser (not shared) inside the editor's folder
+    let (s, m) = call(&r, "POST", "/folders/move-documents", SU_TOKEN, Some(json!({"documents": [foreign], "folder": null}))).await;
+    assert_eq!(s, StatusCode::OK, "{m}");
+    let (s, theirs) = call(&r, "POST", "/folders", SU_TOKEN, Some(json!({"name": "Theirs", "parent": box_id}))).await;
+    assert_eq!(s, StatusCode::CREATED, "{theirs}");
+    let theirs_id = theirs["id"].as_i64().unwrap();
+    let (s, e) = call(&r, "DELETE", &format!("/folders/{box_id}?contents=unsorted"), EDIT_TOKEN, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{e}");
+    assert!(e.to_string().contains(DELETE_FORBIDDEN_FOLDERS), "{e}");
+    let parent: Option<i64> =
+        sqlx::query_scalar("SELECT parent_id FROM paperrust_folder WHERE id = $1").bind(theirs_id).fetch_one(&pool).await.unwrap();
+    assert_eq!(parent, Some(box_id), "subfolder stays");
+    let (s, _) = call(&r, "DELETE", &format!("/folders/{theirs_id}"), SU_TOKEN, None).await;
+    assert_eq!(s, StatusCode::OK);
+    // empty now: the delete right alone is enough
+    let (s, d) = call(&r, "DELETE", &format!("/folders/{box_id}"), EDIT_TOKEN, None).await;
+    assert_eq!(s, StatusCode::OK, "{d}");
+
+    // contents=parent into a parent the editor may not change (here: not even see)
+    let (_, top) = call(&r, "POST", "/folders", SU_TOKEN, Some(json!({"name": "Top"}))).await;
+    let top_id = top["id"].as_i64().unwrap();
+    let (s, child) = call(&r, "POST", "/folders", SU_TOKEN, Some(json!({"name": "EdChild", "parent": top_id, "owner": ed}))).await;
+    assert_eq!(s, StatusCode::CREATED, "{child}");
+    let child_id = child["id"].as_i64().unwrap();
+    let (s, m) = call(&r, "POST", "/folders/move-documents", EDIT_TOKEN, Some(json!({"documents": [open], "folder": child_id}))).await;
+    assert_eq!(s, StatusCode::OK, "{m}");
+    let (s, e) = call(&r, "DELETE", &format!("/folders/{child_id}?contents=parent"), EDIT_TOKEN, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{e}");
+    assert!(e.to_string().contains(DELETE_FORBIDDEN_PARENT), "{e}");
+    assert_eq!(folder_of(&pool, open).await, Some(child_id));
+    // to "Unsorted" the editor only needs its own rights on the document
+    let (s, d) = call(&r, "DELETE", &format!("/folders/{child_id}?contents=unsorted"), EDIT_TOKEN, None).await;
+    assert_eq!(s, StatusCode::OK, "{d}");
+    assert_eq!(d["moved_documents"], 1);
+    assert_eq!(folder_of(&pool, open).await, None);
+
+    cleanup(&pool).await;
+}
+
+/// Review finding 2: the permission checks of `move-documents` and its write are one transaction after
+/// row locks. An owner change of the document that is in flight when the move starts (row locked,
+/// committed while the move runs) must be honoured: the move waits for it and then rejects (400, the
+/// document is no longer visible to the editor). Before
+/// the fix the checks ran as separate pool queries against the old committed state and the move went
+/// through (200).
+#[tokio::test]
+#[ignore = "needs the reference PostgreSQL (copy pl_folders_api_test of paperless_snapshot), see the module comment"]
+async fn move_honours_concurrent_owner_change() {
+    use sqlx::Connection;
+    let (r, pool) = setup().await;
+    let su = user_id(&pool, "pl_folders_api_su").await;
+    let doc = some_doc(&pool, false).await;
+    let table = doc_table(&pool).await;
+    let (s, dest) = call(&r, "POST", "/folders", EDIT_TOKEN, Some(json!({"name": "Dest"}))).await;
+    assert_eq!(s, StatusCode::CREATED, "{dest}");
+    let dest_id = dest["id"].as_i64().unwrap();
+
+    // a second session takes the document away from the editor, not yet committed
+    let mut other = sqlx::PgConnection::connect(&url()).await.unwrap();
+    let mut otx = other.begin().await.unwrap();
+    sqlx::query(&format!("UPDATE {table} SET owner_id = $1 WHERE id = $2"))
+        .bind(su as i32)
+        .bind(doc as i32)
+        .execute(&mut *otx)
+        .await
+        .unwrap();
+
+    let r2 = r.clone();
+    let mv = tokio::spawn(async move {
+        call(&r2, "POST", "/folders/move-documents", EDIT_TOKEN, Some(json!({"documents": [doc], "folder": dest_id}))).await
+    });
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    let waited = !mv.is_finished();
+    otx.commit().await.unwrap();
+    let (s, body) = mv.await.unwrap();
+
+    // restore the reference data before asserting
+    sqlx::query(&format!("UPDATE {table} SET owner_id = NULL WHERE id = $1")).bind(doc as i32).execute(&pool).await.unwrap();
+    let placed = folder_of(&pool, doc).await;
+    cleanup(&pool).await;
+    assert!(waited, "the move must wait for the in-flight owner change");
+    // The new owner makes the document invisible to the editor (no object grant), so the handler's
+    // "unknown/invisible -> 400, visible but unchangeable -> 403" rule (like bulk_edit) answers 400.
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{body}");
+    assert_eq!(body["error"]["fields"]["documents"][0], "Some documents don't exist or were specified twice.", "{body}");
+    assert_eq!(placed, None, "document not moved");
+}
+
+const GROUP_TOKEN: &str = "plfoldersapitestgr0000000000000000000000";
+
+async fn perm_id(pool: &sqlx::PgPool, perm: &str) -> i32 {
+    sqlx::query_scalar(
+        "SELECT p.id FROM auth_permission p JOIN django_content_type ct ON ct.id = p.content_type_id
+         WHERE ct.app_label || '.' || p.codename = $1",
+    )
+    .bind(perm)
+    .fetch_one(pool)
+    .await
+    .unwrap()
+}
+
+#[allow(clippy::too_many_arguments)]
+/// Starts `move-documents` while a second session holds an uncommitted admin change (`admin_sql`, run
+/// after `lock_sql` with `$1` = `id`), then commits it. Returns (move waited, status, body, doc folder).
+async fn move_during_admin_change(
+    r: &Router,
+    pool: &sqlx::PgPool,
+    token: &'static str,
+    doc: i64,
+    dest: i64,
+    lock_sql: &str,
+    admin_sql: &str,
+    id: i32,
+) -> (bool, StatusCode, Value, Option<i64>) {
+    use sqlx::Connection;
+    let mut other = sqlx::PgConnection::connect(&url()).await.unwrap();
+    let mut otx = other.begin().await.unwrap();
+    sqlx::query(lock_sql).bind(id).execute(&mut *otx).await.unwrap();
+    sqlx::query(admin_sql).bind(id).execute(&mut *otx).await.unwrap();
+    let r2 = r.clone();
+    let mv = tokio::spawn(async move {
+        call(&r2, "POST", "/folders/move-documents", token, Some(json!({"documents": [doc], "folder": dest}))).await
+    });
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    let waited = !mv.is_finished();
+    otx.commit().await.unwrap();
+    let (s, body) = mv.await.unwrap();
+    (waited, s, body, folder_of(pool, doc).await)
+}
+
+/// TLA+ gap closed 2026-11-28 (verification/folders README "Not covered" before): the caller's rights
+/// are re-read inside the move transaction after locking the `auth_user` row and the caller's groups.
+/// An admin change in flight when the move starts (pl-auth-api users update: user row FOR UPDATE, then
+/// the permission rows) must be honoured: the move waits for it and then answers 403. Before, the move
+/// used the rights loaded at request start and went through (200).
+#[tokio::test]
+#[ignore = "needs the reference PostgreSQL (copy pl_folders_api_test of paperless_snapshot), see the module comment"]
+async fn move_honours_concurrent_user_permission_revoke() {
+    let (r, pool) = setup().await;
+    let ed = user_id(&pool, "pl_folders_api_ed").await as i32;
+    let change = perm_id(&pool, "documents.change_document").await;
+    let doc = some_doc(&pool, false).await;
+    let (s, dest) = call(&r, "POST", "/folders", EDIT_TOKEN, Some(json!({"name": "Dest"}))).await;
+    assert_eq!(s, StatusCode::CREATED, "{dest}");
+    let dest_id = dest["id"].as_i64().unwrap();
+    let revoke = format!("DELETE FROM auth_user_user_permissions WHERE user_id = $1 AND permission_id = {change}");
+    let (waited, s, body, placed) = move_during_admin_change(
+        &r,
+        &pool,
+        EDIT_TOKEN,
+        doc,
+        dest_id,
+        "SELECT 1 FROM auth_user WHERE id = $1::int8 FOR UPDATE",
+        &revoke,
+        ed,
+    )
+    .await;
+    cleanup(&pool).await;
+    assert!(waited, "the move must wait for the in-flight rights change");
+    assert_eq!(s, StatusCode::FORBIDDEN, "{body}");
+    assert_eq!(placed, None, "document not moved");
+}
+
+/// Same for a group permission (pl-auth-api groups update: group row FOR UPDATE, then
+/// `auth_group_permissions`): the move locks the caller's groups FOR SHARE, waits, and answers 403.
+#[tokio::test]
+#[ignore = "needs the reference PostgreSQL (copy pl_folders_api_test of paperless_snapshot), see the module comment"]
+async fn move_honours_concurrent_group_permission_revoke() {
+    let (r, pool) = setup().await;
+    let gu = user(&pool, "pl_folders_api_gr", false, &["documents.view_document"]).await as i32;
+    let change = perm_id(&pool, "documents.change_document").await;
+    let gid: i32 =
+        sqlx::query_scalar("INSERT INTO auth_group (name) VALUES ('pl_folders_api_grp') RETURNING id").fetch_one(&pool).await.unwrap();
+    sqlx::query("INSERT INTO auth_group_permissions (group_id, permission_id) VALUES ($1, $2)")
+        .bind(gid)
+        .bind(change)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO auth_user_groups (user_id, group_id) VALUES ($1, $2)").bind(gu).bind(gid).execute(&pool).await.unwrap();
+    sqlx::query("INSERT INTO authtoken_token (key, created, user_id) VALUES ($1, now(), $2)")
+        .bind(GROUP_TOKEN)
+        .bind(gu)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let doc = some_doc(&pool, false).await;
+    let (s, dest) = call(&r, "POST", "/folders", GROUP_TOKEN, Some(json!({"name": "GroupDest"}))).await;
+    assert_eq!(s, StatusCode::CREATED, "change_document via the group: {dest}");
+    let dest_id = dest["id"].as_i64().unwrap();
+    let (waited, s, body, placed) = move_during_admin_change(
+        &r,
+        &pool,
+        GROUP_TOKEN,
+        doc,
+        dest_id,
+        "SELECT 1 FROM auth_group WHERE id = $1::int8 FOR UPDATE",
+        "DELETE FROM auth_group_permissions WHERE group_id = $1",
+        gid,
+    )
+    .await;
+    cleanup(&pool).await;
+    assert!(waited, "the move must wait for the in-flight group change");
+    assert_eq!(s, StatusCode::FORBIDDEN, "{body}");
+    assert_eq!(placed, None, "document not moved");
 }

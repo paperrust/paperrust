@@ -313,6 +313,7 @@ pub async fn config(State(state): State<AppState>, Caller(p): Caller) -> V2Resul
         })
         .collect();
     let stats = store::extraction_stats(state.db()).await.map_err(tl)?;
+    let running = refresh::backfill_running_any(state.db()).await.map_err(tl)?;
     Ok(json(&json!({
         "extract_dates": refresh::enabled(&d2::setting),
         "kinds": DateKind::ALL.iter().map(|k| k.as_str()).collect::<Vec<_>>(),
@@ -321,7 +322,7 @@ pub async fn config(State(state): State<AppState>, Caller(p): Caller) -> V2Resul
         "amount_fields": kinds.amount.iter().filter_map(|i| u.get(i)).collect::<Vec<_>>(),
         "setting_warnings": warnings,
         "extraction": stats,
-        "backfill_running": refresh::backfill_running(),
+        "backfill_running": running,
     })))
 }
 
@@ -340,19 +341,21 @@ pub async fn backfill(State(state): State<AppState>, Caller(p): Caller, body: ax
     if !refresh::enabled(&d2::setting) {
         return Err(V2Error(DomainError::invalid(format!("Date extraction is disabled ({}).", pl_timeline::SETTING_EXTRACT))));
     }
-    if refresh::backfill_running() {
-        return Err(V2Error(DomainError::Conflict("A backfill is already running.".into())));
-    }
     d2::ensure(&state).await?;
     let force = if body.iter().all(u8::is_ascii_whitespace) {
         false
     } else {
         serde_json::from_slice::<BackfillBody>(&body).map_err(|e| V2Error(DomainError::invalid(format!("Invalid JSON: {e}"))))?.force
     };
+    // Take the cluster-wide advisory lock *before* answering: of two concurrent calls (in this or another
+    // process) exactly one gets 202 "started", the other 409; the spawned task owns the lock.
+    let Some(lock) = refresh::try_lock_backfill(state.db()).await.map_err(tl)? else {
+        return Err(V2Error(DomainError::Conflict("A backfill is already running.".into())));
+    };
     let pool = state.db().clone();
     tokio::spawn(async move {
         let dp = DateParse::from_lookup(d2::setting);
-        if let Err(e) = refresh::backfill(&pool, &dp, force).await {
+        if let Err(e) = refresh::backfill_locked(&pool, &dp, force, lock).await {
             tracing::error!(target: "paperrust.timeline", error = %e, "timeline backfill failed");
         }
     });

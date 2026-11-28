@@ -137,6 +137,10 @@ wordcraft-docbin = { git = "https://github.com/storytold/wordcraft", rev = "a4b8
 wordcraft-formats = { git = "https://github.com/storytold/wordcraft", rev = "a4b898f820eb28626865292fd037a155e4a07aef" }
 wordcraft-pdf = { git = "https://github.com/storytold/wordcraft", rev = "a4b898f820eb28626865292fd037a155e4a07aef" }
 craft-heif = { git = "https://github.com/storytold/craft-libs", rev = "6e03f65bf45181db77ba6229716e6624db9eb25b" }
+# PP-OCR engine (docs/OCR-NEXT.md): ONNX Runtime loaded at run time (no build-time download, no
+# linking); the rc is pinned exactly because its API still changes between release candidates.
+pl-ppocr = { path = "crates/pl-ppocr", default-features = false }
+ort = { version = "=2.0.0-rc.15", default-features = false, features = ["std", "load-dynamic", "api-20"] }
 # nur dev-dependencies
 tempfile = "=3.27.0"
 tokio-tungstenite = "0.29.0"

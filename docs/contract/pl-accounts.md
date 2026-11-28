@@ -62,10 +62,20 @@ Quelle: paperless-ngx v3.4.2 (`upstream/`), django-allauth **65.20.1** (`upstrea
 * **Sitzung schreiben** (`SessionMiddleware.process_response`, `cached_db`): nur wenn verändert
   und nicht leer; neue Schlüssel 32 Zeichen `[a-z0-9]`; Daten
   `signing.dumps(dict, salt="django.contrib.sessions.SessionStore", compress=True)` (JSON
-  kompakt, `ensure_ascii`); `expire_date = now + get_expiry_age()`; Cookie
+  kompakt, `ensure_ascii`); `expire_date = now + get_expiry_age()` (fehlendes/falsches
+  `_session_expiry`, also auch `set_expiry(0)` = „bis der Browser schließt“ → `SESSION_COOKIE_AGE`;
+  nur das Cookie wird dann ein Sitzungs-Cookie, die DB-Zeile bleibt normal gültig); Cookie
   `sessionid=<key>; expires=<http_date>; HttpOnly; Max-Age=<age>; Path=/; SameSite=Lax` bzw. ohne
   `expires`/`Max-Age` bei Browser-Ende; Cookie vorhanden + Sitzung leer → Lösch-Cookie
   (`=""; expires=Thu, 01 Jan 1970 …; Max-Age=0; Path=/; SameSite=Lax`). Antworten ≥ 500 speichern nicht.
+  Vorhandene Sitzung = `save(must_create=False)`: **nur `UPDATE`** (`pl_auth_api::session::save_row`);
+  ist die Zeile weg (paralleler Logout/`flush`), wird nichts geschrieben: `UpdateError` →
+  `SessionInterrupted` → Djangos 400-Seite ohne die Cookies der View (`SessionError::Interrupted`
+  in `web.rs::Ctx::finish`). Neue Schlüssel nur über `create` (keine gültige Sitzung) bzw.
+  `cycle_key`/`flush`. Bis 2026-11-27 speicherte Rust per `INSERT … ON CONFLICT DO UPDATE` und legte
+  einen per Logout gelöschten Schlüssel mit den alten Anmeldedaten wieder an; außerdem schrieb es bei
+  `set_expiry(0)` `expire_date = now` (Sitzung beim nächsten Request schon abgelaufen). Beides
+  behoben, Test `tests/session_races.rs` (`#[ignore]`, DB) und `session::tests::browser_close_keeps_server_side_age`.
 * **`login(request, user, backend)`**: Sitzung mit anderem Nutzer/Hash → `flush`, sonst
   `cycle_key` (Daten bleiben, z. B. `account_authentication_methods`), dann `_auth_user_id`
   (String), `_auth_user_backend`, `_auth_user_hash`; CSRF rotieren; `user_logged_in` →
@@ -478,7 +488,9 @@ urlencode(kwargs)`).
 21. **Geräte-Token nach Passwort-Reset widerrufen** (PaperRust-Erweiterung, Sicherheitsprüfung
     2026-11-19 F13): `set_password_form` (`/accounts/password/reset/key/…`) widerruft nach dem
     Speichern des neuen Passworts alle Geräte-Token (`prt_…`, `paperrust_device_token`) des
-    Nutzers (`pl_authz::device::revoke_all_for_user`). Der DRF-Token (`authtoken_token`) bleibt wie
+    Nutzers – seit 2026-11-27 in derselben Transaktion wie das Passwort-`UPDATE`
+    (`pl_auth_api::db::set_password_and_revoke`; vorher zwei getrennte Zugriffe, ein Fehler im zweiten
+    ließ die Token trotz neuem Passwort gültig). Der DRF-Token (`authtoken_token`) bleibt wie
     upstream bestehen.
 22. **Fehlertexte von OAuth2-Abrufen ohne URL** (Sicherheitsprüfung 2026-11-19 F14): `oauth2.rs`
     `get` entfernt die URL aus reqwest-Fehlern (`without_url`), weil der GitLab-Profilabruf das

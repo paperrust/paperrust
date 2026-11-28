@@ -44,7 +44,12 @@ async fn abort_and_stack_overflow_only_end_the_child() {
     let t = tempfile::tempdir().unwrap();
     let src = t.path().join("ok.pdf");
     text_pdf(&src);
-    let ok = run_with(&tool(), Op::Search { input: src.to_string_lossy().into(), terms: vec!["4711".into()], max_hits: 5 }, limits()).await;
+    let ok = run_with(
+        &tool(),
+        Op::Search { input: src.to_string_lossy().into(), terms: vec!["4711".into()], max_hits: 5, ocr_input: None },
+        limits(),
+    )
+    .await;
     assert!(ok.is_ok(), "{ok:?}");
 }
 
@@ -97,9 +102,16 @@ async fn hostile_and_broken_files_never_hang_or_crash_the_caller() {
         let out: String = dir.join(format!("{name}.out")).to_string_lossy().into();
         let ops = vec![
             Op::Repair { input: input.clone(), output: out.clone() },
-            Op::Search { input: input.clone(), terms: vec!["x".into()], max_hits: 10 },
+            Op::Search { input: input.clone(), terms: vec!["x".into()], max_hits: 10, ocr_input: None },
             Op::Shrink { input: input.clone(), output: out.clone(), preset: pl_pdftools::ShrinkPreset::Standard },
-            Op::Redact { input: input.clone(), output: out.clone(), areas: vec![], terms: vec!["x".into()], remove_metadata: true },
+            Op::Redact {
+                input: input.clone(),
+                output: out.clone(),
+                areas: vec![],
+                terms: vec!["x".into()],
+                remove_metadata: true,
+                ocr_input: None,
+            },
         ];
         for op in ops {
             let start = Instant::now();

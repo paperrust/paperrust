@@ -302,22 +302,29 @@ Through-Tabelle inkl. gelöschter Dokumente; ist das 0 → Anzahl nicht gelösch
 **create:** Rechte: global `add_sharelinkbundle` **und** `documents.view_document`.
 Felder: `document_ids` (Liste Int ≥1, nicht leer, required, Duplikate →
 `{"document_ids":["Duplicate document identifiers are not allowed."]}`), `expiration_days`
-(Int ≥1, null, optional), `file_version` (Choice, Standard `archive`).
+(Int ≥1, **≤ 36500** (PaperRust, Known differences 11), null, optional), `file_version`
+(Choice, Standard `archive`).
 Dann: fehlende (oder gelöschte) Dokumente → **400 `{"document_ids":"Documents not found: 1, 2"}`**
 (sortiert, String); erstes (kleinste ID) nicht in `permitted_document_ids(user)` →
 **400 `{"document_ids":"Insufficient permissions to share document <id>."}`**.
 INSERT Bundle (`slug` = `get_random_string(50)`, `expiration` = jetzt + Tage oder NULL,
-`status = pending`, `owner` = Nutzer, `file_path = ''`), Dokumente verknüpfen, Status-Felder
-zurücksetzen (Datei entfernen), **Celery `documents.tasks.build_share_link_bundle(bundle_id=<id>)`**
+`status = pending`, `owner` = Nutzer, `file_path = ''`) und Dokumente verknüpfen in **einer**
+Transaktion (das Zurücksetzen der Status-Felder aus upstreams zweitem `save()` steckt im INSERT;
+es gibt noch keine Datei), dann **`documents.tasks.build_share_link_bundle(bundle_id=<id>)`**
 mit Header `trigger_source = "manual"` → **JSON-fähig** (Worker akzeptiert `application/json`).
 `before_task_publish_handler` legt `documents_paperlesstask` an (`task_type = build_share_link`,
 `trigger_source = manual`, `status = pending`, `input_data = {}`, `owner_id = NULL`).
-Response `document_count` = Anzahl der IDs.
+Response `document_count` = Anzahl der IDs. Einreihen scheitert → Bundle + Verknüpfungen wieder
+gelöscht, Fehler (500) – kein `pending`-Bundle ohne Aufgabe (Known differences 12).
 
 **rebuild:** global `add_sharelinkbundle` + Sichtbarkeit + Objektrecht (POST → `add_sharelinkbundle`).
 `status == processing` → **400 `{"detail":"Bundle is already being processed."}`**.
-Sonst Datei entfernen, `status = pending, last_error = NULL, size_bytes = NULL, built_at = NULL,
-file_path = ''`, Celery wie oben, 200 mit Bundle.
+Sonst unter Zeilensperre (`SELECT … FOR UPDATE`, `processing` dort nochmals geprüft)
+`status = pending, last_error = NULL, size_bytes = NULL, built_at = NULL`; **Datei und `file_path`
+bleiben** (die Aufgabe ersetzt die ZIP atomar; der Share antwortet bei `pending` ohnehin 202).
+Dann einreihen wie oben, 200 mit Bundle. Einreihen scheitert → vorherige Werte (`status`,
+`last_error`, `size_bytes`, `built_at`) zurückgeschrieben (nur solange noch `pending`), Fehler (500)
+(Known differences 12).
 
 **destroy:** Datei unter `MEDIA_ROOT/documents/share_link_bundles/<file_path>` entfernen
 (nur relative Pfade innerhalb des Ordners), M2M-Zeilen + Bundle löschen.
@@ -330,12 +337,14 @@ Seit 2026-11-14 gibt es keinen Celery-Weg mehr; ohne eingehängten Dispatcher (n
 
 **Worker-Aufgabe (W14, `bundle_task.rs`, nur Rust-Worker):** `build_share_link_bundle(bundle_id)` wie
 `documents/tasks.py`: Bundle fehlt → Warnung „Share link bundle <id> no longer exists.“, Erfolg ohne Ergebnis;
-sonst `remove_file()`, `status = processing` + Felder leeren, Dokumente `bundle.documents.all()` (ohne
+sonst `status = processing` + Felder leeren (**nicht** `file_path`; die alte Datei bleibt), Dokumente `bundle.documents.all()` (ohne
 gelöschte) nach pk, ZIP_DEFLATED (`pl_files::zipw`) in `SCRATCH_DIR/tmpXXXXXXXX.zip`, Namen wie
 `_filename_only` (`get_public_filename`, Zähler bei Kollision), `file_version = archive` → Archiv-PDF falls
-vorhanden (ArchiveOnlyStrategy), sonst Original (OriginalsOnlyStrategy); verschieben nach
-`SHARE_LINK_BUNDLE_DIR/<slug>.zip`, `status = ready`, `size_bytes`, `built_at = now`. Fehler →
-`status = failed`, `last_error = {bundle_id, exception_type, message, timestamp}` und Aufgabe FAILURE.
+vorhanden (ArchiveOnlyStrategy), sonst Original (OriginalsOnlyStrategy); **atomar** (rename über die
+alte Datei; über Dateisystemgrenzen erst Kopie `.<slug>.zip.part-…` daneben, dann rename) nach
+`SHARE_LINK_BUNDLE_DIR/<slug>.zip`, `status = ready`, `size_bytes`, `built_at = now` (alte Datei mit
+anderem Namen danach entfernt). Fehler → alte Datei entfernt, `file_path = ''`, `status = failed`,
+`last_error = {bundle_id, exception_type, message, timestamp}` und Aufgabe FAILURE (Endzustand wie upstream).
 
 ---
 
@@ -378,6 +387,16 @@ vorhanden (ArchiveOnlyStrategy), sonst Original (OriginalsOnlyStrategy); verschi
 10. `remove_file` (Bundle rebuild/destroy) nutzt `Config.share_link_bundle_dir` und kanonisiert
     Pfade; Symlinks außerhalb des Ordners werden wie upstream (`resolve()` + `relative_to`)
     nicht gelöscht.
+11. **`expiration_days` ≤ 36500** (Review 2026-11-27): upstream hat keine Obergrenze; ein riesiger Wert
+    lässt `timezone.now() + timedelta(days=…)` mit `OverflowError` scheitern (500), Rust löste vorher in
+    `chrono::Duration::days` eine Panik aus. Jetzt DRF-Fehler 400
+    `{"expiration_days":["Ensure this value is less than or equal to 36500."]}`; die Rechnung ist
+    zusätzlich überlaufsicher (`TimeDelta::try_days` + `checked_add_signed`).
+12. **Bundle create/rebuild bei Einreihfehler** (Review 2026-11-27): upstream entfernt beim rebuild zuerst
+    die ZIP und setzt `pending`, dann `apply_async` – scheitert das Einreihen, ist der funktionierende Share
+    weg und keine Aufgabe da; beim create bleibt ein `pending`-Bundle ohne Aufgabe. PaperRust: rebuild
+    löscht nichts mehr (die Aufgabe ersetzt die ZIP atomar und behält die alte bis zum Erfolg), der Status
+    wird bei Einreihfehler zurückgesetzt; create löscht das Bundle wieder. Antwort in beiden Fällen 500.
 
 - **W14 `build_share_link_bundle` (Rust-Worker):** Ausnahmetypen/-texte nur für die üblichen Fälle wie Python
   (`FileNotFoundError: [Errno 2] No such file or directory: '<pfad>'`, `PermissionError`); andere I/O-Fehler

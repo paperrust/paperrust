@@ -12,7 +12,15 @@
 //! `…_MAX_NEW_OBJECTS` per run, never storage paths, and **immediately before creating** again
 //! [`crate::taxonomy::check_duplicate`] (server-side lock).
 //! Undo: only if the current state of the affected fields still equals the state after
-//! applying – otherwise 409 with the differing fields.
+//! applying – otherwise 409 with the differing fields. Every partial acceptance of a review entry
+//! keeps its audit id (`audit_ids`); undo reverts all of them, newest first.
+//!
+//! Atomicity (external review, findings 5/6/8): document fields, tags, custom fields, the AI audit
+//! entry and the review entry are written in **one** transaction when the hooked-in writer supports
+//! it ([`workflow::DocWriter::supports_transaction`]); an audit failure is an error and rolls
+//! everything back. With a writer that does not (yet) support it, a failure after the first write
+//! restores the previous values (best effort, [`Ops`]). Audit failures are logged with ids and field
+//! names only, never with values (finding 7).
 //!
 //! Security wave 3: manual run respects `PAPERRUST_AI_AUTO_MODE` and is limited per run and per
 //! user/hour (M1); new objects only with the `add_<model>` permission of the trigger or the
@@ -32,7 +40,7 @@ use serde_json::{Map, Value, json};
 use sqlx::Row;
 
 use super::data::{self, Cat};
-use super::workflow::{self, DocChanges, DocState};
+use super::workflow::{self, DocChanges, DocState, DocWriter};
 use crate::auto::{self, Field, Plan, PlannedChange, RunLimits, Visible};
 use crate::config::AutoMode;
 use crate::mcp::api::SideStore;
@@ -184,9 +192,26 @@ fn snapshot(cur: &DocState, fields: &[Field]) -> Value {
     Value::Object(m)
 }
 
+/// Field names of an audit snapshot (`title`, `tags`, `custom_fields.<id>`, …) – what may be
+/// logged about an audit entry; values (titles, custom field contents) never are (finding 7).
+pub fn audit_field_names(v: &Value) -> Vec<String> {
+    let mut out = Vec::new();
+    if let Some(o) = v.as_object() {
+        for (k, x) in o {
+            match (k.as_str(), x.as_object()) {
+                ("custom_fields", Some(cf)) => out.extend(cf.keys().map(|id| format!("custom_fields.{id}"))),
+                _ => out.push(k.clone()),
+            }
+        }
+    }
+    out
+}
+
+/// AI audit entry on the caller's connection (inside the change's transaction). A failure is an
+/// error (the change must not stay without audit) and is logged without values.
 #[allow(clippy::too_many_arguments)]
 async fn insert_audit(
-    state: &AppState,
+    conn: &mut sqlx::PgConnection,
     actor: Option<i64>,
     run: uuid::Uuid,
     action: &str,
@@ -195,7 +220,7 @@ async fn insert_audit(
     after: &Value,
     conf: Option<f64>,
     cands: Option<Value>,
-) -> Option<i64> {
+) -> Result<i64, String> {
     let r = sqlx::query_scalar::<_, i64>(
         "INSERT INTO paperrust_ai_audit (actor_id, channel, run_id, action, object_kind, object_id, candidates, before, after, confidence) \
          VALUES ($1, 'auto', $2, $3, 'document', $4, $5, $6, $7, $8) RETURNING id",
@@ -208,15 +233,13 @@ async fn insert_audit(
     .bind(before)
     .bind(after)
     .bind(conf)
-    .fetch_one(state.db())
+    .fetch_one(&mut *conn)
     .await;
-    match r {
-        Ok(id) => Some(id),
-        Err(e) => {
-            tracing::warn!(target: "pl_ai::audit", error = %e, document = doc, action, before = %before, after = %after, "ai audit (db write failed, logged instead)");
-            None
-        }
-    }
+    r.map_err(|e| {
+        let fields = audit_field_names(after).join(",");
+        tracing::warn!(target: "pl_ai::audit", error = %e, document = doc, action, fields = %fields, "ai audit write failed; change not applied");
+        "AI audit could not be written".to_string()
+    })
 }
 
 /// Custom field values `ids` as `{"<id>": value|null}` (for audit and undo).
@@ -228,12 +251,252 @@ fn cf_snapshot(values: &std::collections::BTreeMap<i64, (String, Value)>, ids: &
     Value::Object(m)
 }
 
-/// Applies the marked changes. Returns: indexes of the applied changes, audit id.
-/// New objects are created only by whoever has the `add_<model>` permission (`creator`, [`may_create`]); otherwise
-/// the change stays open (suggestion only).
+/// Document writes of one AI change (apply, undo, compensation).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Writes {
+    pub ch: DocChanges,
+    pub add_tags: Vec<i64>,
+    pub remove_tags: Vec<i64>,
+    /// `(field id, data type, value)`
+    pub cf_set: Vec<(i64, String, Value)>,
+    pub cf_remove: Vec<i64>,
+}
+
+impl Writes {
+    pub fn is_empty(&self) -> bool {
+        *self == Writes::default()
+    }
+}
+
+enum Step<'a> {
+    Save(&'a DocChanges),
+    AddTags(&'a [i64]),
+    RemoveTags(&'a [i64]),
+    SetCf(i64, &'a str, &'a Value),
+    RemoveCf(i64),
+}
+
+fn steps(w: &Writes) -> Vec<Step<'_>> {
+    let mut out = Vec::new();
+    if !w.is_empty() {
+        // save(update_fields=[…, "modified"]) – also when only tags/custom fields change
+        out.push(Step::Save(&w.ch));
+    }
+    if !w.add_tags.is_empty() {
+        out.push(Step::AddTags(&w.add_tags));
+    }
+    if !w.remove_tags.is_empty() {
+        out.push(Step::RemoveTags(&w.remove_tags));
+    }
+    out.extend(w.cf_set.iter().map(|(f, dt, v)| Step::SetCf(*f, dt.as_str(), v)));
+    out.extend(w.cf_remove.iter().map(|f| Step::RemoveCf(*f)));
+    out
+}
+
+/// Write path of the AI changes: through the caller's transaction when the writer supports it
+/// (`atomic`), otherwise through the writer's own (pool) methods with compensation on failure.
+pub struct Ops {
+    pub w: std::sync::Arc<dyn DocWriter>,
+    pub atomic: bool,
+}
+
+impl Ops {
+    pub fn new(state: &AppState) -> Self {
+        let w = workflow::writer(state);
+        let atomic = w.supports_transaction();
+        Ops { w, atomic }
+    }
+
+    async fn step(&self, state: &AppState, conn: Option<&mut sqlx::PgConnection>, doc: i64, s: &Step<'_>) -> Result<(), String> {
+        match (self.atomic, conn) {
+            (true, Some(c)) => match s {
+                Step::Save(ch) => self.w.save_tx(c, doc, ch).await,
+                Step::AddTags(t) => self.w.add_nested_tags_tx(c, doc, t).await,
+                Step::RemoveTags(t) => self.w.remove_tags_tx(c, doc, t).await,
+                Step::SetCf(f, dt, v) => self.w.set_custom_field_tx(c, doc, *f, dt, v).await,
+                Step::RemoveCf(f) => self.w.remove_custom_field_tx(c, doc, *f).await,
+            },
+            (true, None) => Err("internal: transactional write without a transaction".into()),
+            (false, _) => match s {
+                Step::Save(ch) => self.w.save(state, doc, ch).await,
+                Step::AddTags(t) => self.w.add_nested_tags(state, doc, t).await,
+                Step::RemoveTags(t) => self.w.remove_tags(state, doc, t).await,
+                Step::SetCf(f, dt, v) => self.w.set_custom_field(state, doc, *f, dt, v).await,
+                Step::RemoveCf(f) => self.w.remove_custom_field(state, doc, *f).await,
+            },
+        }
+    }
+
+    async fn get_or_create(
+        &self,
+        state: &AppState,
+        conn: &mut sqlx::PgConnection,
+        cat: Cat,
+        name: &str,
+        owner: Option<i64>,
+    ) -> Result<(i64, bool), String> {
+        if self.atomic {
+            self.w.get_or_create_tx(conn, cat, name, owner).await
+        } else {
+            self.w.get_or_create(state, cat, name, owner).await
+        }
+    }
+
+    /// Performs `w`. Atomic: on the caller's transaction (the caller rolls back on error). Otherwise a
+    /// failure after the first successful write applies `revert` (best effort) before the error is returned.
+    pub async fn execute(
+        &self,
+        state: &AppState,
+        mut conn: Option<&mut sqlx::PgConnection>,
+        doc: i64,
+        w: &Writes,
+        revert: Option<&Writes>,
+    ) -> Result<(), String> {
+        let mut wrote = false;
+        for s in steps(w) {
+            if let Err(e) = self.step(state, conn.as_deref_mut(), doc, &s).await {
+                if wrote && let Some(r) = revert {
+                    self.compensate(state, doc, r).await;
+                }
+                return Err(e);
+            }
+            wrote = true;
+        }
+        Ok(())
+    }
+
+    /// Non-atomic writers only: restore the previous values after a later failure (each step is
+    /// tried, failures are logged without values).
+    pub async fn compensate(&self, state: &AppState, doc: i64, r: &Writes) {
+        if self.atomic {
+            return;
+        }
+        for s in steps(r) {
+            if let Err(e) = self.step(state, None, doc, &s).await {
+                tracing::error!(target: "pl_ai", document = doc, error = %e, "restoring the document after a failed AI change failed");
+            }
+        }
+    }
+
+    /// After the commit: the writer's post-commit work (file renaming) and cache/index refresh.
+    async fn after_commit(&self, state: &AppState, doc: i64) {
+        if self.atomic
+            && let Err(e) = self.w.after_commit(state, doc).await
+        {
+            tracing::warn!(target: "pl_ai", document = doc, error = %e, "post-commit work after an AI change failed");
+        }
+        workflow::after_change(state, doc).await;
+    }
+}
+
+/// Writes that bring the snapshot fields of `current` back to `target` (snapshot format of
+/// [`snapshot`] + `custom_fields`). `dts`: data type per custom field id.
+pub fn restore_writes(target: &Value, current: &Value, dts: &std::collections::BTreeMap<i64, String>) -> Writes {
+    let mut w = Writes::default();
+    let Some(t) = target.as_object() else { return w };
+    let differs = |k: &str| current.get(k) != t.get(k);
+    if differs("title")
+        && let Some(x) = t.get("title").and_then(Value::as_str)
+    {
+        w.ch.title = Some(x.to_string());
+    }
+    if t.contains_key("correspondent") && differs("correspondent") {
+        w.ch.correspondent_id = t.get("correspondent").map(Value::as_i64);
+    }
+    if t.contains_key("document_type") && differs("document_type") {
+        w.ch.document_type_id = t.get("document_type").map(Value::as_i64);
+    }
+    if t.contains_key("storage_path") && differs("storage_path") {
+        w.ch.storage_path_id = t.get("storage_path").map(Value::as_i64);
+    }
+    if differs("created")
+        && let Some(d) = t.get("created").and_then(Value::as_str)
+    {
+        w.ch.created = chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").ok();
+    }
+    if let Some(tb) = t.get("tags").and_then(Value::as_array) {
+        let tb: Vec<i64> = tb.iter().filter_map(Value::as_i64).collect();
+        let tc: Vec<i64> =
+            current.get("tags").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_i64).collect()).unwrap_or_default();
+        w.remove_tags = tc.iter().copied().filter(|x| !tb.contains(x)).collect();
+        w.add_tags = tb.iter().copied().filter(|x| !tc.contains(x)).collect();
+    }
+    if let Some(cf) = t.get("custom_fields").and_then(Value::as_object) {
+        for (k, v) in cf {
+            let Ok(fid) = k.parse::<i64>() else { continue };
+            let cur = current.get("custom_fields").and_then(|c| c.get(k)).cloned().unwrap_or(Value::Null);
+            if cur == *v {
+                continue;
+            }
+            if v.is_null() {
+                w.cf_remove.push(fid);
+            } else if let Some(dt) = dts.get(&fid) {
+                w.cf_set.push((fid, dt.clone(), v.clone()));
+            }
+        }
+    }
+    w
+}
+
+fn merge_snapshot(sim: &mut Value, src: &Value) {
+    let (Some(dst), Some(src)) = (sim.as_object_mut(), src.as_object()) else { return };
+    for (k, v) in src {
+        if k == "custom_fields"
+            && let Some(cf) = v.as_object()
+        {
+            let entry = dst.entry(k.clone()).or_insert_with(|| Value::Object(Map::new()));
+            if let Some(m) = entry.as_object_mut() {
+                for (id, x) in cf {
+                    m.insert(id.clone(), x.clone());
+                }
+            }
+        } else {
+            dst.insert(k.clone(), v.clone());
+        }
+    }
+}
+
+/// Undo of several audit entries `(before, after)` in apply order (finding 6): checks newest →
+/// oldest that each entry's `after` still matches the (simulated) current state and returns the
+/// state before the oldest entry; otherwise the conflicting fields.
+pub fn plan_undo(now: &Value, audits: &[(Value, Value)]) -> Result<Value, Vec<String>> {
+    let mut sim = now.clone();
+    let mut conflicts: Vec<String> = Vec::new();
+    for (before, after) in audits.iter().rev() {
+        if let Some(a) = after.as_object() {
+            for (k, v) in a {
+                let ok = if k == "custom_fields" {
+                    v.as_object().is_none_or(|m| m.iter().all(|(id, x)| sim.get("custom_fields").and_then(|c| c.get(id)) == Some(x)))
+                } else {
+                    sim.get(k.as_str()) == Some(v)
+                };
+                if !ok && !conflicts.contains(k) {
+                    conflicts.push(k.clone());
+                }
+            }
+        }
+        merge_snapshot(&mut sim, before);
+    }
+    if conflicts.is_empty() { Ok(sim) } else { Err(conflicts) }
+}
+
+/// Result of [`apply_changes`].
+#[derive(Debug, Default)]
+struct Applied {
+    done: Vec<usize>,
+    audit: Option<i64>,
+    /// Writes that undo the change (non-atomic writers: compensation if the caller fails later).
+    revert: Writes,
+}
+
+/// Applies the marked changes on `conn` (the caller's transaction) incl. the audit entry. New objects
+/// are created only by whoever has the `add_<model>` permission (`creator`, [`may_create`]); otherwise
+/// the change stays open (suggestion only). The caller commits and then calls [`Ops::after_commit`].
 #[allow(clippy::too_many_arguments)]
 async fn apply_changes(
     state: &AppState,
+    conn: &mut sqlx::PgConnection,
+    ops: &Ops,
     doc_id: i64,
     owner_id: Option<i64>,
     creator: Option<&User>,
@@ -242,15 +505,13 @@ async fn apply_changes(
     plan: &mut [PlannedChange],
     which: &[usize],
     tax: &Taxonomy,
-) -> Result<(Vec<usize>, Option<i64>), String> {
-    let Some(cur) = workflow::load_state(state, doc_id).await? else { return Err("document not found".into()) };
-    let w = workflow::writer(state);
-    let mut ch = DocChanges::default();
-    let mut tags: Vec<i64> = Vec::new();
-    let mut cf_writes: Vec<(i64, Value)> = Vec::new();
+) -> Result<Applied, String> {
+    let Some(cur) = workflow::load_state_conn(conn, doc_id, ops.atomic).await? else { return Err("document not found".into()) };
+    let mut w = Writes::default();
     let mut done = Vec::new();
     let mut fields: Vec<Field> = Vec::new();
     let opts = MatchOptions::default();
+    let mut defs: Option<Vec<crate::custom_fields::FieldDef>> = None;
     for &i in which {
         let Some(c) = plan.get(i).cloned() else { continue };
         let id = match (&c.existing_id, &c.new_name, cat_of(c.field)) {
@@ -266,26 +527,35 @@ async fn apply_changes(
                     // Security wave 3 M2: without add_<model> permission only a suggestion
                     continue;
                 } else {
-                    Some(w.get_or_create(state, cat, name, owner_id).await?.0)
+                    Some(ops.get_or_create(state, conn, cat, name, owner_id).await?.0)
                 }
             }
             _ => None,
         };
         match c.field {
-            Field::Title => ch.title = c.value.clone(),
-            Field::Created => ch.created = c.value.as_deref().and_then(|v| chrono::NaiveDate::parse_from_str(v, "%Y-%m-%d").ok()),
-            Field::Correspondent => ch.correspondent_id = id.map(Some),
-            Field::DocumentType => ch.document_type_id = id.map(Some),
-            Field::StoragePath => ch.storage_path_id = id.map(Some),
+            Field::Title => w.ch.title = c.value.clone(),
+            Field::Created => w.ch.created = c.value.as_deref().and_then(|v| chrono::NaiveDate::parse_from_str(v, "%Y-%m-%d").ok()),
+            Field::Correspondent => w.ch.correspondent_id = id.map(Some),
+            Field::DocumentType => w.ch.document_type_id = id.map(Some),
+            Field::StoragePath => w.ch.storage_path_id = id.map(Some),
             Field::Tags => {
                 if let Some(t) = id
                     && !cur.tag_ids.contains(&t)
+                    && !w.add_tags.contains(&t)
                 {
-                    tags.push(t);
+                    w.add_tags.push(t);
                 }
             }
             Field::CustomFields => match (c.existing_id, c.data.clone()) {
-                (Some(fid), Some(v)) if !cf_writes.iter().any(|(f, _)| *f == fid) => cf_writes.push((fid, v)),
+                (Some(fid), Some(v)) if !w.cf_set.iter().any(|(f, _, _)| *f == fid) => {
+                    if defs.is_none() {
+                        defs = Some(super::store::load_field_defs(state.db()).await.map_err(|e| e.status().to_string())?);
+                    }
+                    let Some(def) = defs.as_ref().and_then(|d| d.iter().find(|d| d.id == fid)) else {
+                        return Err("custom field not found".into());
+                    };
+                    w.cf_set.push((fid, def.data_type.clone(), v));
+                }
                 _ => continue,
             },
         }
@@ -295,42 +565,55 @@ async fn apply_changes(
         done.push(i);
     }
     if done.is_empty() {
-        return Ok((done, None));
+        return Ok(Applied::default());
     }
-    let cf_ids: Vec<i64> = cf_writes.iter().map(|(f, _)| *f).collect();
-    let cf_before = if cf_ids.is_empty() { Default::default() } else { workflow::load_custom_values(state, doc_id).await? };
+    let cf_ids: Vec<i64> = w.cf_set.iter().map(|(f, _, _)| *f).collect();
+    let cf_before = if cf_ids.is_empty() { Default::default() } else { workflow::load_custom_values_conn(conn, doc_id).await? };
     let mut before = snapshot(&cur, &fields);
     if !cf_ids.is_empty()
         && let Some(o) = before.as_object_mut()
     {
         o.insert("custom_fields".into(), cf_snapshot(&cf_before, &cf_ids));
     }
-    if !ch.is_empty() || !tags.is_empty() {
-        w.save(state, doc_id, &ch).await?;
-    }
-    if !tags.is_empty() {
-        w.add_nested_tags(state, doc_id, &tags).await?;
-    }
-    if !cf_writes.is_empty() {
-        let defs = super::store::load_field_defs(state.db()).await.map_err(|e| e.status().to_string())?;
-        for (fid, v) in &cf_writes {
-            let Some(def) = defs.iter().find(|d| d.id == *fid) else { return Err("custom field not found".into()) };
-            w.set_custom_field(state, doc_id, *fid, &def.data_type, v).await?;
+    // inverse of `w` (compensation for non-atomic writers)
+    let mut revert = Writes::default();
+    let c = &w.ch;
+    revert.ch = DocChanges {
+        title: c.title.as_ref().map(|_| cur.title.clone()),
+        correspondent_id: c.correspondent_id.map(|_| cur.correspondent_id),
+        document_type_id: c.document_type_id.map(|_| cur.document_type_id),
+        storage_path_id: c.storage_path_id.map(|_| cur.storage_path_id),
+        created: c.created.map(|_| cur.created),
+    };
+    revert.remove_tags = w.add_tags.clone();
+    for (fid, dt, _) in &w.cf_set {
+        match cf_before.get(fid).map(|(_, v)| v).filter(|v| !v.is_null()) {
+            Some(v) => revert.cf_set.push((*fid, dt.clone(), v.clone())),
+            None => revert.cf_remove.push(*fid),
         }
     }
-    let after_state = workflow::load_state(state, doc_id).await?.ok_or("document vanished")?;
-    let mut after = snapshot(&after_state, &fields);
-    if !cf_ids.is_empty() {
-        let cf_after = workflow::load_custom_values(state, doc_id).await?;
-        if let Some(o) = after.as_object_mut() {
-            o.insert("custom_fields".into(), cf_snapshot(&cf_after, &cf_ids));
+    ops.execute(state, Some(&mut *conn), doc_id, &w, Some(&revert)).await?;
+    let after_res = async {
+        let after_state = workflow::load_state_conn(conn, doc_id, false).await?.ok_or("document vanished")?;
+        let mut after = snapshot(&after_state, &fields);
+        if !cf_ids.is_empty() {
+            let cf_after = workflow::load_custom_values_conn(conn, doc_id).await?;
+            if let Some(o) = after.as_object_mut() {
+                o.insert("custom_fields".into(), cf_snapshot(&cf_after, &cf_ids));
+            }
+        }
+        let conf =
+            done.iter().filter_map(|i| plan.get(*i).map(|c| c.confidence)).fold(None, |a: Option<f64>, c| Some(a.map_or(c, |x| x.min(c))));
+        insert_audit(conn, actor, run, "update_document", doc_id, &before, &after, conf, None).await
+    }
+    .await;
+    match after_res {
+        Ok(audit) => Ok(Applied { done, audit: Some(audit), revert }),
+        Err(e) => {
+            ops.compensate(state, doc_id, &revert).await;
+            Err(e)
         }
     }
-    let conf =
-        done.iter().filter_map(|i| plan.get(*i).map(|c| c.confidence)).fold(None, |a: Option<f64>, c| Some(a.map_or(c, |x| x.min(c))));
-    let audit = insert_audit(state, actor, run, "update_document", doc_id, &before, &after, conf, None).await;
-    workflow::after_change(state, doc_id).await;
-    Ok((done, audit))
 }
 
 /// Custom fields via AI (template `custom_fields`): only enabled fields that the document has not
@@ -456,11 +739,16 @@ pub async fn process_document(
         }
         *new_objects_left = new_objects_left.saturating_sub(p.new_objects);
         let which: Vec<usize> = p.changes.iter().enumerate().filter(|(_, c)| c.apply).map(|(i, _)| i).collect();
-        let (done, audit) = if which.is_empty() {
-            (Vec::new(), None)
+        // finding 5: changes, audit and review entry in one transaction
+        let ops = Ops::new(state);
+        let mut tx = state.db().begin().await.map_err(|e| e.to_string())?;
+        let applied = if which.is_empty() {
+            Applied::default()
         } else {
             apply_changes(
                 state,
+                &mut tx,
+                &ops,
                 doc.id,
                 owner.as_ref().map(|u| u.id).or(doc.owner_id),
                 owner.as_ref(),
@@ -472,6 +760,7 @@ pub async fn process_document(
             )
             .await?
         };
+        let (done, audit) = (applied.done.clone(), applied.audit);
         let plan_json: Vec<Value> = p
             .changes
             .iter()
@@ -491,9 +780,9 @@ pub async fn process_document(
         } else {
             "partial"
         };
-        let review: Option<i64> = sqlx::query_scalar(
-            "INSERT INTO paperrust_ai_review (document_id, run_id, trigger, mode, status, suggestions, plan, audit_id) \
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
+        let inserted: Result<i64, String> = sqlx::query_scalar(
+            "INSERT INTO paperrust_ai_review (document_id, run_id, trigger, mode, status, suggestions, plan, audit_id, audit_ids) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CASE WHEN $8::bigint IS NULL THEN '{}'::bigint[] ELSE ARRAY[$8::bigint] END) RETURNING id",
         )
         .bind(doc.id as i32)
         .bind(run)
@@ -503,14 +792,28 @@ pub async fn process_document(
         .bind(serde_json::to_value(&s).unwrap_or(Value::Null))
         .bind(Value::Array(plan_json))
         .bind(audit)
-        .fetch_one(state.db())
+        .fetch_one(&mut *tx)
         .await
         .map_err(|e| {
-            tracing::warn!(target: "pl_ai", error = %e, "review list not installed (migration 0001_paperrust_ai.sql pending)");
-            "review storage not installed".to_string()
-        })
-        .ok();
-        Ok::<_, String>((review, status.to_string(), done.len(), p.changes.len() - done.len()))
+            tracing::warn!(target: "pl_ai", error = %e, document = doc.id, "writing the review entry failed");
+            "review storage not available".to_string()
+        });
+        let committed = match inserted {
+            Ok(id) => tx.commit().await.map(|_| id).map_err(|e| e.to_string()),
+            Err(e) => Err(e),
+        };
+        let review = match committed {
+            Ok(id) => id,
+            Err(e) => {
+                // the transaction was rolled back; non-atomic writers: restore the document
+                ops.compensate(state, doc.id, &applied.revert).await;
+                return Err(e);
+            }
+        };
+        if !done.is_empty() {
+            ops.after_commit(state, doc.id).await;
+        }
+        Ok::<_, String>((Some(review), status.to_string(), done.len(), p.changes.len() - done.len()))
     };
     match inner.await {
         Ok((review, status, applied, pending)) => {
@@ -576,13 +879,14 @@ pub async fn process_trigger_tag(state: &AppState) -> Result<Value, ApiError> {
         return Ok(Value::Null);
     }
     let summary = run(state, &ids, cfg.rs.auto_mode, "tag", None).await?;
-    let w = workflow::writer(state);
+    let ops = Ops::new(state);
+    // finding 8: without the replacement tag the trigger tags stay (no document loses both tags)
     let replacement: Option<i64> = match &opts.tag_after {
-        crate::options::TagAfter::Replace { tag } => match w.get_or_create(state, Cat::Tags, tag, None).await {
+        crate::options::TagAfter::Replace { tag } => match ops.w.get_or_create(state, Cat::Tags, tag, None).await {
             Ok((id, _)) => Some(id),
             Err(e) => {
-                tracing::warn!(target: "pl_ai", error = %e, "could not create replacement tag");
-                None
+                tracing::warn!(target: "pl_ai", error = %e, "could not create replacement tag; trigger tags kept");
+                return Err(ApiError::internal("could not create the replacement tag; trigger tags kept"));
             }
         },
         _ => None,
@@ -598,16 +902,43 @@ pub async fn process_trigger_tag(state: &AppState) -> Result<Value, ApiError> {
                 .collect()
         })
         .unwrap_or_default();
+    let mut not_replaced = 0usize;
     for (d, t) in pairs {
         if opts.tag_after == crate::options::TagAfter::Keep {
             continue;
         }
-        let _ = w.remove_tags(state, d, &[t]).await;
-        if let Some(r) = replacement.filter(|_| !failed.contains(&d)) {
-            let _ = w.add_nested_tags(state, d, &[r]).await;
+        let r = replacement.filter(|_| !failed.contains(&d));
+        if let Err(e) = replace_trigger_tag(state, &ops, d, t, r).await {
+            tracing::warn!(target: "pl_ai", document = d, error = %e, "replacing the AI trigger tag failed; trigger tag kept");
+            not_replaced += 1;
         }
     }
+    if not_replaced > 0 {
+        return Err(ApiError::internal(format!("replacing the AI trigger tag failed for {not_replaced} document(s); trigger tag kept")));
+    }
     Ok(summary)
+}
+
+/// Removes the trigger tag `trigger` and adds `replacement` (if any) as one unit (finding 8):
+/// atomic writers in one transaction; otherwise the replacement is added first, so a failure
+/// leaves the trigger tag in place. Errors are returned, never dropped.
+pub async fn replace_trigger_tag(state: &AppState, ops: &Ops, doc: i64, trigger: i64, replacement: Option<i64>) -> Result<(), String> {
+    if ops.atomic {
+        let mut tx = state.db().begin().await.map_err(|e| e.to_string())?;
+        if let Some(r) = replacement {
+            ops.w.add_nested_tags_tx(&mut tx, doc, &[r]).await?;
+        }
+        ops.w.remove_tags_tx(&mut tx, doc, &[trigger]).await?;
+        tx.commit().await.map_err(|e| e.to_string())?;
+        if let Err(e) = ops.w.after_commit(state, doc).await {
+            tracing::warn!(target: "pl_ai", document = doc, error = %e, "post-commit work after the trigger tag change failed");
+        }
+        return Ok(());
+    }
+    if let Some(r) = replacement {
+        ops.w.add_nested_tags(state, doc, &[r]).await?;
+    }
+    ops.w.remove_tags(state, doc, &[trigger]).await
 }
 
 // ------------------------------------------------------------------ REST /api/x-ai/review/
@@ -624,6 +955,7 @@ fn review_json(r: &sqlx::postgres::PgRow) -> Value {
         "suggestions": r.try_get::<Value, _>("suggestions").unwrap_or(Value::Null),
         "changes": r.try_get::<Value, _>("plan").unwrap_or(Value::Null),
         "audit": r.try_get::<Option<i64>, _>("audit_id").ok().flatten(),
+        "audits": r.try_get::<Vec<i64>, _>("audit_ids").unwrap_or_default(),
         "decided_by": r.try_get::<Option<i32>, _>("decided_by_id").ok().flatten(),
         "decided_at": r.try_get::<Option<chrono::DateTime<chrono::Utc>>, _>("decided_at").ok().flatten().map(|d| pl_core::datetime::python_isoformat(&d)),
     })
@@ -638,8 +970,8 @@ fn not_installed(e: sqlx::Error) -> ApiError {
 }
 
 const REVIEW_COLUMNS: &str =
-    "id, document_id, created, run_id, trigger, mode, status, suggestions, plan, audit_id, decided_by_id, decided_at";
-const SELECT: &str = "SELECT id, document_id, created, run_id, trigger, mode, status, suggestions, plan, audit_id, decided_by_id, decided_at FROM paperrust_ai_review";
+    "id, document_id, created, run_id, trigger, mode, status, suggestions, plan, audit_id, audit_ids, decided_by_id, decided_at";
+const SELECT: &str = "SELECT id, document_id, created, run_id, trigger, mode, status, suggestions, plan, audit_id, audit_ids, decided_by_id, decided_at FROM paperrust_ai_review";
 
 /// `FROM paperrust_ai_review WHERE document_id IN (<visible documents>) [AND status = …]
 /// [AND document_id = …]` without a column list. Visibility as a subquery
@@ -864,15 +1196,19 @@ pub async fn apply(
     let doc_id = i64::from(r.try_get::<i32, _>("document_id").map_err(ApiError::internal)?);
     let rid: i64 = r.try_get("id").map_err(ApiError::internal)?;
     let run: uuid::Uuid = r.try_get("run_id").map_err(ApiError::internal)?;
-    let (done, audit) = if which.is_empty() {
-        (Vec::new(), None)
+    // finding 5: changes, audit and review update in one transaction
+    let ops = Ops::new(&state);
+    let mut tx = state.db().begin().await.map_err(ApiError::internal)?;
+    let applied = if which.is_empty() {
+        Applied::default()
     } else {
         let tax = load_taxonomy(&state, Some(user)).await?;
         // new objects belong to the applying user (AI-N2), not to the document owner
-        apply_changes(&state, doc_id, Some(user.id), Some(user), Some(user.id), run, &mut plan, &which, &tax)
+        apply_changes(&state, &mut tx, &ops, doc_id, Some(user.id), Some(user), Some(user.id), run, &mut plan, &which, &tax)
             .await
             .map_err(ApiError::internal)?
     };
+    let (done, audit) = (applied.done.clone(), applied.audit);
     let mut new_plan = raw_plan.clone();
     for i in &overridden {
         if let (Some(o), Ok(v)) = (new_plan.get_mut(*i).and_then(Value::as_object_mut), serde_json::to_value(&plan[*i])) {
@@ -895,18 +1231,41 @@ pub async fn apply(
         }
     }
     let new_status = review_status(&new_plan);
-    let r = sqlx::query(
-        "UPDATE paperrust_ai_review SET plan = $2, status = $3, audit_id = COALESCE($4, audit_id), decided_by_id = $5, decided_at = now() WHERE id = $1 \
-         RETURNING id, document_id, created, run_id, trigger, mode, status, suggestions, plan, audit_id, decided_by_id, decided_at",
-    )
+    // finding 6: every partial acceptance keeps its audit id
+    let updated = sqlx::query(&format!(
+        "UPDATE paperrust_ai_review SET plan = $2, status = $3, audit_id = COALESCE($4, audit_id), \
+         audit_ids = CASE WHEN $4::bigint IS NULL THEN audit_ids ELSE array_append(audit_ids, $4::bigint) END, \
+         decided_by_id = $5, decided_at = now() WHERE id = $1 AND status IN ('pending', 'partial') RETURNING {REVIEW_COLUMNS}"
+    ))
     .bind(rid)
     .bind(Value::Array(new_plan))
     .bind(new_status)
     .bind(audit)
     .bind(user.id as i32)
-    .fetch_one(state.db())
-    .await
-    .map_err(not_installed)?;
+    .fetch_optional(&mut *tx)
+    .await;
+    let r = match updated {
+        Ok(Some(r)) => match tx.commit().await {
+            Ok(()) => r,
+            Err(e) => {
+                ops.compensate(&state, doc_id, &applied.revert).await;
+                return Err(ApiError::internal(e));
+            }
+        },
+        Ok(None) => {
+            drop(tx);
+            ops.compensate(&state, doc_id, &applied.revert).await;
+            return Err(ApiError::validation(json!({"status": ["Review is already decided."]})));
+        }
+        Err(e) => {
+            drop(tx);
+            ops.compensate(&state, doc_id, &applied.revert).await;
+            return Err(not_installed(e));
+        }
+    };
+    if !done.is_empty() {
+        ops.after_commit(&state, doc_id).await;
+    }
     Ok(Drf::ok(review_json(&r)).indent(ctx.negotiation.indent).into_response())
 }
 
@@ -923,7 +1282,7 @@ pub async fn reject(
     let r = sqlx::query(
         "UPDATE paperrust_ai_review SET status = CASE WHEN status = 'partial' THEN 'applied' ELSE 'rejected' END, decided_by_id = $2, decided_at = now() \
          WHERE id = $1 AND status IN ('pending', 'partial') \
-         RETURNING id, document_id, created, run_id, trigger, mode, status, suggestions, plan, audit_id, decided_by_id, decided_at",
+         RETURNING id, document_id, created, run_id, trigger, mode, status, suggestions, plan, audit_id, audit_ids, decided_by_id, decided_at",
     )
     .bind(rid)
     .bind(user.id as i32)
@@ -934,7 +1293,9 @@ pub async fn reject(
     Ok(Drf::ok(review_json(&r)).indent(ctx.negotiation.indent).into_response())
 }
 
-/// POST /api/x-ai/review/{id}/undo/ – counter-change from the audit (`before`), only without conflict.
+/// POST /api/x-ai/review/{id}/undo/ – counter-change from the audit entries (`before`), only
+/// without conflict. All audit entries of the review (every partial acceptance) are undone,
+/// newest first, in one transaction with the undo audit entries (finding 6).
 pub async fn undo(
     State(state): State<AppState>,
     ctx: RequestContext,
@@ -944,109 +1305,136 @@ pub async fn undo(
     let user = auth.require_perms_by_method(&[("POST", &["documents.change_document"])])?;
     let r = load_review(&state, user, &id, "change_document").await?;
     let rid: i64 = r.try_get("id").map_err(ApiError::internal)?;
-    let audit_id: Option<i64> = r.try_get("audit_id").ok().flatten();
-    let Some(audit_id) = audit_id else {
-        return Err(ApiError::validation(json!({"status": ["Nothing was applied."]})));
-    };
-    let a = sqlx::query("SELECT before, after, object_id, undone_by_id FROM paperrust_ai_audit WHERE id = $1")
-        .bind(audit_id)
-        .fetch_optional(state.db())
-        .await
-        .map_err(not_installed)?
-        .ok_or_else(ApiError::not_found)?;
-    if a.try_get::<Option<i64>, _>("undone_by_id").ok().flatten().is_some() {
-        return Err(ApiError::validation(json!({"status": ["Already undone."]})));
+    let mut ids: Vec<i64> = r.try_get::<Vec<i64>, _>("audit_ids").unwrap_or_default();
+    if ids.is_empty()
+        && let Some(a) = r.try_get::<Option<i64>, _>("audit_id").ok().flatten()
+    {
+        ids.push(a);
     }
-    let before: Value = a.try_get("before").unwrap_or(Value::Null);
-    let after: Value = a.try_get("after").unwrap_or(Value::Null);
-    let doc_id = i64::from(a.try_get::<i32, _>("object_id").map_err(ApiError::internal)?);
-    // Security review final AI-N2: the audit must belong to the review's document (permissions
+    if ids.is_empty() {
+        return Err(ApiError::validation(json!({"status": ["Nothing was applied."]})));
+    }
+    let rows = sqlx::query("SELECT id, before, after, object_id, undone_by_id FROM paperrust_ai_audit WHERE id = ANY($1)")
+        .bind(&ids)
+        .fetch_all(state.db())
+        .await
+        .map_err(not_installed)?;
+    // Security review final AI-N2: every audit must belong to the review's document (permissions
     // were checked in `load_review` for `review.document_id`, `object_id` is what is written).
     let review_doc = i64::from(r.try_get::<i32, _>("document_id").map_err(ApiError::internal)?);
-    if doc_id != review_doc {
-        return Err(ApiError::validation(json!({"status": ["Nothing was applied."]})));
+    let mut audits: Vec<(i64, Value, Value)> = Vec::new();
+    for aid in &ids {
+        let Some(a) = rows.iter().find(|a| a.try_get::<i64, _>("id").ok() == Some(*aid)) else { continue };
+        let doc_id = a.try_get::<Option<i32>, _>("object_id").ok().flatten().map(i64::from);
+        if doc_id != Some(review_doc) {
+            return Err(ApiError::validation(json!({"status": ["Nothing was applied."]})));
+        }
+        if a.try_get::<Option<i64>, _>("undone_by_id").ok().flatten().is_some() {
+            continue;
+        }
+        audits.push((*aid, a.try_get("before").unwrap_or(Value::Null), a.try_get("after").unwrap_or(Value::Null)));
     }
-    let cur = workflow::load_state(&state, doc_id).await.map_err(ApiError::internal)?.ok_or_else(ApiError::not_found)?;
-    let fields: Vec<Field> = after
-        .as_object()
-        .map(|o| o.keys().filter_map(|k| serde_json::from_value::<Field>(Value::String(k.clone())).ok()).collect())
-        .unwrap_or_default();
+    if audits.is_empty() {
+        return Err(if rows.is_empty() { ApiError::not_found() } else { ApiError::validation(json!({"status": ["Already undone."]})) });
+    }
+    let doc_id = review_doc;
+    let ops = Ops::new(&state);
+    let mut tx = state.db().begin().await.map_err(ApiError::internal)?;
+    let cur = workflow::load_state_conn(&mut tx, doc_id, ops.atomic).await.map_err(ApiError::internal)?.ok_or_else(ApiError::not_found)?;
+    let mut fields: Vec<Field> = Vec::new();
+    let mut cf_ids: Vec<i64> = Vec::new();
+    for (_, _, after) in &audits {
+        for k in after.as_object().map(|o| o.keys().cloned().collect::<Vec<_>>()).unwrap_or_default() {
+            if let Ok(f) = serde_json::from_value::<Field>(Value::String(k))
+                && !fields.contains(&f)
+            {
+                fields.push(f);
+            }
+        }
+        for id in after
+            .get("custom_fields")
+            .and_then(Value::as_object)
+            .map(|o| o.keys().filter_map(|k| k.parse().ok()).collect::<Vec<i64>>())
+            .unwrap_or_default()
+        {
+            if !cf_ids.contains(&id) {
+                cf_ids.push(id);
+            }
+        }
+    }
     let mut now = snapshot(&cur, &fields);
     // Custom fields (PaperRust): current value of the affected fields
-    let cf_ids: Vec<i64> = after
-        .get("custom_fields")
-        .and_then(Value::as_object)
-        .map(|o| o.keys().filter_map(|k| k.parse().ok()).collect())
-        .unwrap_or_default();
     let cf_now = if cf_ids.is_empty() {
         Default::default()
     } else {
-        workflow::load_custom_values(&state, doc_id).await.map_err(ApiError::internal)?
+        workflow::load_custom_values_conn(&mut tx, doc_id).await.map_err(ApiError::internal)?
     };
     if !cf_ids.is_empty()
         && let Some(o) = now.as_object_mut()
     {
         o.insert("custom_fields".into(), cf_snapshot(&cf_now, &cf_ids));
     }
-    let conflicts: Vec<String> = after
-        .as_object()
-        .map(|o| o.iter().filter(|(k, v)| now.get(k.as_str()) != Some(v)).map(|(k, _)| k.clone()).collect())
-        .unwrap_or_default();
-    if !conflicts.is_empty() {
-        return Err(ApiError::json(
-            StatusCode::CONFLICT,
-            json!({"detail": "The document was changed after the AI update; not undone.", "fields": conflicts}),
-        ));
-    }
-    let mut ch = DocChanges::default();
-    let b = before.as_object().cloned().unwrap_or_default();
-    let opt_id = |v: Option<&Value>| v.map(|x| x.as_i64());
-    if let Some(t) = b.get("title").and_then(Value::as_str) {
-        ch.title = Some(t.to_string());
-    }
-    if b.contains_key("correspondent") {
-        ch.correspondent_id = opt_id(b.get("correspondent"));
-    }
-    if b.contains_key("document_type") {
-        ch.document_type_id = opt_id(b.get("document_type"));
-    }
-    if b.contains_key("storage_path") {
-        ch.storage_path_id = opt_id(b.get("storage_path"));
-    }
-    if let Some(d) = b.get("created").and_then(Value::as_str) {
-        ch.created = chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").ok();
-    }
-    let w = workflow::writer(&state);
-    w.save(&state, doc_id, &ch).await.map_err(ApiError::internal)?;
-    if let (Some(tb), Some(ta)) = (b.get("tags").and_then(Value::as_array), after.get("tags").and_then(Value::as_array)) {
-        let tb: Vec<i64> = tb.iter().filter_map(Value::as_i64).collect();
-        let added: Vec<i64> = ta.iter().filter_map(Value::as_i64).filter(|t| !tb.contains(t)).collect();
-        w.remove_tags(&state, doc_id, &added).await.map_err(ApiError::internal)?;
-    }
-    if let Some(cf) = b.get("custom_fields").and_then(Value::as_object) {
-        for (k, v) in cf {
-            let Ok(fid) = k.parse::<i64>() else { continue };
-            if v.is_null() {
-                w.remove_custom_field(&state, doc_id, fid).await.map_err(ApiError::internal)?;
-            } else if let Some((dt, _)) = cf_now.get(&fid) {
-                w.set_custom_field(&state, doc_id, fid, dt, v).await.map_err(ApiError::internal)?;
-            }
+    let pairs: Vec<(Value, Value)> = audits.iter().map(|(_, b, a)| (b.clone(), a.clone())).collect();
+    let target = match plan_undo(&now, &pairs) {
+        Ok(t) => t,
+        Err(conflicts) => {
+            return Err(ApiError::json(
+                StatusCode::CONFLICT,
+                json!({"detail": "The document was changed after the AI update; not undone.", "fields": conflicts}),
+            ));
+        }
+    };
+    let mut dts: std::collections::BTreeMap<i64, String> = cf_now.iter().map(|(k, (dt, _))| (*k, dt.clone())).collect();
+    if cf_ids.iter().any(|id| !dts.contains_key(id)) {
+        for d in super::store::load_field_defs(state.db()).await? {
+            dts.entry(d.id).or_insert(d.data_type);
         }
     }
+    let writes = restore_writes(&target, &now, &dts);
+    let back = restore_writes(&now, &target, &dts);
+    ops.execute(&state, Some(&mut *tx), doc_id, &writes, Some(&back)).await.map_err(ApiError::internal)?;
     let run: uuid::Uuid = r.try_get("run_id").map_err(ApiError::internal)?;
-    let undo_id = insert_audit(&state, Some(user.id), run, "undo", doc_id, &after, &before, None, None).await;
-    let _ =
-        sqlx::query("UPDATE paperrust_ai_audit SET undone_by_id = $2 WHERE id = $1").bind(audit_id).bind(undo_id).execute(state.db()).await;
-    workflow::after_change(&state, doc_id).await;
-    let r = sqlx::query(
-        "UPDATE paperrust_ai_review SET status = 'undone', decided_by_id = $2, decided_at = now() WHERE id = $1 \
-         RETURNING id, document_id, created, run_id, trigger, mode, status, suggestions, plan, audit_id, decided_by_id, decided_at",
-    )
-    .bind(rid)
-    .bind(user.id as i32)
-    .fetch_one(state.db())
-    .await
-    .map_err(not_installed)?;
+    let finished: Result<Option<sqlx::postgres::PgRow>, String> = async {
+        for (aid, before, after) in audits.iter().rev() {
+            let undo_id = insert_audit(&mut tx, Some(user.id), run, "undo", doc_id, after, before, None, None).await?;
+            sqlx::query("UPDATE paperrust_ai_audit SET undone_by_id = $2 WHERE id = $1")
+                .bind(aid)
+                .bind(undo_id)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| e.to_string())?;
+        }
+        sqlx::query(&format!(
+            "UPDATE paperrust_ai_review SET status = 'undone', decided_by_id = $2, decided_at = now() WHERE id = $1 AND status <> 'undone' \
+             RETURNING {REVIEW_COLUMNS}"
+        ))
+        .bind(rid)
+        .bind(user.id as i32)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(|e| e.to_string())
+    }
+    .await;
+    let r = match finished {
+        Ok(Some(r)) => match tx.commit().await {
+            Ok(()) => r,
+            Err(e) => {
+                ops.compensate(&state, doc_id, &back).await;
+                return Err(ApiError::internal(e));
+            }
+        },
+        Ok(None) => {
+            drop(tx);
+            ops.compensate(&state, doc_id, &back).await;
+            return Err(ApiError::validation(json!({"status": ["Already undone."]})));
+        }
+        Err(e) => {
+            drop(tx);
+            ops.compensate(&state, doc_id, &back).await;
+            return Err(ApiError::internal(e));
+        }
+    };
+    ops.after_commit(&state, doc_id).await;
     Ok(Drf::ok(review_json(&r)).indent(ctx.negotiation.indent).into_response())
 }
 
@@ -1220,6 +1608,162 @@ mod tests {
         assert!(apply_override(&mut c, &json!({"existing_id": 4}), &defs).is_ok());
         assert_eq!((c.existing_id, c.new_name.clone()), (Some(4), None));
         assert_eq!(assigned_ids(&[c], &[0]), vec![(Cat::Correspondents, vec![4])], "geänderte Objekte werden auf Sichtbarkeit geprüft");
+    }
+
+    /// Finding 6: two partial acceptances are both undone (newest first); the target is the
+    /// state before the first one. Before the fix only the last audit entry was reverted.
+    #[test]
+    fn undo_reverts_every_partial_acceptance() {
+        let a1 = (json!({"title": "Scan 1", "tags": [1]}), json!({"title": "Invoice", "tags": [1, 5]}));
+        let a2 =
+            (json!({"correspondent": null, "custom_fields": {"9": null}}), json!({"correspondent": 7, "custom_fields": {"9": "EUR5.00"}}));
+        let now = json!({"title": "Invoice", "tags": [1, 5], "correspondent": 7, "custom_fields": {"9": "EUR5.00"}});
+        let target = plan_undo(&now, &[a1.clone(), a2.clone()]).unwrap();
+        assert_eq!(target, json!({"title": "Scan 1", "tags": [1], "correspondent": null, "custom_fields": {"9": null}}));
+        let dts = std::collections::BTreeMap::from([(9, "monetary".to_string())]);
+        let w = restore_writes(&target, &now, &dts);
+        assert_eq!(w.ch.title.as_deref(), Some("Scan 1"));
+        assert_eq!(w.ch.correspondent_id, Some(None));
+        assert_eq!(w.remove_tags, vec![5]);
+        assert!(w.add_tags.is_empty());
+        assert_eq!(w.cf_remove, vec![9]);
+        // the inverse brings everything back (compensation of a failed undo)
+        let back = restore_writes(&now, &target, &dts);
+        assert_eq!(back.ch.title.as_deref(), Some("Invoice"));
+        assert_eq!(back.add_tags, vec![5]);
+        assert_eq!(back.cf_set, vec![(9, "monetary".to_string(), json!("EUR5.00"))]);
+        // conflict in the older entry is detected too
+        let changed = json!({"title": "User title", "tags": [1, 5], "correspondent": 7, "custom_fields": {"9": "EUR5.00"}});
+        assert_eq!(plan_undo(&changed, &[a1, a2]).unwrap_err(), vec!["title".to_string()]);
+    }
+
+    /// Finding 7: only field names of an audit snapshot are logged, never values.
+    #[test]
+    fn audit_log_has_no_values() {
+        let after = json!({"title": "Secret salary letter", "tags": [3], "custom_fields": {"9": "EUR 120000.00"}});
+        let names = audit_field_names(&after);
+        assert_eq!(names, vec!["title", "tags", "custom_fields.9"]);
+        let joined = names.join(",");
+        assert!(!joined.contains("Secret") && !joined.contains("120000"), "{joined}");
+    }
+
+    /// Fake non-transactional writer (like the worker's writer before it supports transactions):
+    /// records calls, fails on the configured operation. Never touches the database.
+    #[derive(Default)]
+    struct FakeWriter {
+        calls: std::sync::Mutex<Vec<String>>,
+        fail_on: &'static str,
+    }
+
+    impl FakeWriter {
+        fn record(&self, op: String) -> Result<(), String> {
+            let fail = op.starts_with(self.fail_on) && !self.fail_on.is_empty();
+            if let Ok(mut c) = self.calls.lock() {
+                c.push(op);
+            }
+            if fail { Err("simulated failure".into()) } else { Ok(()) }
+        }
+        fn calls(&self) -> Vec<String> {
+            self.calls.lock().map(|c| c.clone()).unwrap_or_default()
+        }
+    }
+
+    impl DocWriter for FakeWriter {
+        fn save<'a>(&'a self, _s: &'a AppState, _d: i64, c: &'a DocChanges) -> futures::future::BoxFuture<'a, Result<(), String>> {
+            Box::pin(async move { self.record(format!("save:{}", c.title.clone().unwrap_or_default())) })
+        }
+        fn add_nested_tags<'a>(&'a self, _s: &'a AppState, _d: i64, t: &'a [i64]) -> futures::future::BoxFuture<'a, Result<(), String>> {
+            Box::pin(async move { self.record(format!("add:{t:?}")) })
+        }
+        fn remove_tags<'a>(&'a self, _s: &'a AppState, _d: i64, t: &'a [i64]) -> futures::future::BoxFuture<'a, Result<(), String>> {
+            Box::pin(async move { self.record(format!("remove:{t:?}")) })
+        }
+        fn get_or_create<'a>(
+            &'a self,
+            _s: &'a AppState,
+            _c: Cat,
+            _n: &'a str,
+            _o: Option<i64>,
+        ) -> futures::future::BoxFuture<'a, Result<(i64, bool), String>> {
+            Box::pin(async { Ok((1, false)) })
+        }
+        fn set_custom_field<'a>(
+            &'a self,
+            _s: &'a AppState,
+            _d: i64,
+            f: i64,
+            _dt: &'a str,
+            v: &'a Value,
+        ) -> futures::future::BoxFuture<'a, Result<(), String>> {
+            Box::pin(async move { self.record(format!("setcf:{f}={v}")) })
+        }
+        fn remove_custom_field<'a>(&'a self, _s: &'a AppState, _d: i64, f: i64) -> futures::future::BoxFuture<'a, Result<(), String>> {
+            Box::pin(async move { self.record(format!("rmcf:{f}")) })
+        }
+    }
+
+    /// State without database (lazy pool on port 1, never connected).
+    fn offline_state() -> AppState {
+        let env = pl_core::config::Env::from_pairs([
+            ("PAPERLESS_DBHOST", "127.0.0.1"),
+            ("PAPERLESS_DBPORT", "1"),
+            ("PAPERLESS_SECRET_KEY", "test-only-secret-key-for-pl-ai-review"),
+        ]);
+        AppState::new(pl_core::Config::from_env_map(env).unwrap()).unwrap()
+    }
+
+    /// Finding 8: if adding the replacement tag fails, the trigger tag is not removed and the
+    /// error is returned (before the fix the trigger tag was removed first and the error dropped).
+    #[tokio::test]
+    async fn trigger_tag_kept_when_replacement_fails() {
+        let state = offline_state();
+        let fake = std::sync::Arc::new(FakeWriter { fail_on: "add", ..Default::default() });
+        let ops = Ops { w: fake.clone(), atomic: false };
+        let res = replace_trigger_tag(&state, &ops, 42, 7, Some(8)).await;
+        assert!(res.is_err());
+        assert_eq!(fake.calls(), vec!["add:[8]".to_string()], "trigger tag 7 must stay");
+        let ok = std::sync::Arc::new(FakeWriter::default());
+        let ops = Ops { w: ok.clone(), atomic: false };
+        assert!(replace_trigger_tag(&state, &ops, 42, 7, Some(8)).await.is_ok());
+        assert_eq!(ok.calls(), vec!["add:[8]".to_string(), "remove:[7]".to_string()]);
+        let rm = std::sync::Arc::new(FakeWriter { fail_on: "remove", ..Default::default() });
+        let ops = Ops { w: rm.clone(), atomic: false };
+        assert!(replace_trigger_tag(&state, &ops, 42, 7, None).await.is_err(), "remove errors are returned too");
+    }
+
+    /// Finding 5 (non-transactional writer): a failure after the first write restores the earlier
+    /// values and returns the error – the title does not stay changed.
+    #[tokio::test]
+    async fn partial_write_is_compensated() {
+        let state = offline_state();
+        let fake = std::sync::Arc::new(FakeWriter { fail_on: "setcf:9", ..Default::default() });
+        let ops = Ops { w: fake.clone(), atomic: false };
+        let w = Writes {
+            ch: DocChanges { title: Some("AI title".into()), ..Default::default() },
+            add_tags: vec![5],
+            cf_set: vec![(9, "monetary".into(), json!("EUR5.00"))],
+            ..Default::default()
+        };
+        let revert = Writes {
+            ch: DocChanges { title: Some("Old title".into()), ..Default::default() },
+            remove_tags: vec![5],
+            cf_remove: vec![9],
+            ..Default::default()
+        };
+        let res = ops.execute(&state, None, 42, &w, Some(&revert)).await;
+        assert!(res.is_err());
+        assert_eq!(
+            fake.calls(),
+            vec!["save:AI title", "add:[5]", "setcf:9=\"EUR5.00\"", "save:Old title", "remove:[5]", "rmcf:9"]
+                .into_iter()
+                .map(String::from)
+                .collect::<Vec<_>>()
+        );
+        // a transactional writer is never driven without the caller's transaction
+        let ops = Ops { w: std::sync::Arc::new(workflow::SqlDocWriter), atomic: true };
+        assert!(ops.execute(&state, None, 42, &w, None).await.is_err());
+        assert!(workflow::SqlDocWriter.supports_transaction());
+        assert!(!FakeWriter::default().supports_transaction());
     }
 
     /// Security wave 3 AI-N3: `page_size` at most 100, no overflow with a huge `page`.

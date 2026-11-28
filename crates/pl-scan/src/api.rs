@@ -257,18 +257,38 @@ pub async fn jobs_create(State(state): State<AppState>, ctx: RequestContext, aut
     let client = Client::new(base).map_err(scan_error)?;
     let caps = client.capabilities().await.map_err(scan_error)?;
     let settings = ScanSettings::resolve(&caps, source, color, resolution).map_err(scan_error)?;
-    let spec = JobSpec { scanner_id, client, settings, user_id: u.id, title, scratch: state.config().scratch_dir.clone(), intake };
+    let spec = JobSpec {
+        scanner_id,
+        client,
+        settings,
+        user_id: u.id,
+        title,
+        scratch: state.config().scratch_dir.clone(),
+        intake,
+        limits: job::Limits::from_env(),
+    };
     let job = job::registry().start(spec).map_err(scan_error)?;
     tracing::info!(target: "paperrust.scan", user = u.id, scanner = scanner_id, source = source.as_str(), "scan started");
     Ok(Drf::created(json!(job.view())).indent(ctx.negotiation.indent).into_response())
 }
 
+/// Text of the 404 for an unknown job. Jobs live only in the memory of the server process that
+/// started them, so the most likely cause is a restart (contract "Known differences").
+pub const JOB_UNKNOWN_DETAIL: &str =
+    "Scan job unknown. Scan jobs are kept in memory only; the server may have been restarted since the scan started.";
+
+/// 404 for an unknown job and – with the same body, so that existence does not leak – for a job
+/// of another user.
+fn job_unknown() -> ApiError {
+    ApiError::json(StatusCode::NOT_FOUND, json!({"code": "job_unknown", "detail": JOB_UNKNOWN_DETAIL}))
+}
+
 fn own_job(auth: &AuthUser, id: &str) -> Result<std::sync::Arc<job::ScanJob>, ApiError> {
     let u = require_add(auth)?;
-    let id = uuid::Uuid::parse_str(id).map_err(|_| ApiError::not_found())?;
-    let j = job::registry().get(id).ok_or_else(ApiError::not_found)?;
+    let id = uuid::Uuid::parse_str(id).map_err(|_| job_unknown())?;
+    let j = job::registry().get(id).ok_or_else(job_unknown)?;
     if j.user_id != u.id && !u.is_superuser {
-        return Err(ApiError::not_found());
+        return Err(job_unknown());
     }
     Ok(j)
 }
@@ -348,4 +368,21 @@ pub async fn devices_delete(State(state): State<AppState>, auth: AuthUser, Path(
         return Err(ApiError::not_found());
     }
     Ok(StatusCode::NO_CONTENT.into_response())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use http_body_util::BodyExt as _;
+
+    /// Review item 4: unknown job (jobs live in memory only) → 404 with a clear message.
+    #[tokio::test]
+    async fn unknown_job_has_clear_404() {
+        let resp = job_unknown().into_response();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let v: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(v["code"], "job_unknown");
+        assert!(v["detail"].as_str().unwrap().contains("restarted"), "{v}");
+    }
 }

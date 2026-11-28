@@ -105,7 +105,8 @@ async fn handle(State(b): State<Shared>, req: Request) -> Response {
             let truncated = keys.len() > 3;
             let mut x = String::from("<?xml version=\"1.0\"?><ListBucketResult>");
             for k in &page {
-                x.push_str(&format!("<Contents><Key>{}</Key></Contents>", k.replace('&', "&amp;")));
+                let size = g.objects.get(k.as_str()).map(|o| o.data.len()).unwrap_or(0);
+                x.push_str(&format!("<Contents><Key>{}</Key><Size>{size}</Size></Contents>", k.replace('&', "&amp;")));
             }
             x.push_str(&format!("<IsTruncated>{truncated}</IsTruncated>"));
             if truncated && let Some(last) = page.last() {

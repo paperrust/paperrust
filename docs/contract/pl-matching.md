@@ -123,6 +123,11 @@ Neu erzeugen: `reference/venv/Scripts/python.exe -X utf8 tests/parity/pl-matchin
    Sekunde Zeitlimit, mindestens 1 Mio.). Wert ≤ 0 → nur das Budget. Muster ohne solche Konstrukte
    laufen im linearen regex-Crate ohne Zeitlimit und brechen nie ab (`(a+)+$` → kein Treffer, ohne
    „timed out“-Log). `safe_regex_sub`, `fnmatch` und die Datums-Muster nutzen weiter nur das Budget.
+   Höchstens 8 Hilfsthreads gleichzeitig (Review 2026-11-27): fancy-regex lässt sich nicht abbrechen,
+   ein aufgegebener Hilfsthread rechnet bis zum Budget weiter. Sind alle 8 belegt (typisch durch
+   solche Ausreißer), läuft die Suche im Thread des Aufrufers, begrenzt durch dasselbe Budget
+   (Gegendruck statt unbegrenzt vieler Threads). Verbleibende Grenze: ein einzelner Ausreißer
+   belegt seinen Thread bis zum Budget (≈ Zeitlimit bei ~50 Mio. Schritten/s, auf langsamer CPU länger).
    Bei `safe_regex_finditer` zählt upstream auch die Zeit, die dateparser pro Treffer braucht – bei
    langsamem Parsen (kalte Caches, viele Sprachen) werden **upstream** spätere Daten
    nichtdeterministisch abgeschnitten (im Paritätslauf 3 von 304 Fällen). Rust liefert immer alle;

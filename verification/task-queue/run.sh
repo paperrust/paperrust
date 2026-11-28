@@ -65,7 +65,10 @@ checks=(
   "QueueLifecycle Broken_hb_no_fence                 StatusConsistent"
   "QueueLifecycle Broken_reaper_no_fail              Liveness"
   "BeatReserve    Beat_code                          pass"
+  "BeatReserve    Beat_code_fallback                 pass"
+  "BeatReserve    Beat_fallback_crash_repeats        NoSlotTwice"
   "BeatReserve    Beat_broken_no_for_update          NoSlotTwice"
+  "BeatReserve    Beat_broken_record_before_enqueue  NoLostSlot"
 )
 deep=(
   "QueueLease     Deep_lease_code_hang             pass"

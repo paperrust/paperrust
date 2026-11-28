@@ -767,3 +767,141 @@ async fn ws_status_relay_online_with_device_token_offline_503() {
     stop_tx.send(true).unwrap();
     tokio::time::timeout(Duration::from_secs(5), relay).await.unwrap().unwrap();
 }
+
+/// Bytes of all files in the cache folder (`<root>/<shard>/<file>`) and whether `.part` files remain.
+fn disk_usage(root: &std::path::Path) -> (u64, Vec<String>) {
+    let mut total = 0;
+    let mut parts = Vec::new();
+    let Ok(shards) = std::fs::read_dir(root) else { return (0, parts) };
+    for sh in shards.flatten() {
+        let Ok(files) = std::fs::read_dir(sh.path()) else { continue };
+        for f in files.flatten() {
+            let meta = f.metadata().unwrap();
+            if meta.is_file() {
+                total += meta.len();
+                if f.file_name().to_string_lossy().ends_with(".part") {
+                    parts.push(f.file_name().to_string_lossy().into_owned());
+                }
+            }
+        }
+    }
+    (total, parts)
+}
+
+/// Regression (bug 1): on permission revocation the rows were deleted first and file delete errors
+/// ignored → a file locked on Windows stayed on disk, unencrypted, without any record, and the
+/// document counted as removed.
+#[tokio::test]
+async fn revoked_document_with_locked_file_stays_recorded_until_deleted() {
+    let e = env(true, 4).await;
+    login(&e.client).await;
+    e.client.set_orphan_sweep_interval(Duration::ZERO);
+    let key = uid(1, 2);
+    e.client.apply_selection(&[SelectionItem { kind: "document".into(), key: key.clone(), files: "original".into() }]).await.unwrap();
+    e.client.sync_once().await.unwrap();
+    let r = e.client.replica();
+    let target = e.client.files().path_for(&key, "original");
+    assert!(target.is_file());
+    // simulate a lock: a non-empty directory at the path (deleting fails on every OS)
+    std::fs::remove_file(&target).unwrap();
+    std::fs::create_dir_all(&target).unwrap();
+    std::fs::write(target.join("x"), b"secret").unwrap();
+    e.mock.set_visible("document", &key, false);
+    let rep = e.client.sync_once().await.unwrap();
+    assert_eq!(rep.documents_removed, 0, "not counted as removed while the file is on disk: {rep:?}");
+    assert_eq!(rep.documents_pending_delete, 1);
+    assert!(r.document_state(&key).await.unwrap().is_none(), "metadata of the revoked document is gone");
+    assert_eq!(r.pending_deletes().await.unwrap(), vec![target.to_string_lossy().into_owned()]);
+    assert!(!e.client.files().path_for(&key, "thumb").exists());
+    // lock released → the next housekeeping deletes it
+    std::fs::remove_dir_all(&target).unwrap();
+    std::fs::write(&target, b"secret").unwrap();
+    e.client.sync_once().await.unwrap();
+    assert!(!target.exists());
+    assert!(r.pending_deletes().await.unwrap().is_empty());
+    // orphan in the cache folder (no row, no record) is swept
+    let orphan = e.client.files().path_for(&uid(1, 77), "archive");
+    std::fs::create_dir_all(orphan.parent().unwrap()).unwrap();
+    std::fs::write(&orphan, b"left behind").unwrap();
+    e.client.sync_once().await.unwrap();
+    assert!(!orphan.exists());
+}
+
+/// Regression (bug 2): without `Content-Length` the space check reserved 0 bytes and the parallel
+/// downloads all passed it → the cache grew beyond its limit.
+#[tokio::test]
+async fn cache_limit_holds_without_content_length() {
+    let e = env(true, 8).await;
+    login(&e.client).await;
+    e.mock.with(|s| s.chunked = true);
+    // tag 1 = documents 2, 4, 6, 8: originals of ~2.1 KB each, limit 5,000 bytes → only two fit
+    e.client.apply_selection(&[tag_sel(1, "original")]).await.unwrap();
+    e.client.files().set_max_bytes(5_000);
+    let rep = e.client.sync_once().await.unwrap();
+    assert!(rep.file_errors > 0, "{rep:?}");
+    assert!(rep.files_downloaded >= 2, "{rep:?}");
+    let (used, parts) = disk_usage(e.client.files().root());
+    assert!(used <= 5_000, "cache over the limit: {used} bytes");
+    assert!(parts.is_empty(), "aborted downloads leave no partial file: {parts:?}");
+    assert!(e.client.replica().cache_bytes().await.unwrap() <= 5_000);
+    assert_eq!(e.client.files().reserved_bytes(), 0, "all reservations released");
+}
+
+/// Regression (bug 5): one saved view with a full-text rule (server 501) aborted the whole
+/// selection; now only that entry is skipped and reported.
+#[tokio::test]
+async fn unsupported_saved_view_is_skipped_not_fatal() {
+    let e = env(true, 6).await;
+    login(&e.client).await;
+    let (good, bad) = (uid(6, 1), uid(6, 2));
+    e.mock.with(|s| {
+        s.views.insert(good.clone(), vec![uid(1, 2)]);
+        s.unsupported_views.insert(bad.clone());
+    });
+    let sel = [
+        SelectionItem { kind: "saved_view".into(), key: good.clone(), files: "none".into() },
+        SelectionItem { kind: "saved_view".into(), key: bad.clone(), files: "none".into() },
+        tag_sel(2, "none"),
+    ];
+    let p = e.client.apply_selection(&sel).await.unwrap();
+    assert_eq!(p.skipped.len(), 1);
+    assert_eq!(p.skipped[0].item.key, bad);
+    assert!(p.skipped[0].reason.contains("full-text"));
+    let rep = e.client.sync_once().await.unwrap();
+    assert_eq!(rep.skipped_entries.len(), 1, "{rep:?}");
+    assert!(rep.skipped_entries[0].starts_with(&format!("saved_view {bad}")));
+    // tag 2 = documents 1, 3, 5; good view = document 2
+    assert_eq!(e.client.replica().count_documents(true).await.unwrap(), 4);
+}
+
+/// Regression (review A): another account logging in on the same profile/server saw the previous
+/// account's offline documents, files, selection and cached responses until a later sync.
+#[tokio::test]
+async fn account_switch_purges_previous_account_data() {
+    let e = env(true, 4).await;
+    login(&e.client).await;
+    e.client.apply_selection(&[tag_sel(1, "original")]).await.unwrap();
+    e.client.sync_once().await.unwrap();
+    let r = e.client.replica();
+    assert_eq!(r.count_documents(true).await.unwrap(), 2);
+    r.cache_put("/api/statistics/", 200, Some("application/json"), b"{\"documents_total\":2}").await.unwrap();
+    let file = e.client.files().path_for(&uid(1, 2), "original");
+    assert!(file.is_file());
+    e.client.logout(false).await.unwrap();
+    // same account again → data kept
+    login(&e.client).await;
+    assert_eq!(r.count_documents(true).await.unwrap(), 2);
+    e.client.logout(false).await.unwrap();
+    // other account → everything of alice gone before access is unlocked
+    e.client.login(USER2, Zeroizing::new(PASS2.to_string()), None).await.unwrap();
+    assert!(e.client.status().logged_in);
+    assert_eq!(r.count_documents(false).await.unwrap(), 0);
+    assert!(r.selection().await.unwrap().is_empty());
+    assert!(r.cache_get("/api/statistics/").await.unwrap().is_none());
+    assert!(!file.exists());
+    assert_eq!(r.remote().await.unwrap().unwrap().user_name.as_deref(), Some(USER2));
+    let gw = Gateway::new(e.client.clone());
+    let res = gw.handle(get("/rs/api/v2/documents", Some("source=local"))).await;
+    assert_eq!(res.status, 200);
+    assert_eq!(body(&res)["items"].as_array().map(Vec::len), Some(0), "{:?}", body(&res));
+}

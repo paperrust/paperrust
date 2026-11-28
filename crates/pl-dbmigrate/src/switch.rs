@@ -193,11 +193,11 @@ fn step(rep: &mut Report, quiet: bool, level: Level, name: &str, msg: impl Into<
     rep.step(level, name, msg);
 }
 
-/// Copy a folder recursively, existing target files are kept (no overwriting), symlinks
-/// are skipped. Returns: (copied, already present).
+/// Copy a folder recursively, existing target files of the same size are kept (no
+/// overwriting), symlinks are skipped. Returns: (copied or replaced, already present).
 #[cfg(test)]
 pub fn copy_tree(from: &Path, to: &Path) -> std::io::Result<(u64, u64)> {
-    crate::assist::copy_tree_progress(from, to, 0, true)
+    crate::assist::copy_tree_progress(from, to, 0, true).map(|s| (s.copied + s.replaced, s.kept))
 }
 
 fn same_dir(a: &Path, b: &Path) -> bool {
@@ -455,24 +455,49 @@ pub async fn run(o: &SwitchOptions) -> Report {
     rep.duration_s = t0.elapsed().as_secs_f64();
     rep.finish();
     if matches!(o.cmd, Cmd::Switch) && rep.verdict() != Level::Fail {
-        mark_search_index_for_rebuild();
+        let r = mark_search_index_for_rebuild(&search_index_dir());
+        apply_index_marker_result(&mut rep, o.quiet, r);
     }
     rep
+}
+
+/// Index folder on this machine: `PAPERLESS_INDEX_DIR`, else `<PAPERLESS_DATA_DIR>/index`, else
+/// the Docker default.
+fn search_index_dir() -> PathBuf {
+    let var = |k: &str| std::env::var(k).ok().filter(|v| !v.trim().is_empty());
+    var("PAPERLESS_INDEX_DIR")
+        .map(PathBuf::from)
+        .or_else(|| var("PAPERRUST_DATA_DIR").or_else(|| var("PAPERLESS_DATA_DIR")).map(|d| PathBuf::from(d).join("index")))
+        .unwrap_or_else(|| PathBuf::from("/usr/src/paperless/data/index"))
 }
 
 /// After a successful switch the search index must be rebuilt from the new database: leave the
 /// rebuild marker (`pl_search::schema::REBUILD_MARKER`, ".rebuilding") in the index folder, the next
 /// PaperRust start then rebuilds (`document_index reindex --if-needed`). Only if the folder exists
-/// on this machine (`PAPERLESS_INDEX_DIR`, else `<PAPERLESS_DATA_DIR>/index`, else the Docker default).
-fn mark_search_index_for_rebuild() {
-    let var = |k: &str| std::env::var(k).ok().filter(|v| !v.trim().is_empty());
-    let dir = var("PAPERLESS_INDEX_DIR")
-        .map(PathBuf::from)
-        .or_else(|| var("PAPERRUST_DATA_DIR").or_else(|| var("PAPERLESS_DATA_DIR")).map(|d| PathBuf::from(d).join("index")))
-        .unwrap_or_else(|| PathBuf::from("/usr/src/paperless/data/index"));
-    if dir.is_dir() {
-        // Best effort: without the marker the start-up check (empty/incomplete index) still applies.
-        let _ = std::fs::write(dir.join(".rebuilding"), b"");
+/// on this machine. Returns the marker path when written, `None` when there is no index folder.
+fn mark_search_index_for_rebuild(dir: &Path) -> std::io::Result<Option<PathBuf>> {
+    if !dir.is_dir() {
+        return Ok(None);
+    }
+    let marker = dir.join(".rebuilding");
+    std::fs::write(&marker, b"")?;
+    Ok(Some(marker))
+}
+
+/// A marker that cannot be written is reported (review finding 9): WARN step, verdict recomputed.
+fn apply_index_marker_result(rep: &mut Report, quiet: bool, r: std::io::Result<Option<PathBuf>>) {
+    if let Err(e) = r {
+        step(
+            rep,
+            quiet,
+            Level::Warn,
+            "Suchindex",
+            format!(
+                "Markierung zum Neuaufbau des Suchindex nicht geschrieben ({e}) – nach dem Start bitte \
+                 `paperrust manage document_index reindex` ausführen, sonst fehlen Suchergebnisse"
+            ),
+        );
+        rep.finish();
     }
 }
 
@@ -640,6 +665,20 @@ async fn run_inner(o: &SwitchOptions, rep: &mut Report) -> Result<()> {
             _ => None,
         };
         if let Some((from, to)) = copy {
+            if crate::assist::target_inside_source(&from, &to) {
+                step(
+                    rep,
+                    q,
+                    Level::Fail,
+                    "Platz",
+                    format!(
+                        "Ziel-Medienordner {} liegt innerhalb der Quelle {} – die Kopie würde sich selbst kopieren; bitte einen Ordner außerhalb wählen (--target-media)",
+                        to.display(),
+                        from.display()
+                    ),
+                );
+                return Ok(());
+            }
             let (need, files) = crate::assist::dir_size(&from);
             match crate::assist::free_space(&to) {
                 Some(free) if free < need + need / 20 + (64 << 20) => {
@@ -834,11 +873,15 @@ async fn run_inner(o: &SwitchOptions, rep: &mut Report) -> Result<()> {
                 (Some(from), Some(to)) if !same_dir(from, to) => {
                     let (from2, to2, quiet) = (from.clone(), to.clone(), q);
                     let total = crate::assist::dir_size(from).1;
-                    let (c, k) = tokio::task::spawn_blocking(move || crate::assist::copy_tree_progress(&from2, &to2, total, quiet))
+                    let s = tokio::task::spawn_blocking(move || crate::assist::copy_tree_progress(&from2, &to2, total, quiet))
                         .await
                         .map_err(|e| anyhow!("Kopieren: {e}"))?
                         .with_context(|| format!("{} → {} kopieren", from.display(), to.display()))?;
-                    step(rep, q, Level::Ok, "Dateien kopiert", format!("{c} kopiert, {k} schon vorhanden (nicht überschrieben)"));
+                    let mut msg = format!("{} kopiert, {} schon vorhanden (nicht überschrieben)", s.copied, s.kept);
+                    if s.replaced > 0 {
+                        msg.push_str(&format!(", {} unvollständige aus einem früheren Lauf ersetzt", s.replaced));
+                    }
+                    step(rep, q, Level::Ok, "Dateien kopiert", msg);
                 }
                 (Some(_), Some(_)) => step(rep, q, Level::Info, "Dateien", "Ziel nutzt denselben Medienordner – nichts zu kopieren"),
                 _ => step(
@@ -1113,6 +1156,28 @@ mod tests {
         assert_eq!(copy_tree(&src, &dst).unwrap(), (1, 1));
         assert_eq!(std::fs::read_to_string(dst.join("documents/originals/a")).unwrap(), "alt");
         assert!(same_dir(&src, &src.join(".")));
+    }
+
+    /// Review finding 9: a rebuild marker that cannot be written is not lost – WARN in the report.
+    #[test]
+    fn index_marker_failure_is_reported() {
+        let d = tempfile::tempdir().unwrap();
+        let idx = d.path().join("index");
+        // `.rebuilding` occupied by a non-empty folder: writing the marker fails
+        std::fs::create_dir_all(idx.join(".rebuilding").join("x")).unwrap();
+        let r = mark_search_index_for_rebuild(&idx);
+        assert!(r.is_err());
+        let mut rep = Report::default();
+        rep.step(Level::Ok, "Umstieg", "ok");
+        assert_eq!(rep.finish(), Level::Ok);
+        apply_index_marker_result(&mut rep, true, r);
+        assert_eq!(rep.verdict(), Level::Warn);
+        assert!(rep.steps.iter().any(|s| s.name == "Suchindex" && s.message.contains("reindex")));
+        // normal case and no index folder
+        let ok = d.path().join("index2");
+        std::fs::create_dir_all(&ok).unwrap();
+        assert_eq!(mark_search_index_for_rebuild(&ok).unwrap(), Some(ok.join(".rebuilding")));
+        assert_eq!(mark_search_index_for_rebuild(&d.path().join("none")).unwrap(), None);
     }
 
     /// End-to-end without a database: export folder in dry run, one original damaged.

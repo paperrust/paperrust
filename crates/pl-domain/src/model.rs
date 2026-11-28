@@ -520,6 +520,17 @@ pub struct ResolvedSize {
     pub archive: Option<u64>,
 }
 
+/// Result of `POST /sync/resolve` as a whole.
+#[derive(Debug, Clone, PartialEq, Default, Serialize)]
+pub struct Resolution {
+    /// Visible documents of the selection, sorted by local id.
+    pub documents: Vec<ResolvedDoc>,
+    /// Saved views of the selection (as requested, by UUID, in request order) that were skipped
+    /// because their rules cannot be evaluated here (full-text rules, unknown rule types).
+    /// Invisible or unknown views are not listed: they contribute nothing, like v1.
+    pub skipped_saved_views: Vec<Uuid>,
+}
+
 /// Selection for `POST /sync/resolve` (docs/SYNC.md §3.5).
 #[derive(Debug, Clone, PartialEq, Default, Deserialize)]
 #[serde(deny_unknown_fields)]

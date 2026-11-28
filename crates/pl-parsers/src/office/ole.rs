@@ -95,20 +95,25 @@ pub fn format_number(v: f64) -> String {
 pub fn extract(data: &[u8], mime_type: &str, limits: &Limits, deadline: Deadline) -> Result<OfficeContent> {
     let mut cf = open(data)?;
     let mut out = TextSink::new(limits.max_text_chars);
-    match mime_type {
-        MIME_DOC => doc_text(&mut cf, limits, &mut out)?,
-        MIME_XLS => xls_text(&mut cf, limits, deadline, &mut out)?,
-        _ => {
-            for s in ppt_slides_cf(&mut cf, limits, deadline)? {
-                for l in s.title.iter().chain(&s.lines).chain(&s.notes) {
-                    push_line(&mut out, l)?;
-                }
-                out.push('\n')?;
-            }
-        }
-    }
+    let r = match mime_type {
+        MIME_DOC => doc_text(&mut cf, limits, &mut out),
+        MIME_XLS => xls_text(&mut cf, limits, deadline, &mut out),
+        _ => ppt_text(&mut cf, limits, deadline, &mut out),
+    };
+    let truncated = out.truncation(r)?;
     let (metadata, created) = summary_metadata(&mut cf, mime_type, limits);
-    Ok(OfficeContent { text: out.buf, metadata, created })
+    Ok(OfficeContent { text: out.buf, metadata, created, truncated })
+}
+
+/// Text of all PowerPoint slides (title, lines, notes; blank line after each slide).
+fn ppt_text(cf: &mut Cfb<'_>, limits: &Limits, deadline: Deadline, out: &mut TextSink) -> Result<()> {
+    for s in ppt_slides_cf(cf, limits, deadline)? {
+        for l in s.title.iter().chain(&s.lines).chain(&s.notes) {
+            push_line(out, l)?;
+        }
+        out.push('\n')?;
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------------------------

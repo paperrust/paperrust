@@ -1,0 +1,22 @@
+[package]
+name = "pl-ppocr"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "PP-OCR (PaddleOCR) text detection/recognition and page orientation on ONNX models, without Python"
+
+[features]
+default = ["ort"]
+# ONNX Runtime loaded at run time (libonnxruntime / onnxruntime.dll), no build-time download.
+ort = ["dep:ort"]
+
+[dependencies]
+thiserror.workspace = true
+tracing.workspace = true
+sha2.workspace = true
+ort = { workspace = true, optional = true }
+
+[dev-dependencies]
+image.workspace = true
+tracing-subscriber.workspace = true

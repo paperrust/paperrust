@@ -54,6 +54,9 @@ checks=(
   "FolderTree  Broken_repeatable_read        Acyclic"
   "FolderTree  Broken_delete_no_for_update   DeleteHonorsContents"
   "FolderTree  Broken_delete_no_locks        NoRawError"
+  "FolderTree  Authz_code                    pass"
+  "FolderTree  Broken_move_no_locks          NoStaleAuthz"
+  "FolderTree  Broken_delete_check_no_locks  NoStaleAuthz"
   "FolderNames Names_code                    pass"
   "FolderNames Names_broken_no_index         UniqueSiblingNames"
 )
@@ -71,6 +74,7 @@ fi
 if [[ "${1:-}" == "--deep" ]]; then
   checks+=("FolderTree  Deep_tree_code                pass")
   checks+=("FolderTree  Deep_docs_code                pass")
+  checks+=("FolderTree  Deep_authz_code               pass")
 fi
 
 fail=0

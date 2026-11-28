@@ -81,12 +81,85 @@ pub fn human(bytes: u64) -> String {
     }
 }
 
-/// Copy a folder recursively with progress display (every 2 s on stderr), existing files
-/// are kept (no overwriting), symlinks are skipped. Returns: (copied, existing).
-pub fn copy_tree_progress(from: &Path, to: &Path, total_files: u64, quiet: bool) -> std::io::Result<(u64, u64)> {
+/// Absolute, normalized form of `p` that also works for paths that do not exist yet: the
+/// nearest existing ancestor is canonicalized, the rest is appended with `.`/`..` resolved.
+fn resolve_path(p: &Path) -> PathBuf {
+    use std::path::Component;
+    let abs = std::path::absolute(p).unwrap_or_else(|_| p.to_path_buf());
+    // lexical normalization first (`.`/`..`), then canonicalize the nearest existing ancestor
+    let mut norm = PathBuf::new();
+    for c in abs.components() {
+        match c {
+            Component::ParentDir => {
+                norm.pop();
+            }
+            Component::CurDir => {}
+            other => norm.push(other.as_os_str()),
+        }
+    }
+    let mut base = norm.as_path();
+    let mut rest: Vec<&std::ffi::OsStr> = Vec::new();
+    loop {
+        if let Ok(mut c) = std::fs::canonicalize(base) {
+            for name in rest.iter().rev() {
+                c.push(name);
+            }
+            return c;
+        }
+        match (base.parent(), base.file_name()) {
+            (Some(parent), Some(name)) => {
+                rest.push(name);
+                base = parent;
+            }
+            _ => return norm,
+        }
+    }
+}
+
+/// `to` is `from` itself or lies below it (review finding 3: the copy would descend into its own
+/// target). Compared after resolving symlinks and `..`; `to` may not exist yet.
+pub fn target_inside_source(from: &Path, to: &Path) -> bool {
+    resolve_path(to).starts_with(resolve_path(from))
+}
+
+/// Result of [`copy_tree_progress`].
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct CopyStats {
+    /// newly copied
+    pub copied: u64,
+    /// already present with the same size, left untouched
+    pub kept: u64,
+    /// present with a different size (remainder of an interrupted copy), replaced
+    pub replaced: u64,
+}
+
+/// Copy one file via a temporary file in the target folder and rename it afterwards, so an
+/// interruption never leaves a partial file under the final name (review finding 4).
+fn copy_file_atomic(src: &Path, dst: &Path) -> std::io::Result<()> {
+    let name = dst.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let tmp = dst.with_file_name(format!(".{name}.paperrust-part"));
+    if let Err(e) = std::fs::copy(src, &tmp) {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(e);
+    }
+    // flush to disk before the rename makes the file visible under its final name
+    if let Err(e) = std::fs::OpenOptions::new().write(true).open(&tmp).and_then(|f| f.sync_all()) {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(e);
+    }
+    std::fs::rename(&tmp, dst).inspect_err(|_| {
+        let _ = std::fs::remove_file(&tmp);
+    })
+}
+
+/// Copy a folder recursively with progress display (every 2 s on stderr), symlinks are
+/// skipped. An existing target file with the same size is kept (no overwriting); one with a
+/// different size is the remainder of an interrupted run and gets replaced. Every file is
+/// written to a temporary name first and renamed afterwards. A target inside the source is
+/// refused before anything is created.
+pub fn copy_tree_progress(from: &Path, to: &Path, total_files: u64, quiet: bool) -> std::io::Result<CopyStats> {
     struct St {
-        copied: u64,
-        kept: u64,
+        stats: CopyStats,
         total: u64,
         last: Instant,
         quiet: bool,
@@ -100,15 +173,26 @@ pub fn copy_tree_progress(from: &Path, to: &Path, total_files: u64, quiet: bool)
             if ty.is_dir() {
                 walk(&e.path(), &dst, st)?;
             } else if ty.is_file() {
-                if dst.exists() {
-                    st.kept += 1;
-                } else {
-                    std::fs::copy(e.path(), &dst)?;
-                    st.copied += 1;
+                match std::fs::symlink_metadata(&dst) {
+                    Ok(m) if m.is_file() && m.len() == e.metadata()?.len() => st.stats.kept += 1,
+                    Ok(m) if m.is_file() => {
+                        copy_file_atomic(&e.path(), &dst)?;
+                        st.stats.replaced += 1;
+                    }
+                    Ok(_) => {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::AlreadyExists,
+                            format!("{} ist im Ziel keine Datei", dst.display()),
+                        ));
+                    }
+                    Err(_) => {
+                        copy_file_atomic(&e.path(), &dst)?;
+                        st.stats.copied += 1;
+                    }
                 }
                 if !st.quiet && st.last.elapsed() >= Duration::from_secs(2) {
                     st.last = Instant::now();
-                    let done = st.copied + st.kept;
+                    let done = st.stats.copied + st.stats.kept + st.stats.replaced;
                     let pct = if st.total > 0 { (done as f64 / st.total as f64 * 100.0).min(100.0) } else { 0.0 };
                     eprintln!("[....] Dateien kopieren: {done} von {} ({pct:.0} %)", st.total);
                 }
@@ -116,9 +200,19 @@ pub fn copy_tree_progress(from: &Path, to: &Path, total_files: u64, quiet: bool)
         }
         Ok(())
     }
-    let mut st = St { copied: 0, kept: 0, total: total_files, last: Instant::now(), quiet };
+    if target_inside_source(from, to) {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!(
+                "Ziel-Medienordner {} liegt im Quell-Medienordner {} – bitte einen Ordner außerhalb wählen",
+                to.display(),
+                from.display()
+            ),
+        ));
+    }
+    let mut st = St { stats: CopyStats::default(), total: total_files, last: Instant::now(), quiet };
     walk(from, to, &mut st)?;
-    Ok((st.copied, st.kept))
+    Ok(st.stats)
 }
 
 /// Find `pg_dump`: `PAPERRUST_PG_BIN`, `PAPERRUST_DESKTOP_PG_BIN`, next to this program,
@@ -221,9 +315,50 @@ mod tests {
         let dst = d.path().join("b");
         std::fs::create_dir_all(&dst).unwrap();
         std::fs::write(dst.join("x.pdf"), b"alt").unwrap();
-        assert_eq!(copy_tree_progress(&src, &dst, 2, true).unwrap(), (1, 1));
-        assert_eq!(std::fs::read(dst.join("x.pdf")).unwrap(), b"alt", "nie überschreiben");
+        // same size as the source file: kept, never overwritten
+        std::fs::write(dst.join("x.pdf"), b"alt45").unwrap();
+        assert_eq!(copy_tree_progress(&src, &dst, 2, true).unwrap(), CopyStats { copied: 1, kept: 1, replaced: 0 });
+        assert_eq!(std::fs::read(dst.join("x.pdf")).unwrap(), b"alt45", "nie überschreiben");
         assert_eq!(human(2_500_000_000), "2.5 GB");
+    }
+
+    /// Review finding 3: a target folder below the source must be refused, not copied into
+    /// itself.
+    #[test]
+    fn copy_refuses_target_inside_source() {
+        let d = tempfile::tempdir().unwrap();
+        let src = d.path().join("media");
+        std::fs::create_dir_all(src.join("documents")).unwrap();
+        std::fs::write(src.join("documents").join("x.pdf"), b"12345").unwrap();
+        let dst = src.join("paperrust");
+        assert!(copy_tree_progress(&src, &dst, 1, true).is_err());
+        assert!(!dst.join("paperrust").exists(), "copied into itself");
+        // also via a not yet existing deeper path and with `..` in it
+        let dst2 = src.join("a").join("..").join("b").join("c");
+        assert!(copy_tree_progress(&src, &dst2, 1, true).is_err());
+        assert!(!src.join("b").exists());
+        assert!(target_inside_source(&src, &src));
+        assert!(!target_inside_source(&src, &d.path().join("media2")), "only a name prefix, not inside");
+        assert!(!target_inside_source(&src.join("documents"), &src), "source inside target is allowed");
+    }
+
+    /// Review finding 4: a partial file from an interrupted copy is repaired on the next run.
+    #[test]
+    fn copy_repairs_partial_file_on_retry() {
+        let d = tempfile::tempdir().unwrap();
+        let src = d.path().join("a");
+        std::fs::create_dir_all(src.join("sub")).unwrap();
+        std::fs::write(src.join("sub").join("y.pdf"), b"0123456789").unwrap();
+        let dst = d.path().join("b");
+        std::fs::create_dir_all(dst.join("sub")).unwrap();
+        // what an interrupted run left behind: the first bytes only
+        std::fs::write(dst.join("sub").join("y.pdf"), b"0123").unwrap();
+        assert_eq!(copy_tree_progress(&src, &dst, 1, true).unwrap(), CopyStats { copied: 0, kept: 0, replaced: 1 });
+        assert_eq!(std::fs::read(dst.join("sub").join("y.pdf")).unwrap(), b"0123456789");
+        // second retry: now complete, kept
+        assert_eq!(copy_tree_progress(&src, &dst, 1, true).unwrap(), CopyStats { copied: 0, kept: 1, replaced: 0 });
+        let names: Vec<_> = std::fs::read_dir(dst.join("sub")).unwrap().flatten().map(|e| e.file_name()).collect();
+        assert_eq!(names, vec![std::ffi::OsString::from("y.pdf")], "no temp files left");
     }
 
     #[test]

@@ -30,6 +30,8 @@ pub struct Fake {
     pub adf_empty: bool,
     /// foreign host in Location
     pub evil_location: bool,
+    /// wait this long before the final `404` (no more pages) – window for a late cancel
+    pub done_delay_ms: u64,
     // State
     pub duplex: AtomicBool,
     pub feeder: AtomicBool,
@@ -111,6 +113,9 @@ async fn next(State(f): S, Path(_job): Path<String>) -> Response {
         f.sheets
     };
     if delivered >= total {
+        if f.done_delay_ms > 0 {
+            tokio::time::sleep(std::time::Duration::from_millis(f.done_delay_ms)).await;
+        }
         return StatusCode::NOT_FOUND.into_response();
     }
     f.delivered.fetch_add(1, Ordering::SeqCst);

@@ -82,7 +82,7 @@ impl DocumentParsing for FakeArchiveParsing {
         }
         let a = req.tempdir.join("archive.pdf");
         std::fs::copy(req.path, &a).map_err(|e| StageError::Other(e.to_string()))?;
-        Ok(ParsedOutput { text: Some(self.text.clone()), date: None, archive_path: Some(a) })
+        Ok(ParsedOutput { text: Some(self.text.clone()), date: None, archive_path: Some(a), truncation: None })
     }
     fn thumbnail(&self, parser: &ParserInfo, req: &ParseRequest<'_>, archive: Option<&Path>) -> Result<PathBuf, StageError> {
         if parser.class_name != FAKE {

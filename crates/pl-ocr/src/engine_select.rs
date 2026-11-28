@@ -10,6 +10,7 @@
 //! | `tesseract` (default) | Tesseract (library or program, see [`crate::engine::TesseractCli`]). |
 //! | `windows` | `Windows.Media.Ocr` ([`crate::winocr`]). If Windows OCR is missing entirely (other system, Windows N without media features …), warning and Tesseract. Missing language packs report themselves per document with a clear error message. |
 //! | `macos` | Reserved for Apple Vision ([`crate::macocr`], not implemented yet) → warning and Tesseract. |
+//! | `ppocr` | PP-OCRv6 on ONNX Runtime ([`crate::ppocr`], opt-in). Runtime or model files missing → warning once and Tesseract. Non-Latin languages in `PAPERLESS_OCR_LANGUAGE` are read by Tesseract. |
 //! | `auto` | Windows OCR if present **and** all languages from `PAPERLESS_OCR_LANGUAGE` are covered; otherwise Tesseract; without Tesseract, Windows OCR (if present). |
 
 use crate::engine::{OcrEngine, TesseractCli};
@@ -23,6 +24,8 @@ pub enum EngineChoice {
     Windows,
     Macos,
     Auto,
+    /// PP-OCRv6 ([`crate::ppocr`]); not part of `auto` until stage 3 of docs/OCR-NEXT.md.
+    Ppocr,
 }
 
 impl EngineChoice {
@@ -32,9 +35,10 @@ impl EngineChoice {
             "windows" | "windows-ocr" | "winrt" => Ok(Self::Windows),
             "macos" | "vision" => Ok(Self::Macos),
             "auto" => Ok(Self::Auto),
-            other => {
-                Err(OcrError::Config(format!("PAPERRUST_OCR_ENGINE: invalid value {other:?} (allowed: tesseract, windows, macos, auto)")))
-            }
+            "ppocr" | "pp-ocr" | "paddle" | "paddleocr" => Ok(Self::Ppocr),
+            other => Err(OcrError::Config(format!(
+                "PAPERRUST_OCR_ENGINE: invalid value {other:?} (allowed: tesseract, windows, macos, auto, ppocr)"
+            ))),
         }
     }
 
@@ -53,6 +57,7 @@ impl EngineChoice {
             Self::Windows => "windows",
             Self::Macos => "macos",
             Self::Auto => "auto",
+            Self::Ppocr => "ppocr",
         }
     }
 }
@@ -72,7 +77,8 @@ pub enum Selected {
 pub fn decide(choice: EngineChoice, tesseract_available: bool, windows_langs_ok: Option<bool>) -> Selected {
     let tess = if tesseract_available { Selected::Tesseract } else { Selected::None };
     match (choice, windows_langs_ok) {
-        (EngineChoice::Tesseract | EngineChoice::Macos, _) => tess,
+        // ppocr is chosen in `select_engine` before this (it only falls back to Tesseract here)
+        (EngineChoice::Tesseract | EngineChoice::Macos | EngineChoice::Ppocr, _) => tess,
         (EngineChoice::Windows, Some(_)) => Selected::Windows,
         (EngineChoice::Windows, None) => tess,
         (EngineChoice::Auto, Some(true)) => Selected::Windows,
@@ -99,6 +105,25 @@ pub fn select_engine(choice: EngineChoice, tesseract: Option<TesseractCli>, lang
     if choice == EngineChoice::Macos {
         once_warn("macos", &crate::macocr::unavailable_reason());
         return tesseract.map(|t| Box::new(t) as Box<dyn OcrEngine>);
+    }
+    if choice == EngineChoice::Ppocr {
+        return match crate::ppocr::PpOcrEngine::new(tesseract.clone()) {
+            Ok(e) => {
+                if !crate::ppocr::latin_only(languages) {
+                    once_warn(
+                        "ppocr-languages",
+                        &format!(
+                            "PAPERRUST_OCR_ENGINE=ppocr: OCR language '{languages}' is not (only) Latin script; these pages are read by tesseract"
+                        ),
+                    );
+                }
+                Some(Box::new(e))
+            }
+            Err(e) => {
+                once_warn("ppocr-missing", &format!("PAPERRUST_OCR_ENGINE=ppocr, but PP-OCR is not available ({e}); using tesseract"));
+                tesseract.map(|t| Box::new(t) as Box<dyn OcrEngine>)
+            }
+        };
     }
     let win = windows_engine(tesseract.clone());
     let langs_ok = win.as_ref().map(|w| w.check_languages(languages).is_ok());
@@ -191,6 +216,11 @@ const LANGS: &[(&str, &str, &str, Script)] = &[
     ("jpn", "ja-JP", "ja", Script::Japanese),
     ("kor", "ko-KR", "ko", Script::Korean),
 ];
+
+/// Tesseract codes of the Latin-script languages in the table (read by PP-OCRv6 as well).
+pub fn latin_codes() -> impl Iterator<Item = &'static str> {
+    LANGS.iter().filter(|l| l.3 == Script::Latin).map(|l| l.0)
+}
 
 /// Preferred BCP-47 tag for a Tesseract code (`deu` → `de-DE`).
 pub fn bcp47_for(tess: &str) -> Option<&'static str> {
@@ -325,6 +355,8 @@ mod tests {
         assert_eq!(EngineChoice::parse("AUTO").unwrap(), EngineChoice::Auto);
         assert_eq!(EngineChoice::parse("vision").unwrap(), EngineChoice::Macos);
         assert!(matches!(EngineChoice::parse("easyocr"), Err(OcrError::Config(_))));
+        assert_eq!(EngineChoice::parse("PPOCR").unwrap(), EngineChoice::Ppocr);
+        assert_eq!(EngineChoice::Ppocr.as_str(), "ppocr");
         assert_eq!(EngineChoice::default(), EngineChoice::Tesseract);
     }
 
@@ -337,6 +369,7 @@ mod tests {
             assert_eq!(decide(Tesseract, true, w), S::Tesseract);
             assert_eq!(decide(Tesseract, false, w), S::None);
             assert_eq!(decide(Macos, true, w), S::Tesseract);
+            assert_eq!(decide(Ppocr, true, w), S::Tesseract);
         }
         assert_eq!(decide(Windows, true, Some(true)), S::Windows);
         assert_eq!(decide(Windows, true, Some(false)), S::Windows); // language errors visible per document

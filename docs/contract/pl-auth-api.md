@@ -194,10 +194,16 @@ Quelle: `TOTPView.get`, allauth `get_totp_secret(regenerate=True)`, `build_totp_
   (auch bei Token-/Basic-Auth: dann neue Sitzung mit nur diesem Schlüssel). Rust: `src/session.rs`
   `set_session_value` – vorhandene, gültige Sitzung aus dem Cookie laden (sonst neuer 32-Zeichen-
   Schlüssel `[a-z0-9]`), Wert setzen, `signing.dumps(compress=True)` wie `SessionBase.encode` in
-  `django_session` schreiben (Ablauf `get_expiry_age`), danach den `cached_db`-Eintrag im
+  `django_session` schreiben (Ablauf `get_expiry_age`: fehlendes oder falsches `_session_expiry`
+  – `None`, `0` = Browser-Ende – ergibt `SESSION_COOKIE_AGE`, nur das Cookie wird dann ein
+  Sitzungs-Cookie), danach den `cached_db`-Eintrag im
   Django-Cache löschen (Django lädt beim nächsten Zugriff die DB-Fassung); Cookie wie
   `SessionMiddleware.process_response` (`expires`, `HttpOnly`, `Max-Age`, `Path=/`, `SameSite=Lax`;
-  bei Browser-Ende-Sitzungen ohne Ablauf).
+  bei Browser-Ende-Sitzungen ohne Ablauf). Eine vorhandene Sitzung wird wie
+  `save(must_create=False)` **nur per `UPDATE`** gespeichert (`session::save_row`,
+  `UPDATE_SESSION_SQL`); ist die Zeile inzwischen gelöscht (Logout in einem parallelen Request),
+  wird sie nicht neu angelegt: `UpdateError` → `SessionInterrupted` → Djangos 400-Seite
+  (`ApiError::django_bad_request`). Ein neuer Schlüssel entsteht nur ohne gültige Sitzung (`create`).
 - `url` = `otpauth://totp/{quote(label)}?secret=<secret>&issuer=Paperless-ngx`
   (`label` = E-Mail, sonst Username, sonst `str(user)`; `quote` safe=`/`; Query via
   `urlencode(quote_via=quote)` safe=``; `digits`/`period` nur wenn ≠ 6/30 → nie).
@@ -220,6 +226,8 @@ Quelle: `TOTPView.post`.
   `recovery_codes` = unbenutzte Codes: HMAC-SHA1 (Key = Seed ASCII), kumulativ
   `update(f"{i:3},")` für i=0..9, erste 4 Bytes big-endian `% 10**8`, 8-stellig mit Nullen.
   Existierten Recovery-Codes schon → `recovery_codes: null`.
+  Rust: TOTP-Eintrag und Recovery-Codes in **einer** Transaktion (`db::activate_totp`, Known
+  differences 24).
 - Antwort 200: `{"success": <bool>, "recovery_codes": [..]|null}`.
 
 ### `profile.totp.delete` – DELETE `/api/profile/totp/`
@@ -442,13 +450,27 @@ Crates, z. B. allauth-Seiten in pl-accounts), antwortet 404. Stand der Liste unt
 21. **Geräte-Token nach Passwortwechsel widerrufen** (PaperRust-Erweiterung, Sicherheitsprüfung
     2026-11-19 F13): `PATCH /api/profile/` mit neuem Passwort und `PUT`/`PATCH /api/users/{id}/` mit
     neuem Passwort widerrufen danach alle Geräte-Token (`prt_…`, `paperrust_device_token`) des
-    betroffenen Nutzers (`pl_authz::device::revoke_all_for_user`, bei `users` nach dem Commit). Der
+    betroffenen Nutzers – seit 2026-11-27 in **derselben Transaktion** wie das Passwort-`UPDATE`
+    (`db::update_user_and_revoke` bzw. `pl_authz::device::revoke_all_for_user_tx` im `users`-Update vor dem Commit;
+    fehlt die Tabelle, fängt ein Savepoint den Fehler ab). Vorher wurde erst das Passwort gespeichert
+    und dann in einem zweiten Zugriff widerrufen; scheiterte der zweite, blieben die Geräte-Token
+    trotz neuem Passwort gültig (externe Prüfung 2026-11-27). Der
     DRF-Token (`authtoken_token`) bleibt wie upstream bestehen; ein Wert wie `**********` (kein
     echtes Passwort) widerruft nichts.
 22. **`OPTIONS /api/token/` – Labels** (2026-11-20): die `label`-Texte der Metadaten (`Username`,
     `Password`, `Token`, `MFA Code`) sind immer Englisch; upstream übersetzt DRFs `gettext_lazy`-Labels
     mit der aktiven Sprache.
 23. **Passwort-Maske konstant** (2026-11-21, upstream 64bf7f845 / #14784, nach v3.4.2): `password`-Felder werden immer als `"**********"` (10 Sterne) ausgegeben; v3.4.2 sendete `"*" * max(10, len(passwort))` und verriet damit die Länge. „Nur Sterne oder leer“ = unverändert, wie bisher. Betrifft `password` in `/api/profile/`.
+24. **TOTP-Einrichtung atomar** (externe Prüfung 2026-11-27): `TOTPView.post` legt upstream den
+    TOTP-Authenticator und danach (`auto_generate_recovery_codes`) die Recovery-Codes ohne Transaktion
+    an (paperless setzt kein `ATOMIC_REQUESTS`). Scheitert der zweite Schritt, wäre TOTP aktiv ohne
+    Codes und ein neuer Versuch liefe in den Unique-Fehler (500). Rust (`db::activate_totp`) macht beides
+    in einer Transaktion: alles oder nichts. Bei Erfolg identische Antwort und Daten. Test:
+    `tests/tx_regressions.rs::totp_activation_with_recovery_codes_is_atomic` (`#[ignore]`, DB).
+25. **Sitzung gelöscht während des Requests** (externe Prüfung 2026-11-27): wie Django
+    (`SessionInterrupted`, 400); vorher speicherte Rust per `INSERT … ON CONFLICT` und legte einen
+    per Logout gelöschten Sitzungsschlüssel mit den alten Anmeldedaten wieder an. Keine Abweichung
+    mehr, nur Hinweis. Test: `tests/tx_regressions.rs::saving_a_deleted_session_does_not_resurrect_it`.
 
 ## Umsetzungsstand (Rust, `crates/pl-auth-api`)
 

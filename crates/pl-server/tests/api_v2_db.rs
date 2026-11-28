@@ -748,6 +748,43 @@ async fn api_v2_against_db_copy() {
         let res = r.json();
         let v1 = get(&app, &format!("/api/documents/?tags__id__in={}&page_size=100000", tag["legacy_id"]), ALICE).await.json();
         assert_eq!(res["documents"].as_array().unwrap().len(), v1["results"].as_array().unwrap().len(), "hidden doc not added");
+        // field order: documents, as_of_seq, skipped_saved_views (appended last)
+        let keys: Vec<&str> = res.as_object().unwrap().keys().map(String::as_str).collect();
+        assert_eq!(keys, ["documents", "as_of_seq", "skipped_saved_views"], "{res}");
+        assert_eq!(res["skipped_saved_views"], json!([]));
+    });
+
+    check!("sync: resolve reports skipped saved views", {
+        // one view with a full-text rule (20 = query, cannot be evaluated) and one normal view
+        let mut view_uuid = BTreeMap::new();
+        for (name, rules) in [
+            ("p3 resolve full-text", json!([{"rule_type": 20, "value": "invoice"}])),
+            ("p3 resolve normal", json!([{"rule_type": 17, "value": "0"}])),
+        ] {
+            let body = json!({"name": name, "show_on_dashboard": false, "show_in_sidebar": false,
+                "sort_field": "created", "sort_reverse": true, "filter_rules": rules});
+            let r = call(&app, Method::POST, "/api/saved_views/", Some(ADMIN), Some(body), &[]).await;
+            assert_eq!(r.status, StatusCode::CREATED, "{}", String::from_utf8_lossy(&r.body));
+            let id = r.json()["id"].as_i64().unwrap();
+            let all = v2_all(&app, "/rs/api/v2/saved_views", ADMIN, 1000).await;
+            let v = all.iter().find(|v| v["legacy_id"].as_i64() == Some(id)).expect("view in v2 list");
+            view_uuid.insert(name, v["uuid"].as_str().unwrap().to_string());
+        }
+        let fulltext = view_uuid["p3 resolve full-text"].clone();
+        let normal = view_uuid["p3 resolve normal"].clone();
+        let resolve = |sel: Value| call(&app, Method::POST, "/rs/api/v2/sync/resolve", Some(ADMIN), Some(sel), &[]);
+        // unsupported view next to a normal one → 200, listed as skipped (requested twice → once)
+        let r = resolve(json!({"saved_views": [fulltext, normal, fulltext]})).await;
+        assert_eq!(r.status, StatusCode::OK, "{}", String::from_utf8_lossy(&r.body));
+        let res = r.json();
+        assert_eq!(res["skipped_saved_views"], json!([fulltext]), "{res}");
+        assert!(!res["documents"].as_array().unwrap().is_empty(), "normal view still resolved");
+        // only the normal view → nothing skipped
+        let res = resolve(json!({"saved_views": [normal]})).await.json();
+        assert_eq!(res["skipped_saved_views"], json!([]));
+        // only unsupported views → 501 as before
+        let r = resolve(json!({"saved_views": [fulltext]})).await;
+        assert_eq!(r.status, StatusCode::NOT_IMPLEMENTED, "{}", String::from_utf8_lossy(&r.body));
     });
 
     // ---------------------------------------------------------------- Switch

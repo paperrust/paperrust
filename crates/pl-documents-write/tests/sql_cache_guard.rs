@@ -50,6 +50,8 @@ const REVIEWED: &[&str] = &[
     "SELECT id::int8, email FROM auth_user WHERE email = $1",
     "SELECT owner_id FROM documents_document WHERE id = $1",
     "SELECT paperrust_sync_ensure($1, $2::int8[])",
+    // pl-consumer::db and pl-store::legacy (2026-11-27): text key (&str / String)
+    "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
     "SELECT pg_notify($1, $2)",
     "SELECT saved_view_id::int8 AS sv, rule_type::int8 AS rule_type, value FROM documents_savedviewfilterrule WHERE saved_view_id = ANY($1::int8[]) ORDER BY id",
     "SELECT session_data FROM django_session WHERE session_key = $1 AND expire_date > now()",
@@ -62,6 +64,8 @@ const REVIEWED: &[&str] = &[
     "UPDATE documents_document SET filename = $2, archive_filename = $3, modified = $4 WHERE id = $1",
     "UPDATE documents_document SET modified = $2 WHERE id = $1 AND deleted_at IS NULL",
     "UPDATE documents_document SET modified = $2, filename = CASE WHEN $3 THEN $4 ELSE filename END, archive_filename = CASE WHEN $5 THEN $6 ELSE archive_filename END WHERE id = $1 AND deleted_at IS NULL",
+    // pl-ai::server::vision and pl-consumer::system_note (2026-11-27): text, i32
+    "UPDATE documents_note SET note = $1 WHERE id = $2",
     "UPDATE documents_sharelinkbundle SET status = 'pending', last_error = NULL, size_bytes = NULL, built_at = NULL, file_path = '' WHERE id = $1::int8",
     "UPDATE mfa_authenticator SET data = $1 WHERE id = $2",
     "{RANGE_SELECT} WHERE p.id = $1",

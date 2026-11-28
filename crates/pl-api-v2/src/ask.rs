@@ -156,19 +156,31 @@ async fn service(state: &AppState, v2: &V2, p: &Principal) -> V2Result<McpServic
 
 // ------------------------------------------------------------------------------ Throttling
 
+/// Per-process sliding window (one minute) per user. With several PaperRust processes on one
+/// database each process counts on its own (contract pl-api-v2, `/ask`).
 static LIMITER: Mutex<Option<HashMap<i64, VecDeque<Instant>>>> = Mutex::new(None);
+
+const ASK_WINDOW: Duration = Duration::from_secs(60);
 
 fn throttle(user: i64) -> V2Result<()> {
     let mut g = LIMITER.lock().unwrap_or_else(|p| p.into_inner());
     let m = g.get_or_insert_with(HashMap::new);
-    let now = Instant::now();
+    throttle_at(m, user, Instant::now()).map_err(|wait| V2Error(DomainError::Throttled { wait }))
+}
+
+/// Window check at `now`; `Err(wait)` when the user is over the limit. Drops expired timestamps
+/// of **all** users and removes users without timestamps in the window, so the map only holds
+/// users active in the last minute.
+fn throttle_at(m: &mut HashMap<i64, VecDeque<Instant>>, user: i64, now: Instant) -> Result<(), Option<u64>> {
+    m.retain(|_, q| {
+        while q.front().is_some_and(|t| now.duration_since(*t) > ASK_WINDOW) {
+            q.pop_front();
+        }
+        !q.is_empty()
+    });
     let q = m.entry(user).or_default();
-    while q.front().is_some_and(|t| now.duration_since(*t) > Duration::from_secs(60)) {
-        q.pop_front();
-    }
     if q.len() >= ASK_PER_MINUTE {
-        let wait = q.front().map(|t| 60u64.saturating_sub(now.duration_since(*t).as_secs()).max(1));
-        return Err(V2Error(DomainError::Throttled { wait }));
+        return Err(q.front().map(|t| ASK_WINDOW.as_secs().saturating_sub(now.duration_since(*t).as_secs()).max(1)));
     }
     q.push_back(now);
     Ok(())
@@ -686,6 +698,27 @@ mod tests {
         let e = throttle(user).unwrap_err();
         assert!(matches!(e.0, DomainError::Throttled { .. }));
         throttle(user + 1).unwrap();
+    }
+
+    /// Regression: users without requests in the window are removed from the limiter map.
+    #[test]
+    fn throttle_prunes_idle_users() {
+        let mut m = HashMap::new();
+        let t0 = Instant::now();
+        for u in 0..100 {
+            throttle_at(&mut m, u, t0).unwrap();
+        }
+        assert_eq!(m.len(), 100);
+        let later = t0 + ASK_WINDOW + Duration::from_secs(1);
+        throttle_at(&mut m, 500, later).unwrap();
+        assert_eq!(m.len(), 1);
+        assert!(m.contains_key(&500));
+        // still-active users stay, and the limit still applies
+        for _ in 1..ASK_PER_MINUTE {
+            throttle_at(&mut m, 500, later).unwrap();
+        }
+        assert!(throttle_at(&mut m, 500, later).is_err());
+        assert_eq!(m.get(&500).map(VecDeque::len), Some(ASK_PER_MINUTE));
     }
 
     #[test]

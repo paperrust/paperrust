@@ -25,7 +25,9 @@ use header::{EmailAddress, HeaderValue, MailDate};
 use message::{Message, Payload};
 
 /// HTML → text (upstream: Tika server). Signature: (html, max_chars).
-pub type HtmlToText = fn(&str, usize) -> Result<String>;
+/// HTML → text with the text-size limit; returns the text plus the truncation, if the limit cut
+/// it short (see [`crate::html::html_to_text_report`]).
+pub type HtmlToText = fn(&str, usize) -> Result<(String, Option<crate::limits::Truncation>)>;
 
 /// imap_tools `MailMessage` view of a parsed MIME tree.
 #[derive(Debug, Clone)]
@@ -299,7 +301,7 @@ pub struct MailDocumentParser {
 
 impl Default for MailDocumentParser {
     fn default() -> Self {
-        Self { html_to_text: crate::html::html_to_text, converter: None }
+        Self { html_to_text: crate::html::html_to_text_report, converter: None }
     }
 }
 
@@ -323,8 +325,9 @@ impl MailDocumentParser {
         Ok(m)
     }
 
-    /// `build_formatted_text`.
-    pub fn build_formatted_text(&self, mail: &MailMessage, ctx: &ParseContext) -> Result<String> {
+    /// `build_formatted_text`, plus the truncation of the HTML part (PaperRust: the text-size
+    /// limit keeps the HTML text read so far instead of failing the mail).
+    pub fn build_formatted_text(&self, mail: &MailMessage, ctx: &ParseContext) -> Result<(String, Option<crate::limits::Truncation>)> {
         let mut t = format!("Subject: {}\n\n", mail.subject());
         t.push_str(&format!("From: {}\n\n", mail.from_values().map(|a| a.full()).unwrap_or_default()));
         let to: Vec<String> = mail.to_values().iter().map(EmailAddress::full).collect();
@@ -345,14 +348,16 @@ impl MailDocumentParser {
             t.push_str(&format!("Attachments: {}\n\n", v.join(", ")));
         }
         let html = mail.html();
+        let mut truncated = None;
         if !html.is_empty() {
-            let converted = (self.html_to_text)(&html, ctx.limits.max_text_chars)?;
+            let (converted, tr) = (self.html_to_text)(&html, ctx.limits.max_text_chars)?;
+            truncated = tr;
             t.push_str("HTML content: ");
             t.push_str(&strip_text(crate::pystr::py_strip(&converted)));
         }
         t.push_str("\n\n");
         t.push_str(&strip_text(&mail.text()));
-        Ok(t)
+        Ok((t, truncated))
     }
 
     pub fn metadata_for(mail: &MailMessage, tz: Tz) -> Vec<MetadataEntry> {
@@ -397,7 +402,7 @@ impl DocumentParser for MailDocumentParser {
     }
     fn parse(&self, path: &Path, _m: &str, ctx: &ParseContext) -> Result<ParsedDocument> {
         let mail = Self::parse_file_to_message(path, ctx)?;
-        let text = self.build_formatted_text(&mail, ctx)?;
+        let (text, truncated) = self.build_formatted_text(&mail, ctx)?;
         let (date, _) = aware_date(mail.date(), ctx.time_zone);
         // upstream: with a rule `MailRule.PdfLayout(rule.pdf_layout)`, otherwise
         // `EMAIL_PARSE_DEFAULT_LAYOUT`; the caller sets the effective value in `mail_pdf_layout`.
@@ -416,7 +421,7 @@ impl DocumentParser for MailDocumentParser {
             }
             None => None,
         };
-        Ok(ParsedDocument { text, date: Some(date), archive_path })
+        Ok(ParsedDocument { text, date: Some(date), archive_path, truncated: truncated.into_iter().collect() })
     }
     fn page_count(&self, _p: &Path, _m: &str, _c: &ParseContext) -> Option<u32> {
         None
@@ -460,5 +465,25 @@ mod tests {
         let (d, name) = make_aware(n, chrono_tz::Europe::Zurich);
         assert_eq!(d.to_rfc3339(), "1900-01-01T00:00:00+01:00");
         assert_eq!(name, "CET");
+    }
+
+    #[test]
+    fn html_text_size_limit_sets_truncated() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("m.eml");
+        let eml = "From: Anna <anna@example.com>\r\nTo: bert@example.com\r\nSubject: Test\r\n\
+                   Date: Mon, 6 Jan 2025 08:00:00 +0000\r\nMIME-Version: 1.0\r\n\
+                   Content-Type: text/html; charset=utf-8\r\n\r\n<p>eins zwei drei vier fuenf</p>\r\n";
+        std::fs::write(&p, eml).unwrap();
+        let parser = MailDocumentParser::default();
+        let mut ctx = ParseContext::default();
+        let full = parser.parse(&p, "message/rfc822", &ctx).unwrap();
+        assert!(full.truncated.is_empty());
+        assert!(full.text.contains("eins zwei drei vier fuenf"), "{}", full.text);
+        ctx.limits.max_text_chars = 9;
+        let d = parser.parse(&p, "message/rfc822", &ctx).unwrap();
+        assert_eq!(d.truncated, vec![crate::limits::Truncation::Text { limit: 9 }]);
+        assert!(d.text.contains("HTML content: eins zwei"), "{}", d.text);
+        assert!(!d.text.contains("drei"), "{}", d.text);
     }
 }

@@ -115,6 +115,7 @@ pub async fn ids(v2: V2, Caller(p): Caller, Query(q): Query<HashMap<String, Stri
 
 pub async fn resolve(v2: V2, Caller(p): Caller, V2Json(sel): V2Json<Selection>) -> V2Result<Response> {
     let as_of = as_of_seq(&v2).await?;
-    let docs = v2.repo.resolve(&p, &sel).await?;
-    Ok(json(&json!({ "documents": docs, "as_of_seq": as_of })))
+    let r = v2.repo.resolve(&p, &sel).await?;
+    // field order: documents, as_of_seq, skipped_saved_views (appended last, docs/contract/pl-api-v2.md)
+    Ok(json(&json!({ "documents": r.documents, "as_of_seq": as_of, "skipped_saved_views": r.skipped_saved_views })))
 }

@@ -45,10 +45,17 @@ pub struct QueueConfig {
     pub worker_name: String,
 }
 
+/// Upper bound for every duration setting (seconds): one year. Larger values are surely typos and
+/// would overflow `Duration`/`Instant` arithmetic in the worker.
+pub const MAX_DURATION_SECS: f64 = 365.0 * 24.0 * 3600.0;
+
 fn positive_f64(env: &Env, key: &str, default: f64) -> Result<f64, ConfigError> {
     let v = env.float(key)?.unwrap_or(default);
     if !(v.is_finite() && v > 0.0) {
         return Err(ConfigError::Invalid(format!("{key} must be a positive number")));
+    }
+    if v > MAX_DURATION_SECS {
+        return Err(ConfigError::Invalid(format!("{key} must be at most {MAX_DURATION_SECS} seconds (1 year)")));
     }
     Ok(v)
 }
@@ -79,6 +86,9 @@ impl QueueConfig {
         let timeout = env.int_or("PAPERLESS_WORKER_TIMEOUT", 1800)?;
         if timeout <= 0 {
             return Err(ConfigError::Invalid("PAPERRUST_WORKER_TIMEOUT must be > 0".into()));
+        }
+        if timeout as f64 > MAX_DURATION_SECS {
+            return Err(ConfigError::Invalid(format!("PAPERRUST_WORKER_TIMEOUT must be at most {MAX_DURATION_SECS} seconds (1 year)")));
         }
         let tz_name = env.get("PAPERLESS_TIME_ZONE").unwrap_or("UTC");
         let tz: Tz = tz_name.parse().map_err(|_| ConfigError::Invalid(format!("unknown time zone '{tz_name}'")))?;
@@ -149,5 +159,22 @@ mod tests {
         // old values do not abort startup
         assert!(QueueConfig::from_env(&Env::from_pairs([("PAPERRUST_QUEUE_BACKEND", "celery")])).is_ok());
         assert!(QueueConfig::from_env(&Env::from_pairs([("PAPERRUST_QUEUE", "redis")])).is_ok());
+    }
+
+    /// Regression: huge durations were accepted and later panicked in `Duration::from_secs_f64`.
+    #[test]
+    fn duration_settings_are_bounded() {
+        for key in [
+            "PAPERRUST_QUEUE_VISIBILITY_TIMEOUT",
+            "PAPERRUST_QUEUE_POLL_INTERVAL",
+            "PAPERRUST_QUEUE_SHUTDOWN_GRACE",
+            "PAPERRUST_QUEUE_RESULT_EXPIRES",
+        ] {
+            let e = QueueConfig::from_env(&Env::from_pairs([(key, "1e300")])).unwrap_err().to_string();
+            assert!(e.contains("at most") && e.contains("1 year"), "{key}: {e}");
+            assert!(QueueConfig::from_env(&Env::from_pairs([(key, "31536000")])).is_ok(), "{key}: 1 year is allowed");
+        }
+        let e = QueueConfig::from_env(&Env::from_pairs([("PAPERLESS_WORKER_TIMEOUT", "99999999999")])).unwrap_err().to_string();
+        assert!(e.contains("at most"), "{e}");
     }
 }

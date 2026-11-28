@@ -55,15 +55,31 @@ pub fn read_values(dir: &Path) -> BTreeMap<String, String> {
     std::fs::read_to_string(dir.join(VALUES_FILE)).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default()
 }
 
-/// Write atomically (file next to it, then rename).
+/// Write atomically (file next to it, then rename). The temporary file name is unique per
+/// call, so concurrent writers of the same target never share (and clobber) a temp file.
 pub fn write_atomic(path: &Path, data: &[u8]) -> std::io::Result<()> {
-    let tmp = path.with_extension("tmp");
-    std::fs::write(&tmp, data)?;
-    std::fs::rename(&tmp, path)
+    let tmp = path.with_extension(format!("{}-{:016x}.tmp", std::process::id(), rand::random::<u64>()));
+    if let Err(e) = std::fs::write(&tmp, data).and_then(|()| std::fs::rename(&tmp, path)) {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(e);
+    }
+    Ok(())
 }
 
-/// Sends a change request and waits for the response (at most `timeout`).
+/// Serializes change requests of this process: the supervisor protocol has exactly one request
+/// and one result file, so a second request must not start before the first one is answered
+/// or withdrawn (it would overwrite the pending request or delete the other one's result).
+static REQUEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+/// Does the request file still hold the request `id` (and not one written by someone else)?
+fn request_is_ours(dir: &Path, id: &str) -> bool {
+    std::fs::read_to_string(dir.join(REQUEST_FILE)).ok().and_then(|t| serde_json::from_str::<Request>(&t).ok()).is_some_and(|r| r.id == id)
+}
+
+/// Sends a change request and waits for the response (at most `timeout`, measured after a
+/// running request of this process has finished).
 pub async fn request(dir: &Path, changes: BTreeMap<String, String>, timeout: Duration) -> Result<Outcome, String> {
+    let _serial = REQUEST_LOCK.lock().await;
     let id = format!("{:016x}", rand::random::<u64>());
     let req = Request { id: id.clone(), changes };
     let _ = std::fs::remove_file(dir.join(RESULT_FILE));
@@ -79,7 +95,10 @@ pub async fn request(dir: &Path, changes: BTreeMap<String, String>, timeout: Dur
             return Ok(o);
         }
         if tokio::time::Instant::now() >= deadline {
-            let _ = std::fs::remove_file(dir.join(REQUEST_FILE));
+            // Withdraw only our own pending request, never one written by another writer.
+            if request_is_ours(dir, &id) {
+                let _ = std::fs::remove_file(dir.join(REQUEST_FILE));
+            }
             return Err("the desktop app did not answer".into());
         }
         tokio::time::sleep(Duration::from_millis(200)).await;
@@ -89,6 +108,74 @@ pub async fn request(dir: &Path, changes: BTreeMap<String, String>, timeout: Dur
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Supervisor dummy: answers `n` requests one after another (like the real one: read,
+    /// remove the request, apply, write the result).
+    fn supervisor(dir: PathBuf, n: usize) -> tokio::task::JoinHandle<Vec<String>> {
+        tokio::spawn(async move {
+            let mut seen = Vec::new();
+            while seen.len() < n {
+                if let Ok(t) = std::fs::read_to_string(dir.join(REQUEST_FILE))
+                    && let Ok(r) = serde_json::from_str::<Request>(&t)
+                    && !seen.contains(&r.id)
+                {
+                    let _ = std::fs::remove_file(dir.join(REQUEST_FILE));
+                    tokio::time::sleep(Duration::from_millis(50)).await;
+                    let o = Outcome { id: r.id.clone(), ok: true, error: None, restart: false };
+                    write_atomic(&dir.join(RESULT_FILE), &serde_json::to_vec(&o).unwrap()).unwrap();
+                    seen.push(r.id);
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+            seen
+        })
+    }
+
+    fn test_dir(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("pl_settings_desktop_{tag}_{}_{:x}", std::process::id(), rand::random::<u32>()));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    /// Regression: two concurrent changes must not overwrite each other's request/result files;
+    /// both get their own answer.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn concurrent_requests_both_answered() {
+        let dir = test_dir("concurrent");
+        let sup = supervisor(dir.clone(), 2);
+        let ch = |port: &str| -> BTreeMap<String, String> { [("desktop.server.port".to_string(), port.to_string())].into_iter().collect() };
+        let (a, b) = tokio::join!(request(&dir, ch("58081"), Duration::from_secs(5)), request(&dir, ch("58082"), Duration::from_secs(5)),);
+        let (a, b) = (a.unwrap(), b.unwrap());
+        assert!(a.ok && b.ok);
+        assert_ne!(a.id, b.id);
+        let seen = sup.await.unwrap();
+        assert_eq!(seen.len(), 2);
+        assert!(seen.contains(&a.id) && seen.contains(&b.id));
+        let leftovers: Vec<_> = std::fs::read_dir(&dir).unwrap().flatten().map(|e| e.file_name()).collect();
+        assert!(leftovers.is_empty(), "{leftovers:?}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Regression: a timed-out request must not remove a pending request written by someone else.
+    #[tokio::test]
+    async fn timeout_keeps_foreign_request() {
+        let dir = test_dir("foreign");
+        let d2 = dir.clone();
+        let other = tokio::spawn(async move {
+            // Wait until our request is on disk (REQUEST_LOCK is process-wide: a parallel test can
+            // delay it), then replace it with a foreign one before our timeout runs out.
+            while !d2.join(REQUEST_FILE).exists() {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+            let foreign = Request { id: "foreign".into(), changes: BTreeMap::new() };
+            write_atomic(&d2.join(REQUEST_FILE), &serde_json::to_vec(&foreign).unwrap()).unwrap();
+        });
+        let e = request(&dir, BTreeMap::new(), Duration::from_millis(400)).await.unwrap_err();
+        other.await.unwrap();
+        assert!(e.contains("did not answer"));
+        assert!(request_is_ours(&dir, "foreign"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[tokio::test]
     async fn request_round_trip() {

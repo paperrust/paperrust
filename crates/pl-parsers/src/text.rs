@@ -74,7 +74,7 @@ impl DocumentParser for TextDocumentParser {
         false
     }
     fn parse(&self, path: &Path, _mime_type: &str, ctx: &ParseContext) -> Result<ParsedDocument> {
-        Ok(ParsedDocument { text: read_file_handle_unicode_errors(path, ctx)?, date: None, archive_path: None })
+        Ok(ParsedDocument { text: read_file_handle_unicode_errors(path, ctx)?, ..Default::default() })
     }
     fn page_count(&self, _path: &Path, _mime_type: &str, _ctx: &ParseContext) -> Option<u32> {
         None

@@ -12,7 +12,21 @@
 //!   view share (bit 1); change needs owner/ownerless/superuser or bit 2, delete bit 4;
 //! * folder shares do **not** extend to the documents inside (document permissions stay per document);
 //! * moving documents needs `change_document` on every document (object permission) and change on the
-//!   target folder.
+//!   target folder;
+//! * deleting a folder that still has contents moves them, so it needs the same rights as moving them
+//!   directly: delete on the folder, `change_document` on every document in it, change on every direct
+//!   subfolder and (`contents=parent`) change on the parent folder. Otherwise 403 without naming the
+//!   objects.
+//!
+//! Locking (READ COMMITTED): permission checks and writes of `move_documents`/`delete` run in one
+//! transaction after the rows they depend on are locked - lock order caller's `auth_user` row (`FOR SHARE`)
+//! -> caller's groups (`FOR SHARE`, id order; the caller's rights are re-read after these two, see
+//! [`fresh_caller`]) -> tree lock -> folder being deleted
+//! (`FOR UPDATE`) -> its subfolders (`FOR UPDATE`, id order) -> target/parent folder (`FOR SHARE`) ->
+//! documents (`FOR SHARE`, id order). Folder shares only change under `FOR UPDATE` of the folder (`patch`); owner
+//! changes, trash and deletion of documents update the document row; group membership, the superuser/active
+//! flags and direct permissions change under the user row lock, group permissions under the group row lock
+//! (pl-auth-api users/groups, roles apply). So none of them can slip in between the check and the write.
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -216,8 +230,22 @@ async fn visible_folders(pool: &PgPool, a: &Access) -> V2Result<Vec<FolderRow>> 
         .map_err(db)
 }
 
-async fn visible_folder<'e, E: sqlx::PgExecutor<'e>>(ex: E, a: &Access, id: i64, lock: bool) -> V2Result<FolderRow> {
-    let lock = if lock { " FOR UPDATE OF f" } else { "" };
+/// Row lock taken by [`visible_folder`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RowLock {
+    No,
+    /// `FOR SHARE`: the folder (and with it its shares) cannot change or vanish until commit
+    Share,
+    /// `FOR UPDATE`: the caller changes or deletes the folder
+    Update,
+}
+
+async fn visible_folder<'e, E: sqlx::PgExecutor<'e>>(ex: E, a: &Access, id: i64, lock: RowLock) -> V2Result<FolderRow> {
+    let lock = match lock {
+        RowLock::No => "",
+        RowLock::Share => " FOR SHARE OF f",
+        RowLock::Update => " FOR UPDATE OF f",
+    };
     sqlx::query_as::<_, FolderRow>(&format!("{} AND f.id = $3{lock}", select_sql(a)))
         .bind(a.user_id)
         .bind(&a.subjects)
@@ -231,6 +259,72 @@ async fn visible_folder<'e, E: sqlx::PgExecutor<'e>>(ex: E, a: &Access, id: i64,
 /// Visible document ids (root documents outside the trash) as a subquery.
 fn visible_docs_sql(p: &Principal) -> V2Result<String> {
     Ok(pl_store::visible_ids_sql(p, Kind::Document)?)
+}
+
+/// Base table of the documents for row locks: `paperrust_document` from data model stage 1 (then
+/// `documents_document` is a view on which `FOR SHARE` does not work), otherwise the Django table.
+async fn document_lock_table(tx: &mut sqlx::PgConnection) -> V2Result<&'static str> {
+    pl_authz::grants::document_lock_table(tx).await.map_err(db)
+}
+
+/// Lock the document rows `ids` (`FOR SHARE`, id order): owner changes, trash and deletion of these
+/// documents wait until the transaction ends, so a permission check made afterwards stays valid for
+/// the write in the same transaction.
+async fn lock_documents(tx: &mut sqlx::PgConnection, table: &str, ids: &[i32]) -> V2Result<()> {
+    if ids.is_empty() {
+        return Ok(());
+    }
+    sqlx::query(&format!("SELECT id FROM {table} WHERE id = ANY($1::int4[]) ORDER BY id FOR SHARE"))
+        .bind(ids)
+        .execute(&mut *tx)
+        .await
+        .map_err(db)?;
+    Ok(())
+}
+
+/// Number of existing documents among `ids` without `change_document` for `user` (0 for superusers).
+/// Ids without a document row (removed for good) are not counted.
+async fn count_unchangeable(tx: &mut sqlx::PgConnection, table: &str, user: &User, ids: &[i32], include_deleted: bool) -> V2Result<i64> {
+    if user.is_superuser || ids.is_empty() {
+        return Ok(0);
+    }
+    let change = pl_authz::objects::permitted_document_ids(Some(user), "change_document", include_deleted)
+        .to_string(sea_query::PostgresQueryBuilder);
+    sqlx::query_scalar(&format!(
+        "SELECT count(*)::int8 FROM {table} d WHERE d.id = ANY($1::int4[]) \
+         AND NOT EXISTS (SELECT 1 FROM ({change}) c(id) WHERE c.id = d.id)"
+    ))
+    .bind(ids)
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(db)
+}
+
+/// Re-read the caller inside the transaction `tx` after locking what their rights depend on: the
+/// `auth_user` row and their groups (`FOR SHARE`, id order). The request's user object can be older than
+/// an admin change (membership, superuser/active flag, user or group permissions); with these locks such a
+/// change either committed before (and is seen here) or waits until this transaction ends.
+/// Gone or deactivated meanwhile -> 403 like a missing permission.
+async fn fresh_caller(tx: &mut sqlx::PgConnection, id: i64) -> V2Result<(User, Access)> {
+    let found: Option<i64> =
+        sqlx::query_scalar("SELECT id::int8 FROM auth_user WHERE id = $1 FOR SHARE").bind(id).fetch_optional(&mut *tx).await.map_err(db)?;
+    if found.is_none() {
+        return Err(V2Error(DomainError::Forbidden("You do not have permission to perform this action.".into())));
+    }
+    sqlx::query(
+        "SELECT g.id FROM auth_group g JOIN auth_user_groups ug ON ug.group_id = g.id          WHERE ug.user_id = $1 ORDER BY g.id FOR SHARE OF g",
+    )
+    .bind(id)
+    .execute(&mut *tx)
+    .await
+    .map_err(db)?;
+    let user = pl_authz::user::load_user_by_id(&mut *tx, id)
+        .await
+        .map_err(db)?
+        .ok_or(V2Error(DomainError::Forbidden("You do not have permission to perform this action.".into())))?;
+    let a = Access::of(&user)?;
+    a.require_organize()?;
+    Ok((user, a))
 }
 
 /// Visible documents per folder (only direct contents) and the number of visible "Unsorted" documents.
@@ -468,7 +562,7 @@ pub async fn one(State(state): State<AppState>, Caller(p): Caller, Path(id): Pat
     let a = access(&p)?;
     let pool = state.db();
     ensure(pool).await?;
-    let f = visible_folder(pool, &a, id, false).await?;
+    let f = visible_folder(pool, &a, id, RowLock::No).await?;
     detail(pool, &a, &f, StatusCode::OK).await
 }
 
@@ -505,7 +599,7 @@ pub struct FolderWrite {
 
 /// Parent must be visible and changeable for the caller.
 async fn check_parent(tx: &mut sqlx::PgConnection, a: &Access, parent: i64) -> V2Result<()> {
-    match visible_folder(&mut *tx, a, parent, false).await {
+    match visible_folder(&mut *tx, a, parent, RowLock::No).await {
         Ok(p) if p.can_change => Ok(()),
         Ok(_) => Err(V2Error(DomainError::Forbidden("You do not have permission to add folders here.".into()))),
         Err(V2Error(DomainError::NotFound)) => Err(V2Error(DomainError::field("parent", "Folder does not exist."))),
@@ -558,7 +652,7 @@ pub async fn create(State(state): State<AppState>, Caller(p): Caller, V2Json(w):
         write_grants(&mut tx, id, ps).await?;
     }
     tx.commit().await.map_err(db)?;
-    let f = visible_folder(pool, &a, id, false).await?;
+    let f = visible_folder(pool, &a, id, RowLock::No).await?;
     detail(pool, &a, &f, StatusCode::CREATED).await
 }
 
@@ -580,7 +674,7 @@ pub async fn patch(
     if moves {
         tree_lock(&mut tx).await?;
     }
-    let f = visible_folder(&mut *tx, &a, id, true).await?;
+    let f = visible_folder(&mut *tx, &a, id, RowLock::Update).await?;
     if !f.can_change {
         return Err(V2Error(DomainError::Forbidden("You do not have permission to change this folder.".into())));
     }
@@ -647,7 +741,7 @@ pub async fn patch(
     }
     tx.commit().await.map_err(db)?;
     // the caller may have given the folder away: then it is no longer visible → 200 with the old view is wrong
-    match visible_folder(pool, &a, id, false).await {
+    match visible_folder(pool, &a, id, RowLock::No).await {
         Ok(nf) => detail(pool, &a, &nf, StatusCode::OK).await,
         Err(V2Error(DomainError::NotFound)) => Ok(json(&json!({ "id": id, "visible": false }))),
         Err(e) => Err(e),
@@ -689,8 +783,9 @@ pub async fn delete(
     let pool = state.db();
     ensure(pool).await?;
     let mut tx = pool.begin().await.map_err(db)?;
+    let (user, a) = fresh_caller(&mut tx, a.user_id).await?;
     tree_lock(&mut tx).await?;
-    let f = visible_folder(&mut *tx, &a, id, true).await?;
+    let f = visible_folder(&mut *tx, &a, id, RowLock::Update).await?;
     if !f.can_delete {
         return Err(V2Error(DomainError::Forbidden("You do not have permission to delete this folder.".into())));
     }
@@ -703,6 +798,7 @@ pub async fn delete(
         Contents::Parent => f.parent_id,
         Contents::Unsorted => None,
     };
+    check_contents_movable(&mut tx, &a, &user, f.id, target).await?;
     let moved_folders = sqlx::query("UPDATE paperrust_folder SET parent_id = $2, rev = rev + 1, modified = now() WHERE parent_id = $1")
         .bind(f.id)
         .bind(target)
@@ -728,6 +824,54 @@ pub async fn delete(
     sqlx::query("DELETE FROM paperrust_folder WHERE id = $1").bind(f.id).execute(&mut *tx).await.map_err(db)?;
     tx.commit().await.map_err(db)?;
     Ok(json(&json!({ "moved_documents": moved_documents, "moved_folders": moved_folders })))
+}
+
+pub const DELETE_FORBIDDEN_PARENT: &str = "You do not have permission to move the contents of this folder into its parent folder.";
+pub const DELETE_FORBIDDEN_FOLDERS: &str = "You do not have permission to change all subfolders of this folder.";
+pub const DELETE_FORBIDDEN_DOCUMENTS: &str = "You do not have permission to change all documents in this folder.";
+
+/// Deleting folder `id` moves its contents to `target` (`None` = "Unsorted"/top level). Same rights as
+/// moving them directly (`move_documents`, `patch` with a new parent): change on the target folder,
+/// change on every direct subfolder, `change_document` on every document (trashed ones included, they
+/// move too). Locks what it checked (see the module comment); the caller holds the tree lock and the
+/// folder `FOR UPDATE`, so no new contents can arrive. 403 messages name no objects.
+async fn check_contents_movable(tx: &mut sqlx::PgConnection, a: &Access, user: &User, id: i64, target: Option<i64>) -> V2Result<()> {
+    let subfolders: Vec<(i64, bool)> = sqlx::query_as(&format!(
+        "SELECT f.id, {} FROM paperrust_folder f WHERE f.parent_id = $3 ORDER BY f.id FOR UPDATE OF f",
+        a.cond("f", BIT_CHANGE)
+    ))
+    .bind(a.user_id)
+    .bind(&a.subjects)
+    .bind(id)
+    .fetch_all(&mut *tx)
+    .await
+    .map_err(db)?;
+    let docs: Vec<i32> = sqlx::query_scalar("SELECT document_id FROM paperrust_document_folder WHERE folder_id = $1 ORDER BY document_id")
+        .bind(id)
+        .fetch_all(&mut *tx)
+        .await
+        .map_err(db)?;
+    if subfolders.is_empty() && docs.is_empty() {
+        return Ok(());
+    }
+    if let Some(t) = target {
+        match visible_folder(&mut *tx, a, t, RowLock::Share).await {
+            Ok(pf) if pf.can_change => {}
+            Ok(_) | Err(V2Error(DomainError::NotFound)) => return Err(V2Error(DomainError::Forbidden(DELETE_FORBIDDEN_PARENT.into()))),
+            Err(e) => return Err(e),
+        }
+    }
+    if subfolders.iter().any(|(_, can_change)| !can_change) {
+        return Err(V2Error(DomainError::Forbidden(DELETE_FORBIDDEN_FOLDERS.into())));
+    }
+    if !user.is_superuser && !docs.is_empty() {
+        let table = document_lock_table(tx).await?;
+        lock_documents(tx, table, &docs).await?;
+        if count_unchangeable(tx, table, user, &docs, true).await? > 0 {
+            return Err(V2Error(DomainError::Forbidden(DELETE_FORBIDDEN_DOCUMENTS.into())));
+        }
+    }
+    Ok(())
 }
 
 #[derive(Debug, Deserialize)]
@@ -807,7 +951,7 @@ pub async fn check_upload_target(pool: &PgPool, u: &User, id: i64) -> V2Result<R
     if exists.is_none() {
         return Ok(Err(upload_folder_missing(id)));
     }
-    match visible_folder(pool, &a, id, false).await {
+    match visible_folder(pool, &a, id, RowLock::No).await {
         Ok(f) if f.can_change && a.can_organize => Ok(Ok(())),
         Ok(_) => Ok(Err(UPLOAD_FOLDER_FORBIDDEN.into())),
         Err(V2Error(DomainError::NotFound)) => Ok(Err(upload_folder_missing(id))),
@@ -829,42 +973,40 @@ pub async fn move_documents(State(state): State<AppState>, Caller(p): Caller, V2
         return Err(V2Error(DomainError::field("documents", format!("At most {MOVE_MAX} documents per request."))));
     }
     let ids = dedup(&resolve_documents(pool, &b.documents).await?);
-    let folder = match &b.folder {
+    let target = match &b.folder {
         None => None,
-        Some(r) => {
-            let fid = resolve_folder(pool, r).await?;
-            match visible_folder(pool, &a, fid, false).await {
-                Ok(f) if f.can_change => Some(f.id),
-                Ok(_) => return Err(V2Error(DomainError::Forbidden("You do not have permission to change this folder.".into()))),
-                Err(V2Error(DomainError::NotFound)) => return Err(V2Error(DomainError::field("folder", "Folder does not exist."))),
-                Err(e) => return Err(e),
-            }
-        }
+        Some(r) => Some(resolve_folder(pool, r).await?),
     };
-    // like bulk_edit: unknown/invisible → 400, visible but not changeable → 403
-    let vis = visible_docs_sql(&p)?;
+    let ids32: Vec<i32> = ids.iter().filter_map(|i| i32::try_from(*i).ok()).collect();
+    // Checks and write in one transaction, after locking what the checks depend on (caller and groups,
+    // target folder FOR SHARE, then the documents FOR SHARE): a rights/share/owner change committed
+    // meanwhile is either seen by the checks or waits for this move.
+    let mut tx = pool.begin().await.map_err(db)?;
+    let (user, a) = fresh_caller(&mut tx, a.user_id).await?;
+    let folder = match target {
+        None => None,
+        Some(fid) => match visible_folder(&mut *tx, &a, fid, RowLock::Share).await {
+            Ok(f) if f.can_change => Some(f.id),
+            Ok(_) => return Err(V2Error(DomainError::Forbidden("You do not have permission to change this folder.".into()))),
+            Err(V2Error(DomainError::NotFound)) => return Err(V2Error(DomainError::field("folder", "Folder does not exist."))),
+            Err(e) => return Err(e),
+        },
+    };
+    let table = document_lock_table(&mut tx).await?;
+    lock_documents(&mut tx, table, &ids32).await?;
+    // like bulk_edit: unknown/invisible -> 400, visible but not changeable -> 403
+    let vis = pl_store::visible_ids_sql_for(&user, Kind::Document);
     let visible: i64 = sqlx::query_scalar(&format!("SELECT count(*)::int8 FROM ({vis}) v(id) WHERE v.id = ANY($1::int8[])"))
         .bind(&ids)
-        .fetch_one(pool)
+        .fetch_one(&mut *tx)
         .await
         .map_err(db)?;
     if visible != ids.len() as i64 {
         return Err(V2Error(DomainError::field("documents", "Some documents don't exist or were specified twice.")));
     }
-    let user = d2::user(&p)?;
-    if !user.is_superuser {
-        let change =
-            pl_authz::objects::permitted_document_ids(Some(user), "change_document", false).to_string(sea_query::PostgresQueryBuilder);
-        let changeable: i64 = sqlx::query_scalar(&format!("SELECT count(*)::int8 FROM ({change}) c(id) WHERE c.id = ANY($1::int8[])"))
-            .bind(&ids)
-            .fetch_one(pool)
-            .await
-            .map_err(db)?;
-        if changeable != ids.len() as i64 {
-            return Err(V2Error(DomainError::Forbidden("Insufficient permissions.".into())));
-        }
+    if count_unchangeable(&mut tx, table, &user, &ids32, false).await? > 0 {
+        return Err(V2Error(DomainError::Forbidden("Insufficient permissions.".into())));
     }
-    let ids32: Vec<i32> = ids.iter().filter_map(|i| i32::try_from(*i).ok()).collect();
     let moved = match folder {
         Some(fid) => sqlx::query(
             "INSERT INTO paperrust_document_folder (document_id, folder_id) SELECT d, $2 FROM unnest($1::int4[]) AS d \
@@ -875,13 +1017,14 @@ pub async fn move_documents(State(state): State<AppState>, Caller(p): Caller, V2
         .bind(fid),
         None => sqlx::query("DELETE FROM paperrust_document_folder WHERE document_id = ANY($1::int4[])").bind(&ids32),
     }
-    .execute(pool)
+    .execute(&mut *tx)
     .await
     .map_err(|e| match sql_state(&e).as_deref() {
         Some("23503") => V2Error(DomainError::field("folder", "Folder does not exist.")),
         _ => db(e),
     })?
     .rows_affected();
+    tx.commit().await.map_err(db)?;
     Ok(json(&json!({ "moved": moved, "folder": folder })))
 }
 

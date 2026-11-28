@@ -138,13 +138,7 @@ impl MediaLock {
 /// Table for `SELECT … FOR UPDATE` on documents: `paperrust_document` as soon as data model stage 1
 /// is applied (then `documents_document` is a view), otherwise the Django table.
 pub async fn document_lock_table(conn: &mut PgConnection) -> Result<&'static str, sqlx::Error> {
-    let native: bool = sqlx::query_scalar(
-        "SELECT EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace \
-         WHERE n.nspname = current_schema() AND c.relname = 'paperrust_document' AND c.relkind = 'r')",
-    )
-    .fetch_one(&mut *conn)
-    .await?;
-    Ok(if native { "paperrust_document" } else { "documents_document" })
+    pl_authz::grants::document_lock_table(conn).await
 }
 
 /// Step 1 of the lock order: lock the document rows `ids` (e.g. document + root document) in

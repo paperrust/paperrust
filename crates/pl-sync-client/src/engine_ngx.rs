@@ -72,6 +72,8 @@ impl SyncClient {
         let token = ngx.token(username, &password, code).await;
         drop(password);
         let token = token?;
+        // another account than the replica's owner → purge before anything is unlocked
+        self.switch_owner(username).await?;
         self.inner.secrets.set(&target_for(&self.inner.cfg.profile_id), &token)?;
         ngx.set_token(Some(token.clone()));
         self.inner.remote.set_token(Some(token));
@@ -221,9 +223,11 @@ impl SyncClient {
         for (key, _rev, sel, det) in states {
             let id = ngx_id(&key, "document");
             if id.is_none_or(|i| !visible.contains(&i)) {
-                let paths = r.delete_document(&key).await?;
-                FileCache::remove_paths(&paths).await;
-                rep.documents_removed += 1;
+                if self.inner.files.purge_document(r, &key).await? {
+                    rep.documents_removed += 1;
+                } else {
+                    rep.documents_pending_delete += 1;
+                }
                 continue;
             }
             if sel && !p.docs.contains_key(&key) {
@@ -314,8 +318,9 @@ impl SyncClient {
                 rep.documents_fetched += 1;
             }
             for id in chunk.iter().filter(|i| !got.contains(i)) {
-                let paths = r.delete_document(&ngx_uuid(1, *id)).await?;
-                FileCache::remove_paths(&paths).await;
+                if !self.inner.files.purge_document(r, &ngx_uuid(1, *id)).await? {
+                    rep.documents_pending_delete += 1;
+                }
                 missing.insert(*id);
             }
             self.set_status(|s| s.done += chunk.len() as u64);

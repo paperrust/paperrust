@@ -241,6 +241,33 @@ pub async fn update_or_create(
     field: &FieldDef,
     value: &Value,
 ) -> Result<i64, ApiError> {
+    let id = update_or_create_rows(conn, ctx, doc_id, field, value).await?;
+    files::after_custom_field_saved(conn, media, doc_id).await?;
+    Ok(id)
+}
+
+/// [`update_or_create`] without the `post_save` file name update
+/// (`files::after_custom_field_saved`), with identical auditlog entries. For callers that write
+/// inside their own transaction and run `update_filename_and_move_files` only after the commit
+/// (pl-server `ConsumerDocWriter::after_commit`), so a rollback never leaves files moved.
+pub async fn update_or_create_deferred(
+    conn: &mut PgConnection,
+    ctx: &LogCtx,
+    doc_id: i64,
+    field: &FieldDef,
+    value: &Value,
+) -> Result<i64, ApiError> {
+    update_or_create_rows(conn, ctx, doc_id, field, value).await
+}
+
+/// DB and auditlog part of [`update_or_create`].
+async fn update_or_create_rows(
+    conn: &mut PgConnection,
+    ctx: &LogCtx,
+    doc_id: i64,
+    field: &FieldDef,
+    value: &Value,
+) -> Result<i64, ApiError> {
     let col = value_field(&field.data_type).ok_or_else(|| ApiError::Uncaught(format!("data type {}", field.data_type)))?;
     match live_for(conn, doc_id, field.id).await? {
         Some(mut c) => {
@@ -248,10 +275,9 @@ pub async fn update_or_create(
             let only = update_or_create_fields(col);
             save_audit(conn, ctx, &c, Some(&only)).await?;
             write_value(conn, &c, &field.data_type).await?;
-            files::after_custom_field_saved(conn, media, doc_id).await?;
             Ok(c.id)
         }
-        None => create(conn, ctx, media, doc_id, field, value).await,
+        None => create_rows(conn, ctx, doc_id, field, value).await,
     }
 }
 
@@ -264,6 +290,13 @@ pub async fn create(
     field: &FieldDef,
     value: &Value,
 ) -> Result<i64, ApiError> {
+    let id = create_rows(conn, ctx, doc_id, field, value).await?;
+    files::after_custom_field_saved(conn, media, doc_id).await?;
+    Ok(id)
+}
+
+/// DB and auditlog part of [`create`] (INSERT, auditlog CREATE).
+async fn create_rows(conn: &mut PgConnection, ctx: &LogCtx, doc_id: i64, field: &FieldDef, value: &Value) -> Result<i64, ApiError> {
     let mut c = CfiRow {
         id: 0,
         created: now_micros(),
@@ -312,7 +345,6 @@ pub async fn create(
         let r = auditlog::cfi_repr(&field.name, &field.data_type, field.extra_data.as_ref(), &c);
         auditlog::write_diff(conn, ctx, "customfieldinstance", c.id, &r, auditlog::CREATE, ch).await?;
     }
-    files::after_custom_field_saved(conn, media, doc_id).await?;
     Ok(c.id)
 }
 
@@ -334,6 +366,25 @@ pub async fn soft_delete(
     transaction_id: uuid::Uuid,
     then_full_save: bool,
 ) -> Result<(), ApiError> {
+    let n = soft_delete_rows(conn, ctx, c, transaction_id).await?;
+    files::after_custom_field_saved(conn, media, c.document_id).await?;
+    if then_full_save {
+        save_audit(conn, ctx, &n, None).await?;
+        files::after_custom_field_saved(conn, media, c.document_id).await?;
+    }
+    Ok(())
+}
+
+/// [`soft_delete`] with `then_full_save = false`, without the `post_save` file name update
+/// (`files::after_custom_field_saved`), with identical auditlog entries. See
+/// [`update_or_create_deferred`] for when to use it.
+pub async fn soft_delete_deferred(conn: &mut PgConnection, ctx: &LogCtx, c: &CfiRow, transaction_id: uuid::Uuid) -> Result<(), ApiError> {
+    soft_delete_rows(conn, ctx, c, transaction_id).await.map(|_| ())
+}
+
+/// DB and auditlog part of [`soft_delete`] (`save(update_fields=[deleted_at, restored_at,
+/// transaction_id])`); returns the updated row.
+async fn soft_delete_rows(conn: &mut PgConnection, ctx: &LogCtx, c: &CfiRow, transaction_id: uuid::Uuid) -> Result<CfiRow, ApiError> {
     let mut n = c.clone();
     n.deleted_at = Some(now_micros());
     n.restored_at = None;
@@ -341,12 +392,7 @@ pub async fn soft_delete(
     let only = ["deleted_at", "restored_at", "transaction_id"];
     save_audit(conn, ctx, &n, Some(&only)).await?;
     set_delete_fields(conn, &n).await?;
-    files::after_custom_field_saved(conn, media, c.document_id).await?;
-    if then_full_save {
-        save_audit(conn, ctx, &n, None).await?;
-        files::after_custom_field_saved(conn, media, c.document_id).await?;
-    }
-    Ok(())
+    Ok(n)
 }
 
 /// `SoftDeleteModel.restore` + `related_object.save()`.

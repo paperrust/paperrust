@@ -450,7 +450,7 @@ paths:
                 tags: {type: array, items: {type: string, format: uuid}}
                 saved_views: {type: array, items: {type: string, format: uuid}}
                 tag_mode: {type: string, enum: [any, all]}
-      responses: {"200": {description: '{"documents":[{uuid,rev,size}],"as_of_seq"}'}}
+      responses: {"200": {description: '{"documents":[{uuid,rev,size}],"as_of_seq","skipped_saved_views":[uuid]} – skipped_saved_views: requested saved views whose rules cannot be evaluated (full-text, unknown rule type), request order; [] if none'}, "501": {$ref: '#/components/responses/Error'}}
   /asn/presets:
     get: {summary: ASN label sheet presets (pl-labels), responses: {"200": {description: '{"items":[SheetLayout],"default"}'}, "403": {$ref: '#/components/responses/Error'}}}
   /asn/config:

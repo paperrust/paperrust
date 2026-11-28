@@ -246,6 +246,7 @@ Konten und Regeln selbst: DB-Objekte (1.18).
 | `PAPERRUST_SHRINK_PRESET` *(neu)* | Stufe beim Verkleinern: `lossless`, `standard` (150 dpi, JPEG 60), `strong` (96 dpi) | Auswahl | standard | E | L | nein | A |
 | `PAPERRUST_PDFTOOL_TIMEOUT` *(neu)* | Zeitgrenze je Lauf des PDF-Werkzeugs (Schwärzen, Verkleinern, Reparieren) | int s ≥ 1 | 120 | E | L | nein | A |
 | `PAPERRUST_PDFTOOL_MEMORY_MB` *(neu)* | Speichergrenze des PDF-Werkzeugs (Kindprozess) | int MB ≥ 0 | 1536 | E | L | nein | A |
+| `PAPERRUST_SCAN_MAX_JOB_MB` *(neu)* | Scanner (eSCL): Speichergrenze je Scanauftrag; darüber bricht der Auftrag mit `job_too_large` ab | int MB 1–65536 | 1024 | E | L | nein | A |
 | `PAPERRUST_OFFICE_TO_PDF` *(neu)* | Office-Dateien (docx/doc, odt, rtf, xlsx/xls/ods, pptx/ppt/odp/odg) und Mails beim Einlesen mit WordCraft (Kindprozess `paperrust-pdftool`) in ein Archiv-PDF umwandeln; Vorschaubild dann von Seite 1 | bool | true | E | L | nein | A |
 | `PAPERRUST_OFFICE_TO_PDF_TIMEOUT` *(neu)* | Zeitgrenze je Office-Umwandlung (0 = wie `PAPERRUST_PDFTOOL_TIMEOUT`) | int s ≥ 0 | 0 | E | L | nein | A |
 | `PAPERRUST_PDFTOOL_BIN` *(neu)* | Pfad zu `paperrust-pdftool` | Pfad | neben dem Server-Programm | E | S | nein | C |
@@ -292,7 +293,15 @@ OCR-Felder mit AC-Feld: Vorrang AC (E3), wirksam L (nächstes Dokument).
 | `OCR_SKIP_ARCHIVE_FILE` | alt, ohne Wirkung (upstream-Prüfung warnt) | – | – | E | – | nein | X |
 | `OCR_LANGUAGES` | Sprachpakete im upstream-Image installieren | Liste | – | DI | – | nein | X |
 | `PAPERRUST_OCR_LANGUAGE_AUTO` | OCR-Sprache automatisch: Textsprache bestimmen, bei fremder installierter Sprache noch einmal erkennen (pl-consumer, 2026-11-21) | bool | false | E | L | nein | A |
-| `PAPERRUST_OCR_ENGINE` | OCR-Engine | tesseract/windows/macos/auto | tesseract | E | L | nein | A |
+| `PAPERRUST_OCR_ENGINE` | OCR-Engine (`ppocr` = PP-OCRv6 über ONNX Runtime, opt-in; docs/OCR-PPOCR.md) | tesseract/ppocr/windows/macos/auto | tesseract | E | L | nein | A |
+| `PAPERRUST_OCR_ORIENTATION` | Seitendrehung vor der Erkennung: model (PP-LCNet) / engine (Tesseract-OSD) / off | Auswahl | leer (= model, wenn vorhanden) | E | L | nein | A |
+| `PAPERRUST_OCR_HANDWRITING` | Handschrift-Zweitlauf DE·HTR für unsichere Zeilen (nur mit `ppocr` und `deu`) | off/auto | off | E | L | nein | A |
+| `PAPERRUST_PPOCR_MODEL` | PP-OCR-Lesemodell: small / fast (kleine Geräte, ~3× schneller, Handschrift schwächer) / medium | Auswahl | small | E | L | nein | A |
+| `PAPERRUST_PPOCR_MAX_SIDE` | PP-OCR: längste Bildseite in Pixel | int 640–8192 | 1920 | E | L | nein | A |
+| `PAPERRUST_PPOCR_SESSIONS` | PP-OCR: Modell-Sitzungen je Prozess (mehr = mehr RAM, höchstens ~10 % schneller) | int 1–16 | 1 | E | L | nein | A |
+| `PAPERRUST_OCR_MODEL_DOWNLOAD` | fehlende OCR-Modelle aus der festen Liste herunterladen (Prüfsumme) | bool | false | E | L | nein | A |
+| `PAPERRUST_OCR_MODEL_DIR` | Ordner der OCR-Modelle (Docker: `/usr/local/share/paperrust/ocr-models`) | Pfad | Suche | E | L | nein | C |
+| `PAPERRUST_ONNXRUNTIME_PATH` | Pfad der ONNX-Runtime-Bibliothek (Docker gesetzt) | Pfad | Suche | E | L | nein | C |
 | `PAPERRUST_OCR_ENGINE_IDLE_SECS` | geladene Tesseract-Engines (Sprachmodelle) nach so vielen Sekunden Leerlauf entladen und Speicher zurückgeben (pl-ocr `tesslib`); 0 = nie (schnellste erste Erkennung, mehr RAM) | int ≥ 0 | 180 | E | L | nein | A |
 | `PAPERRUST_PDFA_FONT_DIR` | Ordner mit Ersatzschriften (Liberation) für Schriften, die im Original nicht eingebettet sind (PDF/A-Archiv, pl-ocr `pdfa_fonts`); sonst `/usr/share/fonts/liberation` u. a. | Pfad | Suche | E | L | nein | C |
 | `REMOTE_OCR_ENGINE` | Remote-OCR (Azure, REST in `pl-ocr::remote`) | azureai/– | – | E, AC:remote_ocr_engine | L | nein | A |
@@ -462,7 +471,10 @@ AI_*-Felder mit AC-Feld: Vorrang AC (E3), wirksam L.
 | `PAPERRUST_AI_RUN_MAX_DOCUMENTS_PER_HOUR` | manuelle Läufe/h | int | 100 | E | L | nein | A |
 | `PAPERRUST_AI_VISION_ENABLED` | KI-Texterkennung verfügbar (Vorgabe; Oberfläche „KI → Texterkennung“ speichert in `paperrust_ai_option`) | bool | no | E | L | nein | A |
 | `PAPERRUST_AI_VISION_MODEL` | Bildmodell (leer = Textmodell) | Text | – | E | L | nein | A |
-| `PAPERRUST_AI_VISION_WHEN` | wann: off (nur auf Wunsch je Dokument, `ai_ocr`) / difficult (wenig Text) / always | Auswahl | difficult | E | L | nein | A |
+| `PAPERRUST_AI_VISION_WHEN` | alt (bis 0.1.3): off / difficult / always; gilt nur, solange `PAPERRUST_AI_VISION_MODE` leer ist (off→off, always→always, difficult→uncertain_pages) | Auswahl | difficult | E | L | nein | A |
+| `PAPERRUST_AI_VISION_MODE` | KI-Abschrift: off (Aus, nur „Mit KI neu lesen“) / uncertain_lines (Nur unsichere Stellen) / uncertain_pages (Ganze Seite, wenn unsicher) / always (Immer) | Auswahl | leer (= aus `VISION_WHEN`) | E | L | nein | A |
+| `PAPERRUST_AI_VISION_SENSITIVITY` | Empfindlichkeit der „unsicher“-Modi: sparing / normal / thorough | Auswahl | normal | E | L | nein | A |
+| `PAPERRUST_AI_VISION_MAX_SIDE` | längste Bildseite ganzer Seiten in Pixel | int 512–4096 | 1540 | E | L | nein | A |
 | `PAPERRUST_AI_VISION_MAX_PAGES` | Seiten je Dokument | int ≥ 1 (≤ 200) | 10 | E | L | nein | A |
 | `PAPERRUST_AI_VISION_MAX_PAGES_PER_DAY` | Seiten je Tag und Prozess | int (0 = unbegrenzt) | 500 | E | L | nein | A |
 | `PAPERRUST_AI_CUSTOM_FIELDS_ENABLED` | Benutzerfelder per KI ausfüllen (Vorgabe; Felder je Feld in der Oberfläche) | bool | no | E | L | nein | A |
@@ -565,12 +577,12 @@ ohne pro-Nutzer-Werte, ohne DB-Objekte).
 
 | Klasse | Anzahl | davon ApplicationConfiguration |
 |---|---|---|
-| A – GUI live | 189 | 45 |
+| A – GUI live | 199 | 45 |
 | B – GUI mit Neustart | 43 | – |
-| C – Bootstrap / Installation | 94 | – (großteils Desktop-, Docker- und Installationsschlüssel) |
+| C – Bootstrap / Installation | 96 | – (großteils Desktop-, Docker- und Installationsschlüssel) |
 | D – nur Umgebung | 27 | – |
 | X – wirkungslos in PaperRust / intern | 32 | – |
-| **Summe System** | **385** | |
+| **Summe System** | **397** | |
 | pro Nutzer (ui_settings, 1.17) | 44 | |
 | DB-Objekte bereits in der GUI (1.18) | 10 Arten | |
 
@@ -658,6 +670,14 @@ AC-Änderungen über v2 schreiben ebenfalls einen Verlaufseintrag (`key='AC:llm_
   Dokumentiert als bekannte Schwäche; GUI-Hinweis „wird wie bei paperless-ngx unverschlüsselt in der
   Datenbank gespeichert – alternativ über Umgebung setzen“.
 - Logs/Verlauf/Export: Geheimnisse immer `***`.
+- Umzugshilfe `POST /settings/check-file` (seit 2026-11-27): Geheimnisse aus der hochgeladenen Datei
+  kommen nie im Klartext zurück. `items[].value` = `null` mit `secret: true` für Schema-Geheimnisse
+  und für veraltete/unbekannte Namen, die nach Geheimnis aussehen (`PASS`, `PWD`, `SECRET`, `TOKEN`,
+  `KEY`, `CREDENTIAL`, `PRIVATE`; bei bekannten Namen zählt nur das Schema-Kennzeichen). `slim_env`
+  wird maskiert erzeugt: solche Zeilen (auch fremde wie `POSTGRES_PASSWORD`) nur als Kommentar
+  `# NAME=<secret – copy the value from your current configuration>`. Die lokale CLI
+  `manage settings slim-env FILE` gibt weiter unmaskiert aus (kein Netzweg). Einzelheiten:
+  `docs/contract/pl-api-v2.md`, Abschnitt „Umzugshilfe: `POST /settings/check-file` – Geheimnisse“.
 
 ### 2.4 Validierung
 
@@ -707,6 +727,13 @@ AC-Änderungen über v2 schreiben ebenfalls einen Verlaufseintrag (`key='AC:llm_
   `desktop.toml`, startet den Server neu (bei S), schreibt `run/settings.result.json`. Muster wie
   `stop.request`/`backup.request`. **Nur von Loopback-Anfragen** (LAN-Freigabe darf nicht aus dem LAN
   umgestellt werden).
+- Absicherung des Anfrage-Protokolls (seit 2026-11-27, `crates/pl-settings/src/desktop.rs`): Es gibt
+  nur eine Anfrage- und eine Ergebnisdatei, deshalb laufen Anfragen eines Server-Prozesses
+  **nacheinander** (prozessweite Sperre `REQUEST_LOCK`; die Wartezeit zählt erst ab Ende der
+  laufenden Anfrage). Temporäre Dateien von `write_atomic` haben eindeutige Namen
+  (`<pid>-<zufall>.tmp`), gleichzeitige Schreiber teilen sich keine. Bei Zeitüberschreitung wird
+  `settings.request.json` nur gelöscht, wenn sie noch die eigene Anfrage (`id`) enthält – eine
+  fremde Anfrage bleibt liegen.
 - `time_zone` und `ocr_language` werden einmalig umgezogen: beim ersten Start nach dem Update schreibt
   der Supervisor sie per `paperrust manage settings set --if-unset` nach `paperrust_setting`
   (`TIME_ZONE`) bzw. AC `language` und setzt sie **nicht mehr** als Umgebung (sonst wären sie gesperrt).

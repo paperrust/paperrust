@@ -171,9 +171,9 @@ mit Zähler, eindeutig ohne Endung), `-thumbnail.webp`, `-archive.pdf`, `-manife
 `originals/ thumbnails/ archive/ json/`, Share-Link-Bündel unter `share_link_bundles/`.
 Ordner-Senke: Snapshot, Kopie nur bei anderer Größe/mtime (bzw. SHA-256 mit `-c`), mtime/atime
 übernommen, `manifest.json.tmp` → umbenennen, `-cj` byte-gleich → nicht schreiben, `-d` löscht
-übrige Dateien und leere Ordner. ZIP-Senke: `<name>.zip.tmp` → `<name>.zip`, Verzeichniseinträge
+übrige Dateien und leere Ordner. ZIP-Senke: `<name>.zip.<uuid>.tmp` → `<name>.zip` (KD 14a), Verzeichniseinträge
 wie `ZipFile.mkdir`, Dateien wie `ZipFile.write` (DOS-Zeit in `PAPERLESS_TIME_ZONE`), Manifest zuletzt,
-`metadata.json` davor, ZIP64 bei Bedarf; `-d` leert das Ziel bis auf das ZIP. `metadata.json`:
+`metadata.json` davor, ZIP64 bei Bedarf; `-d` leert das Ziel bis auf das ZIP (erst nach dem Umbenennen). `metadata.json`:
 `{"version": "3.4.2"}` + `__crypto__` (`__key_algo__` pbkdf2_sha256, `__key_iters__` 1000000,
 `__key_size__` 32, `__salt_hex__`). Passphrase: Fernet (AES-128-CBC + HMAC-SHA256, Token als Hex)
 auf `paperless_mail.mailaccount.password/refresh_token` und `socialaccount.socialtoken.token/token_secret`
@@ -397,6 +397,17 @@ Swagger-UI-Dateien: drf-spectacular-sidecar 2026.10.1 (Swagger UI, Apache-2.0, L
     Pfade relativ zum Ziel); `--delete` mit `--zip` schreibt eine Warnung auf stderr (Verhalten wie
     upstream). Beim Export werden Archivnamen mit `..`/`\`/Laufwerk abgelehnt statt außerhalb des
     Zielordners geschrieben.
+14a. **ZIP-Export robuster** (2026-11-27, Review-Befunde 1/2): Die Temp-Datei heißt
+    `<name>.zip.<uuid>.tmp` (je Lauf eindeutig, `create_new`) statt `<name>.zip.tmp`, und sie wird erst
+    **nach** dem `MEDIA_LOCK` angelegt (wie upstream `with FileLock(...), sink:`); zwei gleichzeitige
+    Exporte in dasselbe Ziel können sich das Archiv nicht mehr gegenseitig abschneiden. Mit `-d` wird
+    zuerst umbenannt und erst danach der Rest des Ziels gelöscht (upstream `_finalize` löscht vorher:
+    scheitert das Umbenennen, wären ältere Exporte schon weg). Tests
+    `exporter::tests::concurrent_zip_sinks_use_separate_temp_files`,
+    `zip_delete_keeps_old_exports_when_final_rename_fails`.
+14b. **`showmigrations`** (2026-11-27, Review-Befund 8): Scheitert die Abfrage der offenen
+    `paperrust_*`-Migrationen, endet der Befehl mit dem Fehler (vorher: leere Liste, alles `[X]`,
+    Exit 0). Test `migrate::tests::showmigrations_propagates_pending_query_error`.
 - `manage migrate` auf älteren Datenbanken (Echttest 2026-11-16, echte 3.1.3-DB): Die Schlussprüfung
   der Spalten vergleicht ohne Reihenfolge (nachgeholte Spalten stehen hinten; vorher Rollback des
   ganzen Nachholens). Vor ausstehenden `paperrust_*`-Migrationen bekommen Sequenzen der ngx-Tabellen
@@ -446,6 +457,26 @@ Swagger-UI-Dateien: drf-spectacular-sidecar 2026.10.1 (Swagger UI, Apache-2.0, L
     model default). Exports with Markdown notes need paperless-ngx ≥ 3.5; the exporter then prints
     „N note(s) use Markdown … paperless-ngx before 3.5 cannot import this export“. `metadata.json`
     stays `{"version": "3.4.2"}`.
+22. **Importer copies files before the commit** (2026-11-27, `export::importer::import`): upstream
+    (`document_importer.py`, `handle` → `load_data_to_database` in `transaction.atomic()`, then
+    `_import_files_from_manifest`) commits the database first and copies the files afterwards, so a
+    failed copy (disk full, unreadable export file, existing target) leaves documents without files.
+    PaperRust copies the files into their final place while the import transaction is still open
+    (documents read via the same transaction, `ApplicationConfiguration` for the TIFF extension read
+    on it too) and commits only afterwards. On a copy error the transaction is rolled back and every
+    file this run created is removed again ("Copying the files failed; the database import was rolled
+    back", then "Copied files were removed again" or a list of paths that could not be removed); on a
+    commit error likewise ("Database commit failed"). Files that existed before (e.g. an overwritten
+    thumbnail) are never removed. Residual risk: a process crash between copying and commit leaves
+    orphan files without rows (found by `document_sanity_checker`), never rows without files. The
+    transaction stays open during copying (long for big exports). Test:
+    `importer::tests::failed_import_removes_only_own_copies`.
+23. **`check` write probe without truncation** (2026-11-27, `check.rs` `write_probe`): upstream
+    `paths_check` (`paperless/checks.py`) opens `__paperless_write_test_<pid>__` with mode `"w"`
+    (truncates an existing file of that name) and deletes it. PaperRust creates the probe with
+    `create_new`; if the name exists it tries `…_<pid>_<n>__` (up to 16 names) and deletes only the
+    file it created; an existing file is never touched. Messages unchanged. Test:
+    `check::tests::path_check_keeps_existing_probe_name`.
 
 ## CORE-REQUEST
 

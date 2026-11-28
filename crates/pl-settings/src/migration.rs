@@ -71,6 +71,17 @@ fn reason_for(def: &SettingDef) -> Option<String> {
     )
 }
 
+/// Name fragments that mark a variable as secret when the schema does not know it
+/// (unknown/obsolete names and foreign lines such as `POSTGRES_PASSWORD`).
+const SECRET_HINTS: &[&str] = &["PASS", "PWD", "SECRET", "TOKEN", "KEY", "CREDENTIAL", "PRIVATE"];
+
+/// Heuristic for names outside the schema: does the name look like it holds a secret?
+/// Known settings use the schema flag (`SettingDef::secret`) instead.
+pub fn looks_secret(name: &str) -> bool {
+    let upper = name.to_ascii_uppercase();
+    SECRET_HINTS.iter().any(|h| upper.contains(h))
+}
+
 /// Is the name one that we classify (PaperRust/paperless-ngx)?
 pub fn is_ours(name: &str) -> bool {
     name.starts_with(pl_core::config::UPSTREAM_PREFIX) || name.starts_with(pl_core::config::PREFIX)
@@ -78,12 +89,14 @@ pub fn is_ours(name: &str) -> bool {
 
 /// Classifies a name with value. `current` = running snapshot (for "already adopted").
 pub fn classify(name: &str, value: &str, source: &'static str, current: Option<&Settings>) -> Item {
+    // Unknown and obsolete names fall back to the name heuristic; known names use the schema.
+    let heuristic_secret = looks_secret(name);
     let mut item = Item {
         name: name.to_string(),
         key: None,
-        value: Some(value.to_string()),
+        value: if heuristic_secret { None } else { Some(value.to_string()) },
         raw: value.to_string(),
-        secret: false,
+        secret: heuristic_secret,
         source,
         class: None,
         verdict: Verdict::Unknown,
@@ -99,9 +112,7 @@ pub fn classify(name: &str, value: &str, source: &'static str, current: Option<&
     let Some(def) = find(name) else { return item };
     item.key = Some(def.key);
     item.secret = def.secret;
-    if def.secret {
-        item.value = None;
-    }
+    item.value = if def.secret { None } else { Some(value.to_string()) };
     item.class = Some(def.class.as_str());
     item.verdict = match def.class {
         Class::C | Class::D => Verdict::MustStay,
@@ -326,7 +337,8 @@ fn quote_env(v: &str) -> String {
 
 /// Generates a slim `docker-compose.env` (§5 no. 3): keeps C/D values, values not adopted
 /// from A/B and unknown names; removes adopted, ineffective and obsolete ones with a comment.
-/// Secrets from the running process (`mask_secrets`) appear as a comment.
+/// With `mask_secrets`, secrets (schema secrets, and secret-looking names among unknown names
+/// and `other_lines`) appear only as a comment, never with their value.
 pub fn slim_env(items: &[Item], other_lines: &[(String, String)], mask_secrets: bool) -> String {
     let mut keep = Vec::new();
     let mut removed = Vec::new();
@@ -356,7 +368,11 @@ pub fn slim_env(items: &[Item], other_lines: &[(String, String)], mask_secrets: 
         out.push('\n');
     }
     for (k, v) in other_lines {
-        out.push_str(&format!("{k}={}\n", quote_env(v)));
+        if mask_secrets && looks_secret(k) {
+            out.push_str(&format!("# {k}=<secret – copy the value from your current configuration>\n"));
+        } else {
+            out.push_str(&format!("{k}={}\n", quote_env(v)));
+        }
     }
     if !removed.is_empty() {
         out.push_str("\n# removed:\n");
@@ -461,5 +477,50 @@ mod tests {
         assert!(out.contains("# PAPERLESS_TIKA_ENABLED – no effect"));
         assert!(!out.contains("s3cr3t") && out.contains("# PAPERLESS_SECRET_KEY=<secret"));
         assert!(out.contains("PAPERLESS_OCR_LANGUAGE=\"deu eng\"  # can be moved"));
+    }
+
+    /// Regression: obsolete and unknown secret-looking names must not echo their value.
+    #[test]
+    fn obsolete_and_unknown_secrets_are_masked() {
+        let it = classify("PAPERLESS_PASSPHRASE", "gpg-pass", "upload", None);
+        assert_eq!(it.verdict, Verdict::Obsolete);
+        assert!(it.secret && it.value.is_none());
+        assert!(!serde_json::to_string(&it).unwrap_or_default().contains("gpg-pass"));
+        let it = classify(&format!("PAPERRUST_{}", "PASSPHRASE"), "gpg-pass", "upload", None);
+        assert!(it.secret && it.value.is_none());
+        let it = classify("PAPERLESS_MY_API_TOKEN", "tok", "upload", None);
+        assert_eq!(it.verdict, Verdict::Unknown);
+        assert!(it.secret && it.value.is_none());
+        // non-secret obsolete/unknown names keep their value
+        assert_eq!(classify("PAPERLESS_OCR_ALWAYS", "true", "upload", None).value.as_deref(), Some("true"));
+        assert_eq!(classify("PAPERLESS_TYPO_X", "1", "upload", None).value.as_deref(), Some("1"));
+        // the schema flag wins for known names (TOKEN_THROTTLE_RATE is a rate, not a secret)
+        assert_eq!(classify("PAPERLESS_TOKEN_THROTTLE_RATE", "5/min", "upload", None).value.as_deref(), Some("5/min"));
+    }
+
+    /// Regression: with masking, secrets in items and in foreign lines never appear in clear text.
+    #[test]
+    fn slim_env_masks_all_secrets() {
+        let items = vec![
+            classify("PAPERLESS_DBPASS", "dbpw", "upload", None),
+            classify("PAPERLESS_PASSPHRASE", "gpg-pass", "upload", None),
+            classify("PAPERLESS_MY_API_TOKEN", "tok123", "upload", None),
+            classify("PAPERLESS_DBHOST", "db", "upload", None),
+        ];
+        let others = vec![
+            ("POSTGRES_PASSWORD".to_string(), "pgpw".to_string()),
+            ("AWS_SECRET_ACCESS_KEY".to_string(), "awssecret".to_string()),
+            ("USERMAP_UID".to_string(), "1000".to_string()),
+        ];
+        let out = slim_env(&items, &others, true);
+        for secret in ["dbpw", "gpg-pass", "tok123", "pgpw", "awssecret"] {
+            assert!(!out.contains(secret), "{secret} leaked: {out}");
+        }
+        assert!(out.contains("# POSTGRES_PASSWORD=<secret"));
+        assert!(out.contains("PAPERLESS_DBHOST=db\n"));
+        assert!(out.contains("USERMAP_UID=1000\n"));
+        // unmasked (local CLI) keeps the values
+        let raw = slim_env(&items, &others, false);
+        assert!(raw.contains("PAPERLESS_DBPASS=dbpw") && raw.contains("POSTGRES_PASSWORD=pgpw"));
     }
 }

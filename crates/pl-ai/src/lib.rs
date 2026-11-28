@@ -22,6 +22,7 @@
 //! | [`synth`] | chat synthesis compact/refine (streaming) | llama_index `CompactAndRefine` |
 //! | [`pickle`] | Django-Cache-Pickle `SuggestionCacheData` | `documents/caching.py` |
 //! | [`vision`] | AI text recognition: page images → text (Ollama/OpenAI-compatible) | – (extension, cf. paperless-gpt) |
+//! | [`vision_guard`] | loop guard and plausibility checks for AI transcriptions | – (extension) |
 //! | [`prompt_store`] | own prompt templates per task | – (extension) |
 //! | [`custom_fields`] | custom fields via AI: prompt, validation, normalization | – (extension) |
 //! | [`options`] | AI options outside the settings registry | – (extension) |
@@ -59,6 +60,7 @@ mod testutil;
 pub mod tokenizer;
 pub mod vector_store;
 pub mod vision;
+pub mod vision_guard;
 pub mod workflow_assist;
 
 #[cfg(feature = "server")]

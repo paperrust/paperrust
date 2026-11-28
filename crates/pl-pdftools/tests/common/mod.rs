@@ -235,3 +235,100 @@ pub fn mean_luma(img: &image::GrayImage, x0: u32, y0: u32, x1: u32, y1: u32) -> 
     }
     sum as f64 / n.max(1) as f64
 }
+
+/// The grayscale JPEG scan of [`jpeg_scan_pdf`] as an image XObject.
+fn scan_image_stream() -> Stream {
+    let mut img = image::GrayImage::from_pixel(SCAN_W, SCAN_H, image::Luma([255u8]));
+    for (y0, y1) in [(600u32, 640u32), (300, 340)] {
+        for y in y0..y1 {
+            for x in 100..300u32 {
+                img.put_pixel(x, SCAN_H - 1 - y, image::Luma([0u8]));
+            }
+        }
+    }
+    let mut jpeg = Vec::new();
+    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, 90)
+        .encode(img.as_raw(), SCAN_W, SCAN_H, image::ExtendedColorType::L8)
+        .unwrap();
+    Stream::new(
+        dictionary! {
+            "Type" => "XObject", "Subtype" => "Image", "Width" => SCAN_W as i64, "Height" => SCAN_H as i64,
+            "ColorSpace" => "DeviceGray", "BitsPerComponent" => 8, "Filter" => "DCTDecode",
+        },
+        jpeg,
+    )
+}
+
+/// A page of a synthetic document: visible text lines, or the JPEG scan with (optionally)
+/// invisible OCR text (render mode 3, like OCRmyPDF's text layer).
+pub enum MixedPage<'a> {
+    Text(&'a [(&'a str, f64, f64)]),
+    Scan(&'a [(&'a str, f64, f64)]),
+}
+
+/// Write a document of 600 × 800 pt pages built from `pages`.
+pub fn mixed_pdf(path: &Path, pages: &[MixedPage<'_>]) {
+    let mut doc = Document::with_version("1.5");
+    let pages_id = doc.new_object_id();
+    let font_id = doc.add_object(dictionary! {
+        "Type" => "Font", "Subtype" => "Type1", "BaseFont" => "Helvetica", "Encoding" => "WinAnsiEncoding",
+    });
+    let mut kids = Vec::new();
+    for p in pages {
+        let mut resources = dictionary! { "Font" => dictionary! { "F1" => font_id } };
+        let ops = match p {
+            MixedPage::Text(lines) => text_ops(lines),
+            MixedPage::Scan(ocr) => {
+                let img_id = doc.add_object(scan_image_stream());
+                let mut xo = Dictionary::new();
+                xo.set("Im0", img_id);
+                resources.set("XObject", xo);
+                let mut ops = vec![
+                    Operation::new("q", vec![]),
+                    Operation::new("cm", vec![(SCAN_W as i64).into(), 0.into(), 0.into(), (SCAN_H as i64).into(), 0.into(), 0.into()]),
+                    Operation::new("Do", vec!["Im0".into()]),
+                    Operation::new("Q", vec![]),
+                ];
+                if !ocr.is_empty() {
+                    let mut t = text_ops(ocr);
+                    t.insert(1, Operation::new("Tr", vec![3.into()]));
+                    ops.extend(t);
+                }
+                ops
+            }
+        };
+        let content_id = doc.add_object(Stream::new(Dictionary::new(), Content { operations: ops }.encode().unwrap_or_default()));
+        let page_id = doc.add_object(dictionary! {
+            "Type" => "Page", "Parent" => pages_id,
+            "MediaBox" => vec![0.into(), 0.into(), (SCAN_W as i64).into(), (SCAN_H as i64).into()],
+            "Contents" => content_id, "Resources" => resources,
+        });
+        kids.push(Object::Reference(page_id));
+    }
+    let count = kids.len() as i64;
+    doc.objects.insert(pages_id, Object::Dictionary(dictionary! { "Type" => "Pages", "Kids" => kids, "Count" => count }));
+    let catalog_id = doc.add_object(dictionary! { "Type" => "Catalog", "Pages" => pages_id });
+    doc.trailer.set("Root", catalog_id);
+    doc.save(path).unwrap();
+}
+
+/// The image of page `index` (0-based), unpacked as grayscale.
+pub fn page_image(path: &Path, index: usize) -> Option<image::GrayImage> {
+    let doc = Document::load(path).unwrap();
+    let page = *doc.get_pages().values().nth(index)?;
+    let (res, _) = doc.get_page_resources(page).ok()?;
+    let xo = match res?.get(b"XObject").ok()? {
+        Object::Reference(r) => doc.get_dictionary(*r).ok()?,
+        Object::Dictionary(d) => d,
+        _ => return None,
+    };
+    let (_, v) = xo.iter().next()?;
+    let s = doc.get_object(v.as_reference().ok()?).ok()?.as_stream().ok()?;
+    let filter = s.dict.get(b"Filter").ok().and_then(|f| f.as_name().ok()).map(|n| n.to_vec()).unwrap_or_default();
+    let (w, h) = (s.dict.get(b"Width").ok()?.as_i64().ok()? as u32, s.dict.get(b"Height").ok()?.as_i64().ok()? as u32);
+    if filter == b"DCTDecode" {
+        Some(image::load_from_memory_with_format(&s.content, image::ImageFormat::Jpeg).ok()?.to_luma8())
+    } else {
+        image::GrayImage::from_raw(w, h, s.decompressed_content().ok()?[..(w * h) as usize].to_vec())
+    }
+}

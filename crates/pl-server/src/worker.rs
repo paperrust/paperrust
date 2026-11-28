@@ -1109,9 +1109,10 @@ pub async fn ai_after_consumption(state: &AppState, queue: &dyn TaskQueue, docum
 #[cfg(not(feature = "ai"))]
 pub async fn ai_after_consumption(_state: &AppState, _queue: &dyn TaskQueue, _document_id: i64) {}
 
-/// [`pl_core::vision::VisionOcr`] on pl-ai (`server::assist::{vision_wanted, vision_ocr}`):
-/// rules (enabled, `vision_when`, per-document choice), image model, page limits and daily budget
-/// come from the AI options (`paperrust_ai_option` / `PAPERRUST_AI_VISION_*`).
+/// [`pl_core::vision::VisionOcr`] on pl-ai (`server::vision::{plan, transcribe, record}`, KI-Abschrift):
+/// mode ("Aus"/"Nur unsichere Stellen"/"Ganze Seite, wenn unsicher"/"Immer", legacy `vision_when`),
+/// sensitivity, image model, image size, page limits and daily budget come from the AI options
+/// (`paperrust_ai_option` / `PAPERRUST_AI_VISION_*`); `record` stores the transcript and the label note.
 #[cfg(feature = "ai")]
 pub struct AiVisionOcr {
     pub state: AppState,
@@ -1119,28 +1120,28 @@ pub struct AiVisionOcr {
 
 #[cfg(feature = "ai")]
 impl pl_core::vision::VisionOcr for AiVisionOcr {
-    fn plan(&self, requested: bool, ocr_chars: Option<usize>, pages: usize) -> pl_core::vision::VisionFuture<'_, Option<usize>> {
+    fn plan(&self, requested: bool) -> pl_core::vision::VisionFuture<'_, Option<pl_core::vision::VisionPlan>> {
+        Box::pin(async move { pl_ai::server::vision::plan(&self.state, requested).await })
+    }
+
+    fn recognize(
+        &self,
+        request: pl_core::vision::VisionRequest,
+    ) -> pl_core::vision::VisionFuture<'_, Result<Option<pl_core::vision::VisionResponse>, String>> {
         Box::pin(async move {
-            if !pl_ai::server::assist::vision_wanted(&self.state, requested, ocr_chars, pages).await {
-                return None;
+            let r = pl_ai::server::vision::transcribe(&self.state, request).await?;
+            if let Some(r) = &r {
+                let skipped = r.items.iter().filter(|i| i.status == pl_core::vision::ItemStatus::Skipped).count();
+                if skipped > 0 {
+                    tracing::info!(target: "paperless.consumer", "AI transcription: {skipped} page(s)/crop(s) not sent (page limit or daily budget)");
+                }
             }
-            let opts = pl_ai::server::store::load_options(self.state.db()).await;
-            Some(usize::try_from(opts.vision_limits.max_pages).unwrap_or(usize::MAX).max(1))
+            Ok(r)
         })
     }
 
-    fn recognize(&self, pages: Vec<pl_core::vision::PageImage>) -> pl_core::vision::VisionFuture<'_, Result<Option<String>, String>> {
-        Box::pin(async move {
-            let pages: Vec<pl_ai::vision::PageImage> =
-                pages.into_iter().map(|p| pl_ai::vision::PageImage { mime: p.mime, data: p.data }).collect();
-            let r = pl_ai::server::assist::vision_ocr(&self.state, &pages).await?;
-            Ok(r.map(|r| {
-                if r.skipped_pages > 0 {
-                    tracing::info!(target: "paperless.consumer", "AI text recognition: {} page(s) not sent (page limit or daily budget)", r.skipped_pages);
-                }
-                r.text()
-            }))
-        })
+    fn record(&self, document_id: i64, transcript: pl_core::vision::Transcript) -> pl_core::vision::VisionFuture<'_, ()> {
+        Box::pin(async move { pl_ai::server::vision::record(&self.state, document_id, transcript).await })
     }
 }
 
@@ -1152,10 +1153,31 @@ impl pl_core::vision::VisionOcr for AiVisionOcr {
 /// is always `None` (the trait carries no user). W5: after `save`/`add_nested_tags`/`remove_tags`
 /// the receivers `post_save`/`m2m_changed` → `update_filename_and_move_files` run in the same
 /// transaction (pl-consumer `files`).
+///
+/// Transactional path (`supports_transaction() == true`, used by the AI review/automation/undo):
+/// the `*_tx` methods write on the caller's connection with the same auditlog entries and never
+/// begin/commit themselves; the file move runs only in [`DocWriter::after_commit`] (own
+/// transaction after the caller's commit), so a rollback never leaves files moved. Custom fields
+/// on that path use the deferred pl-documents-write variants (`cfi::update_or_create_deferred`,
+/// `cfi::soft_delete_deferred`), which skip the `post_save` file move.
+///
+/// [`DocWriter::after_commit`]: pl_ai::server::workflow::DocWriter::after_commit
 #[cfg(feature = "ai")]
 pub struct ConsumerDocWriter {
     pub audit_enabled: bool,
     pub settings: Arc<pl_consumer::settings::ConsumerSettings>,
+}
+
+/// Error text of a pl-documents-write `cfi` call for the `DocWriter` trait (no internals beyond
+/// what the previous local mirror returned: the message or the database error).
+#[cfg(feature = "ai")]
+fn cfi_err(e: pl_documents_write::error::ApiError) -> String {
+    use pl_documents_write::error::ApiError;
+    match e {
+        ApiError::Uncaught(m) | ApiError::BadRequestText(m) => m,
+        ApiError::Database(e) => e.to_string(),
+        other => format!("{other:?}"),
+    }
 }
 
 #[cfg(feature = "ai")]
@@ -1303,6 +1325,110 @@ impl pl_ai::server::workflow::DocWriter for ConsumerDocWriter {
                     .await
                     .map_err(|e| format!("{e:?}"))?;
             }
+            tx.commit().await.map_err(|e| e.to_string())
+        })
+    }
+
+    // ---- transactional path: caller's connection, no begin/commit, files only after the commit ----
+
+    fn supports_transaction(&self) -> bool {
+        true
+    }
+
+    /// `save` on the caller's connection: `Document.save(update_fields)` with auditlog, no file move.
+    fn save_tx<'a>(
+        &'a self,
+        conn: &'a mut sqlx::PgConnection,
+        doc_id: i64,
+        c: &'a pl_ai::server::workflow::DocChanges,
+    ) -> futures::future::BoxFuture<'a, Result<(), String>> {
+        Box::pin(async move {
+            let mut doc = load_instance(conn, doc_id).await?;
+            let fields = apply_doc_changes(&mut doc, c);
+            pl_consumer::docops::save(conn, &self.audit(), &mut doc, Some(&fields)).await.map_err(|e| e.to_string())
+        })
+    }
+
+    fn add_nested_tags_tx<'a>(
+        &'a self,
+        conn: &'a mut sqlx::PgConnection,
+        doc_id: i64,
+        tag_ids: &'a [i64],
+    ) -> futures::future::BoxFuture<'a, Result<(), String>> {
+        Box::pin(async move {
+            let doc = load_instance(conn, doc_id).await?;
+            pl_consumer::docops::add_nested_tags(conn, &self.audit(), &doc, tag_ids).await.map(|_| ()).map_err(|e| e.to_string())
+        })
+    }
+
+    fn remove_tags_tx<'a>(
+        &'a self,
+        conn: &'a mut sqlx::PgConnection,
+        doc_id: i64,
+        tag_ids: &'a [i64],
+    ) -> futures::future::BoxFuture<'a, Result<(), String>> {
+        Box::pin(async move {
+            let doc = load_instance(conn, doc_id).await?;
+            pl_consumer::docops::remove_tags(conn, &self.audit(), &doc, tag_ids).await.map_err(|e| e.to_string())
+        })
+    }
+
+    /// Same SQL as the pool variant (`SqlDocWriter`), on the caller's connection.
+    fn get_or_create_tx<'a>(
+        &'a self,
+        conn: &'a mut sqlx::PgConnection,
+        cat: pl_ai::server::data::Cat,
+        name: &'a str,
+        owner: Option<i64>,
+    ) -> futures::future::BoxFuture<'a, Result<(i64, bool), String>> {
+        Box::pin(pl_ai::server::workflow::sql_get_or_create(conn, cat, name, owner))
+    }
+
+    /// `update_or_create` with auditlog on the caller's connection; the field type comes from the
+    /// database (mismatch rejected). File name: [`Self::after_commit`].
+    fn set_custom_field_tx<'a>(
+        &'a self,
+        conn: &'a mut sqlx::PgConnection,
+        doc_id: i64,
+        field_id: i64,
+        data_type: &'a str,
+        value: &'a Value,
+    ) -> futures::future::BoxFuture<'a, Result<(), String>> {
+        Box::pin(async move {
+            let log = pl_documents_write::auditlog::LogCtx { enabled: self.audit_enabled, ..Default::default() };
+            let field = pl_documents_write::cfi::field_def(conn, field_id)
+                .await
+                .map_err(|e| e.to_string())?
+                .ok_or_else(|| format!("custom field {field_id} does not exist"))?;
+            if field.data_type != data_type {
+                return Err(format!("custom field {field_id} has type {}, not {data_type}", field.data_type));
+            }
+            pl_documents_write::cfi::update_or_create_deferred(conn, &log, doc_id, &field, value).await.map(|_| ()).map_err(cfi_err)
+        })
+    }
+
+    /// Soft delete of the live instance with auditlog on the caller's connection; none → no-op.
+    fn remove_custom_field_tx<'a>(
+        &'a self,
+        conn: &'a mut sqlx::PgConnection,
+        doc_id: i64,
+        field_id: i64,
+    ) -> futures::future::BoxFuture<'a, Result<(), String>> {
+        Box::pin(async move {
+            let log = pl_documents_write::auditlog::LogCtx { enabled: self.audit_enabled, ..Default::default() };
+            let Some(c) = pl_documents_write::cfi::live_for(conn, doc_id, field_id).await.map_err(|e| e.to_string())? else {
+                return Ok(());
+            };
+            pl_documents_write::cfi::soft_delete_deferred(conn, &log, &c, uuid::Uuid::new_v4()).await.map_err(cfi_err)
+        })
+    }
+
+    /// After the caller's commit: `post_save`/`m2m_changed` → `update_filename_and_move_files` in
+    /// a fresh transaction (move errors are logged and rolled back inside, as upstream).
+    fn after_commit<'a>(&'a self, state: &'a AppState, doc_id: i64) -> futures::future::BoxFuture<'a, Result<(), String>> {
+        Box::pin(async move {
+            let mut tx = state.db().begin().await.map_err(|e| e.to_string())?;
+            pl_consumer::files::update_filename_and_move_files(&mut tx, &self.settings, doc_id).await.map_err(|e| e.to_string())?;
             tx.commit().await.map_err(|e| e.to_string())
         })
     }

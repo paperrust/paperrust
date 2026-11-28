@@ -68,3 +68,25 @@ async fn init_and_unlock_identity_on_s3() {
     assert!(pl_guard::backup::identity(&t, Some("wrong passphrase!!"), None).await.is_err());
     assert!(pl_guard::backup::init(&t, data.path(), "short", Some(10)).await.is_err());
 }
+
+/// Streaming upload from a file (SHA-256 + MD5 precomputed, body streamed with
+/// Content-Length) with Object Lock, sizes in the listing, streaming download into a file.
+#[tokio::test]
+async fn streaming_put_file_and_get_to_file() {
+    let (ep, state) = s3mock::start().await;
+    let t = s3mock::target(&ep, "repo", LockMode::Compliance);
+    let s = Store::open(&t).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let src = dir.path().join("big.bin");
+    let data: Vec<u8> = (0..700_000u32).map(|i| (i % 253) as u8).collect();
+    std::fs::write(&src, &data).unwrap();
+    s.put_file("objects/ab/big", &src, s.retain_until(Utc::now())).await.unwrap();
+    assert_eq!(s.list_sized("objects/").await.unwrap(), vec![("objects/ab/big".to_string(), 700_000)]);
+    let dest = dir.path().join("dl.bin");
+    assert!(s.get_to_file("objects/ab/big", &dest).await.unwrap());
+    assert_eq!(std::fs::read(&dest).unwrap(), data);
+    assert!(!s.get_to_file("objects/ab/none", &dir.path().join("none.bin")).await.unwrap());
+    let g = state.lock().unwrap();
+    assert_eq!(g.objects["repo/objects/ab/big"].mode.as_deref(), Some("COMPLIANCE"));
+    assert_eq!(g.bad_signatures, 0);
+}

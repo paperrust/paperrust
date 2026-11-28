@@ -243,6 +243,27 @@ struct ZipSink {
 }
 
 impl ZipSink {
+    /// Opens the archive under a temp name unique to this run (`<name>.zip.<uuid>.tmp`,
+    /// `create_new`): a second export into the same target must not truncate this run's file
+    /// (review finding 1; upstream uses the fixed name `<name>.zip.tmp`).
+    fn create(target: &Path, zip_path: PathBuf, method: Method, level: Option<i32>, tz: chrono_tz::Tz, delete: bool) -> CliResult<ZipSink> {
+        let tmp_path = zip_path.with_file_name(format!(
+            "{}.{}.tmp",
+            zip_path.file_name().and_then(|s| s.to_str()).unwrap_or("export.zip"),
+            uuid::Uuid::new_v4().simple()
+        ));
+        let zw = ZipWriter::create_new(&tmp_path, method, level, tz)?;
+        Ok(ZipSink {
+            target: target.to_path_buf(),
+            zip_path,
+            tmp_path,
+            delete,
+            zip: Some(zw),
+            dirs: HashSet::new(),
+            pending_manifest: None,
+        })
+    }
+
     fn ensure_dirs(&mut self, arcname: &str) -> CliResult {
         // same naming rules as for the directory export (review C-N4)
         arc_path(&self.target, arcname)?;
@@ -287,10 +308,13 @@ impl ZipSink {
         if let Some(z) = self.zip.take() {
             z.finish()?;
         }
+        // Rename first, delete afterwards (review finding 2; upstream wipes before the rename): if
+        // the rename fails, older exports in the target are still there.
+        std::fs::rename(&self.tmp_path, &self.zip_path)?;
         if self.delete {
             for e in std::fs::read_dir(&self.target)?.flatten() {
                 let p = e.path();
-                if p == self.zip_path || p == self.tmp_path {
+                if p == self.zip_path {
                     continue;
                 }
                 if p.is_dir() {
@@ -300,7 +324,6 @@ impl ZipSink {
                 }
             }
         }
-        std::fs::rename(&self.tmp_path, &self.zip_path)?;
         Ok(())
     }
 
@@ -562,6 +585,9 @@ pub async fn export(c: &Ctx, o: &ExportOptions) -> CliResult {
             _ => {}
         }
     }
+    // MEDIA_LOCK before the sink opens anything in the target (upstream `with FileLock(...), sink:`;
+    // review finding 1: opening the ZIP before the lock let a second export touch the first one's file)
+    let _lock = MediaLock::acquire(&c.cfg.media_lock).await?;
     let mut sink = if o.zip {
         // (target / zip_name).with_suffix(".zip")
         // PaperRust: only a file name, no path (review C-N3)
@@ -573,20 +599,10 @@ pub async fn export(c: &Ctx, o: &ExportOptions) -> CliResult {
             eprintln!("Warning: --delete with --zip removes every other file and folder in {}", target.display());
         }
         let zip_path = target.join(format!("{}.zip", pypath::without_suffix(zn)));
-        let tmp_path = zip_path.with_file_name(format!("{}.tmp", zip_path.file_name().and_then(|s| s.to_str()).unwrap_or("export.zip")));
         std::fs::create_dir_all(&c.cfg.scratch_dir)?;
         // bounds checked above (LEVEL_BOUNDS)
         let level = o.zip_compression_level.and_then(|l| i32::try_from(l).ok());
-        let zw = ZipWriter::create(&tmp_path, method, level, c.cfg.tz)?;
-        Sink::Zip(ZipSink {
-            target: target.clone(),
-            zip_path,
-            tmp_path,
-            delete: o.delete,
-            zip: Some(zw),
-            dirs: HashSet::new(),
-            pending_manifest: None,
-        })
+        Sink::Zip(ZipSink::create(&target, zip_path, method, level, c.cfg.tz, o.delete)?)
     } else {
         let mut ds = DirSink {
             target: target.clone(),
@@ -599,7 +615,6 @@ pub async fn export(c: &Ctx, o: &ExportOptions) -> CliResult {
         Sink::Dir(ds)
     };
 
-    let _lock = MediaLock::acquire(&c.cfg.media_lock).await?;
     let result = dump(c, o, d, &mut sink, &target).await;
     match (&mut sink, result) {
         (Sink::Zip(z), Err(e)) => {
@@ -951,6 +966,60 @@ mod tests {
         assert!(!d.path().join("escape.pdf").exists() && !d.path().join("manifest.json").exists());
         ds.add_file(&src, "originals/ok.pdf", None).unwrap();
         assert!(target.join("originals").join("ok.pdf").exists());
+    }
+
+    fn zip_entries(p: &Path) -> Vec<String> {
+        let mut r = super::super::zip::ZipReader::open(p).unwrap();
+        let out = tempfile::tempdir().unwrap();
+        r.extract_all(out.path()).unwrap();
+        r.entries.iter().map(|e| e.name.clone()).collect()
+    }
+
+    /// Review finding 1: two ZIP exports into the same target must not share one temp file
+    /// (opening truncated the other run's file). Each run finishes with a valid archive.
+    #[test]
+    fn concurrent_zip_sinks_use_separate_temp_files() {
+        let d = tempfile::tempdir().unwrap();
+        let target = d.path().to_path_buf();
+        let zip_path = target.join("export.zip");
+        let big = "x".repeat(200_000);
+        let mut a = ZipSink::create(&target, zip_path.clone(), Method::Stored, None, chrono_tz::UTC, false).unwrap();
+        a.add_json(&big, "a/first.json").unwrap();
+        let mut b = ZipSink::create(&target, zip_path.clone(), Method::Stored, None, chrono_tz::UTC, false).unwrap();
+        assert_ne!(a.tmp_path, b.tmp_path, "each run needs its own temp file");
+        b.add_json(&big, "b/second.json").unwrap();
+        a.add_json("[]", "a/more.json").unwrap();
+        a.finalize().unwrap();
+        assert_eq!(zip_entries(&zip_path), vec!["a/", "a/first.json", "a/more.json"]);
+        b.finalize().unwrap();
+        assert_eq!(zip_entries(&zip_path), vec!["b/", "b/second.json"]);
+        let left: Vec<_> = std::fs::read_dir(&target).unwrap().flatten().map(|e| e.file_name()).collect();
+        assert_eq!(left, vec![std::ffi::OsString::from("export.zip")], "no temp files left behind");
+    }
+
+    /// Review finding 2: with `--delete`, older exports must survive when the finished ZIP cannot
+    /// be moved to its final name.
+    #[test]
+    fn zip_delete_keeps_old_exports_when_final_rename_fails() {
+        let d = tempfile::tempdir().unwrap();
+        let target = d.path().to_path_buf();
+        std::fs::write(target.join("export-old.zip"), b"older backup").unwrap();
+        // the final name is occupied by a non-empty folder: the rename must fail
+        let zip_path = target.join("export.zip");
+        std::fs::create_dir_all(zip_path.join("blocker")).unwrap();
+        std::fs::write(zip_path.join("blocker").join("f"), b"x").unwrap();
+        let mut s = ZipSink::create(&target, zip_path.clone(), Method::Deflated, None, chrono_tz::UTC, true).unwrap();
+        s.add_json("[]", "manifest.json").unwrap();
+        assert!(s.finalize().is_err());
+        assert_eq!(std::fs::read(target.join("export-old.zip")).unwrap(), b"older backup", "old export deleted too early");
+        // normal case: rename succeeds, then everything else is removed
+        std::fs::remove_dir_all(&zip_path).unwrap();
+        let mut s = ZipSink::create(&target, zip_path.clone(), Method::Deflated, None, chrono_tz::UTC, true).unwrap();
+        s.add_json("[]", "manifest.json").unwrap();
+        s.finalize().unwrap();
+        let left: Vec<_> = std::fs::read_dir(&target).unwrap().flatten().map(|e| e.file_name()).collect();
+        assert_eq!(left, vec![std::ffi::OsString::from("export.zip")]);
+        assert_eq!(zip_entries(&zip_path), vec!["manifest.json"]);
     }
 
     #[test]

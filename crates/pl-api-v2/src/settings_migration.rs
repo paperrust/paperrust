@@ -136,16 +136,23 @@ pub async fn check_file(State(state): State<AppState>, Caller(p): Caller, req: R
         return Err(SettingsError::field("file", "File too large (1 MiB max)."));
     }
     let text_in = String::from_utf8_lossy(&content);
-    let parsed = migration::parse_file(&text_in);
     let s = snapshot(&state, &handle(&state)).await?;
-    let items = migration::check_pairs(&parsed.pairs, Some(&s));
+    Ok(crate::http::json(&check_file_body(&text_in, Some(&s))))
+}
+
+/// Response body of `check-file`. Secrets never leave the server in clear text: schema secrets,
+/// obsolete/unknown secret-looking names (`items[].value` = null) and secret-looking foreign
+/// lines such as `POSTGRES_PASSWORD` are masked in `items` and in `slim_env`. The admin copies
+/// those values from their own file (the local CLI `manage settings slim-env` keeps them).
+fn check_file_body(text_in: &str, current: Option<&pl_settings::layer::Settings>) -> Value {
+    let parsed = migration::parse_file(text_in);
+    let items = migration::check_pairs(&parsed.pairs, current);
     let others: Vec<(String, String)> = parsed.pairs.iter().filter(|(k, _)| !migration::is_ours(k)).cloned().collect();
-    // The file comes from the admin themselves – the slim version may contain its values.
-    let slim = migration::slim_env(&items, &others, false);
-    Ok(crate::http::json(&json!({
+    let slim = migration::slim_env(&items, &others, true);
+    json!({
         "kind": parsed.kind, "service": parsed.service, "env_files": parsed.env_files,
         "items": items, "slim_env": slim,
-    })))
+    })
 }
 
 #[derive(Debug, Deserialize)]
@@ -266,4 +273,29 @@ pub async fn import(State(state): State<AppState>, Caller(p): Caller, V2Json(bod
         tracing::warn!(error = %e, "settings reload after import failed");
     }
     Ok(crate::http::json(&json!({"dry_run": false, "items": rows, "applied": apply.len(), "rev": rev})))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Regression: the check-file response must not echo secrets (schema secrets, obsolete
+    /// PAPERLESS_PASSPHRASE, foreign DB passwords) in `items` or `slim_env`.
+    #[test]
+    fn check_file_masks_secrets() {
+        let file = "PAPERLESS_DBHOST=db\nPAPERLESS_DBPASS=dbpw-1\nPAPERLESS_SECRET_KEY=sk-2\nPAPERLESS_PASSPHRASE=gpg-3\n\
+                    POSTGRES_PASSWORD=pg-4\nPAPERLESS_TIME_ZONE=Europe/Zurich\n";
+        let body = check_file_body(file, None);
+        let out = body.to_string();
+        for secret in ["dbpw-1", "sk-2", "gpg-3", "pg-4"] {
+            assert!(!out.contains(secret), "{secret} leaked: {out}");
+        }
+        let items = body["items"].as_array().cloned().unwrap_or_default();
+        let pass = items.iter().find(|i| i["name"] == "PAPERLESS_PASSPHRASE");
+        assert!(pass.is_some_and(|i| i["value"].is_null() && i["secret"] == true));
+        // non-secret values stay usable for "adopt"
+        let tz = items.iter().find(|i| i["name"] == "PAPERLESS_TIME_ZONE");
+        assert!(tz.is_some_and(|i| i["value"] == "Europe/Zurich"));
+        assert!(body["slim_env"].as_str().is_some_and(|s| s.contains("PAPERLESS_DBHOST=db")));
+    }
 }

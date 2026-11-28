@@ -9,6 +9,9 @@
 
 use std::path::{Path, PathBuf};
 
+use pl_parsers::limits::Truncation;
+use pl_parsers::pdf::PdfText;
+
 use crate::args::{ArgsRequest, ImageOps, construct_ocrmypdf_parameters};
 use crate::config::{ArchiveFileGeneration, Mode, OcrConfig};
 use crate::imageinfo::is_image;
@@ -19,6 +22,11 @@ use crate::{OcrArgs, OcrError, Result};
 pub trait OcrBackend {
     /// `extract_pdf_text` (pdftotext): raw text or `None` on error.
     fn extract_pdf_text(&self, pdf: &Path) -> Option<String>;
+    /// [`Self::extract_pdf_text`] plus the limit that cut the text short, if any (PaperRust:
+    /// page, time and text-size limits keep the pages read so far). Default: no limits known.
+    fn extract_pdf_text_report(&self, pdf: &Path) -> PdfText {
+        PdfText { text: self.extract_pdf_text(pdf), truncated: None }
+    }
     /// `is_tagged_pdf`.
     fn is_tagged_pdf(&self, pdf: &Path) -> bool;
     /// `ocrmypdf.ocr(**args)`.
@@ -30,6 +38,13 @@ pub trait OcrBackend {
 
     /// `RasterisedDocumentParser.extract_text(sidecar_file, pdf_file)`.
     fn extract_text(&self, sidecar: Option<&Path>, pdf: &Path, mode: Mode) -> Option<String> {
+        self.extract_text_report(sidecar, pdf, mode).text
+    }
+
+    /// [`Self::extract_text`] plus the truncation of the PDF text extraction (the sidecar is
+    /// never cut). This is what [`RasterisedParser::parse`] calls, so the reported truncation
+    /// always belongs to the very text that ends up in [`ParseOutcome::text`].
+    fn extract_text_report(&self, sidecar: Option<&Path>, pdf: &Path, mode: Mode) -> PdfText {
         if let Some(sc) = sidecar {
             // When re-doing OCR, the sidecar contains ONLY the new text
             if sc.is_file()
@@ -38,15 +53,16 @@ pub trait OcrBackend {
             {
                 if !text.contains("[OCR skipped on page") {
                     tracing::debug!("Using text from sidecar file");
-                    return post_process_text(Some(&text));
+                    return PdfText { text: post_process_text(Some(&text)), truncated: None };
                 }
                 tracing::debug!("Incomplete sidecar file: discarding.");
             }
         }
         if !pdf.is_file() {
-            return None;
+            return PdfText::default();
         }
-        post_process_text(self.extract_pdf_text(pdf).as_deref())
+        let r = self.extract_pdf_text_report(pdf);
+        PdfText { text: post_process_text(r.text.as_deref()), truncated: r.truncated }
     }
 }
 
@@ -57,6 +73,9 @@ pub struct ParseOutcome {
     pub archive_path: Option<PathBuf>,
     /// All `ocrmypdf.ocr` calls (for logs/tests).
     pub ocr_calls: Vec<OcrArgs>,
+    /// PaperRust: a parser limit cut `text` short (only possible when `text` comes from the
+    /// PDF text extraction, not from the OCR sidecar). The consumer turns it into a note.
+    pub truncated: Option<Truncation>,
 }
 
 /// `RasterisedDocumentParser` (without thumbnail/metadata, see `thumbnail`, pl-parsers).
@@ -107,13 +126,15 @@ impl RasterisedParser<'_> {
         let mode = self.settings.mode;
         let mut out = ParseOutcome::default();
         let mut text: Option<String>;
+        // truncation of the text in `text` (PaperRust)
+        let mut truncated: Option<Truncation> = None;
 
-        let (text_original, original_has_text) = if mime_type == "application/pdf" {
-            let t = self.backend.extract_text(None, document_path, mode);
-            let has = is_born_digital_text(t.as_deref(), || self.backend.is_tagged_pdf(document_path));
-            (t, has)
+        let (text_original, trunc_original, original_has_text) = if mime_type == "application/pdf" {
+            let r = self.backend.extract_text_report(None, document_path, mode);
+            let has = is_born_digital_text(r.text.as_deref(), || self.backend.is_tagged_pdf(document_path));
+            (r.text, r.truncated, has)
         } else {
-            (None, false)
+            (None, None, false)
         };
         tracing::debug!(
             "Text detection: original_has_text={} (text_length={}, mode={}, produce_archive={})",
@@ -127,6 +148,7 @@ impl RasterisedParser<'_> {
         if mode == Mode::Off {
             if !produce_archive {
                 out.text = text_original.unwrap_or_default();
+                out.truncated = trunc_original;
                 return Ok(out);
             }
             if is_image(mime_type) {
@@ -146,6 +168,7 @@ impl RasterisedParser<'_> {
                 Ok(()) => {
                     out.archive_path = Some(archive_path);
                     out.text = text_original.unwrap_or_default();
+                    out.truncated = trunc_original;
                 }
                 Err(OcrError::SubprocessOutput(m)) => return Err(Self::subprocess_error(&m)),
                 Err(e) => return Err(Self::wrap(&e)),
@@ -157,6 +180,7 @@ impl RasterisedParser<'_> {
         if mode == Mode::Auto && original_has_text && !produce_archive {
             tracing::debug!("Document has text and no archive requested; skipping OCRmyPDF entirely.");
             out.text = text_original.unwrap_or_default();
+            out.truncated = trunc_original;
             return Ok(out);
         }
 
@@ -173,7 +197,7 @@ impl RasterisedParser<'_> {
         tracing::debug!("Calling OCRmyPDF with args: {}", args.to_json());
         out.ocr_calls.push(args.clone());
 
-        let first: Result<Option<String>> = (|| {
+        let first: Result<PdfText> = (|| {
             self.backend.ocr(&args)?;
             Ok(())
         })()
@@ -181,18 +205,22 @@ impl RasterisedParser<'_> {
             if produce_archive {
                 out.archive_path = Some(archive_path.clone());
             }
-            self.backend.extract_text(Some(&sidecar_file), &archive_path, mode)
+            self.backend.extract_text_report(Some(&sidecar_file), &archive_path, mode)
         });
 
         text = None;
         let mut needs_fallback: Option<String> = None;
         match first {
-            Ok(Some(t)) if !t.is_empty() => text = Some(t),
+            Ok(PdfText { text: Some(t), truncated: tr }) if !t.is_empty() => {
+                text = Some(t);
+                truncated = tr;
+            }
             Ok(_) => needs_fallback = Some("No text was found in the original document".into()),
             Err(OcrError::DigitalSignature) | Err(OcrError::EncryptedPdf) => {
                 tracing::warn!("This file is encrypted and/or signed, OCR is impossible. Using any text present in the original file.");
                 if original_has_text {
                     text = text_original.clone();
+                    truncated = trunc_original.clone();
                 }
             }
             Err(OcrError::SubprocessOutput(m)) => return Err(Self::subprocess_error(&m)),
@@ -209,7 +237,9 @@ impl RasterisedParser<'_> {
             out.ocr_calls.push(args.clone());
             match self.backend.ocr(&args) {
                 Ok(()) => {
-                    text = self.backend.extract_text(Some(&sidecar_fb), &archive_fb, mode);
+                    let r = self.backend.extract_text_report(Some(&sidecar_fb), &archive_fb, mode);
+                    text = r.text;
+                    truncated = r.truncated;
                     if produce_archive {
                         out.archive_path = Some(archive_fb);
                     }
@@ -218,12 +248,12 @@ impl RasterisedParser<'_> {
             }
         }
 
-        out.text = match text.filter(|t| !t.is_empty()) {
-            Some(t) => t,
-            None if original_has_text => text_original.unwrap_or_default(),
+        (out.text, out.truncated) = match text.filter(|t| !t.is_empty()) {
+            Some(t) => (t, truncated),
+            None if original_has_text => (text_original.unwrap_or_default(), trunc_original),
             None => {
                 tracing::warn!("No text was found in {}, the content will be empty.", document_path.display());
-                String::new()
+                (String::new(), None)
             }
         };
         Ok(out)
@@ -305,6 +335,8 @@ mod tests {
         gs_calls: RefCell<u32>,
         gs_result: RefCell<Option<OcrError>>,
         extract_calls: RefCell<Vec<Option<PathBuf>>>,
+        /// Truncations reported next to `texts`, in the same order (last one repeated).
+        truncations: RefCell<Vec<Option<Truncation>>>,
     }
     impl Mock {
         fn with_text(t: Option<&str>) -> Self {
@@ -337,10 +369,13 @@ mod tests {
                 None => Ok(()),
             }
         }
-        fn extract_text(&self, sidecar: Option<&Path>, _: &Path, _: Mode) -> Option<String> {
+        fn extract_text_report(&self, sidecar: Option<&Path>, _: &Path, _: Mode) -> PdfText {
             self.extract_calls.borrow_mut().push(sidecar.map(Path::to_path_buf));
             let mut t = self.texts.borrow_mut();
-            if t.len() > 1 { t.remove(0) } else { t.first().cloned().flatten() }
+            let text = if t.len() > 1 { t.remove(0) } else { t.first().cloned().flatten() };
+            let mut tr = self.truncations.borrow_mut();
+            let truncated = if tr.len() > 1 { tr.remove(0) } else { tr.first().cloned().flatten() };
+            PdfText { text, truncated }
         }
     }
 
@@ -472,6 +507,55 @@ mod tests {
         m.tagged = true;
         parser(&m, Mode::Auto).parse(Path::new("d.pdf"), PDF, false).unwrap();
         assert_eq!(*m.ocr_calls.borrow(), 1);
+    }
+
+    // --- PaperRust: truncation of the PDF text extraction ---
+    fn pages_cut() -> Truncation {
+        Truncation::PdfPages { read: 2, total: 3, limit: 2 }
+    }
+
+    #[test]
+    fn auto_text_no_archive_reports_truncation_of_the_original_text() {
+        let m = Mock::with_text(Some(LONG));
+        *m.truncations.borrow_mut() = vec![Some(pages_cut())];
+        let r = parser(&m, Mode::Auto).parse(Path::new("d.pdf"), PDF, false).unwrap();
+        assert_eq!(*m.ocr_calls.borrow(), 0);
+        assert_eq!(r.text, LONG);
+        assert_eq!(r.truncated, Some(pages_cut()));
+    }
+
+    #[test]
+    fn off_mode_reports_truncation_of_the_original_text() {
+        let m = Mock::with_text(Some(LONG));
+        *m.truncations.borrow_mut() = vec![Some(pages_cut())];
+        let r = parser(&m, Mode::Off).parse(Path::new("d.pdf"), PDF, false).unwrap();
+        assert_eq!(r.truncated, Some(pages_cut()));
+    }
+
+    #[test]
+    fn truncation_follows_the_text_that_is_used() {
+        // original cut short, OCR text (sidecar) complete → the stored OCR text is complete
+        let m = Mock::with_texts(&[Some(LONG), Some("ocr text")]);
+        *m.truncations.borrow_mut() = vec![Some(pages_cut()), None];
+        let r = parser(&m, Mode::Force).parse(Path::new("d.pdf"), PDF, true).unwrap();
+        assert_eq!(r.text, "ocr text");
+        assert_eq!(r.truncated, None);
+        // original complete, archive text cut short → reported
+        let m = Mock::with_texts(&[Some(LONG), Some("archive text")]);
+        *m.truncations.borrow_mut() = vec![None, Some(pages_cut())];
+        let r = parser(&m, Mode::Force).parse(Path::new("d.pdf"), PDF, true).unwrap();
+        assert_eq!(r.text, "archive text");
+        assert_eq!(r.truncated, Some(pages_cut()));
+    }
+
+    #[test]
+    fn signed_pdf_keeps_truncation_of_the_original_text() {
+        let m = Mock::with_text(Some(LONG));
+        *m.truncations.borrow_mut() = vec![Some(pages_cut())];
+        m.ocr_results.borrow_mut().push(Err(OcrError::DigitalSignature));
+        let r = parser(&m, Mode::Auto).parse(Path::new("signed.pdf"), PDF, true).unwrap();
+        assert_eq!(r.text, LONG);
+        assert_eq!(r.truncated, Some(pages_cut()));
     }
 
     #[test]

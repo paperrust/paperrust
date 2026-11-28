@@ -95,6 +95,14 @@ Nach `ocr()`: `archive_path` nur wenn produce_archive; Text = `extract_text(side
 `extract_text(sidecar, pdf)`: Sidecar nur wenn vorhanden, Modus ≠ redo (Sidecar enthält dann nur neuen
 Text) und **ohne** `[OCR skipped on page`; sonst pdftotext des Archivs (fehlt die Datei → `None`).
 
+PaperRust (2026-11-28): `parse` ruft `OcrBackend::extract_text_report` (gleiche Logik, plus die Kürzung
+des PDF-Textlaufs, `pl_parsers::pdf::PdfText`) und gibt in `ParseOutcome::truncated` die Kürzung genau des
+Textes zurück, der in `ParseOutcome::text` landet (Original-Text → dessen Kürzung, Sidecar → keine,
+Archiv-Text → dessen Kürzung). `NativeOcrmypdf` liest PDF-Text mit `NativeOcrmypdf::limits`
+(Standard `pl_parsers::Limits::default()`, der Consumer setzt seine konfigurierten Limits per
+`with_limits`); vorher fest `ParseContext::default()` ohne Meldung. Hat ein Limit vor dem ersten Text
+gegriffen, wird nicht ungebremst über lopdf nachgelesen (sonst widersprächen Text und Meldung).
+
 Parität: 82 Abläufe (alle Modi × Archiv × Textlagen, alle Ausnahmeklassen erste/zweite Stufe, Bilder,
 img2pdf-/Ghostscript-Fehler) – Text, Archivpfad, Fehlertext, **jede** `ocr()`-Argumentliste und jeder
 `extract_text`-Aufruf: **0 Abweichungen**.
@@ -533,6 +541,12 @@ ITU-R 601.
    `omp_set_max_active_levels(0)` je Worker-Thread in `tesslib`). Zeitmessung:
    `examples/page_pool_bench.rs`.
 
+24. **Begrenzte Ausgabe des Tesseract-Programms** (Review 2026-11-27): stdout und stderr eines
+   Programmlaufs (`engine::run_with_timeout`, auch `--version`) werden je höchstens 4 MiB
+   (`MAX_CAPTURE_BYTES`) gespeichert; der Rest wird gelesen und verworfen, am Ende steht
+   `[... N bytes of output dropped]`. OCRmyPDF sammelt die Ausgabe unbegrenzt. Echte Ausgaben sind
+   weit kleiner (Text/TSV kommen aus Dateien, nicht über stdout).
+
 ## 12. Was läuft ohne externe Programme / was braucht Werkzeuge
 
 Ohne externe Programme (reines Rust): Einstellungen, Argumente, komplette `parse()`-Steuerlogik,
@@ -651,3 +665,23 @@ Messung und Empfehlung: `results/bench/ocr-quality/RESULTS.md` (Skripte `tests/b
   Known difference: die image-Crate liest kein HEIC (Pillow mit pillow-heif schon); dort entsteht
   weiter das Standardbild (Rückfall im Aufrufer), und WebP ist verlustfrei kodiert (wie schon bei
   `make_thumbnail_from_pdf`, siehe 11.).
+
+## 14. KI-Abschrift: Seitenbilder und unsichere Zeilen (PaperRust, kein upstream)
+
+* `vision_pages::page_images_sized(renderer, path, mime, max_pages, dpi, max_bytes, max_side)`: wie
+  `page_images`, längste Seite auf `max_side` px verkleinert (Standard der KI-Optionen 1540, `0` = unverändert;
+  nie vergrößert). `page_rasters(…, pages, dpi)` liefert dekodierte Raster ausgewählter Seiten (1-basiert),
+  `downscale`, `encode` sind öffentlich.
+* `uncertain` (docs/OCR-NEXT.md 2.8): `LinesFile` = Zeilendaten der klassischen OCR je Seite (Text, Box in
+  OCR-Pixeln, zeichengewichtete Konfidenz 0–100, Seitentext, `has_confidence`) als `ocr-lines.json` neben dem
+  Sidecar (`write_for_sidecar`, `read_for_dir`). 0–1-Werte (PP-OCR) werden auf 0–100 normiert. `select(mode,
+  sensitivity, lines, doc_chars, page_count, max_pages)` wählt ganze Seiten und Zeilenausschnitte;
+  `thresholds(engine, sensitivity)` ist die Schwellentabelle je Engine (TODO kalibrieren aus
+  `results/ocr-eval/2026-11-24`). `build_request` rendert Seiten/Ausschnitte (Ausschnitte bevorzugt aus dem
+  Archiv-PDF; abweichendes Seitenverhältnis → kein Ausschnitt), `merge_content`/`replace_lines` setzen
+  angenommene KI-Texte seiten- bzw. zeilenweise in den Inhalt. Die PDF-Textebene wird nie verändert.
+* **Offener Haken (Known difference):** `native.rs` schreibt `ocr-lines.json` noch nicht. Benötigt: in
+  `NativeOcrmypdf::run` neben `std::fs::write(sc, merge_sidecars(&sidecar))` die `PageOcr` je Seite sammeln
+  (`run_pdf`/`run_image` geben heute nur `Option<String>` je Seite zurück) und
+  `crate::uncertain::write_for_sidecar(sc, <engine-name>, &pages)` aufrufen (Fehler nur loggen). Engine-Name:
+  `tesseract` bzw. `ppocr` (Schwellentabelle). Bis dahin gilt für die „unsicher“-Modi die alte Dokumentregel.

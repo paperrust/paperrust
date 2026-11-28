@@ -14,6 +14,7 @@ use std::path::Path;
 
 use lopdf::{Document, LoadOptions, Object};
 
+use crate::limits::Truncation;
 use crate::xmlutil::{Elem, parse_dom};
 use crate::{DocumentParser, Limits, MetadataEntry, ParseContext, ParseError, ParsedDocument, Result, read_limited};
 
@@ -110,17 +111,33 @@ pub fn is_tagged_pdf(path: &Path, ctx: &ParseContext) -> bool {
     load_path(path, ctx).is_some_and(|d| is_tagged(&d))
 }
 
+/// Extracted PDF text plus the limit that cut it short, if any.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PdfText {
+    pub text: Option<String>,
+    /// `Some` when the page, time or text-size limit stopped extraction before the last page;
+    /// `text` then holds only the pages read so far.
+    pub truncated: Option<Truncation>,
+}
+
 /// Text of all pages (replacement for `pdftotext -layout`; pages separated by form feed).
 /// Reading order via text positions ([`crate::pdftext`], gap E14); if a page is not
 /// readable that way, lopdf's simple text is used.
-pub fn extract_text_from(doc: &Document, limits: &Limits) -> Option<String> {
-    let pages: Vec<(u32, lopdf::ObjectId)> = doc.get_pages().into_iter().take(limits.max_pdf_pages as usize).collect();
+///
+/// Page limit, time limit and text-size limit keep the pages read so far and report the
+/// truncation in [`PdfText::truncated`] (also logged at WARN), never silently.
+pub fn extract_text_report(doc: &Document, limits: &Limits) -> PdfText {
+    let all = doc.get_pages();
+    let total = u32::try_from(all.len()).unwrap_or(u32::MAX);
+    let pages: Vec<(u32, lopdf::ObjectId)> = all.into_iter().take(limits.max_pdf_pages as usize).collect();
     let deadline = crate::Deadline::from_limits(limits);
     let limit = limits.max_entry_size.min(usize::MAX as u64) as usize;
     let mut out = String::new();
+    let mut read: u32 = 0;
+    let mut truncated = None;
     for (p, id) in pages {
         if deadline.check().is_err() {
-            tracing::warn!(target: "paperless.parsers.utils", "PDF text extraction timed out");
+            truncated = Some(Truncation::PdfTime { read, total, limit: limits.timeout });
             break;
         }
         let r = catch_unwind(AssertUnwindSafe(|| match crate::pdftext::page_text(doc, id, limit) {
@@ -129,20 +146,38 @@ pub fn extract_text_from(doc: &Document, limits: &Limits) -> Option<String> {
         }));
         if let Ok(Ok(t)) = r {
             if out.len() + t.len() > limits.max_text_chars {
+                truncated = Some(Truncation::PdfText { read, total, limit: limits.max_text_chars });
                 break;
             }
             out.push_str(&t);
         }
         out.push('\x0c');
+        read += 1;
+    }
+    if truncated.is_none() && total > limits.max_pdf_pages {
+        truncated = Some(Truncation::PdfPages { read, total, limit: limits.max_pdf_pages });
+    }
+    if let Some(t) = &truncated {
+        tracing::warn!(target: "paperless.parsers.utils", "PDF text is incomplete: {t}");
     }
     let out = out.replace('\0', "");
-    if out.is_empty() { None } else { Some(out) }
+    PdfText { text: if out.is_empty() { None } else { Some(out) }, truncated }
+}
+
+/// [`extract_text_report`] without the truncation info (a truncation is still logged).
+pub fn extract_text_from(doc: &Document, limits: &Limits) -> Option<String> {
+    extract_text_report(doc, limits).text
 }
 
 /// `extract_pdf_text`.
 pub fn extract_pdf_text(path: &Path, ctx: &ParseContext) -> Option<String> {
+    extract_pdf_text_report(path, ctx).and_then(|r| r.text)
+}
+
+/// `extract_pdf_text` with truncation info; `None` if the PDF is unreadable.
+pub fn extract_pdf_text_report(path: &Path, ctx: &ParseContext) -> Option<PdfText> {
     let doc = load_path(path, ctx)?;
-    extract_text_from(&doc, &ctx.limits)
+    Some(extract_text_report(&doc, &ctx.limits))
 }
 
 fn is_ws_not_nl(c: char) -> bool {
@@ -206,12 +241,20 @@ pub fn is_born_digital_text(text: Option<&str>, tagged: bool) -> bool {
 
 /// `pdf_born_digital_text`: (normalized text, born-digital?).
 pub fn pdf_born_digital_text(path: &Path, ctx: &ParseContext) -> (Option<String>, bool) {
-    let Some(doc) = load_path(path, ctx) else {
-        return (None, false);
-    };
-    let text = post_process_text(extract_text_from(&doc, &ctx.limits).as_deref());
-    let bd = text.is_some() && is_born_digital_text(text.as_deref(), is_tagged(&doc));
+    let (text, bd, _) = pdf_born_digital_text_report(path, ctx);
     (text, bd)
+}
+
+/// [`pdf_born_digital_text`] plus the truncation, if a limit cut the text short
+/// (see [`extract_text_report`]).
+pub fn pdf_born_digital_text_report(path: &Path, ctx: &ParseContext) -> (Option<String>, bool, Option<Truncation>) {
+    let Some(doc) = load_path(path, ctx) else {
+        return (None, false, None);
+    };
+    let r = extract_text_report(&doc, &ctx.limits);
+    let text = post_process_text(r.text.as_deref());
+    let bd = text.is_some() && is_born_digital_text(text.as_deref(), is_tagged(&doc));
+    (text, bd, r.truncated)
 }
 
 // ---------------------------------------------------------------------------
@@ -431,11 +474,11 @@ impl DocumentParser for RasterisedDocumentParser {
         if mime_type != "application/pdf" {
             return Err(ParseError::OcrRequired);
         }
-        let (text, born_digital) = pdf_born_digital_text(path, ctx);
+        let (text, born_digital, truncated) = pdf_born_digital_text_report(path, ctx);
         if !born_digital {
             return Err(ParseError::OcrRequired);
         }
-        Ok(ParsedDocument { text: text.unwrap_or_default(), date: None, archive_path: None })
+        Ok(ParsedDocument { text: text.unwrap_or_default(), truncated: truncated.into_iter().collect(), ..Default::default() })
     }
     fn page_count(&self, path: &Path, mime_type: &str, ctx: &ParseContext) -> Option<u32> {
         if mime_type == "application/pdf" { get_page_count(path, ctx) } else { None }
@@ -496,5 +539,71 @@ mod tests {
                 ("dc:format".into(), "application/pdf".into()),
             ]
         );
+    }
+
+    /// PDF with one Helvetica text line per page.
+    fn multipage(texts: &[&str]) -> Document {
+        use lopdf::{Stream, dictionary};
+        let mut d = Document::with_version("1.5");
+        let pages_id = d.new_object_id();
+        let font = d.add_object(dictionary! {
+            "Type" => "Font", "Subtype" => "Type1", "BaseFont" => "Helvetica", "Encoding" => "WinAnsiEncoding",
+        });
+        let mut kids = Vec::new();
+        for t in texts {
+            let c = d.add_object(Stream::new(dictionary! {}, format!("BT /F1 10 Tf 100 700 Td ({t}) Tj ET").into_bytes()));
+            let page = d.add_object(dictionary! {
+                "Type" => "Page", "Parent" => pages_id, "MediaBox" => vec![0.into(), 0.into(), 595.into(), 842.into()],
+                "Resources" => dictionary! { "Font" => dictionary! { "F1" => font } }, "Contents" => c,
+            });
+            kids.push(Object::Reference(page));
+        }
+        let n = kids.len() as i64;
+        d.objects.insert(pages_id, Object::Dictionary(dictionary! { "Type" => "Pages", "Kids" => kids, "Count" => n }));
+        let cat = d.add_object(dictionary! { "Type" => "Catalog", "Pages" => pages_id });
+        d.trailer.set("Root", cat);
+        d
+    }
+
+    #[test]
+    fn complete_extraction_reports_no_truncation() {
+        let d = multipage(&["one", "two", "three"]);
+        let r = extract_text_report(&d, &Limits::default());
+        assert_eq!(r.truncated, None);
+        let t = r.text.unwrap();
+        assert!(t.contains("one") && t.contains("three"), "{t:?}");
+    }
+
+    #[test]
+    fn page_limit_keeps_text_but_reports_truncation() {
+        // Regression: the page limit used to return the first pages as if they were the whole document.
+        let d = multipage(&["one", "two", "three"]);
+        let limits = Limits { max_pdf_pages: 2, ..Limits::default() };
+        let r = extract_text_report(&d, &limits);
+        let t = r.text.unwrap();
+        assert!(t.contains("two") && !t.contains("three"), "{t:?}");
+        assert_eq!(r.truncated, Some(Truncation::PdfPages { read: 2, total: 3, limit: 2 }));
+        assert!(r.truncated.unwrap().message().contains("only 2 of 3 pages"));
+    }
+
+    #[test]
+    fn text_limit_keeps_text_but_reports_truncation() {
+        let d = multipage(&["aaaaaaaaaa", "bbbbbbbbbb", "cccccccccc"]);
+        let first = extract_text_report(&multipage(&["aaaaaaaaaa"]), &Limits::default()).text.unwrap();
+        // room for the first page (+ form feed) but not for the second
+        let limits = Limits { max_text_chars: first.len() + 2, ..Limits::default() };
+        let r = extract_text_report(&d, &limits);
+        assert!(r.text.unwrap().contains("aaaaaaaaaa"));
+        assert_eq!(r.truncated, Some(Truncation::PdfText { read: 1, total: 3, limit: first.len() + 2 }));
+    }
+
+    #[test]
+    fn time_limit_reports_truncation() {
+        let d = multipage(&["one", "two"]);
+        let limits = Limits { timeout: std::time::Duration::ZERO, ..Limits::default() };
+        let r = extract_text_report(&d, &limits);
+        // the very first check may still see "no time elapsed" on a coarse clock; the second cannot
+        assert!(matches!(r.truncated, Some(Truncation::PdfTime { read: 0 | 1, total: 2, .. })), "{:?}", r.truncated);
+        assert!(!r.text.unwrap_or_default().contains("two"));
     }
 }

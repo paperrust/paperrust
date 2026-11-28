@@ -327,10 +327,9 @@ async fn set_password_form(ctx: &mut Ctx, u: User) -> R<Response> {
         if e1.is_empty() && e2.is_empty() {
             let pw = p1.clone();
             let enc = tokio::task::spawn_blocking(move || pl_authz::hashers::make_password(&pw)).await?;
-            pl_authz::user::update_password(ctx.st.db(), u.id, &enc).await?;
-            // PaperRust: revoke device tokens (`prt_…`); DRF token stays as upstream
-            // (security review 2026-11-19 F13).
-            pl_authz::device::revoke_all_for_user(ctx.st.db(), u.id).await?;
+            // PaperRust: new password + revocation of the device tokens (`prt_…`) in one
+            // transaction; DRF token stays as upstream (security review 2026-11-19 F13).
+            pl_auth_api::db::set_password_and_revoke(ctx.st.db(), u.id, &enc).await?;
             // finalize_password_reset: delete login_failed counter per email address
             let rows: Vec<(String,)> =
                 sqlx::query_as("SELECT email FROM account_emailaddress WHERE user_id = $1").bind(u.id).fetch_all(ctx.st.db()).await?;

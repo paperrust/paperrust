@@ -51,7 +51,7 @@ pl-server (Montage /rs/api/v2, PAPERRUST_API_V2, v1-Schreibrouter)
 | POST | `/objects/batch` | `{"kind","uuids"≤500,"include"}` → `{"items","missing"}` |
 | GET | `/sync/changes` | **501 bis P2 eingehängt** (Logik inkl. Rechtefilter/Entzug fertig, s. u.) |
 | GET | `/sync/ids?kind=` | `{"items":[[uuid,rev],…],"as_of_seq"}` |
-| POST | `/sync/resolve` | Dokumente, Tags (any/all), gespeicherte Ansichten (v1-Regeln) |
+| POST | `/sync/resolve` | Dokumente, Tags (any/all), gespeicherte Ansichten (v1-Regeln); Antwort `{documents, as_of_seq, skipped_saved_views}` |
 | POST/GET | `/auth/devices` | Ausgabe (Benutzer/Passwort/`code`/`device_name`) bzw. eigene Liste |
 | DELETE | `/auth/devices/{uuid}` | eigenes Gerät widerrufen, sofort wirksam |
 | GET/POST/DELETE | `/asn/{presets,config,preview,labels,printed[/{id}],separator}` | ASN-Etiketten-Generator (`documents.change_document`), Vertrag [pl-labels.md](pl-labels.md) |
@@ -79,9 +79,24 @@ HTTP-Methode des Kontexts wird angepasst).
 `uuid`/`rev` aus `paperrust_sync_object` (P2-Migration `pl_sync.0001_paperrust_sync`). Fehlende
 Zeilen legt `pl-store` mit `INSERT … ON CONFLICT DO NOTHING` an (Erfassung abgeschaltet, Objekte
 aus der Zeit davor). `rev` steigt nur durch die P2-Trigger – ohne installierte/aktive Erfassung ist
-`If-Match` wirkungslos (jeder Wert ≠ aktueller rev → 412, gleicher rev → Schreiben). Prüfung und
-Schreiben sind nicht atomar (kleines Fenster zwischen `rev`-Vergleich und v1-Schreibzugriff;
-Sperre über die Trigger-Zeile würde mit dem Trigger verklemmen).
+`If-Match` wirkungslos (jeder Wert ≠ aktueller rev → 412, gleicher rev → Schreiben).
+
+Prüfung und Schreiben (`pl-store/src/legacy.rs`: update, delete, patch_document, seit 2026-11-27):
+zuerst Sichtbarkeit (404) und eine frühe `rev`-Prüfung (412 vor Feldfehlern, Reihenfolge wie
+bisher), dann ein transaktionsgebundener Advisory-Lock je Objekt
+(`pg_advisory_xact_lock(hashtextextended('paperrust:v2write:<kind>:<id>', 0))`) auf einer Verbindung
+eines eigenen kleinen Neben-Pools (`pl_core::dbconn::side_pool`, max. 4 je Prozess und Datenbank);
+unter dem Lock wird `rev` **erneut gelesen** und verglichen, der v1-Schreibzugriff läuft noch unter
+dem Lock, danach `ROLLBACK` (gibt den Lock frei). Damit sind alle v2-Schreibzugriffe auf dasselbe
+Objekt serialisiert: von zwei Schreibern mit gleichem `If-Match` gewinnt genau einer, der andere
+erhält 412 mit dem neuen rev. `SELECT … FOR UPDATE` auf der Objektzeile ist nicht möglich: der
+v1-Handler schreibt dieselbe Zeile über eine andere Pool-Verbindung und würde auf unsere Sperre
+warten, während wir auf seine Antwort warten.
+Restfenster (Known difference): Schreibzugriffe, die **nicht** über v2 laufen (klassische v1-API,
+Django-Oberfläche, Workflows/Consumer), nehmen den Lock nicht und können zwischen erneutem
+`rev`-Vergleich und v1-Schreiben landen; sie senden selbst kein `If-Match`. Ein vollständiger
+Schutz bräuchte die Prüfung im `rev`-Trigger oder den v1-Schreibzugriff in derselben Transaktion.
+Regressionstest (ohne DB, Protokoll mit Speicher-Lock): `legacy::tests::concurrent_if_match_writes_are_serialized`.
 
 ## Dokumentabfrage (`DocQuery`)
 
@@ -121,6 +136,24 @@ Begrenzung „≤ 4 offene Long-Polls je Token“ (SYNC.md §8) ist noch nicht u
   Geräte-Token (Ausgabe, v1+v2, nur Hash, Liste, Widerruf sofort, MFA, Drossel), Sync ids/resolve,
   501-Stub, Schalter `PAPERRUST_API_V2=off`.
 
+## Umzugshilfe: `POST /settings/check-file` – Geheimnisse
+
+Antwort `{"kind","service","env_files","items","slim_env"}` (`settings_migration.rs::check_file_body`).
+Geheimnisse verlassen den Server nicht im Klartext (seit 2026-11-27):
+
+- `items[].value` = `null` und `secret: true` für Schema-Geheimnisse (`SettingDef::secret`, z. B.
+  `PAPERLESS_DBPASS`, `PAPERLESS_SECRET_KEY`) sowie für veraltete und unbekannte Namen, die nach
+  Geheimnis aussehen (`pl_settings::migration::looks_secret`: Name enthält `PASS`, `PWD`, `SECRET`,
+  `TOKEN`, `KEY`, `CREDENTIAL` oder `PRIVATE`; z. B. `PAPERLESS_PASSPHRASE`). Bei bekannten Namen gilt
+  nur das Schema-Kennzeichen (`PAPERLESS_TOKEN_THROTTLE_RATE` bleibt sichtbar).
+- `slim_env` wird **maskiert** erzeugt: solche Zeilen und fremde Zeilen mit geheimem Namen (z. B.
+  `POSTGRES_PASSWORD`) erscheinen nur als Kommentar `# NAME=<secret – copy the value from your current
+  configuration>`; die übrigen Werte bleiben. Vorher enthielt `slim_env` alle Werte im Klartext und
+  veraltete Namen gaben ihren Wert in `items[].value` zurück.
+- „Übernehmen“ (`/settings/adopt` mit `values`) nutzt nur Einträge mit Wert, Geheimnisse waren dort
+  schon vorher ausgenommen. Die lokale CLI `manage settings slim-env FILE` gibt die Werte weiterhin
+  unmaskiert aus (lokale Datei, kein Netzweg).
+
 ## Known differences / offen
 
 1. Schreiben nur für Tags, Korrespondenten, Dokumenttypen, Dokument-PATCH, Notizen,
@@ -128,9 +161,20 @@ Begrenzung „≤ 4 offene Long-Polls je Token“ (SYNC.md §8) ist noch nicht u
    Ansichten, Nutzer, Gruppen nur lesend (405).
 2. Notizen (`include=notes`) nur mit Modellrecht `view_note`, sonst Feld fehlt.
 3. `sync/resolve` mit Volltextregeln gespeicherter Ansichten (query, more_like_id, title_search,
-   text) → 501; Regel 19 (`title_content`) als Teilstringfilter.
+   text) oder unbekannten Regelarten: diese Ansicht wird übersprungen (Warnung im Log), der Rest der
+   Auswahl wird aufgelöst. Nur wenn die Anfrage ausschließlich aus solchen Ansichten besteht (keine
+   Dokumente/Tags, keine auswertbare Ansicht) → 501 – so meldet die Einzelauflösung des Clients den
+   Eintrag, statt still nichts zu liefern (`pl_store::sync::view_params`). Übersprungene Ansichten
+   stehen in der Antwort im Feld `skipped_saved_views` (letztes Feld, nach `as_of_seq`): Liste der
+   UUIDs wie in der Anfrage, in Anfragereihenfolge, ohne Doppelte; leer (`[]`), wenn nichts
+   übersprungen wurde. Unsichtbare/unbekannte Ansichten erscheinen dort nicht (sie tragen wie in v1
+   nichts bei; `pl_domain::model::Resolution`). Regel 19 (`title_content`) als Teilstringfilter.
+   `tag_mode = "all"` mit einer unbekannten/gelöschten Tag-UUID liefert keine Dokumente (ein solcher
+   Tag kann an keinem Dokument hängen); `any` ignoriert unbekannte UUIDs wie bei `documents`.
 4. Dateigrößen werden je Abruf per `stat` ermittelt (kein Cache).
 5. Audit-Log der v2-Schreibzugriffe wie v1 (Token/Geräte-Token: Akteur NULL; Session: Nutzer).
+6. `If-Match` ist gegenüber anderen v2-Schreibzugriffen atomar (Advisory-Lock je Objekt, s.
+   „Identität und `rev`“), gegenüber Schreibzugriffen außerhalb von v2 bleibt ein kleines Fenster.
 
 ## CORE-REQUESTs
 
@@ -210,6 +254,15 @@ Inhaltsänderung über v1), (3) `paperrust manage timeline_backfill [--force]`, 
 `paperrust.timeline.backfill` (`force`), `POST /timeline/backfill` (Superuser, läuft im
 Hintergrund des Servers).
 
+Die Rückfüllung (3) läuft je Datenbank höchstens einmal gleichzeitig, über alle Server-, Worker- und
+`manage`-Prozesse: PostgreSQL-Advisory-Lock `pg_try_advisory_lock(0x50525354, 0x544c4246)`
+(`pl_timeline::refresh::BACKFILL_LOCK_KEY`, Sitzungs-Lock auf einer eigenen, aus dem Pool gelösten Verbindung;
+Fehler/Abbruch schließt die Verbindung und gibt den Lock frei). `POST /timeline/backfill` nimmt den Lock
+**vor** der Antwort: von zwei gleichzeitigen Aufrufen bekommt genau einer 202, der andere 409. Läuft schon eine
+Rückfüllung, liefern Worker-Aufgabe und `manage` „already running“ ohne zweiten Lauf. `backfill_running` in
+`/timeline/config` liest `pg_locks` (prozessübergreifend). Die Nachbesserung beim Lesen (2) ist nicht gesperrt
+(je Dokument idempotent).
+
 ## Rechte
 
 - Zeitstrahl, Demnächst, Erinnerungen, Erledigt/Zurückstellen, `/ask`: Modellrecht
@@ -230,7 +283,10 @@ Hintergrund des Servers).
   Anmeldekontext statt per HTTP mit Token (`ApiBackend` mit `Transport`). Antwort mit dem
   konfigurierten LLM und den Chat-Vorlagen wie MCP. Gespeicherte Quellen werden beim Lesen des
   Verlaufs erneut gegen die aktuelle Sichtbarkeit gefiltert. Je Nutzer höchstens 20 Fragen je
-  Minute (429 `throttled`).
+  Minute (429 `throttled`). Die Drossel ist ein gleitendes Fenster **je Prozess** im Speicher
+  (`ask.rs::throttle_at`): mehrere PaperRust-Prozesse an einer Datenbank zählen getrennt, ein
+  Neustart setzt sie zurück. Nutzer ohne Anfrage in der letzten Minute werden bei jedem Aufruf aus
+  der Tabelle entfernt (kein unbegrenztes Wachstum).
 
 ## Lebensbereiche `/life-areas`
 
@@ -395,6 +451,9 @@ die aktuelle Frage (wie `ask_documents`); der Verlauf dient der Anzeige.
   `-p pl-ai` (MCP `ask_documents` unverändert über `retrieve` + `start_answer`).
 - DB (Kopie `pl_design2_test` aus `paperless_snapshot`, wird gelöscht):
   `PL_DESIGN2_TEST_DB=1 cargo test -p pl-server -j 4 --test design2_db -- --ignored --test-threads 1`.
+- Rückfüll-Lock (Review 2026-11-27, nur Advisory-Locks, keine Tabellen): `pl-timeline/tests/backfill_lock.rs`
+  (`#[ignore]`, `PAPERRUST_TIMELINE_TEST_DATABASE_URL` auf eine lokale `pl_*test*`-Datenbank):
+  `lock_held_by_another_process_blocks_backfill`, `concurrent_starts_get_the_lock_once`.
 
 ## CORE-REQUESTs (Design 2)
 
@@ -539,6 +598,13 @@ gelöscht → ihre Freigaben weg.
 - Unterordner anlegen/hineinverschieben: Änderungsrecht am Elternordner.
 - **Keine Vererbung** auf Dokumente: Dokumentrechte bleiben je Dokument. Verschieben braucht
   `change_document` am Dokument (Objektrecht wie `bulk_edit`) und Änderungsrecht am Zielordner.
+- Löschen eines Ordners mit Inhalt verschiebt den Inhalt und braucht deshalb **dieselben Rechte wie das direkte
+  Verschieben** (Entscheidung 2026-11-27 nach externem Review): Löschrecht am Ordner, `change_document` an
+  **jedem** Dokument darin (auch im Papierkorb, unsichtbare zählen als nicht änderbar), Änderungsrecht an
+  **jedem** direkten Unterordner und bei `contents=parent` (mit Elternordner) Änderungsrecht am Elternordner.
+  Sonst 403 ohne Nennung der Objekte: „You do not have permission to change all documents in this folder.“ /
+  „… to change all subfolders of this folder.“ / „… to move the contents of this folder into its parent
+  folder.“ Leerer Ordner: nur das Löschrecht. Superuser: keine Dokumentprüfung.
 
 ### Routen
 
@@ -569,6 +635,24 @@ Dokumente → 400 `fields.documents` „Some documents don't exist or were speci
 Nebenläufigkeit: Baumänderungen (Elternordner ändern, Löschen) laufen unter
 `pg_advisory_xact_lock(hashtext('paperrust_folder_tree'))` – zwei gleichzeitige Verschiebungen können keinen
 Kreis bauen. Verschieben von Dokumenten ist ein `INSERT … ON CONFLICT` (letzter Schreiber gewinnt).
+Rechteprüfung und Schreiben von `move-documents` und `DELETE` laufen in **einer** Transaktion, nachdem die
+geprüften Zeilen gesperrt sind. Sperrreihenfolge: eigene `auth_user`-Zeile `FOR SHARE` → eigene Gruppen `FOR SHARE`
+(id-Reihenfolge; danach werden die Rechte des Aufrufers in der Transaktion **neu gelesen**, nicht die beim
+Request-Start geladenen verwendet) → Baum-Lock → zu löschender Ordner `FOR UPDATE` → seine
+Unterordner `FOR UPDATE` (id-Reihenfolge) → Ziel-/Elternordner `FOR SHARE` → Dokumente `FOR SHARE`
+(id-Reihenfolge, Basistabelle `paperrust_document` ab Datenmodell-Stufe 1, sonst `documents_document`;
+`pl_authz::grants::document_lock_table`). Gruppenmitgliedschaft, Superuser-/Aktiv-Flag und direkte Rechte ändern
+sich nur unter `FOR UPDATE` der Benutzerzeile, Gruppenrechte unter `FOR UPDATE` der Gruppenzeile (pl-auth-api
+users/groups, Rollen) – ein laufender Rechteentzug durch einen Admin wartet also auf das Verschieben oder wird
+von dessen Prüfung gesehen (Tests `move_honours_concurrent_user_permission_revoke`,
+`move_honours_concurrent_group_permission_revoke`). Kosten gemessen 2026-11-28 (Referenz-PG, Kopie mit 100 000
+Dokumenten, `tests/folders_bench.rs`): 50 000 Dokumente verschieben 1,5 s, davon Dokument-Sperre 0,26 s (~17 %);
+7 889 Dokumente als Nicht-Superuser 0,84 s; Ordner mit 50 000 Dokumenten löschen 0,16 s. Ordnerfreigaben ändern sich nur
+unter `FOR UPDATE` des Ordners (PATCH), Besitzerwechsel/Papierkorb/Löschen ändern die Dokumentzeile – beides
+wartet also auf ein laufendes Verschieben bzw. wird von dessen Prüfung gesehen. Rest: eine reine
+Objektfreigabe-Rücknahme (guardian/`paperrust_grant`, ohne Änderung der Dokumentzeile), die zwischen Prüfung
+und Schreiben committet, ordnet sich hinter das Verschieben ein (Verschieben zuerst, dann Rücknahme – ein
+gültiger serieller Ablauf).
 
 ### Filter (v1 und v2)
 
@@ -667,8 +751,10 @@ in `paperrust_document_folder` ein. Ist der Ordner inzwischen gelöscht, bleibt 
   Kreisprüfung, `contents`, Freigabe-Zeilen hin und zurück, Body-Parsing (`null` vs. fehlend, UUID/id),
   Rechte-SQL, Migration expand-only. pl-docfilter: Filterparameter → SQL/AST.
 - DB (`tests/folders_api.rs`, `#[ignore]`, eigene Kopie `pl_folders_api_test` aus `paperless_snapshot`,
-  Anleitung im Kopfkommentar): `folder_lifecycle_and_permissions`, Stufe 2 `upload_target_rules`
-  (`PAPERRUST_FOLDERS_TEST_DATABASE_URL`).
+  Anleitung im Kopfkommentar): `folder_lifecycle_and_permissions`, Stufe 2 `upload_target_rules`,
+  Review 2026-11-27 `delete_needs_change_rights_on_contents` (Löschen mit fremdem Inhalt/Unterordner/nicht
+  änderbarem Elternordner → 403) und `move_honours_concurrent_owner_change` (laufender Besitzerwechsel wird
+  abgewartet → 403) (`PAPERRUST_FOLDERS_TEST_DATABASE_URL`).
 - Stufe 2: pl-server `upload.rs` Unit (Feld `folder`: fehlt/leer/Zahl/kein pk), pl-consumer `data.rs` Unit
   (`folder_id` nur wenn gesetzt, `update`), DB `pl-consumer/tests/e2e.rs::e2e_upload_into_folder` (`#[ignore]`,
   `PAPERRUST_CONSUMER_TEST_DATABASE_URL`). Frontend: `frontend-light/src/design2/lib/folder-dnd.test.ts`

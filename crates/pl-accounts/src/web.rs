@@ -307,6 +307,12 @@ impl Ctx {
         match self.session.finish(self.st.db(), &self.cache, &self.s, status).await {
             Ok(Some(c)) => cookies.push(c),
             Ok(None) => {}
+            // SessionMiddleware: `UpdateError` -> `SessionInterrupted` (BadRequest) -> plain 400
+            // page; the view's response and its cookies are discarded.
+            Err(crate::session::SessionError::Interrupted) => {
+                tracing::warn!(target: "pl_accounts", "session was deleted before the request completed (concurrent logout?)");
+                return axum::response::IntoResponse::into_response(pl_core::ApiError::django_bad_request());
+            }
             Err(e) => return server_error(&Internal(format!("{e:?}"))),
         }
         let h = resp.headers_mut();

@@ -121,15 +121,18 @@ async fn roundtrip(target: Target, src: PgPool, dst: PgPool) {
 
     // contents at the target are encrypted
     let id = backup::identity(&target, Some(pass), None).await.unwrap();
-    let (n, missing) = backup::check(&target, &id, "latest").await.unwrap();
-    assert!(n >= 76 && missing.is_empty(), "{n} {missing:?}");
+    let r = backup::check(&target, &id, "latest", true).await.unwrap();
+    assert!(r.objects >= 76 && r.is_ok(), "{r:?}");
 
     // 4. restore into a new media folder and the second database
     let restored = work.path().join("restored");
-    let st =
-        backup::restore(&target, &id, &RestoreOptions { snapshot: "latest", media_dir: Some(&restored), db: Some(&dst), overwrite: false })
-            .await
-            .unwrap();
+    let st = backup::restore(
+        &target,
+        &id,
+        &RestoreOptions { snapshot: "latest", media_dir: Some(&restored), db: Some(&dst), overwrite: false, allow_missing_tables: false },
+    )
+    .await
+    .unwrap();
     assert_eq!(st.files, 77);
     assert!(st.db_tables.unwrap() > 50);
     assert_eq!(hashes(&restored), hashes(&media_root), "Medien Bit für Bit gleich");
@@ -150,15 +153,23 @@ async fn roundtrip(target: Target, src: PgPool, dst: PgPool) {
 
     // 5. restore an older state specifically: dup-b.txt has the old content there
     let old = work.path().join("restored-old");
-    backup::restore(&target, &id, &RestoreOptions { snapshot: &snaps[2].0, media_dir: Some(&old), db: None, overwrite: false })
-        .await
-        .unwrap();
+    backup::restore(
+        &target,
+        &id,
+        &RestoreOptions { snapshot: &snaps[2].0, media_dir: Some(&old), db: None, overwrite: false, allow_missing_tables: false },
+    )
+    .await
+    .unwrap();
     assert_eq!(std::fs::read(old.join("documents/originals/dup-b.txt")).unwrap(), b"same content");
     // existing, differing file is not silently overwritten
     assert!(
-        backup::restore(&target, &id, &RestoreOptions { snapshot: "latest", media_dir: Some(&old), db: None, overwrite: false })
-            .await
-            .is_err()
+        backup::restore(
+            &target,
+            &id,
+            &RestoreOptions { snapshot: "latest", media_dir: Some(&old), db: None, overwrite: false, allow_missing_tables: false }
+        )
+        .await
+        .is_err()
     );
 }
 

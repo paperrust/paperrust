@@ -210,9 +210,14 @@ pub fn precondition_response(p: &Precondition) -> Option<Response> {
 }
 
 /// `condition()` post-processing plus `cache_control(no_cache=True)`.
+///
+/// Unlike Django, ETag/Last-Modified are only attached to 2xx and 304 responses: error
+/// responses (403, 404, 412, ...) never carry validators (contract pl-files, Known difference 7).
 pub fn finish(mut r: Response, method: &Method, etag: Option<&str>, last_modified: Option<i64>) -> Response {
+    let status = r.status();
+    let attach_validators = status.is_success() || status == StatusCode::NOT_MODIFIED;
     let h = r.headers_mut();
-    if method == Method::GET || method == Method::HEAD {
+    if attach_validators && (method == Method::GET || method == Method::HEAD) {
         if let Some(lm) = last_modified.filter(|v| *v != 0)
             && !h.contains_key(header::LAST_MODIFIED)
             && let Ok(v) = HeaderValue::from_str(&http_date(lm))
@@ -267,5 +272,25 @@ mod tests {
         let mut h = HeaderMap::new();
         h.insert("if-match", HeaderValue::from_static("\"x\""));
         assert_eq!(evaluate(&Method::GET, &h, Some("\"y\""), None), Precondition::Failed);
+    }
+
+    /// Regression: validators must never be attached to error responses.
+    #[test]
+    fn finish_skips_validators_on_errors() {
+        for status in [StatusCode::FORBIDDEN, StatusCode::NOT_FOUND, StatusCode::PRECONDITION_FAILED, StatusCode::INTERNAL_SERVER_ERROR] {
+            let mut r = Response::new(Body::empty());
+            *r.status_mut() = status;
+            let r = finish(r, &Method::GET, Some("\"abc\""), Some(1_600_000_000));
+            assert!(r.headers().get(header::ETAG).is_none(), "{status}");
+            assert!(r.headers().get(header::LAST_MODIFIED).is_none(), "{status}");
+            assert_eq!(r.headers().get(header::CACHE_CONTROL).and_then(|v| v.to_str().ok()), Some("no-cache"));
+        }
+        for status in [StatusCode::OK, StatusCode::NOT_MODIFIED] {
+            let mut r = Response::new(Body::empty());
+            *r.status_mut() = status;
+            let r = finish(r, &Method::GET, Some("\"abc\""), Some(1_600_000_000));
+            assert!(r.headers().get(header::ETAG).is_some(), "{status}");
+            assert!(r.headers().get(header::LAST_MODIFIED).is_some(), "{status}");
+        }
     }
 }

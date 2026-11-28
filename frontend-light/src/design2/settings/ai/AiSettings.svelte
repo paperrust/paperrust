@@ -20,6 +20,7 @@
   let form = $state<AiForm | null>(null)
   let saved = $state<AiForm | null>(null)
   let opts = $state<AiOptions | null>(null)
+  let visionRemote = $state(false)
   let savedOpts = $state('')
   let fields = $state<FieldInfo[]>([])
   let loadError = $state(false)
@@ -54,6 +55,9 @@
       rev = s.rev
       form = formFrom(s.items)
       saved = { ...form }
+      // KI-Abschrift: show the effective mode (legacy `vision_when` mapped) as the selection
+      if (!o.options.vision_mode && o.vision_mode_effective) o.options.vision_mode = o.vision_mode_effective
+      visionRemote = o.vision_remote === true
       opts = o.options
       savedOpts = JSON.stringify(o.options)
       fields = o.custom_fields
@@ -323,12 +327,27 @@
               <datalist id="d2-ai-vmodels">{#each visionModels as m (m)}<option value={m}></option>{/each}</datalist>
               <p class="d2-muted small">{t('m.ai_settings.vision_model_hint')}</p>
             </div>
-            <label class="d2-label" for="d2-ai-vwhen">{t('m.ai_settings.vision_when')}</label>
-            <select class="d2-select" id="d2-ai-vwhen" bind:value={opts.vision_when}>
-              <option value="off">{t('m.ai_settings.vision_when_off')}</option>
-              <option value="difficult">{t('m.ai_settings.vision_when_difficult')}</option>
-              <option value="always">{t('m.ai_settings.vision_when_always')}</option>
-            </select>
+            <label class="d2-label" for="d2-ai-vmode">{t('m.ai_settings.vision_mode')}</label>
+            <div>
+              <select class="d2-select" id="d2-ai-vmode" bind:value={opts.vision_mode}>
+                <option value="off">{t('m.ai_settings.vision_mode_off')}</option>
+                <option value="uncertain_lines">{t('m.ai_settings.vision_mode_uncertain_lines')}</option>
+                <option value="uncertain_pages">{t('m.ai_settings.vision_mode_uncertain_pages')}</option>
+                <option value="always">{t('m.ai_settings.vision_mode_always')}</option>
+              </select>
+              <p class="d2-muted small">{t('m.ai_settings.vision_mode_hint')}</p>
+              {#if visionRemote && opts.vision_mode !== 'off'}
+                <p class="warn small" role="alert">{t('m.ai_settings.vision_cloud_warning')}</p>
+              {/if}
+            </div>
+            {#if opts.vision_mode === 'uncertain_lines' || opts.vision_mode === 'uncertain_pages'}
+              <label class="d2-label" for="d2-ai-vsens">{t('m.ai_settings.vision_sensitivity')}</label>
+              <select class="d2-select" id="d2-ai-vsens" bind:value={opts.vision_sensitivity}>
+                <option value="sparing">{t('m.ai_settings.vision_sensitivity_sparing')}</option>
+                <option value="normal">{t('m.ai_settings.vision_sensitivity_normal')}</option>
+                <option value="thorough">{t('m.ai_settings.vision_sensitivity_thorough')}</option>
+              </select>
+            {/if}
             <label class="d2-label" for="d2-ai-vpages">{t('m.ai_settings.vision_max_pages')}</label>
             <input class="d2-input num" id="d2-ai-vpages" type="number" min="1" max="200" bind:value={opts.vision_limits.max_pages} />
             <label class="d2-label" for="d2-ai-vday">{t('m.ai_settings.vision_per_day')}</label>
@@ -351,6 +370,8 @@
           <input class="d2-input num" id="d2-ai-maxnew" type="number" min="1" bind:value={form.maxNew} disabled={!!lock('maxNew')} />
           <label class="d2-label" for="d2-ai-tokens">{t('m.ai_settings.vision_tokens')}</label>
           <input class="d2-input num" id="d2-ai-tokens" type="number" min="0" bind:value={opts.vision_limits.max_tokens_per_page} />
+          <label class="d2-label" for="d2-ai-vside">{t('m.ai_settings.vision_max_side')}</label>
+          <input class="d2-input num" id="d2-ai-vside" type="number" min="512" max="4096" step="64" bind:value={opts.vision_max_side} />
           <label class="d2-label" for="d2-ai-rate">{t('m.ai_settings.backfill_rate')}</label>
           <input class="d2-input num" id="d2-ai-rate" type="number" min="1" max="120" bind:value={opts.backfill_per_minute} />
         </div>

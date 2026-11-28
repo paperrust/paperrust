@@ -10,7 +10,7 @@ Nur reine Rust-Abhängigkeiten, kein Netzwerk, kein Tika/Gotenberg.
 
 | Modul | Upstream-Quelle | Inhalt |
 |---|---|---|
-| `lib` | `paperless/parsers/__init__.py` (`ParserProtocol`, `MetadataEntry`, `ParserContext`) | Trait `DocumentParser`, `MetadataEntry {namespace, prefix, key, value}` (Feldreihenfolge = JSON von `/api/documents/{id}/metadata/`), `ParseContext` (mailrule_id, `PAPERLESS_TIME_ZONE`, `Limits`), `ParsedDocument` (text, date, archive_path), `ParseError` |
+| `lib` | `paperless/parsers/__init__.py` (`ParserProtocol`, `MetadataEntry`, `ParserContext`) | Trait `DocumentParser`, `MetadataEntry {namespace, prefix, key, value}` (Feldreihenfolge = JSON von `/api/documents/{id}/metadata/`), `ParseContext` (mailrule_id, `PAPERLESS_TIME_ZONE`, `Limits`), `ParsedDocument` (text, date, archive_path, truncated), `ParseError` |
 | `registry` | `paperless/parsers/registry.py` (`register_defaults`, `get_parser_for_file`, `all_parsers`), `documents/parsers.py` (`is_mime_type_supported`, `get_default_file_extension`, `is_file_ext_supported`, `get_supported_file_extensions`) | `ParserRegistry`, `RegistryConfig {tika_enabled, extended_formats}` |
 | `mime` | `documents/consumer.py` (`magic.from_file(working_copy, mime=True)`), libmagic Magdir/readcdf.c/is_csv.c/is_json.c | `detect_file`, `detect_bytes`, `cdf_classify` |
 | `text` | `paperless/parsers/text.py` (`TextDocumentParser`), `utils.py` (`read_file_handle_unicode_errors`) | Kodierungserkennung, Text-Parser |
@@ -237,6 +237,28 @@ abgefangen. Fehler → `ParseError::{LimitExceeded, Timeout, Invalid, Encrypted,
 OcrRequired, Upstream, Io}`, nie Absturz (`tests/robustness.rs`: alle Beispiele abgeschnitten und
 mit Zufallsbytes verfälscht).
 
+**Abgeschnittene Ergebnisse werden gemeldet** (Review 2026-11-27, erweitert 2026-11-28): Diese Stellen
+behalten bei einem Limit den bisher gelesenen Text, statt abzubrechen, und melden das als
+`limits::Truncation` (WARN-Log `PDF text is incomplete: …` / `Extracted text is incomplete: …`, Text über
+`Truncation::message` für eine Dokument-Notiz):
+- PDF-Text (`pdf::extract_text_report`, `extract_pdf_text_report`, `pdf_born_digital_text_report`):
+  Seitenlimit (`PdfPages`), Zeitlimit (`PdfTime`), Textgrößenlimit (`PdfText`), jeweils mit gelesenen
+  und gesamten Seiten. Die alten Funktionen (`extract_text_from`, `extract_pdf_text`,
+  `pdf_born_digital_text`) liefern weiter nur den Text, loggen die Kürzung aber ebenfalls.
+- MSG-Eigenschaften (`MsgMessage::truncated`): ein Eigenschafts-Stream über `max_entry_size` wird nur
+  bis zum Limit gelesen und als `MsgProperty {stream, size, limit}` vermerkt (vorher still als ganzer
+  Wert behandelt).
+- Textgrößenlimit `max_text_chars` in Office (OOXML, ODF, RTF, DOC/XLS/PPT), HTML und dem HTML-Teil von
+  Mail/MSG (`limits::TextSink`): der Text bis zum Limit bleibt (an einer Zeichengrenze geschnitten),
+  gemeldet als `Text {limit}` (vorher `ParseError::LimitExceeded`, das Dokument scheiterte). Metadaten
+  werden danach wie sonst gelesen. `html::html_to_text` bleibt streng (Fehler), `html_to_text_report`
+  liefert Text + Kürzung; `mail::HtmlToText` hat jetzt diese Form. Nicht umgestellt: die Einzelprüfungen
+  "paragraph too long"/"slide text too long"/"shared strings too large"/"text too long" (DOC-Stücktabelle,
+  XLS) vor dem Puffer und das Zeitlimit – sie brechen weiter mit Fehler ab.
+Alle Parser geben die Kürzungen in `ParsedDocument::truncated` (`Vec<Truncation>`, leer = vollständig)
+zurück; `ParsedDocument::truncation_message()` fasst sie für die Notiz zusammen (mit `; `). Der Consumer
+macht daraus die Systemnotiz (pl-consumer Vertrag, Punkt 26).
+
 ## Paritätstests
 
 - `tests/parity/pl-parsers/gen_samples.py` erzeugt `samples/` (Text, EML, PDF via fpdf2/pikepdf,
@@ -329,3 +351,8 @@ fehlende Grenze, DST-Lücke) und PDF-Metadaten/Seitenzahl/Tagging: 0 Abweichunge
     `MailRule.DoesNotExist`.
 17. **Folien-PDF**: schlichte Textseiten (Titel, Absätze, Notizen) je Folie statt gerenderter Folie
     (LibreOffice); Formen, Bilder, Diagramme und Folienlayout fehlen.
+18. **Teilergebnis bei Limits statt Abbruch** (PDF-Text, MSG-Eigenschaften, Textgrößenlimit von
+    Office/HTML/Mail): upstream kennt keine
+    eigenen Limits; pdftotext liest alle Seiten, und `CELERY_TASK_TIME_LIMIT` lässt die ganze Aufgabe
+    scheitern. Hier bleibt der bis zum Limit gelesene Text erhalten, die Kürzung wird aber immer
+    gemeldet (`limits::Truncation`, WARN-Log), nie still.

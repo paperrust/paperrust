@@ -520,6 +520,8 @@ pub struct CountRow {
     pub label: &'static str,
     pub source: Option<i64>,
     pub target: Option<i64>,
+    /// Target counts were read (false in a dry run: `target` is then always `None`).
+    pub target_read: bool,
 }
 
 impl CountRow {
@@ -527,6 +529,8 @@ impl CountRow {
         match (self.source, self.target) {
             (a, b) if a == b => Level::Ok,
             (None, Some(0)) | (Some(0), None) => Level::Ok,
+            // table missing in the target while the source has rows: data lost (review finding 7)
+            (_, None) if self.target_read => Level::Fail,
             (_, None) => Level::Info,
             _ => Level::Fail,
         }
@@ -596,6 +600,7 @@ impl Report {
                 label: o.label,
                 source: source.get(o.key).copied(),
                 target: target.and_then(|t| t.get(o.key).copied()),
+                target_read: target.is_some(),
             })
             .collect();
         if target.is_some() {
@@ -661,7 +666,12 @@ impl Report {
         let mut add = vec![];
         if let Some(t) = &self.target_files {
             for p in &t.problems {
-                let pre = src_keys.contains_key(&(p.doc, p.kind));
+                // "already like this in the source" only if the target is not worse: a file missing
+                // in the target counts as pre-existing only if it was missing there too (review
+                // finding 5: wrong checksum in the source + missing in the target is a loss)
+                let pre = src_keys
+                    .get(&(p.doc, p.kind))
+                    .is_some_and(|s| p.issue != FileIssue::Missing || matches!(s, FileIssue::Missing | FileIssue::NoFilename));
                 let level = if p.kind == FileKind::Thumbnail || pre { Level::Warn } else { Level::Fail };
                 let mut m = format!("Ziel: {}", p.describe());
                 if pre {
@@ -718,11 +728,16 @@ impl Report {
     }
 
     pub fn finish(&mut self) -> Level {
+        // findings from the full counters, not from the bounded detail list (review finding 6)
+        let counted = [Level::Ok, Level::Info, Level::Warn, Level::Fail]
+            .into_iter()
+            .filter(|l| self.findings_total.get(l.as_str()).is_some_and(|n| *n > 0));
         let worst = self
             .steps
             .iter()
             .map(|s| s.level)
             .chain(self.findings.iter().map(|f| f.level))
+            .chain(counted)
             .chain(self.counts.iter().map(CountRow::level).filter(|_| self.target.is_some()))
             .max()
             .unwrap_or(Level::Ok);
@@ -1208,6 +1223,52 @@ mod tests {
         let d = tempfile::tempdir().unwrap();
         assert_eq!(r.write(d.path()).unwrap().len(), 3);
         assert!(d.path().join("umstieg-bericht.html").is_file());
+    }
+
+    /// Review finding 5: a source file with a wrong checksum that is completely missing in the
+    /// target got worse – FAIL, not "nothing got worse".
+    #[test]
+    fn source_mismatch_but_missing_in_target_is_fail() {
+        let p = |issue| FileProblem { doc: 1, kind: FileKind::Original, path: "p".into(), issue };
+        let mut r = base_report();
+        r.source_files =
+            Some(FileSummary { problems: vec![p(FileIssue::Mismatch { expected: "e".into(), actual: "a".into() })], ..Default::default() });
+        r.target_files = Some(FileSummary { problems: vec![p(FileIssue::Missing)], ..Default::default() });
+        r.file_findings();
+        assert_eq!(r.finish(), Level::Fail);
+        assert!(!r.to_text().contains("nichts verschlechtert"));
+    }
+
+    /// Review finding 6: the verdict comes from all findings, not from the truncated detail list.
+    #[test]
+    fn verdict_counts_findings_beyond_the_detail_limit() {
+        let mut r = base_report();
+        for i in 0..MAX_LIST * 4 {
+            r.finding(Level::Warn, "Datei", format!("w{i}"));
+        }
+        r.finding(Level::Fail, "Dokument", "Dokument 99 fehlt im Ziel");
+        assert_eq!(r.findings.len(), MAX_LIST * 4, "detail list stays bounded");
+        assert_eq!(r.finish(), Level::Fail);
+    }
+
+    /// Review finding 7: a table missing in the target while the source has rows is FAIL.
+    #[test]
+    fn missing_target_table_with_source_rows_is_fail() {
+        let mut src = Counts::new();
+        src.insert("documents", 2);
+        src.insert("notes", 3);
+        let mut tgt = Counts::new();
+        tgt.insert("documents", 2);
+        let mut r = base_report();
+        r.set_counts(&src, Some(&tgt));
+        let notes = r.counts.iter().find(|c| c.key == "notes").unwrap();
+        assert_eq!(notes.level(), Level::Fail);
+        assert_eq!(r.finish(), Level::Fail);
+        assert!(r.to_text().contains("Notizen: Quelle 3, Ziel -"), "{}", r.to_text());
+        // dry run (target not read yet): no verdict from the counts
+        let mut r = base_report();
+        r.set_counts(&src, None);
+        assert_eq!(r.finish(), Level::Ok);
     }
 
     #[test]

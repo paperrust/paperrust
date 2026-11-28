@@ -575,8 +575,12 @@ Autovacuum (Insert-Schwelle).
     Rehash beim zweiten Mal entfällt weiter. Test `authn::tests::same_hash_runs_for_known_and_unknown_names`.
 16. **Geräte-Token-Widerruf nach Passwortwechsel** (Sicherheitsprüfung 2026-11-19 F13):
     `device::revoke_all_for_user(db, user_id)` setzt `revoked_at` für alle aktiven Geräte des
-    Nutzers (fehlende Tabelle → 0). Aufgerufen von pl-accounts (Passwort-Reset) und pl-auth-api
-    (`PATCH /api/profile/`, `PUT|PATCH /api/users/{id}/` mit neuem Passwort). DB-Test
+    Nutzers (fehlende Tabelle → 0). `device::revoke_all_for_user_tx(conn, user_id)` (2026-11-28) macht
+    dasselbe auf der Verbindung bzw. in der Transaktion des Aufrufers, in einem Savepoint (fehlende
+    Tabelle → 0, ohne die äußere Transaktion abzubrechen); `revoke_all_for_user` nutzt es intern. Aufgerufen
+    (jeweils in derselben Transaktion wie das Passwort-`UPDATE`) von pl-auth-api (`PATCH /api/profile/`,
+    `PUT|PATCH /api/users/{id}/` mit neuem Passwort, `db::set_password_and_revoke` für den Passwort-Reset in
+    pl-accounts) und pl-cli (`changepassword`). DB-Test
     `tests/device_revoke.rs` (`#[ignore]`, Wegwerf-DB auf der Referenz-PostgreSQL).
 
 ## CORE-REQUEST

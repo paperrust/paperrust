@@ -4,9 +4,11 @@
 //! Run (reference PostgreSQL 127.0.0.1:54329 must be running; re-creates `pl_w6_test` and
 //! `pl_w6_test_up` from `paperless_snapshot`):
 //! ```text
-//! PL_W6_TEST_DB=1 cargo test -p pl-mail -j 1 --test worker_parity -- --ignored --nocapture
+//! PL_W6_TEST_DB=1 cargo test -p pl-mail -j 2 --test worker_parity -- --ignored --test-threads=1 --nocapture
 //! ```
-//! `PL_W6_SKIP_UPSTREAM=1` skips the Python run (Rust flow + checks only).
+//! Upstream is run live (`tests/parity/pl-mail-worker/run_upstream.sh`); the deliberate
+//! differences of docs/contract/pl-mail.md (Known differences 23-27) are applied to the upstream
+//! observation in `apply_known_differences` with asserted counts, everything else must be equal.
 
 mod support;
 
@@ -117,6 +119,8 @@ struct Observed {
     imap_actions: Vec<Vec<String>>,
     mailbox: Value,
     results: Vec<Value>,
+    /// Rust eager run only: kwargs of the queued `apply_mail_action` bodies.
+    action_kwargs: Vec<serde_json::Map<String, Value>>,
 }
 
 /// Bring raw data from DB/fake server into a comparable form.
@@ -197,7 +201,7 @@ async fn observe(pool: &PgPool, std: &fake_imap::Shared, g: &fake_imap::Shared, 
     let mailbox = json!({"std": std.lock().unwrap().summary(), "gmail": g.lock().unwrap().summary()});
     let mut consumed = consumed;
     consumed.sort_by_key(|v| v.to_string());
-    Observed { consumed, processed, correspondents, audit, imap_main, imap_actions, mailbox, results }
+    Observed { consumed, processed, correspondents, audit, imap_main, imap_actions, mailbox, results, action_kwargs: Vec::new() }
 }
 
 /// imaplib writes `UID fetch` no differently than we do – but the date in SINCE depends on the day.
@@ -278,6 +282,8 @@ async fn wait_queue_idle(pool: &PgPool) {
 struct EagerQueue {
     worker: std::sync::OnceLock<Arc<MailWorker>>,
     consume: Arc<dyn pl_queue::TaskHandler>,
+    /// kwargs of every queued `apply_mail_action` body (Known difference 24 check).
+    bodies: Mutex<Vec<serde_json::Map<String, Value>>>,
 }
 
 type Bf<'a, T> = std::pin::Pin<Box<dyn std::future::Future<Output = Result<T, pl_queue::QueueError>> + Send + 'a>>;
@@ -311,6 +317,7 @@ impl pl_queue::TaskQueue for EagerQueue {
                     return Err(pl_queue::QueueError::Invalid(format!("{}: {}", e.error_type, e.message)));
                 }
             }
+            self.bodies.lock().unwrap().push(body.kwargs.clone());
             let w = self.worker.get().expect("worker").clone();
             let _ = fetch::apply_mail_action(&w, &body.kwargs).await;
             Ok(uuid::Uuid::nil())
@@ -345,7 +352,11 @@ async fn run_rust(runs: usize, eager: bool) -> (Observed, PgPool) {
     ]))
     .unwrap();
     let recorded = Arc::new(Mutex::new(Vec::new()));
-    let eager_q = Arc::new(EagerQueue { worker: std::sync::OnceLock::new(), consume: Arc::new(stub_consume(recorded.clone())) });
+    let eager_q = Arc::new(EagerQueue {
+        worker: std::sync::OnceLock::new(),
+        consume: Arc::new(stub_consume(recorded.clone())),
+        bodies: Mutex::new(Vec::new()),
+    });
     let queue: Arc<dyn pl_queue::TaskQueue> =
         if eager { eager_q.clone() } else { Arc::new(PgQueue::new(pool.clone(), qcfg.max_deliveries)) };
     let worker = Arc::new(MailWorker::new(pool.clone(), queue.clone(), cfg));
@@ -365,7 +376,8 @@ async fn run_rust(runs: usize, eager: bool) -> (Observed, PgPool) {
     let _ = tx.send(true);
     let _ = jh.await;
     let consumed = recorded.lock().unwrap().clone();
-    let obs = observe(&pool, &std, &g, consumed, results).await;
+    let mut obs = observe(&pool, &std, &g, consumed, results).await;
+    obs.action_kwargs = eager_q.bodies.lock().unwrap().clone();
     let _ = std::fs::remove_dir_all(&scratch);
     (obs, pool)
 }
@@ -442,6 +454,92 @@ fn normalize(up: &mut Observed, rust: &mut Observed) {
     rust.consumed.sort_by_key(|v| v.to_string());
 }
 
+/// Rules of the scenario with `consumption_scope = 3` (EVERYTHING): 203 `archive-everything`.
+const EVERYTHING_RULES: &[i64] = &[203];
+
+/// How often each deliberate difference rewrote the upstream observation.
+#[derive(Debug, Default, PartialEq, Eq)]
+struct KnownDifferenceCounts {
+    /// Known difference 23: folder-wide `EXPUNGE` after a flag `UID STORE` (not `\Deleted`).
+    kd23_expunge_after_flag: usize,
+    /// Known difference 25: second identical `ProcessedMail` row from the second chord.
+    kd25_duplicate_rows: usize,
+    /// Known difference 25: `PROCESSED_WO_CONSUMPTION` next to a chord row of the same mail.
+    kd25_wo_consumption_rows: usize,
+    /// Known difference 25: second identical action connection from the second chord.
+    kd25_duplicate_actions: usize,
+}
+
+/// Turns the upstream v3.4.2 observation into what PaperRust is expected to do, applying only
+/// the deliberate differences from docs/contract/pl-mail.md (Known differences 23-27). Every
+/// rewrite is counted; the caller asserts the counts, so a rewrite that stops applying (or
+/// starts applying more often) fails just like any other difference.
+fn apply_known_differences(up: &mut Observed) -> KnownDifferenceCounts {
+    let mut n = KnownDifferenceCounts::default();
+
+    // Known difference 23: no folder-wide EXPUNGE after MARK_READ / FLAG / TAG (`UID STORE
+    // ±FLAGS`). The EXPUNGE after `+FLAGS (\Deleted)` stays: the fake server announces no
+    // UIDPLUS, so PaperRust falls back to the upstream folder-wide EXPUNGE there.
+    for conn in &mut up.imap_actions {
+        let mut out: Vec<String> = Vec::with_capacity(conn.len());
+        for cmd in conn.drain(..) {
+            let after_flag_store =
+                out.last().is_some_and(|p| p.starts_with("UID STORE ") && p.contains("FLAGS (") && !p.contains("+FLAGS (\\Deleted)"));
+            if cmd == "EXPUNGE" && after_flag_store {
+                n.kd23_expunge_after_flag += 1;
+                continue;
+            }
+            out.push(cmd);
+        }
+        *conn = out;
+    }
+
+    // Known difference 25: EVERYTHING queues one chord per mail (upstream: one for the .eml and
+    // one for the attachments, each with the same mail action). Upstream therefore records the
+    // result twice and runs the action twice; PaperRust once.
+    let mut merged: Vec<(String, String)> = Vec::new();
+    let mut rows: Vec<Value> = Vec::with_capacity(up.processed.len());
+    for row in up.processed.drain(..) {
+        let everything = row["rule"].as_i64().is_some_and(|r| EVERYTHING_RULES.contains(&r));
+        if everything && row["status"] != "PROCESSED_WO_CONSUMPTION" && rows.last() == Some(&row) {
+            n.kd25_duplicate_rows += 1;
+            merged.push((row["folder"].as_str().unwrap_or_default().to_string(), row["uid"].as_str().unwrap_or_default().to_string()));
+            continue;
+        }
+        rows.push(row);
+    }
+    let key = |r: &Value| (r["rule"].clone(), r["folder"].clone(), r["uid"].clone());
+    let chord_keys: Vec<_> = rows.iter().filter(|r| r["status"] != "PROCESSED_WO_CONSUMPTION").map(key).collect();
+    rows.retain(|r| {
+        let everything = r["rule"].as_i64().is_some_and(|x| EVERYTHING_RULES.contains(&x));
+        let drop = everything && r["status"] == "PROCESSED_WO_CONSUMPTION" && chord_keys.contains(&key(r));
+        if drop {
+            n.kd25_wo_consumption_rows += 1;
+        }
+        !drop
+    });
+    up.processed = rows;
+    for (folder, uid) in &merged {
+        let select = format!("SELECT \"{folder}\"");
+        let hits_uid =
+            |c: &Vec<String>| c.contains(&select) && c.iter().any(|x| x.starts_with("UID ") && x.split(' ').nth(2) == Some(uid.as_str()));
+        let dup = (0..up.imap_actions.len())
+            .find(|&j| hits_uid(&up.imap_actions[j]) && up.imap_actions[..j].iter().any(|c| *c == up.imap_actions[j]));
+        if let Some(j) = dup {
+            up.imap_actions.remove(j);
+            n.kd25_duplicate_actions += 1;
+        }
+    }
+    up.imap_actions.sort();
+
+    // Known difference 26 (account failures in the result) does not show here: no account fails
+    // as a whole (only rule 206 of account 101), so the result texts must stay equal.
+    // Known difference 27 (Gmail `NO` is an error): the scenario's Gmail labels succeed or fail
+    // the same way on both sides (rule 212 sends `+X-GM-LABELS` without a label → FAILED in
+    // upstream as well), so no rewrite either; the `NO` case itself is in tests/mail_actions.rs.
+    n
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[ignore = "braucht die Referenz-PostgreSQL (eigene DB-Kopien pl_w6_test*) und reference/venv"]
 async fn mail_worker_parity() {
@@ -454,7 +552,30 @@ async fn mail_worker_parity() {
     assert!(rust.results[0].as_str().is_some_and(|s| s.starts_with("Added")));
     let mut up = run_upstream(runs).await;
     normalize(&mut up, &mut rust);
+    // Deliberate differences (pl-mail.md Known differences 23-27), asserted with exact counts.
+    let kd = apply_known_differences(&mut up);
+    // Known difference 24: every queued mail action carries the PaperRust kwargs `folder` and
+    // `account_id` (not visible in upstream's observation, so asserted on the Rust side).
+    assert!(!rust.action_kwargs.is_empty(), "no apply_mail_action was queued");
+    for kw in &rust.action_kwargs {
+        assert!(kw.get("folder").is_some_and(Value::is_string), "apply_mail_action without folder: {kw:?}");
+        assert!(kw.get("account_id").is_some_and(Value::is_i64), "apply_mail_action without account_id: {kw:?}");
+    }
     let mut d = Vec::new();
+    diff(
+        "known_differences",
+        &json!(format!(
+            "{:?}",
+            KnownDifferenceCounts {
+                kd23_expunge_after_flag: 6,
+                kd25_duplicate_rows: 1,
+                kd25_wo_consumption_rows: 0,
+                kd25_duplicate_actions: 1,
+            }
+        )),
+        &json!(format!("{kd:?}")),
+        &mut d,
+    );
     diff("results", &Value::from(up.results.clone()), &Value::from(rust.results.clone()), &mut d);
     diff("consumed", &Value::from(up.consumed.clone()), &Value::from(rust.consumed.clone()), &mut d);
     diff("processed_mail", &Value::from(up.processed.clone()), &Value::from(rust.processed.clone()), &mut d);
@@ -463,7 +584,7 @@ async fn mail_worker_parity() {
     diff("imap_main", &json!(up.imap_main), &json!(rust.imap_main), &mut d);
     diff("imap_actions", &json!(up.imap_actions), &json!(rust.imap_actions), &mut d);
     diff("mailbox_after", &up.mailbox, &rust.mailbox, &mut d);
-    let n = 8;
+    let n = 9;
     let report = repo().join("tests/parity/pl-mail-worker/out");
     let _ = std::fs::create_dir_all(&report);
     let text = if d.is_empty() { format!("{n} comparisons, 0 differences\n") } else { d.join("\n\n") };

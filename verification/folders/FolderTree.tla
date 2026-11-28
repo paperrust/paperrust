@@ -16,10 +16,12 @@
 (*                                                                         *)
 (* Locks are <<proc, resource, mode>>: resource <<"t",0>> = advisory lock  *)
 (* hashtext('paperrust_folder_tree'), <<"f",id>> = paperrust_folder row,    *)
-(* <<"d",id>> = paperrust_document_folder row. Modes as in PostgreSQL:     *)
+(* <<"d",id>> = paperrust_document_folder row, <<"doc",id>> = document row  *)
+(* (paperrust_document / documents_document). Modes as in PostgreSQL:      *)
 (* "X" = FOR UPDATE / row written by DELETE / advisory, "NK" = FOR NO KEY  *)
-(* UPDATE (plain UPDATE not touching the key), "KS" = FOR KEY SHARE (taken  *)
-(* by every foreign-key check on the referenced folder row). All held to   *)
+(* UPDATE (plain UPDATE not touching the key), "S" = FOR SHARE, "KS" = FOR *)
+(* KEY SHARE (taken by every foreign-key check on the referenced folder    *)
+(* row). All held to                                                       *)
 (* COMMIT/ROLLBACK. A lock-wait cycle is aborted like PostgreSQL does      *)
 (* (40P01) - for the folder API that is a raw 500 (db(e)), for the         *)
 (* consumer a retry.                                                       *)
@@ -41,9 +43,18 @@ CONSTANTS
     LockAfterCheck, \* broken: cycle check (check_parent + SELECT id, parent_id) before the lock
     UseRowLock,     \* folders.rs delete: visible_folder(.., lock = true) = SELECT .. FOR UPDATE OF f
     RepeatableRead, \* broken: REPEATABLE READ instead of the default READ COMMITTED
-    AssignKeyShare  \* proposed fix: assign_folder's SELECT .. FOR KEY SHARE (code: FALSE)
+    AssignKeyShare, \* assign_folder's SELECT .. FOR KEY SHARE (code since ba8ea24b: TRUE)
+    MoveTx,         \* move_documents: checks + write in one transaction after target FOR SHARE and
+                    \* document rows FOR SHARE (code: TRUE); FALSE = old code (checks on the pool, autocommit write)
+    DelLocks        \* delete/check_contents_movable: subfolders FOR UPDATE, parent FOR SHARE, documents
+                    \* FOR SHARE (code: TRUE); FALSE = same checks as plain reads (check-then-write gap)
 
-OpKinds == {"patchmove", "patchroot", "delete", "movedocs", "consume"}
+(* Permissions (only what the new checks read): the caller of move/delete starts with change rights on
+   every folder and document; "unsharef" (PATCH /folders/{f} with new permissions/owner: visible_folder
+   FOR UPDATE -> write_grants -> commit) and "unsharedoc" (document owner / set_permissions change:
+   update.rs begin_root_tx or bulk_edit::lock_documents = document row FOR UPDATE -> owner/guardian
+   write -> commit) take that right away. *)
+OpKinds == {"patchmove", "patchroot", "delete", "movedocs", "consume", "unsharef", "unsharedoc"}
 ASSUME Kinds \subseteq OpKinds
 
 Procs == 1..NProcs
@@ -64,6 +75,8 @@ Ops ==
   \cup (IF "delete"    \in Kinds THEN {Op("delete", f, m, 0) : f \in Folders, m \in {0, 1}} ELSE {})
   \cup (IF "movedocs"  \in Kinds THEN {Op("movedocs", f, 0, d) : f \in {0} \cup Folders, d \in Docs} ELSE {})
   \cup (IF "consume"   \in Kinds THEN {Op("consume", f, 0, 0) : f \in Folders} ELSE {})
+  \cup (IF "unsharef"  \in Kinds THEN {Op("unsharef", f, 0, 0) : f \in Folders} ELSE {})
+  \cup (IF "unsharedoc" \in Kinds THEN {Op("unsharedoc", 0, 0, d) : d \in Docs} ELSE {})
 
 TreeLk == IF UseTreeLock THEN <<"lock">> ELSE <<>>
 DelTreeLk == IF DelTreeLock THEN <<"lock">> ELSE <<>>
@@ -79,12 +92,28 @@ Steps0(o) ==
          \* folders.rs patch with parent null: moves = false -> no tree_lock
          <<"forupd", "update", "commit">>
     [] o.k = "delete" ->
-         \* folders.rs delete: tree_lock -> visible_folder FOR UPDATE -> UPDATE subfolders -> UPDATE/DELETE
-         \* paperrust_document_folder -> DELETE paperrust_folder (ON DELETE CASCADE) -> commit
-         DelTreeLk \o <<IF UseRowLock THEN "forupd_del" ELSE "read_del", "children", "docs", "delete", "commit">>
-    [] o.k = "movedocs" ->
-         \* folders.rs move_documents (no transaction: one autocommit statement after the checks)
-         IF o.f = 0 THEN <<"mv_del">> ELSE <<"mv_check", "mv_write", "mv_fk">>
+         \* folders.rs delete: tree_lock -> visible_folder FOR UPDATE -> check_contents_movable (subfolders
+         \* FOR UPDATE, SELECT document_id .. WHERE folder_id, parent FOR SHARE, documents FOR SHARE,
+         \* count_unchangeable) -> UPDATE subfolders -> UPDATE/DELETE paperrust_document_folder ->
+         \* DELETE paperrust_folder (ON DELETE CASCADE) -> commit
+         DelTreeLk \o <<IF UseRowLock THEN "forupd_del" ELSE "read_del",
+                        "del_subs", "del_docsread", "del_parent", "del_lockdocs", "del_chkdocs",
+                        "children", "docs", "delete", "commit">>
+    [] o.k = "movedocs" /\ MoveTx ->
+         \* folders.rs move_documents: pool.begin -> visible_folder(.., RowLock::Share) -> lock_documents
+         \* (FOR SHARE) -> visibility count + count_unchangeable -> INSERT .. ON CONFLICT / DELETE -> commit
+         IF o.f = 0 THEN <<"mv_lockdocs", "mv_chkdocs", "mv_del", "commit">>
+         ELSE <<"mv_target", "mv_lockdocs", "mv_chkdocs", "mv_write", "mv_fk", "commit">>
+    [] o.k = "movedocs" /\ ~MoveTx ->
+         \* broken (code before 2026-11-27): checks on the pool, then one autocommit statement
+         IF o.f = 0 THEN <<"mv_chkdocs", "mv_del", "commit">>
+         ELSE <<"mv_check", "mv_chkdocs", "mv_write", "mv_fk", "commit">>
+    [] o.k = "unsharef" ->
+         \* folders.rs patch with permissions/owner only: visible_folder FOR UPDATE -> write_grants -> commit
+         <<"forupd", "revoke", "commit">>
+    [] o.k = "unsharedoc" ->
+         \* document permission change: document row FOR UPDATE -> owner_id / guardian rows -> commit
+         <<"doc_forupd", "revoke", "commit">>
     [] o.k = "consume" ->
          \* consumer.rs store_all ... apply_overrides -> assign_folder -> rest of store_all (files) -> commit
          IF AssignKeyShare THEN <<"as_insert_ks", "rest", "commit">>
@@ -101,11 +130,18 @@ VARIABLES
     op, pc, res,    \* request per proc, index into Steps(op), outcome
     tgt,            \* delete: target of the contents; movedocs: 1 = row written (FK check due)
     snap,           \* REPEATABLE READ snapshot of parent_id per proc (NoSnap = not taken)
-    loss            \* ghost: a delete with contents=parent put a document into Unsorted (ON DELETE CASCADE)
+    loss,           \* ghost: a delete with contents=parent put a document into Unsorted (ON DELETE CASCADE)
+    fpc, fpw,       \* caller may change folder f: committed / revoking open transaction (0 = none)
+    dpc, dpw,       \* caller may change document d: committed / revoking open transaction
+    chk,            \* objects whose change right p checked: <<"f", id>> / <<"doc", id>>
+    seen,           \* delete: documents read by SELECT document_id .. WHERE folder_id = $1
+    unauth,         \* ghost: a move/delete committed although a right it checked was revoked meanwhile
+    unchecked       \* ghost: delete moved a subfolder/document (or into a target) it had not checked
 
 NoSnap == <<>>
 
-vars == <<fcv, fnv, fw, dcv, dnv, dw, locks, op, pc, res, tgt, snap, loss>>
+authv == <<fpc, fpw, dpc, dpw, chk, seen, unauth, unchecked>>
+vars == <<fcv, fnv, fw, dcv, dnv, dw, locks, op, pc, res, tgt, snap, loss, authv>>
 
 Lbl(p) == Steps(op[p])[pc[p]]
 Done(p) == pc[p] > Len(Steps(op[p]))
@@ -151,6 +187,12 @@ Need(p) ==
     [] Lbl(p) = "delete"     -> {<<R("f", o.f), "X">>}
                                 \cup {<<R("d", d), "X">> : d \in DocRows(p, o.f)}       \* cascade
                                 \cup {<<R("f", c), "KS">> : c \in RefRows(p, o.f)}      \* NO ACTION check
+    [] Lbl(p) = "del_subs"   -> IF DelLocks THEN {<<R("f", c), "X">> : c \in ChildRows(p, o.f)} ELSE {}
+    [] Lbl(p) = "del_parent" -> IF DelLocks THEN {<<R("f", tgt[p]), "S">>} ELSE {}
+    [] Lbl(p) = "del_lockdocs" -> IF DelLocks THEN {<<R("doc", d), "S">> : d \in seen[p]} ELSE {}
+    [] Lbl(p) = "mv_target"  -> {<<R("f", o.f), "S">>}
+    [] Lbl(p) = "mv_lockdocs" -> {<<R("doc", o.d), "S">>}
+    [] Lbl(p) = "doc_forupd" -> {<<R("doc", o.d), "X">>}
     [] Lbl(p) = "mv_write"   -> {<<R("d", o.d), "X">>}
     [] Lbl(p) = "mv_fk"      -> IF tgt[p] = 1 THEN {<<R("f", o.f), "KS">>} ELSE {}
     [] Lbl(p) = "mv_del"     -> {<<R("d", o.d), "X">>}
@@ -158,7 +200,8 @@ Need(p) ==
     [] Lbl(p) = "as_insert_ks" -> {<<R("f", o.f), "KS">>}
     [] OTHER                 -> {}
 
-Conflict(m1, m2) == m1 = "X" \/ m2 = "X" \/ (m1 = "NK" /\ m2 = "NK")
+(* PostgreSQL row-lock conflict table: KS conflicts only with X; S with NK and X; NK with NK, S, X *)
+Conflict(m1, m2) == m1 = "X" \/ m2 = "X" \/ (m1 = "NK" /\ m2 \in {"NK", "S"}) \/ (m1 = "S" /\ m2 = "NK")
 Blockers(p) == {q \in Procs \ {p} :
                   \E n \in Need(p), l \in locks : l[1] = q /\ l[2] = n[1] /\ Conflict(n[2], l[3])}
 Free(p) == Blockers(p) = {}
@@ -201,6 +244,14 @@ Init ==
     /\ tgt = [p \in Procs |-> 0]
     /\ snap = [p \in Procs |-> NoSnap]
     /\ loss = FALSE
+    /\ fpc = [f \in Folders |-> TRUE]
+    /\ fpw = [f \in Folders |-> 0]
+    /\ dpc = [d \in AllDocs |-> TRUE]
+    /\ dpw = [d \in AllDocs |-> 0]
+    /\ chk = [p \in Procs |-> {}]
+    /\ seen = [p \in Procs |-> {}]
+    /\ unauth = FALSE
+    /\ unchecked = FALSE
 
 (* p may run its next statement: not finished and no conflicting lock held by another transaction *)
 G(p) == ~Done(p) /\ Free(p)
@@ -217,7 +268,17 @@ Abort(p, kind) ==
     /\ locks' = {l \in locks : l[1] # p}
     /\ res' = [res EXCEPT ![p] = kind]
     /\ pc' = [pc EXCEPT ![p] = Len(Steps(op[p])) + 1]
-    /\ UNCHANGED <<fcv, dcv, op, tgt, snap, loss>>
+    /\ fpw' = [f \in Folders |-> IF fpw[f] = p THEN 0 ELSE fpw[f]]
+    /\ dpw' = [d \in AllDocs |-> IF dpw[d] = p THEN 0 ELSE dpw[d]]
+    /\ UNCHANGED <<fcv, dcv, op, tgt, snap, loss, fpc, dpc, chk, seen, unauth, unchecked>>
+
+PermC(x) == IF x[1] = "f" THEN fpc[x[2]] ELSE dpc[x[2]]
+Wrote(p) == (\E f \in Folders : fw[f] = p) \/ (\E d \in AllDocs : dw[d] = p)
+PcOf(p, l) == CHOOSE i \in 1..Len(Steps(op[p])) : Steps(op[p])[i] = l
+Goto(p, l) == pc' = [pc EXCEPT ![p] = PcOf(p, l)]
+AddChk(p, S) == chk' = [chk EXCEPT ![p] = @ \cup S]
+CheckedF(p) == {x[2] : x \in {y \in chk[p] : y[1] = "f"}}
+CheckedD(p) == {x[2] : x \in {y \in chk[p] : y[1] = "doc"}}
 
 (* COMMIT: own writes become visible, locks released *)
 CommitTx(p) ==
@@ -232,7 +293,14 @@ CommitTx(p) ==
     \* own row ending as "no row" was removed by the ON DELETE CASCADE of the folder row
     /\ loss' = (loss \/ (op[p].k = "delete" /\ op[p].t = 1 /\ tgt[p] # ROOT
                          /\ \E d \in AllDocs : dw[d] = p /\ dnv[d] = ROOT))
-    /\ UNCHANGED <<fnv, dnv, op, tgt, snap>>
+    /\ fpc' = [f \in Folders |-> IF fpw[f] = p THEN FALSE ELSE fpc[f]]
+    /\ fpw' = [f \in Folders |-> IF fpw[f] = p THEN 0 ELSE fpw[f]]
+    /\ dpc' = [d \in AllDocs |-> IF dpw[d] = p THEN FALSE ELSE dpc[d]]
+    /\ dpw' = [d \in AllDocs |-> IF dpw[d] = p THEN 0 ELSE dpw[d]]
+    \* the move/delete writes now although a right its checks relied on was revoked after the check
+    /\ unauth' = (unauth \/ (op[p].k \in {"movedocs", "delete"} /\ Wrote(p)
+                             /\ \E x \in chk[p] : ~PermC(x)))
+    /\ UNCHANGED <<fnv, dnv, op, tgt, snap, chk, seen, unchecked>>
 
 RRChanged(p, S) == RepeatableRead /\ \E c \in S : fcv[c] # Snap1(p)[c]
 
@@ -242,13 +310,13 @@ RRChanged(p, S) == RepeatableRead /\ \E c \in S : fcv[c] # Snap1(p)[c]
 SRRSnap(p) ==
     /\ G(p) /\ Lbl(p) = "rr_snap"
     /\ snap' = [snap EXCEPT ![p] = fcv] /\ Adv(p)
-    /\ UNCHANGED <<fcv, fnv, fw, dcv, dnv, dw, locks, op, res, tgt, loss>>
+    /\ UNCHANGED <<fcv, fnv, fw, dcv, dnv, dw, locks, op, res, tgt, loss, authv>>
 
 (* tree_lock: SELECT pg_advisory_xact_lock(hashtext('paperrust_folder_tree')) *)
 SLock(p) ==
     /\ G(p) /\ Lbl(p) = "lock"
     /\ Acquire(p, {}) /\ Adv(p) /\ TakeSnap(p)
-    /\ UNCHANGED <<fcv, fnv, fw, dcv, dnv, dw, op, res, tgt, loss>>
+    /\ UNCHANGED <<fcv, fnv, fw, dcv, dnv, dw, op, res, tgt, loss, authv>>
 
 (* patch: visible_folder(&mut *tx, &a, id, true) - SELECT .. FOR UPDATE OF f; gone -> 404 *)
 SForUpd(p) ==
@@ -256,21 +324,21 @@ SForUpd(p) ==
     /\ IF RRChanged(p, {op[p].f}) THEN Abort(p, "err_raw")                \* 40001
        ELSE IF FP(p, op[p].f) = GONE THEN Abort(p, "err_mapped")         \* NotFound
        ELSE /\ Acquire(p, {}) /\ Adv(p) /\ TakeSnap(p)
-            /\ UNCHANGED <<fcv, fnv, fw, dcv, dnv, dw, op, res, tgt, loss>>
+            /\ UNCHANGED <<fcv, fnv, fw, dcv, dnv, dw, op, res, tgt, loss, authv>>
 
 (* patch: check_parent (plain visible_folder of the new parent); gone -> 400 fields.parent *)
 SChkParent(p) ==
     /\ G(p) /\ Lbl(p) = "chkparent"
     /\ IF FP(p, op[p].t) = GONE THEN Abort(p, "err_mapped")
        ELSE /\ Adv(p) /\ TakeSnap(p)
-            /\ UNCHANGED <<fcv, fnv, fw, dcv, dnv, dw, locks, op, res, tgt, loss>>
+            /\ UNCHANGED <<fcv, fnv, fw, dcv, dnv, dw, locks, op, res, tgt, loss, authv>>
 
 (* patch: SELECT id, parent_id FROM paperrust_folder + creates_cycle -> 400 fields.parent *)
 SReadTree(p) ==
     /\ G(p) /\ Lbl(p) = "readtree"
     /\ IF CreatesCycle(p, op[p].f, op[p].t) THEN Abort(p, "err_mapped")
        ELSE /\ Adv(p) /\ TakeSnap(p)
-            /\ UNCHANGED <<fcv, fnv, fw, dcv, dnv, dw, locks, op, res, tgt, loss>>
+            /\ UNCHANGED <<fcv, fnv, fw, dcv, dnv, dw, locks, op, res, tgt, loss, authv>>
 
 (* patch: UPDATE paperrust_folder SET .., parent_id = $3 .. WHERE id = $1 (FK check on the new parent;
    23503 -> write_err -> 400 fields.parent) *)
@@ -283,7 +351,7 @@ SUpdate(p) ==
        ELSE /\ fnv' = [fnv EXCEPT ![o.f] = new]
             /\ fw' = [fw EXCEPT ![o.f] = p]
             /\ Acquire(p, {}) /\ Adv(p) /\ TakeSnap(p)
-            /\ UNCHANGED <<fcv, dcv, dnv, dw, op, res, tgt, loss>>
+            /\ UNCHANGED <<fcv, dcv, dnv, dw, op, res, tgt, loss, authv>>
 
 (* delete: visible_folder(&mut *tx, &a, id, true) (or without FOR UPDATE in the broken variant);
    target = parent_id (contents=parent) or NULL *)
@@ -293,7 +361,7 @@ SDelRead(p) ==
        ELSE IF FP(p, op[p].f) = GONE THEN Abort(p, "err_mapped")
        ELSE /\ tgt' = [tgt EXCEPT ![p] = IF op[p].t = 1 THEN FP(p, op[p].f) ELSE ROOT]
             /\ Acquire(p, {}) /\ Adv(p) /\ TakeSnap(p)
-            /\ UNCHANGED <<fcv, fnv, fw, dcv, dnv, dw, op, res, loss>>
+            /\ UNCHANGED <<fcv, fnv, fw, dcv, dnv, dw, op, res, loss, authv>>
 
 (* delete: UPDATE paperrust_folder SET parent_id = target .. WHERE parent_id = f
    (errors other than 23505 -> db(e) -> 500) *)
@@ -306,7 +374,9 @@ SChildren(p) ==
        ELSE /\ fnv' = [c \in Folders |-> IF c \in M THEN tgt[p] ELSE fnv[c]]
             /\ fw' = [c \in Folders |-> IF c \in M THEN p ELSE fw[c]]
             /\ Acquire(p, {}) /\ Adv(p) /\ TakeSnap(p)
-            /\ UNCHANGED <<fcv, dcv, dnv, dw, op, res, tgt, loss>>
+            /\ unchecked' = (unchecked \/ ~(M \subseteq CheckedF(p))
+                             \/ (M # {} /\ tgt[p] # ROOT /\ tgt[p] \notin CheckedF(p)))
+            /\ UNCHANGED <<fcv, dcv, dnv, dw, op, res, tgt, loss, fpc, fpw, dpc, dpw, chk, seen, unauth>>
 
 (* delete: UPDATE paperrust_document_folder SET folder_id = target WHERE folder_id = f, or
    DELETE FROM paperrust_document_folder WHERE folder_id = f when the target is "Unsorted" *)
@@ -318,7 +388,9 @@ SDocs(p) ==
        ELSE /\ dnv' = [d \in AllDocs |-> IF d \in M THEN tgt[p] ELSE dnv[d]]
             /\ dw' = [d \in AllDocs |-> IF d \in M THEN p ELSE dw[d]]
             /\ Acquire(p, {}) /\ Adv(p) /\ TakeSnap(p)
-            /\ UNCHANGED <<fcv, fnv, fw, dcv, op, res, tgt, loss>>
+            /\ unchecked' = (unchecked \/ ~(M \subseteq CheckedD(p))
+                             \/ (M # {} /\ tgt[p] # ROOT /\ tgt[p] \notin CheckedF(p)))
+            /\ UNCHANGED <<fcv, fnv, fw, dcv, op, res, tgt, loss, fpc, fpw, dpc, dpw, chk, seen, unauth>>
 
 (* delete: DELETE FROM paperrust_folder WHERE id = f. Document rows still pointing at f go with
    ON DELETE CASCADE; a subfolder still pointing at f violates parent_id's FK (NO ACTION) -> db(e) -> 500 *)
@@ -333,18 +405,115 @@ SDelete(p) ==
             /\ dnv' = [d \in AllDocs |-> IF d \in MD THEN ROOT ELSE dnv[d]]
             /\ dw' = [d \in AllDocs |-> IF d \in MD THEN p ELSE dw[d]]
             /\ Acquire(p, {}) /\ Adv(p) /\ TakeSnap(p)
-            /\ UNCHANGED <<fcv, dcv, op, res, tgt, loss>>
+            /\ UNCHANGED <<fcv, dcv, op, res, tgt, loss, authv>>
 
 SCommit(p) ==
     /\ G(p) /\ Lbl(p) = "commit"
     /\ CommitTx(p)
 
-(* move_documents: resolve_folder + visible_folder(pool, ..) (plain read); gone -> 400 fields.folder *)
+(* --- delete: check_contents_movable (runs for both contents modes; caller is no superuser) ---- *)
+DataUnch == <<fcv, fnv, fw, dcv, dnv, dw, op, res, tgt, snap, loss>>
+
+(* SELECT f.id, <change cond> FROM paperrust_folder f WHERE f.parent_id = $3 ORDER BY f.id FOR UPDATE OF f.
+   The row locks are taken in one step (the model has no partial lock sets); a subfolder that a
+   concurrent patchroot moved out is re-checked and skipped (ChildRows recomputed after the wait).
+   A subfolder without change right -> 403 DELETE_FORBIDDEN_FOLDERS (code decides it after the
+   parent check, same statement result). *)
+SDelSubs(p) ==
+    /\ G(p) /\ Lbl(p) = "del_subs"
+    /\ LET S == ChildRows(p, op[p].f) IN
+       IF DelLocks /\ RRChanged(p, S) THEN Abort(p, "err_raw")
+       ELSE IF \E c \in S : ~fpc[c] THEN Abort(p, "err_mapped")
+       ELSE /\ AddChk(p, {<<"f", c>> : c \in S})
+            /\ Acquire(p, {}) /\ Adv(p)
+            /\ UNCHANGED <<DataUnch, fpc, fpw, dpc, dpw, seen, unauth, unchecked>>
+
+(* SELECT document_id FROM paperrust_document_folder WHERE folder_id = $1 ORDER BY document_id (no lock).
+   Nothing to move -> Ok (no parent/document check); target None -> no parent check. *)
+SDelDocsRead(p) ==
+    /\ G(p) /\ Lbl(p) = "del_docsread"
+    /\ LET S == DocRows(p, op[p].f) IN
+       /\ seen' = [seen EXCEPT ![p] = S]
+       /\ Goto(p, IF S = {} /\ CheckedF(p) = {} THEN "children"
+                  ELSE IF tgt[p] # ROOT THEN "del_parent"
+                  ELSE IF S # {} THEN "del_lockdocs" ELSE "children")
+       /\ UNCHANGED <<DataUnch, locks, fpc, fpw, dpc, dpw, chk, unauth, unchecked>>
+
+(* visible_folder(&mut *tx, a, target, RowLock::Share) = SELECT .. FOR SHARE OF f; gone or no change
+   right -> 403 DELETE_FORBIDDEN_PARENT *)
+SDelParent(p) ==
+    /\ G(p) /\ Lbl(p) = "del_parent"
+    /\ LET t == tgt[p] IN
+       IF FP(p, t) = GONE \/ ~fpc[t] THEN Abort(p, "err_mapped")
+       ELSE /\ AddChk(p, {<<"f", t>>})
+            /\ Acquire(p, {})
+            /\ Goto(p, IF seen[p] # {} THEN "del_lockdocs" ELSE "children")
+            /\ UNCHANGED <<DataUnch, fpc, fpw, dpc, dpw, seen, unauth, unchecked>>
+
+(* lock_documents: SELECT id FROM <document table> WHERE id = ANY($1) ORDER BY id FOR SHARE
+   (document_lock_table's catalog query before it reads nothing the model has) *)
+SDelLockDocs(p) ==
+    /\ G(p) /\ Lbl(p) = "del_lockdocs"
+    /\ Acquire(p, {}) /\ Adv(p)
+    /\ UNCHANGED <<DataUnch, fpc, fpw, dpc, dpw, chk, seen, unauth, unchecked>>
+
+(* count_unchangeable(.., include_deleted = true) > 0 -> 403 DELETE_FORBIDDEN_DOCUMENTS *)
+SDelChkDocs(p) ==
+    /\ G(p) /\ Lbl(p) = "del_chkdocs"
+    /\ IF \E d \in seen[p] : ~dpc[d] THEN Abort(p, "err_mapped")
+       ELSE /\ AddChk(p, {<<"doc", d>> : d \in seen[p]})
+            /\ Adv(p)
+            /\ UNCHANGED <<DataUnch, locks, fpc, fpw, dpc, dpw, seen, unauth, unchecked>>
+
+(* --- permission changes by another user ------------------------------------------------ *)
+
+(* document row FOR UPDATE (update.rs begin_root_tx / bulk_edit::lock_documents_sorted) *)
+SDocForUpd(p) ==
+    /\ G(p) /\ Lbl(p) = "doc_forupd"
+    /\ Acquire(p, {}) /\ Adv(p)
+    /\ UNCHANGED <<DataUnch, fpc, fpw, dpc, dpw, chk, seen, unauth, unchecked>>
+
+(* write_grants (folder) / owner_id + guardian rows (document): the caller loses the change right *)
+SRevoke(p) ==
+    /\ G(p) /\ Lbl(p) = "revoke"
+    /\ IF op[p].k = "unsharef"
+       THEN fpw' = [fpw EXCEPT ![op[p].f] = p] /\ UNCHANGED dpw
+       ELSE dpw' = [dpw EXCEPT ![op[p].d] = p] /\ UNCHANGED fpw
+    /\ Adv(p)
+    /\ UNCHANGED <<DataUnch, locks, fpc, dpc, chk, seen, unauth, unchecked>>
+
+(* --- move_documents --------------------------------------------------------------------- *)
+
+(* broken/old: resolve_folder + visible_folder(pool, ..) (plain read); gone -> 400 fields.folder,
+   no change right -> 403 *)
 SMvCheck(p) ==
     /\ G(p) /\ Lbl(p) = "mv_check"
-    /\ IF fcv[op[p].f] = GONE THEN Abort(p, "err_mapped")
-       ELSE /\ Adv(p)
-            /\ UNCHANGED <<fcv, fnv, fw, dcv, dnv, dw, locks, op, res, tgt, snap, loss>>
+    /\ IF fcv[op[p].f] = GONE \/ ~fpc[op[p].f] THEN Abort(p, "err_mapped")
+       ELSE /\ Adv(p) /\ AddChk(p, {<<"f", op[p].f>>})
+            /\ UNCHANGED <<DataUnch, locks, fpc, fpw, dpc, dpw, seen, unauth, unchecked>>
+
+(* code: visible_folder(&mut *tx, &a, fid, RowLock::Share) = SELECT .. FOR SHARE OF f (waits for a
+   deleting / re-sharing transaction); gone -> 400 fields.folder, no change right -> 403 *)
+SMvTarget(p) ==
+    /\ G(p) /\ Lbl(p) = "mv_target"
+    /\ IF fcv[op[p].f] = GONE \/ ~fpc[op[p].f] THEN Abort(p, "err_mapped")
+       ELSE /\ Acquire(p, {}) /\ Adv(p) /\ AddChk(p, {<<"f", op[p].f>>})
+            /\ UNCHANGED <<DataUnch, fpc, fpw, dpc, dpw, seen, unauth, unchecked>>
+
+(* code: lock_documents(&mut tx, table, &ids32) = SELECT id .. ORDER BY id FOR SHARE *)
+SMvLockDocs(p) ==
+    /\ G(p) /\ Lbl(p) = "mv_lockdocs"
+    /\ Acquire(p, {}) /\ Adv(p)
+    /\ UNCHANGED <<DataUnch, fpc, fpw, dpc, dpw, chk, seen, unauth, unchecked>>
+
+(* visibility count + count_unchangeable(.., include_deleted = false) (old code: the same counts on
+   the pool). Visibility is not modelled separately: it reads the same rows under the same locks,
+   and a lost view right implies a lost change right. Not changeable -> 403 *)
+SMvChkDocs(p) ==
+    /\ G(p) /\ Lbl(p) = "mv_chkdocs"
+    /\ IF ~dpc[op[p].d] THEN Abort(p, "err_mapped")
+       ELSE /\ Adv(p) /\ AddChk(p, {<<"doc", op[p].d>>})
+            /\ UNCHANGED <<DataUnch, locks, fpc, fpw, dpc, dpw, seen, unauth, unchecked>>
 
 (* move_documents: INSERT .. ON CONFLICT (document_id) DO UPDATE .. WHERE folder_id IS DISTINCT FROM ..
    - row written (or only locked when already in that folder) *)
@@ -354,27 +523,33 @@ SMvWrite(p) ==
        IF dcv[o.d] = o.f
        THEN /\ tgt' = [tgt EXCEPT ![p] = 0]
             /\ Acquire(p, {}) /\ Adv(p)
-            /\ UNCHANGED <<fcv, fnv, fw, dcv, dnv, dw, op, res, snap, loss>>
+            /\ UNCHANGED <<fcv, fnv, fw, dcv, dnv, dw, op, res, snap, loss, authv>>
        ELSE /\ tgt' = [tgt EXCEPT ![p] = 1]
             /\ dnv' = [dnv EXCEPT ![o.d] = o.f]
             /\ dw' = [dw EXCEPT ![o.d] = p]
             /\ Acquire(p, {}) /\ Adv(p)
-            /\ UNCHANGED <<fcv, fnv, fw, dcv, op, res, snap, loss>>
+            /\ UNCHANGED <<fcv, fnv, fw, dcv, op, res, snap, loss, authv>>
 
-(* same statement: FK check on folder_id (23503 -> 400 fields.folder), then autocommit *)
+(* same statement: FK check on folder_id (23503 -> 400 fields.folder); then tx.commit() (code) or
+   the autocommit (old code) as the following "commit" step *)
 SMvFk(p) ==
     /\ G(p) /\ Lbl(p) = "mv_fk"
     /\ IF tgt[p] = 1 /\ fcv[op[p].f] = GONE THEN Abort(p, "err_mapped")
-       ELSE CommitTx(p)
+       ELSE /\ Acquire(p, {}) /\ Adv(p)
+            /\ UNCHANGED <<fcv, fnv, fw, dcv, dnv, dw, op, res, tgt, snap, loss, authv>>
 
-(* move_documents with folder null: DELETE FROM paperrust_document_folder WHERE document_id = ANY($1), autocommit *)
+(* move_documents with folder null: DELETE FROM paperrust_document_folder WHERE document_id = ANY($1)
+   (row lock X until commit; a missing row deletes nothing) *)
 SMvDel(p) ==
     /\ G(p) /\ Lbl(p) = "mv_del"
-    /\ dcv' = [dcv EXCEPT ![op[p].d] = ROOT]
-    /\ dnv' = [dnv EXCEPT ![op[p].d] = ROOT]
-    /\ res' = [res EXCEPT ![p] = "ok"]
-    /\ pc' = [pc EXCEPT ![p] = Len(Steps(op[p])) + 1]
-    /\ UNCHANGED <<fcv, fnv, fw, dw, locks, op, tgt, snap, loss>>
+    /\ LET d == op[p].d IN
+       IF dcv[d] = ROOT
+       THEN /\ Adv(p)
+            /\ UNCHANGED <<fcv, fnv, fw, dcv, dnv, dw, locks, op, res, tgt, snap, loss, authv>>
+       ELSE /\ dnv' = [dnv EXCEPT ![d] = ROOT]
+            /\ dw' = [dw EXCEPT ![d] = p]
+            /\ Acquire(p, {}) /\ Adv(p)
+            /\ UNCHANGED <<fcv, fnv, fw, dcv, op, res, tgt, snap, loss, authv>>
 
 (* assign_folder: INSERT INTO paperrust_document_folder .. SELECT $1, f.id FROM paperrust_folder f
    WHERE f.id = $2 .. - the SELECT reads without a lock; folder gone -> 0 rows -> "stays unsorted" *)
@@ -384,11 +559,11 @@ SAsInsert(p) ==
            d == NewDoc(p) IN
        IF fcv[o.f] = GONE
        THEN /\ pc' = [pc EXCEPT ![p] = @ + 2]          \* skip the FK check, no row written
-            /\ UNCHANGED <<fcv, fnv, fw, dcv, dnv, dw, locks, op, res, tgt, snap, loss>>
+            /\ UNCHANGED <<fcv, fnv, fw, dcv, dnv, dw, locks, op, res, tgt, snap, loss, authv>>
        ELSE /\ dnv' = [dnv EXCEPT ![d] = o.f]
             /\ dw' = [dw EXCEPT ![d] = p]
             /\ Acquire(p, {<<R("d", d), "X">>}) /\ Adv(p)
-            /\ UNCHANGED <<fcv, fnv, fw, dcv, op, res, tgt, snap, loss>>
+            /\ UNCHANGED <<fcv, fnv, fw, dcv, op, res, tgt, snap, loss, authv>>
 
 (* same statement: FK check of folder_id (KEY SHARE on the folder row, waits for a deleting
    transaction). Folder deleted meanwhile -> 23503 -> assign_folder Err -> store_all fails *)
@@ -396,7 +571,7 @@ SAsFk(p) ==
     /\ G(p) /\ Lbl(p) = "as_fk"
     /\ IF fcv[op[p].f] = GONE THEN Abort(p, "ingest_fk_fail")
        ELSE /\ Acquire(p, {}) /\ Adv(p)
-            /\ UNCHANGED <<fcv, fnv, fw, dcv, dnv, dw, op, res, tgt, snap, loss>>
+            /\ UNCHANGED <<fcv, fnv, fw, dcv, dnv, dw, op, res, tgt, snap, loss, authv>>
 
 (* proposed fix: .. FROM paperrust_folder f WHERE f.id = $2 FOR KEY SHARE - waits for a deleting
    transaction, a deleted row is skipped (READ COMMITTED) -> 0 rows -> unsorted, no FK error *)
@@ -406,17 +581,17 @@ SAsInsertKs(p) ==
            d == NewDoc(p) IN
        IF fcv[o.f] = GONE
        THEN /\ Adv(p)
-            /\ UNCHANGED <<fcv, fnv, fw, dcv, dnv, dw, locks, op, res, tgt, snap, loss>>
+            /\ UNCHANGED <<fcv, fnv, fw, dcv, dnv, dw, locks, op, res, tgt, snap, loss, authv>>
        ELSE /\ dnv' = [dnv EXCEPT ![d] = o.f]
             /\ dw' = [dw EXCEPT ![d] = p]
             /\ Acquire(p, {<<R("d", d), "X">>}) /\ Adv(p)
-            /\ UNCHANGED <<fcv, fnv, fw, dcv, op, res, tgt, snap, loss>>
+            /\ UNCHANGED <<fcv, fnv, fw, dcv, op, res, tgt, snap, loss, authv>>
 
 (* rest of store_all after apply_overrides (files, more inserts) before tx.commit() *)
 SRest(p) ==
     /\ G(p) /\ Lbl(p) = "rest"
     /\ Adv(p)
-    /\ UNCHANGED <<fcv, fnv, fw, dcv, dnv, dw, locks, op, res, tgt, snap, loss>>
+    /\ UNCHANGED <<fcv, fnv, fw, dcv, dnv, dw, locks, op, res, tgt, snap, loss, authv>>
 
 (* PostgreSQL deadlock detector: one transaction of a lock-wait cycle gets 40P01 *)
 DeadlockAbort(p) ==
@@ -429,7 +604,10 @@ Finished == /\ \A p \in Procs : Done(p)
 Next == \/ \E p \in Procs :
             \/ SRRSnap(p) \/ SLock(p) \/ SForUpd(p) \/ SChkParent(p) \/ SReadTree(p) \/ SUpdate(p)
             \/ SDelRead(p) \/ SChildren(p) \/ SDocs(p) \/ SDelete(p) \/ SCommit(p)
-            \/ SMvCheck(p) \/ SMvWrite(p) \/ SMvFk(p) \/ SMvDel(p)
+            \/ SDelSubs(p) \/ SDelDocsRead(p) \/ SDelParent(p) \/ SDelLockDocs(p) \/ SDelChkDocs(p)
+            \/ SDocForUpd(p) \/ SRevoke(p)
+            \/ SMvCheck(p) \/ SMvTarget(p) \/ SMvLockDocs(p) \/ SMvChkDocs(p)
+            \/ SMvWrite(p) \/ SMvFk(p) \/ SMvDel(p)
             \/ SAsInsert(p) \/ SAsFk(p) \/ SAsInsertKs(p) \/ SRest(p)
             \/ DeadlockAbort(p)
         \/ Finished
@@ -463,7 +641,16 @@ NoRawError == \A p \in Procs : res[p] # "err_raw"
    the document stays "Unsorted") *)
 NoIngestFkError == \A p \in Procs : res[p] # "ingest_fk_fail"
 
+(* P5: move-documents / DELETE with contents never commits a move whose permission check was made
+   stale by a share/owner change committed between the check and the write (check-then-write gap) *)
+NoStaleAuthz == ~unauth
+
+(* P6: DELETE moves only subfolders/documents (and only into a target) that check_contents_movable checked *)
+MovesChecked == ~unchecked
+
 TypeOK ==
     /\ fcv \in [Folders -> PVal] /\ fnv \in [Folders -> PVal] /\ fw \in [Folders -> {0} \cup Procs]
     /\ dcv \in [AllDocs -> {ROOT} \cup Folders] /\ dw \in [AllDocs -> {0} \cup Procs]
+    /\ fpc \in [Folders -> BOOLEAN] /\ fpw \in [Folders -> {0} \cup Procs]
+    /\ dpc \in [AllDocs -> BOOLEAN] /\ dpw \in [AllDocs -> {0} \cup Procs]
 =============================================================================

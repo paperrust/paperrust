@@ -341,22 +341,90 @@ pub async fn changepassword(argv: Vec<String>) -> CliResult {
     let Some(p) = password else {
         return Err(CliError::Command(format!("Aborting password change for user '{}' after {count} attempts", attrs.username)));
     };
-    sqlx::query("UPDATE auth_user SET password = $1 WHERE id = $2")
-        .bind(pl_authz::hashers::make_password(&p))
-        .bind(id)
-        .execute(&c.pool)
-        .await?;
-    // Security review 2026-11-19 F13: device tokens do not survive a password change (like reset/profile)
-    if let Err(e) = pl_authz::device::revoke_all_for_user(&c.pool, i64::from(id)).await {
-        eprintln!("warning: could not revoke device tokens: {e}");
-    }
+    set_password_and_revoke(&c.pool, id, &pl_authz::hashers::make_password(&p)).await?;
     println!("Password changed successfully for user '{}'", attrs.username);
     Ok(())
+}
+
+/// Store the new (encoded) password and revoke the user's device tokens in **one** transaction
+/// (security review 2026-11-19 F13, like `pl_auth_api::db::set_password_and_revoke` for reset
+/// and profile): the new password never becomes visible while old device tokens still work, and
+/// a failed revocation leaves the old password in place. A missing `paperrust_device_token`
+/// table (migration not applied) counts as "nothing to revoke"; that statement runs in a
+/// savepoint so its error does not abort the outer transaction (`pl_authz::device::revoke_all_for_user_tx`).
+async fn set_password_and_revoke(pool: &PgPool, user_id: i32, encoded: &str) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    sqlx::query("UPDATE auth_user SET password = $1 WHERE id = $2").bind(encoded).bind(user_id).execute(&mut *tx).await?;
+    pl_authz::device::revoke_all_for_user_tx(&mut tx, i64::from(user_id)).await?;
+    tx.commit().await
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Pool with one connection whose `search_path` is a fresh schema `schema` (created here),
+    /// so the test tables never touch real data. Needs `PAPERRUST_CLI_USERS_TEST_DATABASE_URL`.
+    async fn scratch_pool(schema: &str) -> Option<PgPool> {
+        let url = std::env::var("PAPERRUST_CLI_USERS_TEST_DATABASE_URL").ok()?;
+        let pool = sqlx::postgres::PgPoolOptions::new().max_connections(1).connect(&url).await.unwrap();
+        sqlx::query(&format!("DROP SCHEMA IF EXISTS {schema} CASCADE")).execute(&pool).await.unwrap();
+        sqlx::query(&format!("CREATE SCHEMA {schema}")).execute(&pool).await.unwrap();
+        sqlx::query(&format!("SET search_path TO {schema}")).execute(&pool).await.unwrap();
+        sqlx::query("CREATE TABLE auth_user (id int4 PRIMARY KEY, password text NOT NULL)").execute(&pool).await.unwrap();
+        sqlx::query("INSERT INTO auth_user VALUES (7, 'old')").execute(&pool).await.unwrap();
+        Some(pool)
+    }
+
+    async fn drop_schema(pool: &PgPool, schema: &str) {
+        sqlx::query(&format!("DROP SCHEMA {schema} CASCADE")).execute(pool).await.unwrap();
+    }
+
+    async fn password(pool: &PgPool) -> String {
+        sqlx::query_scalar("SELECT password FROM auth_user WHERE id = 7").fetch_one(pool).await.unwrap()
+    }
+
+    #[tokio::test]
+    #[ignore = "needs PAPERRUST_CLI_USERS_TEST_DATABASE_URL (any PostgreSQL; works in its own schema)"]
+    async fn password_change_revokes_device_tokens_atomically() {
+        let schema = "paperrust_cli_users_test_a";
+        let Some(pool) = scratch_pool(schema).await else { return };
+        sqlx::query("CREATE TABLE paperrust_device_token (id serial PRIMARY KEY, user_id int4 NOT NULL, revoked_at timestamptz)")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO paperrust_device_token (user_id) VALUES (7), (7), (8)").execute(&pool).await.unwrap();
+        set_password_and_revoke(&pool, 7, "new").await.unwrap();
+        assert_eq!(password(&pool).await, "new");
+        let open: Vec<i32> =
+            sqlx::query_scalar("SELECT user_id FROM paperrust_device_token WHERE revoked_at IS NULL").fetch_all(&pool).await.unwrap();
+        assert_eq!(open, vec![8], "only the other user's token stays active");
+
+        // A failing revocation (here: a trigger raising an error) keeps the old password.
+        sqlx::query("CREATE FUNCTION boom() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'boom'; END $$")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("CREATE TRIGGER t BEFORE UPDATE ON paperrust_device_token FOR EACH ROW EXECUTE FUNCTION boom()")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO paperrust_device_token (user_id) VALUES (7)").execute(&pool).await.unwrap();
+        assert!(set_password_and_revoke(&pool, 7, "newer").await.is_err());
+        assert_eq!(password(&pool).await, "new", "password change rolled back with the failed revocation");
+        drop_schema(&pool, schema).await;
+    }
+
+    #[tokio::test]
+    #[ignore = "needs PAPERRUST_CLI_USERS_TEST_DATABASE_URL (any PostgreSQL; works in its own schema)"]
+    async fn password_change_without_device_token_table() {
+        let schema = "paperrust_cli_users_test_b";
+        let Some(pool) = scratch_pool(schema).await else { return };
+        // Only the scratch schema is searched, so `paperrust_device_token` is missing (42P01).
+        set_password_and_revoke(&pool, 7, "new").await.unwrap();
+        assert_eq!(password(&pool).await, "new");
+        drop_schema(&pool, schema).await;
+    }
 
     #[test]
     fn validators_like_django() {

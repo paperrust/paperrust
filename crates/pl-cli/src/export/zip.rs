@@ -151,6 +151,13 @@ impl ZipWriter {
         Ok(ZipWriter { out: BufWriter::new(f), entries: Vec::new(), method, level, tz })
     }
 
+    /// Like [`ZipWriter::create`], but fails if `path` already exists instead of truncating it
+    /// (temp files of the exporter, review finding 1).
+    pub fn create_new(path: &Path, method: Method, level: Option<i32>, tz: chrono_tz::Tz) -> io::Result<ZipWriter> {
+        let f = std::fs::OpenOptions::new().read(true).write(true).create_new(true).open(path)?;
+        Ok(ZipWriter { out: BufWriter::new(f), entries: Vec::new(), method, level, tz })
+    }
+
     fn pos(&mut self) -> io::Result<u64> {
         self.out.stream_position()
     }

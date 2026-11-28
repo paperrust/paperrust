@@ -365,6 +365,76 @@ src/documents/mail.py@v3.4.2 `send_email`, src/documents/models.py@v3.4.2 `get_p
     (upstream öffnet den Pfad ungeprüft).
 22. **Passwort-Maske konstant** (2026-11-21, upstream 64bf7f845 / #14784, nach v3.4.2): `password`-Felder werden immer als `"**********"` (10 Sterne) ausgegeben; v3.4.2 sendete `"*" * max(10, len(passwort))` und verriet damit die Länge. „Nur Sterne oder leer“ = unverändert, wie bisher. Betrifft `/api/mail_accounts/`.
 
+### Mail-Abruf (fetch/, Review 2026-11-27) – maßgeblich für `pl-mail-worker.md` (dort nur Verweise)
+
+23. **Kein ordnerweites `EXPUNGE` nach Markier-Aktionen** (`fetch/client.rs` `flag`, `delete`,
+    `uid_expunge`, `move_to`): imap_tools schickt nach jedem `flag()` (MARK_READ, FLAG, TAG mit
+    Schlüsselwort/Apple-Farbe) ein `EXPUNGE`, das **alle** von irgendeinem Client mit `\Deleted`
+    markierten Mails des Ordners endgültig löscht. PaperRust: nach `UID STORE ±FLAGS` kein
+    `EXPUNGE`. DELETE: `UID STORE u +FLAGS (\Deleted)` + `UID EXPUNGE u` (RFC 4315), wenn der Server
+    `UIDPLUS` meldet (vor oder nach der Anmeldung, `[CAPABILITY …]` in der LOGIN-Antwort); MOVE:
+    `UID MOVE` bei `MOVE` (ebenfalls auch nach der Anmeldung gemeldet), sonst `UID COPY` + DELETE wie
+    eben. **Rückfall ohne `UIDPLUS`:** ordnerweites `EXPUNGE` wie upstream (Warnung im Log) – nur
+    noch bei DELETE/MOVE-ohne-MOVE auf Servern ohne UIDPLUS. Tests: `tests/mail_actions.rs`
+    (`mark_read_does_not_expunge_foreign_deleted_mail`, `flag_call_sends_no_expunge`,
+    `delete_with_uidplus_expunges_only_this_uid`, `delete_uses_uidplus_announced_after_login`,
+    `move_without_move_capability_uses_uid_expunge`, `delete_without_uidplus_falls_back_to_folder_expunge`).
+24. **Verzögerte Mail-Aktion prüft Ordner, Konto und UIDVALIDITY** (`fetch/tasks.rs`
+    `ActionTarget`, `run_mail_action`; `fetch/handler.rs` `queue_consumption_tasks`): upstream lädt
+    in `apply_mail_action` Konto/Ordner/Aktion aus der *aktuellen* Regel und handelt auf die
+    gespeicherte UID, ohne `uid_validity` zu vergleichen – nach Neuanlage des Ordners oder
+    Regeländerung trifft die Aktion eine andere Mail. PaperRust legt zusätzlich die kwargs
+    `folder` und `account_id` in `apply_mail_action`/`error_callback` ab. Vor der Aktion: Regel
+    zeigt auf anderes Konto oder anderen Ordner → überspringen (ohne Verbindung); nach `SELECT`
+    UIDVALIDITY aus `OK [UIDVALIDITY n]` (sonst `STATUS`) ≠ gespeicherter Wert → überspringen.
+    Überspringen = Warnung im Log, `ProcessedMail` mit `status=FAILED` und Grund im `error`
+    (Ordner = Import-Ordner), Task-Ergebnis SUCCESS mit dem Grund als Text (das Dokument wurde ja
+    verarbeitet). Unbekannte UIDVALIDITY (bei Import oder jetzt) oder Tasks ohne die neuen kwargs
+    (ältere Versionen) → keine Prüfung, wie upstream. Tests: `changed_uidvalidity_skips_the_action`,
+    `same_uidvalidity_runs_the_action`, `unknown_stored_uidvalidity_keeps_upstream_behaviour`,
+    `changed_rule_folder_skips_without_connecting`, `changed_rule_account_skips_without_connecting`,
+    `target_from_kwargs_reads_paperrust_fields`.
+25. **„Mail und Anhänge verarbeiten“ = ein Chord** (`fetch/handler.rs` `consume_message`):
+    upstream ruft in `_process_eml` und `_process_attachments` je `queue_consumption_tasks` auf →
+    zwei Chords mit derselben Mail-Aktion; die Aktion läuft zweimal und kann die Mail
+    verschieben/löschen, während ein Anhang noch verarbeitet wird oder danach scheitert. PaperRust:
+    alle consume-Tasks einer Mail (eml zuerst, dann die Anhänge in Mail-Reihenfolge) in **einem**
+    `chord(…, apply_mail_action).on_error(error_callback)`; die Aktion läuft einmal und nur, wenn
+    alle Teile erfolgreich waren. Folge: upstream legt bei EVERYTHING ohne passende Anhänge
+    zusätzlich zum eml-Chord einen `PROCESSED_WO_CONSUMPTION`-Eintrag an; PaperRust nur, wenn gar
+    nichts eingereiht wurde. Tests: `handler::tests::everything_scope_queues_one_chord_for_eml_and_attachments`,
+    `attachments_scope_queues_one_chord`.
+26. **Konto-Fehler im Ergebnis von `process_mail_accounts`** (`fetch/tasks.rs` `summarize`,
+    `AccountRun::failure`): upstream loggt Konto-Fehler (MailError, Verbindungs-/Postfachfehler,
+    Regelfehler) und meldet immer „No new documents were added.“ bzw. „Added N document(s).“ –
+    auch wenn jedes Konto scheitert. PaperRust zählt als Konto-Fehler: MailError, Verbindungs-/
+    Postfachfehler, OAuth-Erneuerung gescheitert, **alle** aktiven Regeln des Kontos gescheitert.
+    Alle versuchten Konten gescheitert → Task FAILURE (`MailError: All N mail account(s) failed:
+    <konto>: <fehler>; …`); nur einige → upstream-Text + ` K of N mail account(s) failed: …`.
+    Ohne Fehler: Texte unverändert. Konten ohne aktive Regel zählen nicht. Tests:
+    `unreachable_account_is_reported_as_failure`, `all_accounts_failed_is_a_task_failure`,
+    `partial_failure_keeps_result_and_names_the_account`, `no_failure_keeps_upstream_texts`.
+27. **Gmail-Label: Antwortstatus wird geprüft** (`fetch/client.rs` `gmail_label`): upstream
+    `M.client.uid("STORE", uid, "+X-GM-LABELS", kw)` ignoriert den Status; ein `NO` führte zu
+    `ProcessedMail` SUCCESS. PaperRust: `NO` → `MailboxTaggingError: "NO" received` → FAILED wie
+    jeder andere Aktionsfehler (`BAD` war schon ein Fehler). Tests: `rejected_gmail_label_is_an_error`,
+    `accepted_gmail_label_succeeds`, `gmail_label_no_from_mailbox_call`.
+28. **Neue Task-kwargs nur für PaperRust-Worker – keine gemeinsame Warteschlange mit Python**
+    (Entscheidung 2026-11-28): Die kwargs `folder`/`account_id` (Nr. 24) in `apply_mail_action`/
+    `error_callback` würden einen paperless-ngx-Celery-Worker brechen (`TypeError: unexpected keyword
+    argument`). Das kann nicht eintreten: Seit 2026-11-14 ist `pl_queue::PgQueue` (Tabelle
+    `paperrust_task_queue`) die einzige Warteschlange (`docs/contract/pl-queue.md` Kopf und A-Tabelle
+    `PAPERRUST_QUEUE_BACKEND` „wirkungslos“; Celery-Brücke `CeleryBridge`/`pl_core::celery` entfernt).
+    `PAPERRUST_QUEUE=celery|redis` und `PAPERLESS_REDIS` erzeugen nur einen Starthinweis
+    (`pl_core::config::retired_warnings`), kein Code im Workspace schreibt in Redis/AMQP. Ein Celery-
+    Worker liest nur seinen Broker (Redis), nie `paperrust_task_queue`; umgekehrt liest PaperRust keine
+    Celery-Nachrichten. Gemeinsam ist höchstens die Datenbank, nicht die Warteschlange (Mischbetrieb
+    abgeschafft, `pl-mail-worker.md` Known difference 1). Deshalb keine Kompatibilitätsweiche. Rückweg
+    zu paperless-ngx: noch eingereihte Aufgaben bleiben in `paperrust_task_queue` liegen (ngx ignoriert
+    die Tabelle); ohne gelaufene Aktion gibt es (wie upstream) keine `ProcessedMail`-Zeile, ngx ruft
+    die Mail also erneut ab – betrifft den Umstieg, nicht einen laufenden Mischbetrieb. Umgekehrt liest PaperRust die kwargs tolerant:
+    Aufgaben ohne `folder`/`account_id` laufen ohne Prüfung wie upstream (Nr. 24).
+
 ## Paritätsstand
 
 - **Lesend gegen Django verglichen** (`crates/pl-mail/tests/parity_django.rs`, `#[ignore]`, nur GET):

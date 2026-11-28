@@ -356,7 +356,8 @@ pub fn clean_title(t: &str) -> String {
 
 // ------------------------------------------------------------------ Options
 
-/// GET /api/x-ai/options/ → `{"options": {…}, "custom_fields": [{id, name, data_type, supported}]}`
+/// GET /api/x-ai/options/ → `{"options": {…}, "custom_fields": [{id, name, data_type, supported}],
+/// "vision_mode_effective", "vision_remote": bool|null}` (`vision_remote` = LLM endpoint is not local).
 pub async fn options_get(State(state): State<AppState>, ctx: RequestContext, auth: AuthUser) -> Result<Response, ApiError> {
     require_superuser(&auth)?;
     let o = load_options(state.db()).await;
@@ -365,7 +366,19 @@ pub async fn options_get(State(state): State<AppState>, ctx: RequestContext, aut
         .iter()
         .map(|f| json!({"id": f.id, "name": f.name, "data_type": f.data_type, "supported": custom_fields::supported(&f.data_type)}))
         .collect();
-    Ok(Drf::ok(json!({"options": o, "custom_fields": fields})).indent(ctx.negotiation.indent).into_response())
+    // KI-Abschrift: the settings page warns if page images/crops would leave the house (cloud endpoint).
+    let vision_remote = match super::effective_config(&state).await {
+        Ok(cfg) => crate::llm::LlmClient::from_config(&cfg).ok().map(|c| !crate::vision::endpoint_is_local(&c.endpoint)),
+        Err(_) => None,
+    };
+    Ok(Drf::ok(json!({
+        "options": o,
+        "custom_fields": fields,
+        "vision_mode_effective": o.effective_vision_mode(),
+        "vision_remote": vision_remote,
+    }))
+    .indent(ctx.negotiation.indent)
+    .into_response())
 }
 
 /// PATCH /api/x-ai/options/ `{"<key>": <value>, …}` (values are validated and clamped).

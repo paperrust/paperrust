@@ -77,8 +77,10 @@ pub trait Repo: Send + Sync {
     /// All visible `(uuid, rev)` of a kind (docs/SYNC.md §3.3 `sync/ids`).
     fn ids<'a>(&'a self, p: &'a Principal, kind: Kind) -> BoxFut<'a, Vec<(Uuid, i64)>>;
 
-    /// Resolve selection (docs/SYNC.md §3.5).
-    fn resolve<'a>(&'a self, p: &'a Principal, sel: &'a Selection) -> BoxFut<'a, Vec<ResolvedDoc>>;
+    /// Resolve selection (docs/SYNC.md §3.5). Saved views whose rules cannot be evaluated are
+    /// skipped and reported in [`Resolution::skipped_saved_views`]; when the selection consists only
+    /// of such views the implementation returns `NotImplemented` (501) instead.
+    fn resolve<'a>(&'a self, p: &'a Principal, sel: &'a Selection) -> BoxFut<'a, Resolution>;
 
     fn ui_settings<'a>(&'a self, p: &'a Principal) -> BoxFut<'a, Value>;
     fn set_ui_settings<'a>(&'a self, p: &'a Principal, settings: &'a Value) -> BoxFut<'a, Value>;

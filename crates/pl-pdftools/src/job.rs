@@ -74,6 +74,11 @@ pub enum Op {
         terms: Vec<String>,
         #[serde(default)]
         remove_metadata: bool,
+        /// OCR text layer of the same pages (archive PDF of a scan). The terms are searched in
+        /// both the original and this file per page; every hit is redacted on the original (image
+        /// area for scanned pages), and the verification also checks this text layer.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        ocr_input: Option<String>,
     },
     /// Find search terms (matches with rectangles, without changing anything).
     Search {
@@ -81,6 +86,9 @@ pub enum Op {
         terms: Vec<String>,
         #[serde(default = "default_max_hits")]
         max_hits: usize,
+        /// OCR text layer (archive PDF), searched in addition; hits mapped onto the original.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        ocr_input: Option<String>,
     },
     /// Shrinking.
     Shrink { input: String, output: String, preset: ShrinkPreset },
@@ -184,6 +192,9 @@ pub struct Hit {
     pub context: String,
     /// Rectangles (words that contain the match), PDF user coordinates.
     pub rects: Vec<Rect>,
+    /// Found only in the OCR text layer (archive PDF), not in the original's text.
+    #[serde(default)]
+    pub from_ocr: bool,
 }
 
 /// Report after redacting.
@@ -264,6 +275,7 @@ mod tests {
                 areas: vec![Area { page: 0, rect: [1.0, 2.0, 3.0, 4.0] }],
                 terms: vec!["geheim".into()],
                 remove_metadata: true,
+                ocr_input: Some("archive.pdf".into()),
             },
             memory_mb: 512,
         };

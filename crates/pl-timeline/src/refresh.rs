@@ -1,18 +1,21 @@
 //! Save content detection (`paperrust_doc_date`, `source='content'`) and maintain its state
 //! (`paperrust_doc_date_state`): after ingestion, for outdated documents on read,
 //! as backfill (command/task). All only with [`crate::SETTING_EXTRACT`].
+//!
+//! The full recompute ([`backfill`]) is guarded by a PostgreSQL advisory lock ([`BACKFILL_LOCK_KEY`]),
+//! so it runs at most once at a time across all processes on one database.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::Serialize;
-use sqlx::PgPool;
+use sqlx::{Connection, PgConnection, PgPool};
 
 use crate::Result;
 use crate::extract::{DateParse, EXTRACTOR_VERSION, extract};
 use crate::store::ensure;
 
-/// Erkennung eingeschaltet? (`get` z. B. `pl_core::config::var`)
+/// Is detection switched on? (`get` e.g. `pl_core::config::var`)
 pub fn enabled(get: &dyn Fn(&str) -> Option<String>) -> bool {
     crate::truthy(get(crate::SETTING_EXTRACT).as_deref())
 }
@@ -101,25 +104,93 @@ pub struct BackfillReport {
 
 static RUNNING: AtomicBool = AtomicBool::new(false);
 
-/// Is a backfill currently running in this process?
+/// Key of the PostgreSQL advisory lock that guards the full recompute (two-int4 form, so `pg_locks`
+/// shows it as `classid`/`objid` with `objsubid = 2`). Fixed values ("PRST", "TLBF"), the same in every
+/// server, worker and `manage` process of one database.
+pub const BACKFILL_LOCK_KEY: (i32, i32) = (0x5052_5354, 0x544c_4246);
+
+/// Is a backfill currently running in **this** process? Cheap, no database access; for the
+/// cluster-wide answer use [`backfill_running_any`].
 pub fn backfill_running() -> bool {
     RUNNING.load(Ordering::Relaxed)
 }
 
-struct Running;
-impl Drop for Running {
+/// Is a backfill running in any process connected to this database (advisory lock held)?
+pub async fn backfill_running_any(pool: &PgPool) -> Result<bool> {
+    Ok(sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND granted
+            AND database = (SELECT oid FROM pg_database WHERE datname = current_database())
+            AND classid = $1::int4::oid AND objid = $2::int4::oid AND objsubid = 2)",
+    )
+    .bind(BACKFILL_LOCK_KEY.0)
+    .bind(BACKFILL_LOCK_KEY.1)
+    .fetch_one(pool)
+    .await?)
+}
+
+/// Held backfill lock: a session-level advisory lock on a connection taken out of the pool
+/// (`detach`), so it can never return to the pool with the lock still held. Dropping it closes that
+/// connection, which releases the lock on the server even after an error or a panic.
+pub struct BackfillLock {
+    conn: Option<PgConnection>,
+}
+
+impl BackfillLock {
+    /// Release the lock and close its connection gracefully.
+    pub async fn release(mut self) {
+        if let Some(mut c) = self.conn.take() {
+            let unlocked =
+                sqlx::query("SELECT pg_advisory_unlock($1, $2)").bind(BACKFILL_LOCK_KEY.0).bind(BACKFILL_LOCK_KEY.1).execute(&mut c).await;
+            if let Err(e) = unlocked {
+                tracing::warn!(target: "paperrust.timeline", error = %e, "releasing the backfill lock failed; closing its connection");
+            }
+            // closing the session releases any session lock as well
+            let _ = c.close().await;
+        }
+    }
+}
+
+impl Drop for BackfillLock {
     fn drop(&mut self) {
         RUNNING.store(false, Ordering::Relaxed);
     }
 }
 
-/// Backfill: all outdated (with `force`: all) root documents. `None` if a
-/// backfill is already running in this process.
-pub async fn backfill(pool: &PgPool, dp: &DateParse, force: bool) -> Result<Option<BackfillReport>> {
-    if RUNNING.swap(true, Ordering::SeqCst) {
+/// Try to take the backfill lock (`pg_try_advisory_lock`, never waits). `None` if a backfill is
+/// already running in any process on this database.
+pub async fn try_lock_backfill(pool: &PgPool) -> Result<Option<BackfillLock>> {
+    let mut conn = pool.acquire().await?.detach();
+    let got: bool = sqlx::query_scalar("SELECT pg_try_advisory_lock($1, $2)")
+        .bind(BACKFILL_LOCK_KEY.0)
+        .bind(BACKFILL_LOCK_KEY.1)
+        .fetch_one(&mut conn)
+        .await?;
+    if !got {
+        let _ = conn.close().await;
         return Ok(None);
     }
-    let _guard = Running;
+    RUNNING.store(true, Ordering::Relaxed);
+    Ok(Some(BackfillLock { conn: Some(conn) }))
+}
+
+/// Backfill: all outdated (with `force`: all) root documents. `None` if a backfill is already running
+/// (in any process on this database, see [`try_lock_backfill`]).
+pub async fn backfill(pool: &PgPool, dp: &DateParse, force: bool) -> Result<Option<BackfillReport>> {
+    let Some(lock) = try_lock_backfill(pool).await? else {
+        return Ok(None);
+    };
+    backfill_locked(pool, dp, force, lock).await.map(Some)
+}
+
+/// Backfill under a lock taken earlier with [`try_lock_backfill`] (lets an HTTP handler answer
+/// "started"/"already running" truthfully before it spawns the work). Releases the lock at the end.
+pub async fn backfill_locked(pool: &PgPool, dp: &DateParse, force: bool, lock: BackfillLock) -> Result<BackfillReport> {
+    let res = backfill_run(pool, dp, force).await;
+    lock.release().await;
+    res
+}
+
+async fn backfill_run(pool: &PgPool, dp: &DateParse, force: bool) -> Result<BackfillReport> {
     ensure(pool).await?;
     if force {
         sqlx::query("DELETE FROM paperrust_doc_date_state").execute(pool).await?;
@@ -143,7 +214,7 @@ pub async fn backfill(pool: &PgPool, dp: &DateParse, force: bool) -> Result<Opti
         }
     }
     tracing::info!(target: "paperrust.timeline", documents = rep.documents, dates = rep.dates, "timeline date backfill finished");
-    Ok(Some(rep))
+    Ok(rep)
 }
 
 /// After ingestion/reprocessing (worker): with detection switched on, re-detect the

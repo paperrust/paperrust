@@ -7,9 +7,9 @@
 
 use pl_core::sqlbind::SqlxBinder as _;
 use rand::RngCore;
-use sea_query::{Alias, Expr, Order, PostgresQueryBuilder, Query};
+use sea_query::{Alias, Expr, Order, PostgresQueryBuilder, Query, UpdateStatement};
 use serde_json::Value;
-use sqlx::{PgPool, Row};
+use sqlx::{PgConnection, PgPool, Row};
 
 pub fn a(name: &str) -> Alias {
     Alias::new(name)
@@ -123,7 +123,7 @@ pub async fn delete_and_cleanup(db: &PgPool, auth_id: i64, user_id: i64) -> Resu
 }
 
 /// `Authenticator(user, type, data).save()` (created_at = now, last_used_at = NULL).
-pub async fn insert_authenticator(db: &PgPool, user_id: i64, kind: &str, data: Value) -> Result<(), sqlx::Error> {
+pub async fn insert_authenticator(db: &mut PgConnection, user_id: i64, kind: &str, data: Value) -> Result<(), sqlx::Error> {
     let (sql, values) = Query::insert()
         .into_table(a("mfa_authenticator"))
         .columns([a("user_id"), a("type"), a("data"), a("created_at"), a("last_used_at")])
@@ -138,6 +138,54 @@ pub async fn insert_authenticator(db: &PgPool, user_id: i64, kind: &str, data: V
         .build_sqlx(PostgresQueryBuilder);
     sqlx::query_with(&sql, values).execute(db).await?;
     Ok(())
+}
+
+/// `TOTP.activate(user, secret)` + `auto_generate_recovery_codes` (TOTPView.post) in **one**
+/// transaction: either the TOTP authenticator and (if missing) the recovery codes are both
+/// stored, or nothing is (a failure while storing the recovery codes must not leave TOTP active
+/// without codes; upstream runs the two saves without a transaction). Returns the new recovery
+/// codes' `data` when they were generated here.
+pub async fn activate_totp(db: &PgPool, user_id: i64, secret: &str, rc_seed: &str) -> Result<Option<Value>, sqlx::Error> {
+    let mut tx = db.begin().await?;
+    insert_authenticator(&mut tx, user_id, "totp", serde_json::json!({ "secret": secret })).await?;
+    let (sql, values) = Query::select()
+        .expr(Expr::col(a("id")).count())
+        .from(a("mfa_authenticator"))
+        .and_where(Expr::col(a("user_id")).eq(user_id))
+        .and_where(Expr::col(a("type")).eq("recovery_codes"))
+        .build_sqlx(PostgresQueryBuilder);
+    let existing: i64 = sqlx::query_with(&sql, values).fetch_one(&mut *tx).await?.try_get(0)?;
+    let mut created = None;
+    if existing == 0 {
+        let rc_data = serde_json::json!({ "seed": rc_seed, "used_mask": 0 });
+        insert_authenticator(&mut tx, user_id, "recovery_codes", rc_data.clone()).await?;
+        created = Some(rc_data);
+    }
+    tx.commit().await?;
+    Ok(created)
+}
+
+/// Run an `UPDATE auth_user ...` (if any) and, when `revoke_for` is set (the password changed),
+/// revoke that user's device tokens in the **same** transaction. Used by `ProfileView.patch`
+/// and the password reset: the new password never becomes visible without the revocation.
+pub async fn update_user_and_revoke(db: &PgPool, update: Option<&UpdateStatement>, revoke_for: Option<i64>) -> Result<(), sqlx::Error> {
+    let mut tx = db.begin().await?;
+    if let Some(q) = update {
+        let (sql, values) = q.build_sqlx(PostgresQueryBuilder);
+        sqlx::query_with(&sql, values).execute(&mut *tx).await?;
+    }
+    if let Some(uid) = revoke_for {
+        pl_authz::device::revoke_all_for_user_tx(&mut tx, uid).await?;
+    }
+    tx.commit().await
+}
+
+/// `user.set_password(raw); user.save()` with an already encoded password plus the
+/// device-token revocation in one transaction (password reset).
+pub async fn set_password_and_revoke(db: &PgPool, user_id: i64, encoded: &str) -> Result<(), sqlx::Error> {
+    let mut q = Query::update();
+    q.table(a("auth_user")).value(a("password"), encoded).and_where(Expr::col(a("id")).eq(user_id));
+    update_user_and_revoke(db, Some(&q), Some(user_id)).await
 }
 
 /// `is_mfa_enabled` for many users at once.

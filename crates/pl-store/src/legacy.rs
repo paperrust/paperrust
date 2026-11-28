@@ -7,7 +7,8 @@
 //! validation, permissions, audit log, workflows, index and file names thus remain identical to v1.
 //! The v1 response is evaluated only for success/error, the result is re-read from the DB.
 
-use std::sync::Arc;
+use std::future::Future;
+use std::sync::{Arc, Mutex, OnceLock};
 
 use axum::body::Body;
 use axum::http::{Method, Request, StatusCode, header};
@@ -15,10 +16,11 @@ use http_body_util::BodyExt as _;
 use pl_domain::model::*;
 use pl_domain::{DomainError, DomainResult, Kind, Principal};
 use serde_json::{Map, Value, json};
+use sqlx::PgPool;
 use tower::ServiceExt as _;
 use uuid::Uuid;
 
-use crate::{Store, auth, documents, ident, objects};
+use crate::{Store, auth, db_err, documents, ident, objects};
 
 /// Router with the v1 write handlers (state and `Authz` extension already set).
 #[derive(Clone)]
@@ -133,6 +135,95 @@ fn check_rev(if_match: Option<i64>, current: i64) -> DomainResult<()> {
     }
 }
 
+// ---------------------------------------------------------------------------------------------
+// Atomic `If-Match` check and v1 write (contract pl-api-v2, "Identität und rev").
+//
+// A row lock (`SELECT … FOR UPDATE`) on the object is not possible: the v1 handler writes the
+// same row on another pool connection, so it would wait for our lock while we wait for its
+// response. Instead every v2 write takes a transaction-scoped advisory lock per object, re-reads
+// `rev` while holding it and calls v1 inside the lock. Two v2 writers of one object are thus
+// serialized: the second one sees the rev bumped by the first and gets 412.
+// ---------------------------------------------------------------------------------------------
+
+/// A held per-object write lock.
+trait ObjectLock {
+    /// Releases the lock (awaited, so the next writer is not left waiting for a lazy rollback).
+    async fn release(self);
+}
+
+/// Advisory lock held in a transaction on a connection of the lock side pool.
+struct PgObjectLock(sqlx::Transaction<'static, sqlx::Postgres>);
+
+impl ObjectLock for PgObjectLock {
+    async fn release(self) {
+        if let Err(e) = self.0.rollback().await {
+            // A failed rollback closes the connection, which also ends the lock.
+            tracing::warn!(error = %e, "releasing the v2 write lock failed");
+        }
+    }
+}
+
+/// Connections of the lock side pool per database. The lock connection idles while the v1
+/// handler works on the general pool; taking it from that pool could starve the v1 handler
+/// (small pools) – hence an own small pool (`pl_core::dbconn::side_pool`, FINDINGS B2).
+static LOCK_POOLS: OnceLock<Mutex<Vec<(String, PgPool)>>> = OnceLock::new();
+/// Concurrent lock holders/waiters per process; more writers queue on the pool acquire.
+const LOCK_POOL_MAX: u32 = 4;
+
+fn lock_pool(db: &PgPool) -> PgPool {
+    let o = db.connect_options();
+    let key = format!("{}|{}|{}|{}", o.get_host(), o.get_port(), o.get_database().unwrap_or(""), o.get_username());
+    let pools = LOCK_POOLS.get_or_init(|| Mutex::new(Vec::new()));
+    let mut g = match pools.lock() {
+        Ok(g) => g,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    if let Some((_, p)) = g.iter().find(|(k, _)| *k == key) {
+        return p.clone();
+    }
+    let p = pl_core::dbconn::side_pool(db, LOCK_POOL_MAX);
+    g.push((key, p.clone()));
+    p
+}
+
+/// Advisory lock key of an object (same scheme as the consumer locks: `hashtextextended`).
+fn lock_key(kind: Kind, id: i64) -> String {
+    format!("paperrust:v2write:{}:{id}", kind.code())
+}
+
+async fn lock_object(store: &Store, kind: Kind, id: i64) -> DomainResult<PgObjectLock> {
+    let mut tx = lock_pool(&store.db).begin().await.map_err(db_err)?;
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
+        .bind(lock_key(kind, id))
+        .execute(&mut *tx)
+        .await
+        .map_err(db_err)?;
+    Ok(PgObjectLock(tx))
+}
+
+/// Current `rev` of a live object (read after the lock was granted).
+async fn current_rev(store: &Store, kind: Kind, uuid: Uuid) -> DomainResult<i64> {
+    ident::resolve_one(&store.db, kind, uuid).await.map(|(_, rev)| rev)
+}
+
+/// Check-and-write under a held lock: `current_rev` is awaited only now (futures are lazy), the
+/// revision compared, then `write` runs; the lock is released afterwards in every case.
+async fn locked_write<L, R, W, WF, T>(lock: L, current_rev: R, if_match: Option<i64>, write: W) -> DomainResult<T>
+where
+    L: ObjectLock,
+    R: Future<Output = DomainResult<i64>>,
+    W: FnOnce() -> WF,
+    WF: Future<Output = DomainResult<T>>,
+{
+    let result = async {
+        check_rev(if_match, current_rev.await?)?;
+        write().await
+    }
+    .await;
+    lock.release().await;
+    result
+}
+
 async fn object_body(store: &Store, kind: Kind, w: &ObjectWrite) -> DomainResult<Value> {
     let mut m = Map::new();
     if let Some(n) = &w.name {
@@ -219,9 +310,13 @@ pub(crate) async fn update(
 ) -> DomainResult<Object> {
     let base = v1_base(kind)?;
     let (id, rev) = visible(store, p, kind, uuid).await?;
+    // Early check keeps the error order (412 before body validation); the binding check
+    // follows under the lock.
     check_rev(if_match, rev)?;
     let body = object_body(store, kind, w).await?;
-    call(store, p, Method::PATCH, &format!("{base}{id}/"), Some(body)).await?;
+    let lock = lock_object(store, kind, id).await?;
+    let path = format!("{base}{id}/");
+    locked_write(lock, current_rev(store, kind, uuid), if_match, || call(store, p, Method::PATCH, &path, Some(body))).await?;
     reload(store, p, kind, id).await
 }
 
@@ -229,7 +324,9 @@ pub(crate) async fn delete(store: &Store, p: &Principal, kind: Kind, uuid: Uuid,
     let base = v1_base(kind)?;
     let (id, rev) = visible(store, p, kind, uuid).await?;
     check_rev(if_match, rev)?;
-    call(store, p, Method::DELETE, &format!("{base}{id}/"), None).await?;
+    let lock = lock_object(store, kind, id).await?;
+    let path = format!("{base}{id}/");
+    locked_write(lock, current_rev(store, kind, uuid), if_match, || call(store, p, Method::DELETE, &path, None)).await?;
     Ok(())
 }
 
@@ -288,7 +385,10 @@ pub(crate) async fn patch_document(
         }
         m.insert("custom_fields".into(), Value::Array(out));
     }
-    call(store, p, Method::PATCH, &format!("/api/documents/{id}/"), Some(Value::Object(m))).await?;
+    let lock = lock_object(store, Kind::Document, id).await?;
+    let path = format!("/api/documents/{id}/");
+    locked_write(lock, current_rev(store, Kind::Document, uuid), if_match, || call(store, p, Method::PATCH, &path, Some(Value::Object(m))))
+        .await?;
     documents::get_by_id(store, user, id).await
 }
 
@@ -312,4 +412,155 @@ pub(crate) async fn set_ui_settings(store: &Store, p: &Principal, settings: &Val
     }
     call(store, p, Method::POST, "/api/ui_settings/", Some(json!({"settings": settings}))).await?;
     objects::ui_settings(store, p).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicI64, Ordering};
+
+    /// In-memory stand-in for the advisory lock.
+    struct MemLock(#[allow(dead_code)] tokio::sync::OwnedMutexGuard<()>);
+
+    impl ObjectLock for MemLock {
+        async fn release(self) {}
+    }
+
+    /// One v2 writer: lock, re-read rev, compare, "write" (bump rev after a yield, like the
+    /// v1 round trip).
+    async fn writer(lock: Arc<tokio::sync::Mutex<()>>, rev: Arc<AtomicI64>, if_match: i64) -> DomainResult<()> {
+        let guard = MemLock(lock.lock_owned().await);
+        let read = {
+            let rev = rev.clone();
+            async move { Ok(rev.load(Ordering::SeqCst)) }
+        };
+        locked_write(guard, read, Some(if_match), || async {
+            tokio::task::yield_now().await;
+            tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+            rev.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        })
+        .await
+    }
+
+    /// Regression (TOCTOU between If-Match check and v1 write): two concurrent writers with
+    /// the same If-Match – exactly one succeeds, the other gets 412 with the new rev.
+    #[test]
+    fn concurrent_if_match_writes_are_serialized() {
+        let rt = match tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_time().build() {
+            Ok(rt) => rt,
+            Err(e) => panic!("runtime: {e}"),
+        };
+        rt.block_on(async {
+            for _ in 0..20 {
+                let lock = Arc::new(tokio::sync::Mutex::new(()));
+                let rev = Arc::new(AtomicI64::new(1));
+                let a = tokio::spawn(writer(lock.clone(), rev.clone(), 1));
+                let b = tokio::spawn(writer(lock.clone(), rev.clone(), 1));
+                let (ra, rb) = match (a.await, b.await) {
+                    (Ok(ra), Ok(rb)) => (ra, rb),
+                    _ => panic!("writer task failed"),
+                };
+                let oks = [&ra, &rb].iter().filter(|r| r.is_ok()).count();
+                assert_eq!(oks, 1, "exactly one writer may win: {ra:?} / {rb:?}");
+                let err = if ra.is_err() { ra } else { rb };
+                assert!(matches!(err, Err(DomainError::RevMismatch { current: 2 })), "{err:?}");
+                assert_eq!(rev.load(Ordering::SeqCst), 2);
+            }
+        });
+    }
+
+    #[test]
+    fn mismatch_skips_the_write_and_releases() {
+        let rt = match tokio::runtime::Builder::new_current_thread().build() {
+            Ok(rt) => rt,
+            Err(e) => panic!("runtime: {e}"),
+        };
+        rt.block_on(async {
+            let lock = Arc::new(tokio::sync::Mutex::new(()));
+            let wrote = std::cell::Cell::new(false);
+            let r: DomainResult<()> = locked_write(MemLock(lock.clone().lock_owned().await), async { Ok(7) }, Some(6), || async {
+                wrote.set(true);
+                Ok(())
+            })
+            .await;
+            assert!(matches!(r, Err(DomainError::RevMismatch { current: 7 })));
+            assert!(!wrote.get());
+            // lock released
+            assert!(lock.try_lock().is_ok());
+            // no If-Match: write runs
+            let r: DomainResult<()> =
+                locked_write(MemLock(lock.clone().lock_owned().await), async { Ok(7) }, None, || async { Ok(()) }).await;
+            assert!(r.is_ok());
+        });
+    }
+
+    /// Same TOCTOU regression as above, but with the real PostgreSQL advisory lock
+    /// (`lock_object` on the side pool). Only takes advisory locks (no table is read or written),
+    /// still only against a local test database:
+    /// ```text
+    /// PAPERRUST_STORE_TEST_DATABASE_URL=postgres://paperless:paperless@127.0.0.1:54329/pl_store_lock_test \
+    ///   cargo test -p pl-store -j 2 --lib legacy::tests::advisory_lock -- --ignored
+    /// ```
+    #[test]
+    #[ignore = "needs PAPERRUST_STORE_TEST_DATABASE_URL (local test database, advisory locks only)"]
+    fn advisory_lock_serializes_concurrent_if_match_writes() {
+        let Ok(url) = std::env::var("PAPERRUST_STORE_TEST_DATABASE_URL") else { return };
+        let db = url.trim_end_matches('/').rsplit('/').next().unwrap_or("").split('?').next().unwrap_or("").to_string();
+        assert!(db.starts_with("pl_") && db.contains("test"), "refusing to run against a non-test database ({db})");
+        let rt = match tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build() {
+            Ok(rt) => rt,
+            Err(e) => panic!("runtime: {e}"),
+        };
+        rt.block_on(async {
+            let pool = PgPool::connect(&url).await.expect("connect");
+            let env = pl_core::config::Env::from_pairs([("PAPERRUST_SECRET_KEY", "pl-store-lock-test-secret-key-local-only-0123456789")]);
+            let cfg = Arc::new(pl_core::Config::from_env_map(env).expect("config"));
+            let store = Arc::new(Store::new(pool, cfg, None));
+            // Object id unique per run so parallel runs do not share the key.
+            let id = i64::from(std::process::id());
+            for _ in 0..10 {
+                let rev = Arc::new(AtomicI64::new(1));
+                let run = |store: Arc<Store>, rev: Arc<AtomicI64>| async move {
+                    let lock = lock_object(&store, Kind::Tag, id).await?;
+                    let read = {
+                        let rev = rev.clone();
+                        async move { Ok(rev.load(Ordering::SeqCst)) }
+                    };
+                    locked_write(lock, read, Some(1), || async {
+                        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+                        rev.fetch_add(1, Ordering::SeqCst);
+                        Ok(())
+                    })
+                    .await
+                };
+                let a = tokio::spawn(run(store.clone(), rev.clone()));
+                let b = tokio::spawn(run(store.clone(), rev.clone()));
+                let (ra, rb) = match (a.await, b.await) {
+                    (Ok(ra), Ok(rb)) => (ra, rb),
+                    _ => panic!("writer task failed"),
+                };
+                assert_eq!([&ra, &rb].iter().filter(|r| r.is_ok()).count(), 1, "exactly one writer may win: {ra:?} / {rb:?}");
+                let err = if ra.is_err() { ra } else { rb };
+                assert!(matches!(err, Err(DomainError::RevMismatch { current: 2 })), "{err:?}");
+            }
+            // Released after every write: the lock is free again for another session.
+            let mut other = store.db.acquire().await.expect("conn");
+            let free: bool = sqlx::query_scalar("SELECT pg_try_advisory_lock(hashtextextended($1, 0))")
+                .bind(lock_key(Kind::Tag, id))
+                .fetch_one(&mut *other)
+                .await
+                .expect("try lock");
+            assert!(free, "lock released after the writes");
+            let _ =
+                sqlx::query("SELECT pg_advisory_unlock(hashtextextended($1, 0))").bind(lock_key(Kind::Tag, id)).execute(&mut *other).await;
+        });
+    }
+
+    #[test]
+    fn lock_keys_are_per_kind_and_object() {
+        assert_ne!(lock_key(Kind::Tag, 1), lock_key(Kind::Correspondent, 1));
+        assert_ne!(lock_key(Kind::Tag, 1), lock_key(Kind::Tag, 2));
+        assert!(lock_key(Kind::Document, 5).starts_with("paperrust:v2write:"));
+    }
 }

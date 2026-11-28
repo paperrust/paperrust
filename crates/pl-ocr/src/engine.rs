@@ -182,7 +182,9 @@ impl TesseractCli {
 
     /// Version (`tesseract --version`, first line) or `None` if not executable.
     pub fn version(&self) -> Option<String> {
-        let out = Command::new(&self.program).arg("--version").stdin(Stdio::null()).output().ok()?;
+        let mut c = Command::new(&self.program);
+        c.arg("--version").stdin(Stdio::null());
+        let out = run_with_timeout(c, Some(Duration::from_secs(30))).ok()?;
         if !out.status.success() {
             return None;
         }
@@ -251,8 +253,43 @@ impl TesseractCli {
     }
 }
 
-/// Starts `cmd`, waits at most `timeout`; errors as `SubprocessOutputError`.
-pub fn run_with_timeout(mut cmd: Command, timeout: Option<Duration>) -> Result<std::process::Output> {
+/// Upper bound per captured pipe (stdout, stderr) of a Tesseract run. Real output is far
+/// smaller (OSD: a few lines; `--list-langs`: one line per language; errors: a few KiB);
+/// anything beyond this is drained and dropped so a misbehaving program cannot fill memory.
+pub const MAX_CAPTURE_BYTES: usize = 4 * 1024 * 1024;
+
+/// Reads `r` to the end but keeps at most `cap` bytes; the rest is read (so the child never
+/// blocks on a full pipe) and discarded, and a marker with the dropped byte count is appended.
+fn read_capped<R: std::io::Read>(mut r: R, cap: usize) -> Vec<u8> {
+    let mut kept = Vec::new();
+    let mut dropped: u64 = 0;
+    let mut chunk = [0u8; 64 * 1024];
+    loop {
+        match r.read(&mut chunk) {
+            Ok(0) => break,
+            Ok(n) => {
+                let room = cap.saturating_sub(kept.len());
+                let take = n.min(room);
+                kept.extend_from_slice(&chunk[..take]);
+                dropped += (n - take) as u64;
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(_) => break,
+        }
+    }
+    if dropped > 0 {
+        kept.extend_from_slice(format!("\n[... {dropped} bytes of output dropped]").as_bytes());
+    }
+    kept
+}
+
+/// Starts `cmd`, waits at most `timeout`; errors as `SubprocessOutputError`. stdout and
+/// stderr are each captured up to [`MAX_CAPTURE_BYTES`] (see [`read_capped`]).
+pub fn run_with_timeout(cmd: Command, timeout: Option<Duration>) -> Result<std::process::Output> {
+    run_with_timeout_capped(cmd, timeout, MAX_CAPTURE_BYTES)
+}
+
+fn run_with_timeout_capped(mut cmd: Command, timeout: Option<Duration>, cap: usize) -> Result<std::process::Output> {
     let mut child = cmd
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -260,22 +297,10 @@ pub fn run_with_timeout(mut cmd: Command, timeout: Option<Duration>) -> Result<s
         .map_err(|e| OcrError::Unavailable(format!("could not start {:?}: {e}", cmd.get_program())))?;
     let start = Instant::now();
     // read stdout/stderr in threads so that full pipes do not block.
-    let mut so = child.stdout.take();
-    let mut se = child.stderr.take();
-    let t_out = std::thread::spawn(move || {
-        let mut b = Vec::new();
-        if let Some(s) = so.as_mut() {
-            let _ = std::io::Read::read_to_end(s, &mut b);
-        }
-        b
-    });
-    let t_err = std::thread::spawn(move || {
-        let mut b = Vec::new();
-        if let Some(s) = se.as_mut() {
-            let _ = std::io::Read::read_to_end(s, &mut b);
-        }
-        b
-    });
+    let so = child.stdout.take();
+    let se = child.stderr.take();
+    let t_out = std::thread::spawn(move || so.map(|s| read_capped(s, cap)).unwrap_or_default());
+    let t_err = std::thread::spawn(move || se.map(|s| read_capped(s, cap)).unwrap_or_default());
     let status = loop {
         if let Some(st) = child.try_wait()? {
             break st;
@@ -492,5 +517,35 @@ mod tests {
         let s = "Page number: 0\nOrientation in degrees: 270\nRotate: 90\nOrientation confidence: 7.65\nScript: Latin\nScript confidence: 2.33\n";
         assert_eq!(parse_osd(s), Some(Orientation { rotate: 90, confidence: 7.65 }));
         assert_eq!(parse_osd("garbage"), None);
+    }
+
+    #[test]
+    fn capped_reader_keeps_prefix_and_marks_the_rest() {
+        let data = vec![b'x'; 200_000];
+        let out = read_capped(&data[..], 1000);
+        assert!(out.starts_with(&[b'x'; 1000]));
+        assert!(String::from_utf8_lossy(&out[1000..]).contains("199000 bytes of output dropped"));
+        assert_eq!(read_capped(&b"short"[..], 1000), b"short");
+    }
+
+    #[test]
+    fn subprocess_output_is_bounded() {
+        // Regression: stdout/stderr of the program were collected without any byte limit.
+        let dir = tempfile::tempdir().unwrap();
+        let f = dir.path().join("big.txt");
+        std::fs::write(&f, vec![b'y'; 300_000]).unwrap();
+        let cmd = if cfg!(windows) {
+            let mut c = Command::new("cmd");
+            c.arg("/C").arg("type").arg(&f);
+            c
+        } else {
+            let mut c = Command::new("cat");
+            c.arg(&f);
+            c
+        };
+        let out = run_with_timeout_capped(cmd, Some(Duration::from_secs(30)), 64 * 1024).unwrap();
+        assert!(out.status.success());
+        assert!(out.stdout.len() < 64 * 1024 + 100, "{}", out.stdout.len());
+        assert!(String::from_utf8_lossy(&out.stdout).ends_with(&format!("[... {} bytes of output dropped]", 300_000 - 64 * 1024)));
     }
 }

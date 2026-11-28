@@ -2,7 +2,7 @@
 //!
 //! * [`ai_verdict`] – "AI condition": what does the AI think about a document (without changing anything).
 //! * [`workflow_draft`] – "workflow from description" (suggestion only, nothing is stored).
-//! * [`vision_ocr`] / [`vision_wanted`] – AI text recognition; pl-server hooks it into pl-consumer as pl-core `vision::VisionOcr`.
+//! * AI text recognition (KI-Abschrift) moved to [`super::vision`] (`plan`, `transcribe`, `record`).
 //!
 //! | Route | Rechte |
 //! |---|---|
@@ -23,9 +23,7 @@ use super::store::body_json;
 use crate::auto::{self, Field, Visible};
 use crate::config::AutoMode;
 use crate::llm::LlmClient;
-use crate::prompt_store::PromptKind;
 use crate::taxonomy::{MatchOptions, TaxonomyKind};
-use crate::vision::{PageImage, VisionResult};
 use crate::workflow_assist::{self, AiVerdict, DraftTaxonomy, WorkflowDraft};
 
 const ALL_FIELDS: [Field; 6] = [Field::Title, Field::Tags, Field::Correspondent, Field::DocumentType, Field::StoragePath, Field::Created];
@@ -74,42 +72,6 @@ pub async fn workflow_draft(state: &AppState, description: &str, user: Option<&U
         .await
         .map_err(|e| e.to_string())?;
     Ok(workflow_assist::sanitize_draft(&raw, &t))
-}
-
-/// Should AI text recognition run? `requested` = user chose "AI text recognition" for this
-/// document; `ocr_chars` = characters of the normal text recognition (if it has already run).
-/// Rules: AI off or option off → never; `requested` → yes; `vision_when = always` → yes;
-/// `difficult` → if fewer than 50 characters per page were recognized.
-pub async fn vision_wanted(state: &AppState, requested: bool, ocr_chars: Option<usize>, pages: usize) -> bool {
-    let Ok(cfg) = super::effective_config(state).await else { return false };
-    let opts = super::store::load_options(state.db()).await;
-    vision_decision(cfg.ai_enabled && opts.vision_enabled, &opts.vision_when, requested, ocr_chars, pages)
-}
-
-/// Pure decision for [`vision_wanted`].
-pub fn vision_decision(enabled: bool, when: &str, requested: bool, ocr_chars: Option<usize>, pages: usize) -> bool {
-    if !enabled {
-        return false;
-    }
-    if requested || when == "always" {
-        return true;
-    }
-    when == "difficult" && ocr_chars.is_some_and(|c| c < 50 * pages.max(1))
-}
-
-/// AI text recognition with the effective configuration (image model, template `vision_ocr`, limits).
-/// `Ok(None)` if AI or the option is off. Called via pl-server `worker::AiVisionOcr` (ingestion, reprocessing).
-pub async fn vision_ocr(state: &AppState, pages: &[PageImage]) -> Result<Option<VisionResult>, String> {
-    let cfg = super::effective_config(state).await.map_err(|e| e.status().to_string())?;
-    let opts = super::store::load_options(state.db()).await;
-    if !cfg.ai_enabled || !opts.vision_enabled {
-        return Ok(None);
-    }
-    let prompts = super::store::load_prompts(state.db()).await;
-    let lang = super::store::language_name(&cfg, None);
-    let prompt = crate::prompt_store::render(prompts.get(PromptKind::VisionOcr), &[("language", &lang)]);
-    let client = LlmClient::from_config(&cfg).map_err(|e| e.to_string())?.with_model(&opts.vision_model);
-    crate::vision::recognize_pages(&client, &prompt, pages, &opts.vision_limits).await.map(Some).map_err(|e| e.to_string())
 }
 
 fn budget(kind: &str, per_hour: u32) -> &'static crate::mcp::ratelimit::Budget {
@@ -161,20 +123,4 @@ pub async fn workflow_draft_view(
 /// Error text without internals (addresses/keys never appear in [`crate::llm::LlmError`] texts; truncated).
 fn short(e: &str) -> String {
     e.chars().take(160).collect()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn vision_rules() {
-        assert!(!vision_decision(false, "always", true, None, 1));
-        assert!(vision_decision(true, "off", true, Some(5000), 1));
-        assert!(!vision_decision(true, "off", false, Some(0), 1));
-        assert!(vision_decision(true, "always", false, None, 3));
-        assert!(vision_decision(true, "difficult", false, Some(80), 2));
-        assert!(!vision_decision(true, "difficult", false, Some(400), 2));
-        assert!(!vision_decision(true, "difficult", false, None, 2));
-    }
 }

@@ -86,11 +86,9 @@ impl Store {
                 .await
                 .map_err(|e| e.to_string())?
             }
-            Store::S3(c) => {
-                // S3 needs Content-MD5 + SHA-256 beforehand; objects are single files
-                let data = tokio::fs::read(src).await.map_err(|e| io(src, e))?;
-                c.put(key, data, until).await.map_err(|e| e.to_string())
-            }
+            // S3 needs Content-MD5 + SHA-256 beforehand: computed in a streaming pass, then the
+            // body is streamed from the file (no full copy in memory)
+            Store::S3(c) => c.put_file(key, src, until).await.map_err(|e| e.to_string()),
         }
     }
 
@@ -102,6 +100,30 @@ impl Store {
                 Err(e) => Err(io(&Self::local(root, key), e)),
             },
             Store::S3(c) => c.get(key).await.map_err(|e| e.to_string()),
+        }
+    }
+
+    /// Download into `dest` without holding the object in memory; `Ok(false)` if it does not exist.
+    pub async fn get_to_file(&self, key: &str, dest: &Path) -> Result<bool, String> {
+        match self {
+            Store::Local(root) => {
+                let p = Self::local(root, key);
+                match tokio::fs::copy(&p, dest).await {
+                    Ok(_) => {
+                        // the copy inherits the read-only flag of stored objects; temp files must stay deletable
+                        if let Ok(m) = std::fs::metadata(dest) {
+                            let mut perm = m.permissions();
+                            #[allow(clippy::permissions_set_readonly_false)]
+                            perm.set_readonly(false);
+                            let _ = std::fs::set_permissions(dest, perm);
+                        }
+                        Ok(true)
+                    }
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound && !p.exists() => Ok(false),
+                    Err(e) => Err(io(&p, e)),
+                }
+            }
+            Store::S3(c) => c.get_to_file(key, dest).await.map_err(|e| e.to_string()),
         }
     }
 
@@ -143,6 +165,12 @@ impl Store {
 
     /// Keys under `prefix` (e.g. `snapshots/`), relative to the root of the target.
     pub async fn list(&self, prefix: &str) -> Result<Vec<String>, String> {
+        Ok(self.list_sized(prefix).await?.into_iter().map(|(k, _)| k).collect())
+    }
+
+    /// Keys under `prefix` with their stored (encrypted) sizes. A listing is complete or an
+    /// error: unreadable folders (local) or a truncated listing (S3) are never skipped silently.
+    pub async fn list_sized(&self, prefix: &str) -> Result<Vec<(String, u64)>, String> {
         match self {
             Store::Local(root) => {
                 let root = root.clone();
@@ -150,30 +178,39 @@ impl Store {
                 tokio::task::spawn_blocking(move || {
                     let dir = Self::local(&root, prefix.trim_end_matches('/'));
                     let mut out = Vec::new();
-                    list_rec(&root, &dir, &mut out);
+                    list_rec(&root, &dir, &mut out, true)?;
                     out.sort();
-                    out
+                    Ok(out)
                 })
                 .await
-                .map_err(|e| e.to_string())
+                .map_err(|e| e.to_string())?
             }
-            Store::S3(c) => c.list(prefix).await.map_err(|e| e.to_string()),
+            Store::S3(c) => c.list_sized(prefix).await.map_err(|e| e.to_string()),
         }
     }
 }
 
-fn list_rec(root: &Path, dir: &Path, out: &mut Vec<String>) {
-    let Ok(rd) = std::fs::read_dir(dir) else { return };
-    for e in rd.flatten() {
+/// `top`: a missing prefix folder is an empty listing (new target); below it, every
+/// unreadable folder is an error.
+fn list_rec(root: &Path, dir: &Path, out: &mut Vec<(String, u64)>, top: bool) -> Result<(), String> {
+    let rd = match std::fs::read_dir(dir) {
+        Ok(rd) => rd,
+        Err(e) if top && e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(e) => return Err(io(dir, e)),
+    };
+    for e in rd {
+        let e = e.map_err(|e| io(dir, e))?;
         let p = e.path();
         if p.is_dir() {
-            list_rec(root, &p, out);
+            list_rec(root, &p, out, false)?;
         } else if !e.file_name().to_string_lossy().ends_with(".paperrust-tmp")
             && let Some(rel) = crate::guard::rel_path(root, &p)
         {
-            out.push(rel);
+            let len = std::fs::metadata(&p).map(|m| m.len()).unwrap_or(0);
+            out.push((rel, len));
         }
     }
+    Ok(())
 }
 
 fn tmp_name(_root: &Path, p: &Path) -> PathBuf {
@@ -225,6 +262,12 @@ mod tests {
         assert_eq!(s.get("objects/ab/abc").await.unwrap().as_deref(), Some(&b"x"[..]));
         assert_eq!(s.get("nope").await.unwrap(), None);
         assert_eq!(s.list("objects/").await.unwrap(), vec!["objects/ab/abc"]);
+        assert_eq!(s.list_sized("objects/").await.unwrap(), vec![("objects/ab/abc".to_string(), 1)]);
+        assert_eq!(s.list("missing/").await.unwrap(), Vec::<String>::new());
+        let dl = t.path().join("dl.bin");
+        assert!(s.get_to_file("objects/ab/abc", &dl).await.unwrap());
+        assert_eq!(std::fs::read(&dl).unwrap(), b"x");
+        assert!(!s.get_to_file("objects/zz/none", &t.path().join("none.bin")).await.unwrap());
         assert!(s.delete("objects/ab/abc").await.unwrap());
         assert!(!s.exists("objects/ab/abc").await.unwrap());
     }

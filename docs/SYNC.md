@@ -282,7 +282,10 @@ der DB).
 ```json
 {"documents":["<uuid>"],"tags":["<uuid>"],"saved_views":["<uuid>"],"tag_mode":"any"}
 ```
-→ `{"documents":[{"uuid":"…","rev":7,"size":{"original":…,"archive":…}}],"as_of_seq":1043}`.
+→ `{"documents":[{"uuid":"…","rev":7,"size":{"original":…,"archive":…}}],"as_of_seq":1043,"skipped_saved_views":[]}`.
+`skipped_saved_views`: angefragte Ansichten, deren Regeln der Server nicht auswerten kann (Volltextregeln,
+unbekannte Regelarten), als UUIDs in Anfragereihenfolge; der Rest der Auswahl wird trotzdem aufgelöst.
+Besteht die Anfrage nur aus solchen Ansichten → `501`.
 Gespeicherte Ansichten werden mit **ihren v1-Filterregeln** über `pl-docfilter` ausgewertet (übergangsweise,
 ARCHITECTURE-V2 §1); Tags inkl. Unter-Tags wie upstream (`tags__id__all`/`__in` mit Nachfahren).
 

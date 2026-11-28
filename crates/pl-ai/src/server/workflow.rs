@@ -15,7 +15,7 @@ use futures::future::BoxFuture;
 use pl_authz::User;
 use pl_core::AppState;
 use serde_json::{Map, Value};
-use sqlx::Row;
+use sqlx::{PgConnection, Row};
 
 use super::data::{self, Cat};
 use super::index::{AiTaskError, enqueue};
@@ -57,7 +57,10 @@ pub trait DocWriter: Send + Sync {
     ) -> BoxFuture<'a, Result<(i64, bool), String>>;
     /// PaperRust: `CustomFieldInstance.objects.update_or_create(document, field, defaults={<col>: value})`.
     /// Default: direct SQL ([`sql_set_custom_field`], without django-auditlog and without file name update);
-    /// the worker (pl-server `ConsumerDocWriter`) uses pl-documents-write `cfi::update_or_create` (audit, file name).
+    /// the worker (pl-server `ConsumerDocWriter`) uses pl-documents-write `cfi::update_or_create` (audit, file
+    /// name in its own transaction); its transactional variant [`DocWriter::set_custom_field_tx`] uses
+    /// `cfi::update_or_create_deferred` (same audit, no file move) and runs the file name update in
+    /// [`DocWriter::after_commit`] after the caller's commit.
     fn set_custom_field<'a>(
         &'a self,
         state: &'a AppState,
@@ -71,6 +74,61 @@ pub trait DocWriter: Send + Sync {
     /// PaperRust: remove custom field (soft delete, for undo only).
     fn remove_custom_field<'a>(&'a self, state: &'a AppState, doc_id: i64, field_id: i64) -> BoxFuture<'a, Result<(), String>> {
         Box::pin(sql_remove_custom_field(state, doc_id, field_id))
+    }
+
+    // ---- transactional variants (review findings 5/6/8: one transaction incl. the AI audit) ----
+    //
+    // A writer that returns `true` from `supports_transaction` performs the `*_tx` operations on the
+    // caller's connection (inside the caller's transaction, never committing itself); work that may
+    // only happen after the commit (file renaming) goes into `after_commit`. Writers that keep the
+    // default `false` are driven through the pool methods above, and the AI paths compensate a
+    // failure by restoring the previous state (best effort, see `review::Ops`).
+
+    /// Whether the `*_tx` methods write through the caller's connection.
+    fn supports_transaction(&self) -> bool {
+        false
+    }
+    /// `save` on the caller's connection.
+    fn save_tx<'a>(&'a self, conn: &'a mut PgConnection, doc_id: i64, c: &'a DocChanges) -> BoxFuture<'a, Result<(), String>> {
+        Box::pin(sql_save(conn, doc_id, c))
+    }
+    /// `add_nested_tags` on the caller's connection.
+    fn add_nested_tags_tx<'a>(&'a self, conn: &'a mut PgConnection, doc_id: i64, tag_ids: &'a [i64]) -> BoxFuture<'a, Result<(), String>> {
+        Box::pin(sql_add_nested_tags(conn, doc_id, tag_ids))
+    }
+    /// `remove_tags` on the caller's connection.
+    fn remove_tags_tx<'a>(&'a self, conn: &'a mut PgConnection, doc_id: i64, tag_ids: &'a [i64]) -> BoxFuture<'a, Result<(), String>> {
+        Box::pin(sql_remove_tags(conn, doc_id, tag_ids))
+    }
+    /// `get_or_create` on the caller's connection.
+    fn get_or_create_tx<'a>(
+        &'a self,
+        conn: &'a mut PgConnection,
+        cat: Cat,
+        name: &'a str,
+        owner: Option<i64>,
+    ) -> BoxFuture<'a, Result<(i64, bool), String>> {
+        Box::pin(sql_get_or_create(conn, cat, name, owner))
+    }
+    /// `set_custom_field` on the caller's connection (worker: `cfi::update_or_create_deferred`, file
+    /// name update only in [`DocWriter::after_commit`]).
+    fn set_custom_field_tx<'a>(
+        &'a self,
+        conn: &'a mut PgConnection,
+        doc_id: i64,
+        field_id: i64,
+        data_type: &'a str,
+        value: &'a Value,
+    ) -> BoxFuture<'a, Result<(), String>> {
+        Box::pin(sql_set_custom_field_conn(conn, doc_id, field_id, data_type, value))
+    }
+    /// `remove_custom_field` on the caller's connection.
+    fn remove_custom_field_tx<'a>(&'a self, conn: &'a mut PgConnection, doc_id: i64, field_id: i64) -> BoxFuture<'a, Result<(), String>> {
+        Box::pin(sql_remove_custom_field_conn(conn, doc_id, field_id))
+    }
+    /// Work after the commit of a `*_tx` sequence (e.g. file renaming). Default: nothing.
+    fn after_commit<'a>(&'a self, _state: &'a AppState, _doc_id: i64) -> BoxFuture<'a, Result<(), String>> {
+        Box::pin(async { Ok(()) })
     }
 }
 
@@ -125,39 +183,57 @@ fn bind_value<'q>(
 /// Sets a custom field via SQL (an existing – also soft-deleted – instance is revived,
 /// uniqueness `(document, field)` like upstream).
 pub async fn sql_set_custom_field(state: &AppState, doc_id: i64, field_id: i64, data_type: &str, value: &Value) -> Result<(), String> {
+    let mut tx = state.db().begin().await.map_err(e)?;
+    sql_set_custom_field_conn(&mut tx, doc_id, field_id, data_type, value).await?;
+    tx.commit().await.map_err(e)?;
+    Ok(())
+}
+
+/// [`sql_set_custom_field`] on the caller's connection (no own transaction).
+pub async fn sql_set_custom_field_conn(
+    conn: &mut PgConnection,
+    doc_id: i64,
+    field_id: i64,
+    data_type: &str,
+    value: &Value,
+) -> Result<(), String> {
     let col = custom_value_column(data_type).ok_or_else(|| format!("data type {data_type} is not supported"))?;
     let b = bound(data_type, value)?;
-    let mut tx = state.db().begin().await.map_err(e)?;
     let existing: Option<i32> =
         sqlx::query_scalar("SELECT id FROM documents_customfieldinstance WHERE document_id = $1 AND field_id = $2 LIMIT 1")
             .bind(doc_id as i32)
             .bind(field_id as i32)
-            .fetch_optional(&mut *tx)
+            .fetch_optional(&mut *conn)
             .await
             .map_err(e)?;
     match existing {
         Some(id) => {
             let sql = format!("UPDATE documents_customfieldinstance SET {col} = $2, deleted_at = NULL WHERE id = $1");
-            bind_value(sqlx::query(&sql).bind(id), &b).execute(&mut *tx).await.map_err(e)?;
+            bind_value(sqlx::query(&sql).bind(id), &b).execute(&mut *conn).await.map_err(e)?;
         }
         None => {
             let sql =
                 format!("INSERT INTO documents_customfieldinstance (created, document_id, field_id, {col}) VALUES (now(), $1, $2, $3)");
-            bind_value(sqlx::query(&sql).bind(doc_id as i32).bind(field_id as i32), &b).execute(&mut *tx).await.map_err(e)?;
+            bind_value(sqlx::query(&sql).bind(doc_id as i32).bind(field_id as i32), &b).execute(&mut *conn).await.map_err(e)?;
         }
     }
-    tx.commit().await.map_err(e)?;
     Ok(())
 }
 
 /// Removes a custom field (soft, `deleted_at`).
 pub async fn sql_remove_custom_field(state: &AppState, doc_id: i64, field_id: i64) -> Result<(), String> {
+    let mut conn = state.db().acquire().await.map_err(e)?;
+    sql_remove_custom_field_conn(&mut conn, doc_id, field_id).await
+}
+
+/// [`sql_remove_custom_field`] on the caller's connection.
+pub async fn sql_remove_custom_field_conn(conn: &mut PgConnection, doc_id: i64, field_id: i64) -> Result<(), String> {
     sqlx::query(
         "UPDATE documents_customfieldinstance SET deleted_at = now() WHERE document_id = $1 AND field_id = $2 AND deleted_at IS NULL",
     )
     .bind(doc_id as i32)
     .bind(field_id as i32)
-    .execute(state.db())
+    .execute(&mut *conn)
     .await
     .map_err(e)?;
     Ok(())
@@ -165,13 +241,22 @@ pub async fn sql_remove_custom_field(state: &AppState, doc_id: i64, field_id: i6
 
 /// Current custom field values of a document: `field_id → (data_type, value)` (live instances only).
 pub async fn load_custom_values(state: &AppState, doc_id: i64) -> Result<std::collections::BTreeMap<i64, (String, Value)>, String> {
+    let mut conn = state.db().acquire().await.map_err(e)?;
+    load_custom_values_conn(&mut conn, doc_id).await
+}
+
+/// [`load_custom_values`] on the caller's connection (sees the caller's uncommitted writes).
+pub async fn load_custom_values_conn(
+    conn: &mut PgConnection,
+    doc_id: i64,
+) -> Result<std::collections::BTreeMap<i64, (String, Value)>, String> {
     let rows = sqlx::query(
         "SELECT i.field_id, f.data_type, i.value_text, i.value_bool, i.value_url, i.value_date, i.value_int, i.value_float, \
          i.value_monetary, i.value_select, i.value_long_text FROM documents_customfieldinstance i \
          JOIN documents_customfield f ON f.id = i.field_id WHERE i.document_id = $1 AND i.deleted_at IS NULL",
     )
     .bind(doc_id as i32)
-    .fetch_all(state.db())
+    .fetch_all(&mut *conn)
     .await
     .map_err(e)?;
     let mut out = std::collections::BTreeMap::new();
@@ -213,65 +298,22 @@ fn e(x: impl std::fmt::Display) -> String {
 impl DocWriter for SqlDocWriter {
     fn save<'a>(&'a self, state: &'a AppState, doc_id: i64, c: &'a DocChanges) -> BoxFuture<'a, Result<(), String>> {
         Box::pin(async move {
-            sqlx::query(
-                "UPDATE documents_document SET \
-                 title = CASE WHEN $2 THEN $3 ELSE title END, \
-                 correspondent_id = CASE WHEN $4 THEN $5 ELSE correspondent_id END, \
-                 document_type_id = CASE WHEN $6 THEN $7 ELSE document_type_id END, \
-                 storage_path_id = CASE WHEN $8 THEN $9 ELSE storage_path_id END, \
-                 created = CASE WHEN $10 THEN $11 ELSE created END, \
-                 modified = now() WHERE id = $1",
-            )
-            .bind(doc_id as i32)
-            .bind(c.title.is_some())
-            .bind(c.title.clone().unwrap_or_default())
-            .bind(c.correspondent_id.is_some())
-            .bind(c.correspondent_id.flatten().map(|v| v as i32))
-            .bind(c.document_type_id.is_some())
-            .bind(c.document_type_id.flatten().map(|v| v as i32))
-            .bind(c.storage_path_id.is_some())
-            .bind(c.storage_path_id.flatten().map(|v| v as i32))
-            .bind(c.created.is_some())
-            .bind(c.created.unwrap_or_default())
-            .execute(state.db())
-            .await
-            .map_err(e)?;
-            Ok(())
+            let mut conn = state.db().acquire().await.map_err(e)?;
+            sql_save(&mut conn, doc_id, c).await
         })
     }
 
     fn add_nested_tags<'a>(&'a self, state: &'a AppState, doc_id: i64, tag_ids: &'a [i64]) -> BoxFuture<'a, Result<(), String>> {
         Box::pin(async move {
-            // Tag.get_hierarchy().with_ancestors(tags) – one snapshot of the parent edges (upstream #14612)
             let mut conn = state.db().acquire().await.map_err(e)?;
-            let tree = pl_objects::tagtree::TagTree::load(&mut conn).await.map_err(e)?;
-            drop(conn);
-            let mut all: Vec<i32> =
-                tree.with_ancestors(tag_ids.iter().copied().filter(|t| tree.contains(*t))).into_iter().map(|i| i as i32).collect();
-            all.sort_unstable();
-            sqlx::query(
-                "INSERT INTO documents_document_tags (document_id, tag_id) SELECT $1, t.id FROM documents_tag t WHERE t.id = ANY($2) \
-                 ON CONFLICT DO NOTHING",
-            )
-            .bind(doc_id as i32)
-            .bind(&all)
-            .execute(state.db())
-            .await
-            .map_err(e)?;
-            Ok(())
+            sql_add_nested_tags(&mut conn, doc_id, tag_ids).await
         })
     }
 
     fn remove_tags<'a>(&'a self, state: &'a AppState, doc_id: i64, tag_ids: &'a [i64]) -> BoxFuture<'a, Result<(), String>> {
         Box::pin(async move {
-            let ids: Vec<i32> = tag_ids.iter().map(|i| *i as i32).collect();
-            sqlx::query("DELETE FROM documents_document_tags WHERE document_id = $1 AND tag_id = ANY($2)")
-                .bind(doc_id as i32)
-                .bind(&ids)
-                .execute(state.db())
-                .await
-                .map_err(e)?;
-            Ok(())
+            let mut conn = state.db().acquire().await.map_err(e)?;
+            sql_remove_tags(&mut conn, doc_id, tag_ids).await
         })
     }
 
@@ -283,45 +325,114 @@ impl DocWriter for SqlDocWriter {
         owner: Option<i64>,
     ) -> BoxFuture<'a, Result<(i64, bool), String>> {
         Box::pin(async move {
-            let table = cat.model().table;
-            let name: String = name.chars().take(128).collect();
-            let owner32 = owner.map(|o| o as i32);
             let mut tx = state.db().begin().await.map_err(e)?;
-            let found: Option<i32> =
-                sqlx::query_scalar(&format!("SELECT id FROM {table} WHERE name = $1 AND owner_id IS NOT DISTINCT FROM $2 LIMIT 1"))
-                    .bind(&name)
-                    .bind(owner32)
-                    .fetch_optional(&mut *tx)
-                    .await
-                    .map_err(e)?;
-            if let Some(id) = found {
-                return Ok((i64::from(id), false));
-            }
-            // MatchingModel default values: match "", matching_algorithm MATCH_ANY (1), is_insensitive True
-            let id: i32 = match cat {
-                Cat::Tags => sqlx::query_scalar(
-                    "INSERT INTO documents_tag (name, match, matching_algorithm, is_insensitive, color, is_inbox_tag, owner_id, tn_parent_id) \
-                     VALUES ($1, '', 1, true, '#a6cee3', false, $2, NULL) RETURNING id",
-                )
-                .bind(&name)
-                .bind(owner32)
-                .fetch_one(&mut *tx)
-                .await
-                .map_err(e)?,
-                Cat::Correspondents | Cat::DocumentTypes => sqlx::query_scalar(&format!(
-                    "INSERT INTO {table} (name, match, matching_algorithm, is_insensitive, owner_id) VALUES ($1, '', 1, true, $2) RETURNING id"
-                ))
-                .bind(&name)
-                .bind(owner32)
-                .fetch_one(&mut *tx)
-                .await
-                .map_err(e)?,
-                Cat::StoragePaths => return Err("storage paths are never created from AI suggestions".into()),
-            };
+            let out = sql_get_or_create(&mut tx, cat, name, owner).await?;
             tx.commit().await.map_err(e)?;
-            Ok((i64::from(id), true))
+            Ok(out)
         })
     }
+
+    fn supports_transaction(&self) -> bool {
+        true
+    }
+}
+
+/// `document.save(update_fields=[…, "modified"])` as direct SQL on `conn`.
+pub async fn sql_save(conn: &mut PgConnection, doc_id: i64, c: &DocChanges) -> Result<(), String> {
+    sqlx::query(
+        "UPDATE documents_document SET \
+         title = CASE WHEN $2 THEN $3 ELSE title END, \
+         correspondent_id = CASE WHEN $4 THEN $5 ELSE correspondent_id END, \
+         document_type_id = CASE WHEN $6 THEN $7 ELSE document_type_id END, \
+         storage_path_id = CASE WHEN $8 THEN $9 ELSE storage_path_id END, \
+         created = CASE WHEN $10 THEN $11 ELSE created END, \
+         modified = now() WHERE id = $1",
+    )
+    .bind(doc_id as i32)
+    .bind(c.title.is_some())
+    .bind(c.title.clone().unwrap_or_default())
+    .bind(c.correspondent_id.is_some())
+    .bind(c.correspondent_id.flatten().map(|v| v as i32))
+    .bind(c.document_type_id.is_some())
+    .bind(c.document_type_id.flatten().map(|v| v as i32))
+    .bind(c.storage_path_id.is_some())
+    .bind(c.storage_path_id.flatten().map(|v| v as i32))
+    .bind(c.created.is_some())
+    .bind(c.created.unwrap_or_default())
+    .execute(&mut *conn)
+    .await
+    .map_err(e)?;
+    Ok(())
+}
+
+/// `document.add_nested_tags(tags)` (incl. ancestors) as direct SQL on `conn`.
+pub async fn sql_add_nested_tags(conn: &mut PgConnection, doc_id: i64, tag_ids: &[i64]) -> Result<(), String> {
+    // Tag.get_hierarchy().with_ancestors(tags) – one snapshot of the parent edges (upstream #14612)
+    let tree = pl_objects::tagtree::TagTree::load(&mut *conn).await.map_err(e)?;
+    let mut all: Vec<i32> =
+        tree.with_ancestors(tag_ids.iter().copied().filter(|t| tree.contains(*t))).into_iter().map(|i| i as i32).collect();
+    all.sort_unstable();
+    sqlx::query(
+        "INSERT INTO documents_document_tags (document_id, tag_id) SELECT $1, t.id FROM documents_tag t WHERE t.id = ANY($2) \
+         ON CONFLICT DO NOTHING",
+    )
+    .bind(doc_id as i32)
+    .bind(&all)
+    .execute(&mut *conn)
+    .await
+    .map_err(e)?;
+    Ok(())
+}
+
+/// `document.tags.remove(*ids)` as direct SQL on `conn`.
+pub async fn sql_remove_tags(conn: &mut PgConnection, doc_id: i64, tag_ids: &[i64]) -> Result<(), String> {
+    let ids: Vec<i32> = tag_ids.iter().map(|i| *i as i32).collect();
+    sqlx::query("DELETE FROM documents_document_tags WHERE document_id = $1 AND tag_id = ANY($2)")
+        .bind(doc_id as i32)
+        .bind(&ids)
+        .execute(&mut *conn)
+        .await
+        .map_err(e)?;
+    Ok(())
+}
+
+/// `Model.objects.get_or_create(name=name[:128], owner=owner)` on `conn` → (id, created?).
+pub async fn sql_get_or_create(conn: &mut PgConnection, cat: Cat, name: &str, owner: Option<i64>) -> Result<(i64, bool), String> {
+    let table = cat.model().table;
+    let name: String = name.chars().take(128).collect();
+    let owner32 = owner.map(|o| o as i32);
+    let found: Option<i32> =
+        sqlx::query_scalar(&format!("SELECT id FROM {table} WHERE name = $1 AND owner_id IS NOT DISTINCT FROM $2 LIMIT 1"))
+            .bind(&name)
+            .bind(owner32)
+            .fetch_optional(&mut *conn)
+            .await
+            .map_err(e)?;
+    if let Some(id) = found {
+        return Ok((i64::from(id), false));
+    }
+    // MatchingModel default values: match "", matching_algorithm MATCH_ANY (1), is_insensitive True
+    let id: i32 = match cat {
+        Cat::Tags => sqlx::query_scalar(
+            "INSERT INTO documents_tag (name, match, matching_algorithm, is_insensitive, color, is_inbox_tag, owner_id, tn_parent_id) \
+             VALUES ($1, '', 1, true, '#a6cee3', false, $2, NULL) RETURNING id",
+        )
+        .bind(&name)
+        .bind(owner32)
+        .fetch_one(&mut *conn)
+        .await
+        .map_err(e)?,
+        Cat::Correspondents | Cat::DocumentTypes => sqlx::query_scalar(&format!(
+            "INSERT INTO {table} (name, match, matching_algorithm, is_insensitive, owner_id) VALUES ($1, '', 1, true, $2) RETURNING id"
+        ))
+        .bind(&name)
+        .bind(owner32)
+        .fetch_one(&mut *conn)
+        .await
+        .map_err(e)?,
+        Cat::StoragePaths => return Err("storage paths are never created from AI suggestions".into()),
+    };
+    Ok((i64::from(id), true))
 }
 
 /// `resolve_date(dates)`: first date in the format `%Y-%m-%d`.
@@ -385,15 +496,23 @@ pub struct DocState {
 }
 
 pub async fn load_state(state: &AppState, id: i64) -> Result<Option<DocState>, String> {
-    let r = sqlx::query(
-        "SELECT title, content, correspondent_id, document_type_id, storage_path_id, created, owner_id, \
+    let mut conn = state.db().acquire().await.map_err(e)?;
+    load_state_conn(&mut conn, id, false).await
+}
+
+/// [`load_state`] on the caller's connection; `lock` = `FOR UPDATE` on the document row
+/// (only inside a transaction whose writes go through the same connection).
+pub async fn load_state_conn(conn: &mut PgConnection, id: i64, lock: bool) -> Result<Option<DocState>, String> {
+    if lock {
+        // Lock the base row first: from data model stage 1 `documents_document` is a view with an outer
+        // join, on which `FOR UPDATE OF d` fails ("nullable side of an outer join").
+        let table = pl_authz::grants::document_lock_table(&mut *conn).await.map_err(e)?;
+        sqlx::query(&format!("SELECT id FROM {table} WHERE id = $1 FOR UPDATE")).bind(id as i32).execute(&mut *conn).await.map_err(e)?;
+    }
+    let sql = "SELECT title, content, correspondent_id, document_type_id, storage_path_id, created, owner_id, \
          COALESCE((SELECT array_agg(tag_id ORDER BY tag_id) FROM documents_document_tags WHERE document_id = d.id), '{}') AS tags \
-         FROM documents_document d WHERE id = $1 AND deleted_at IS NULL",
-    )
-    .bind(id as i32)
-    .fetch_optional(state.db())
-    .await
-    .map_err(e)?;
+         FROM documents_document d WHERE id = $1 AND deleted_at IS NULL";
+    let r = sqlx::query(sql).bind(id as i32).fetch_optional(&mut *conn).await.map_err(e)?;
     Ok(r.map(|r| {
         let g = |c: &str| r.try_get::<Option<i32>, _>(c).ok().flatten().map(i64::from);
         DocState {

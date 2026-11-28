@@ -118,6 +118,8 @@ export const ERROR_KEYS: Record<string, string> = {
   unsupported: 'scan.error_unsupported',
   protocol: 'scan.error_protocol',
   too_large: 'scan.error_too_large',
+  too_many_pages: 'scan.error_too_many_pages',
+  job_too_large: 'scan.error_job_too_large',
   pdf: 'scan.error_pdf',
   intake: 'scan.error_intake',
 }

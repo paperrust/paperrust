@@ -64,10 +64,26 @@ Windows: `CREATE_NO_WINDOW`. Keine `unwrap`/`expect` in Handlern.
   `sanitize::remove_hidden(&[Hidden::Metadata])` (meldet PdfCraft `NothingToApply`, weil keine
   Metadaten mehr da sind – `apply` entfernt das XMP schon –, ist das kein Fehler, C-066b); **voll** neu schreiben (`write_full`, nie
   inkrementell – sonst blieben die alten Objekte in der Datei). Danach eigene Nachprüfung: das
-  geschriebene Ergebnis neu öffnen und nach den Begriffen suchen; ein Treffer → Fehler, nichts wird
-  geschrieben. Seiten außerhalb, ungültige Rechtecke, nichts zu tun → Fehler.
+  geschriebene Ergebnis neu öffnen und nach den Begriffen suchen (seitenweise, auch über
+  Zeilenumbrüche); ein Treffer → Fehler, nichts wird geschrieben. Seiten außerhalb, ungültige
+  Rechtecke, nichts zu tun → Fehler.
+- **OCR-Textebene (`ocr_input`, Review 2026-11-27):** Redact und Search bekommen optional das
+  Archiv-PDF. Begriffe werden **je Seite in beiden** Textebenen gesucht (früher beendete ein Treffer im
+  Original die Suche – bei gemischten Dokumenten blieb der Name auf Scan-Seiten lesbar). Archiv-Treffer
+  werden über die Seitengeometrie (`view_matrix`/`display_size`, Skalierung bei anderer Größe) auf das
+  Original abgebildet; andere Seitenzahl oder anderes Seitenverhältnis (> 2 %) → Fehler „The OCR text
+  layer (archive PDF) does not match the pages of the original; nothing was changed.“ Alle Rechtecke
+  beider Ebenen werden markiert (auf Scan-Seiten = Bildbereich unter den OCR-Wortboxen); `term_hits`
+  zählt Archiv-Duplikate (gleiche Seite, gleicher Begriff, überlappend) einmal. **Nachprüfung 2:** die
+  gleichen Marken, auf das Archiv zurückgerechnet, auf eine Kopie der OCR-Textebene anwenden und dort
+  erneut suchen; ein Rest → Fehler, nichts wird geschrieben. Search-Antwort: `Hit.from_ocr` (nur im
+  Archiv gefunden).
 - **Search:** `pdfcraft_edit::text_lines` je Seite (Zeilen mit Wortrechtecken `ink`), Begriffe ohne
-  Groß-/Kleinschreibung (zeichenweise `to_lowercase`), Treffer → Rechtecke der berührten Wörter
+  Groß-/Kleinschreibung (zeichenweise `to_lowercase`). Seit 2026-11-27 je Seite als ein Textstrom
+  (`matching::page_matches`): Leerraum zusammengefasst (auch im Begriff), Zeilen mit einem Leerzeichen
+  verbunden, endet eine Zeile auf Bindestrich nach einem Buchstaben, zusätzlich „mit Bindestrich ohne
+  Leerzeichen“ (Meier-Schmidt) und „ohne Bindestrich“ (Muster-/mann → Mustermann); gleiche Fundstellen
+  mehrerer Varianten einmal. Treffer → Rechtecke der berührten Wörter **jeder** beteiligten Zeile
   (+0,5 pt), passt die Wortzahl nicht zu den Rechtecken → Zeilenrechteck. Höchstens `max_hits`
   (API 500, Redact intern 10 000 → darüber Fehler).
 - **Shrink:** `pdfcraft_optimize::optimize` mit `lossless` (Bilder `Retain`, kein Herunterrechnen),
@@ -89,15 +105,20 @@ Absturz/Protokoll → 422; Body `{"detail": "<Nutzertext ohne Pfade>"}`.
 
 | id | Methode, Pfad | Request (JSON) | Antwort 200 | Nebenwirkung |
 |---|---|---|---|---|
-| `documents.redact_search` | POST `/api/documents/{id}/redact/search/` | `terms` (Pflicht, Liste ≤ 50, je ≤ 200 Zeichen, getrimmt, doppelte/leere entfernt) | `document`, `version`, `source` (`original`/`archive`), `truncated`, `hits[]` (`page` 1-basiert, `term`, `context` ≤ 200 Zeichen, `rects`) | keine |
+| `documents.redact_search` | POST `/api/documents/{id}/redact/search/` | `terms` (Pflicht, Liste ≤ 50, je ≤ 200 Zeichen, getrimmt, doppelte/leere entfernt) | `document`, `version`, `source` (`archive`, sobald ein Treffer nur aus der OCR-Textebene stammt, sonst `original`), `truncated`, `hits[]` (`page` 1-basiert, `term`, `context` ≤ 200 Zeichen, `rects`, `from_ocr`) | keine |
 | `documents.redact` | POST `/api/documents/{id}/redact/` | `areas` (≤ 2000, `{"page" ≥ 1, "rect": [4 Zahlen]}` mit Fläche), `terms`, `remove_metadata` (bool), `version_label` (≤ 64, Standard `Redacted`) | `task_id`, `document`, `source_version`, `report` | Datei in SCRATCH_DIR, `consume_file` mit `root_document_id` (PaperRust-Warteschlange, sonst 503), `owner_id`/`actor_id` = Nutzer, Auslöser Web-UI |
 | `documents.shrink` | POST `/api/documents/{id}/shrink/` | `preset` (`lossless`/`standard`/`strong`, Alias `mobile`; Standard `standard`), `version_label` (Standard `Shrunk`) | `task_id` (oder `null`), `document`, `new_version`, `report` | nur wenn `size_after < size_before`: wie oben; sonst Datei verworfen |
 
 Validierungsfehler: 400 DRF-Form (`{"areas": ["…"]}`, `{"terms": ["This field is required."]}`,
-`non_field_errors` bei nichts zu tun). Begriffe nur im Archiv-PDF (Scan): Suche im Original leer und
-Archiv vorhanden → Suche im Archiv, Treffer werden als `areas` auf das Original angewandt (gleiche
-Seitengeometrie wie OCRmyPDF-Ausgabe); dann prüft die Nachprüfung im Kind keine Begriffe (das
-Original hat keine Textebene), die neue Version wird neu erkannt (OCR).
+`non_field_errors` bei nichts zu tun). Archiv-PDF vorhanden und Begriffe gegeben → es geht als
+`ocr_input` an das Kind (Suche und Schwärzen je Seite in Original **und** Archiv, Nachprüfung beider
+Textebenen, siehe §3); keine Treffer in beiden → 400 „There is nothing to redact (no areas and no
+matches).“ (früher „The search terms were not found; nothing was changed.“). Die neue Version wird neu
+erkannt (OCR).
+
+**Known difference / Grenze (2026-11-27):** die Nachprüfung erkennt die Ausgabe nicht selbst neu (kein
+OCR im Kindprozess); für Scan-Seiten prüft sie gegen die OCR-Textebene des Archivs (Marken auf eine
+Kopie angewandt). Was die ursprüngliche OCR nicht erkannt hat, findet auch die Nachprüfung nicht.
 
 ### 4.1 Geschwärzte Versionen beim Teilen (Stand 2026-11-19)
 

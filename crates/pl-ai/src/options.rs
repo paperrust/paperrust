@@ -34,9 +34,18 @@ pub struct AiOptions {
     pub vision_enabled: bool,
     /// Image model (empty = text model from `PAPERLESS_AI_LLM_MODEL`).
     pub vision_model: String,
-    /// When: `off` (only on request per document), `difficult` (only if the normal text recognition
-    /// yields little/no text), `always`.
+    /// Legacy "when" (before 0.1.4): `off` (only on request per document), `difficult` (only if the normal
+    /// text recognition yields little/no text), `always`. Used only while [`Self::vision_mode`] is empty
+    /// (mapping in [`Self::effective_vision_mode`]).
     pub vision_when: String,
+    /// "KI-Abschrift" mode (docs/OCR-NEXT.md 2.8): `off` (Aus), `uncertain_lines` (Nur unsichere
+    /// Stellen), `uncertain_pages` (Ganze Seite, wenn unsicher), `always` (Immer); empty = derived from
+    /// `vision_when`.
+    pub vision_mode: String,
+    /// Sensitivity of the "uncertain" modes: `sparing` (sparsam), `normal`, `thorough` (gründlich).
+    pub vision_sensitivity: String,
+    /// Long side of whole-page images in pixels (default 1540; 512–4096).
+    pub vision_max_side: u32,
     /// Limits (pages per document, image size, pages per day, tokens per page).
     pub vision_limits: VisionLimits,
     /// Behavior of the trigger tag.
@@ -55,6 +64,9 @@ impl Default for AiOptions {
             vision_enabled: false,
             vision_model: String::new(),
             vision_when: "difficult".into(),
+            vision_mode: String::new(),
+            vision_sensitivity: "normal".into(),
+            vision_max_side: DEFAULT_VISION_MAX_SIDE,
             vision_limits: VisionLimits::default(),
             tag_after: TagAfter::Remove,
             backfill_per_minute: 6,
@@ -63,6 +75,15 @@ impl Default for AiOptions {
     }
 }
 
+/// Default long side of whole-page images (pl-core `vision::DEFAULT_MAX_SIDE`): on CPU about 3x faster
+/// than 2048 px with little loss (results/ocr-eval/2026-11-24).
+pub const DEFAULT_VISION_MAX_SIDE: u32 = 1540;
+
+/// Valid values of [`AiOptions::vision_mode`] (besides empty).
+pub const VISION_MODES: &[&str] = &["off", "uncertain_lines", "uncertain_pages", "always"];
+/// Valid values of [`AiOptions::vision_sensitivity`].
+pub const VISION_SENSITIVITIES: &[&str] = &["sparing", "normal", "thorough"];
+
 /// Known keys (table `paperrust_ai_option.key` = field name).
 pub const KEYS: &[&str] = &[
     "custom_fields_enabled",
@@ -70,6 +91,9 @@ pub const KEYS: &[&str] = &[
     "vision_enabled",
     "vision_model",
     "vision_when",
+    "vision_mode",
+    "vision_sensitivity",
+    "vision_max_side",
     "vision_limits",
     "tag_after",
     "backfill_per_minute",
@@ -91,6 +115,15 @@ impl AiOptions {
         }
         if let Some(v) = env("PAPERRUST_AI_VISION_WHEN") {
             o.vision_when = v;
+        }
+        if let Some(v) = env("PAPERRUST_AI_VISION_MODE") {
+            o.vision_mode = v.trim().to_ascii_lowercase();
+        }
+        if let Some(v) = env("PAPERRUST_AI_VISION_SENSITIVITY") {
+            o.vision_sensitivity = v.trim().to_ascii_lowercase();
+        }
+        if let Some(v) = n("PAPERRUST_AI_VISION_MAX_SIDE") {
+            o.vision_max_side = v;
         }
         if let Some(v) = n("PAPERRUST_AI_VISION_MAX_PAGES") {
             o.vision_limits.max_pages = v;
@@ -119,6 +152,13 @@ impl AiOptions {
         if !matches!(self.vision_when.as_str(), "off" | "difficult" | "always") {
             self.vision_when = "difficult".into();
         }
+        if !self.vision_mode.is_empty() && !VISION_MODES.contains(&self.vision_mode.as_str()) {
+            self.vision_mode = String::new();
+        }
+        if !VISION_SENSITIVITIES.contains(&self.vision_sensitivity.as_str()) {
+            self.vision_sensitivity = "normal".into();
+        }
+        self.vision_max_side = self.vision_max_side.clamp(512, 4096);
         self.vision_model = self.vision_model.trim().chars().take(128).collect();
         self.vision_limits.max_pages = self.vision_limits.max_pages.clamp(1, 200);
         self.vision_limits.max_image_bytes = self.vision_limits.max_image_bytes.clamp(64 * 1024, 32 * 1024 * 1024);
@@ -132,6 +172,20 @@ impl AiOptions {
             if tag.is_empty() {
                 self.tag_after = TagAfter::Remove;
             }
+        }
+    }
+
+    /// Effective "KI-Abschrift" mode: [`Self::vision_mode`] if set, otherwise the legacy `vision_when`
+    /// (`off` → `off`, `always` → `always`, `difficult` → `uncertain_pages`; the old "fewer than 50
+    /// characters per page" rule is part of "page uncertain").
+    pub fn effective_vision_mode(&self) -> &str {
+        if !self.vision_mode.is_empty() {
+            return &self.vision_mode;
+        }
+        match self.vision_when.as_str() {
+            "off" => "off",
+            "always" => "always",
+            _ => "uncertain_pages",
         }
     }
 
@@ -186,5 +240,34 @@ mod tests {
         assert!(AiOptions::validate_pair("nope", &json!(1)).is_err());
         assert_eq!(AiOptions::validate_pair("custom_fields", &json!([3, 1, 3])), Ok(json!([1, 3])));
         assert_eq!(AiOptions::validate_pair("vision_when", &json!("sometimes")), Ok(json!("difficult")));
+        assert_eq!(AiOptions::validate_pair("vision_mode", &json!("uncertain_lines")), Ok(json!("uncertain_lines")));
+        assert_eq!(AiOptions::validate_pair("vision_mode", &json!("sometimes")), Ok(json!("")));
+        assert_eq!(AiOptions::validate_pair("vision_sensitivity", &json!("x")), Ok(json!("normal")));
+        assert_eq!(AiOptions::validate_pair("vision_max_side", &json!(99999)), Ok(json!(4096)));
+    }
+
+    #[test]
+    fn legacy_vision_when_maps_to_mode() {
+        let none = |_: &str| None;
+        let mode = |when: &str, mode: &str| {
+            AiOptions::from_pairs(&none, &[("vision_when".into(), json!(when)), ("vision_mode".into(), json!(mode))])
+                .effective_vision_mode()
+                .to_string()
+        };
+        assert_eq!(mode("off", ""), "off");
+        assert_eq!(mode("always", ""), "always");
+        assert_eq!(mode("difficult", ""), "uncertain_pages");
+        // an explicit mode wins over the legacy value
+        assert_eq!(mode("always", "uncertain_lines"), "uncertain_lines");
+        // defaults: compatible with the old default ("difficult"), 1540 px
+        let o = AiOptions::default();
+        assert_eq!((o.effective_vision_mode(), o.vision_max_side, o.vision_sensitivity.as_str()), ("uncertain_pages", 1540, "normal"));
+        let env = |k: &str| match k {
+            "PAPERRUST_AI_VISION_MODE" => Some("Always".to_string()),
+            "PAPERRUST_AI_VISION_MAX_SIDE" => Some("2048".to_string()),
+            _ => None,
+        };
+        let o = AiOptions::from_pairs(&env, &[]);
+        assert_eq!((o.effective_vision_mode(), o.vision_max_side), ("always", 2048));
     }
 }

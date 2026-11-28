@@ -218,7 +218,7 @@ async fn timeline_backfill(rest: Vec<String>) -> CliResult {
             println!("Extracted dates for {} documents ({} dates found)", r.documents, r.dates);
             Ok(())
         }
-        Ok(None) => Err(CliError::Command("A backfill is already running in this process.".into())),
+        Ok(None) => Err(CliError::Command("A backfill is already running (on this database).".into())),
         Err(e) => Err(CliError::Command(e.to_string())),
     }
 }

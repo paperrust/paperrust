@@ -21,6 +21,9 @@
 //!   [`optimize`]/[`jbig2`]/[`pdfimage`]: archive size reduction like `ocrmypdf --optimize`.
 //! - [`remote`]: remote OCR via Azure AI Document Intelligence (`RemoteDocumentParser`).
 //! - [`vision_pages`]: page images (PNG/JPEG) for AI text recognition (pl-core `vision`).
+//! - [`ppocr`]: PP-OCRv6 engine (`PAPERRUST_OCR_ENGINE=ppocr`) and the page orientation model
+//!   (`PAPERRUST_OCR_ORIENTATION`), on top of the `pl-ppocr` crate.
+//! - [`uncertain`]: uncertain lines/pages of the classic OCR for the AI transcription.
 
 pub mod args;
 pub mod color;
@@ -41,12 +44,14 @@ pub mod pdfimage;
 pub mod pdfwrite;
 pub mod permits;
 pub mod pipeline;
+pub mod ppocr;
 pub mod preprocess;
 pub mod remote;
 pub mod render;
 pub mod tesslib;
 pub mod text;
 pub mod thumbnail;
+pub mod uncertain;
 pub mod vision_pages;
 pub mod winocr;
 

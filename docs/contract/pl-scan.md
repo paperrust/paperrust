@@ -32,8 +32,8 @@ Session). „add“ = aktiver Nutzer mit `documents.add_document` (Superuser hab
 | `scan.scanners.capabilities` | GET | `/api/x-scan/scanners/{id}/capabilities/` | add | – | 200 `{scanner, make_and_model, sources: [{source, color_modes, resolutions, formats, max_width, max_height}], state, adf_state}`; Scanner nicht erreichbar → 502 `{code, detail}` |
 | `scan.discover` | GET | `/api/x-scan/discover/` | SU | – | 200 `{count, results: [{name, base_url, model, uuid, tls, known}]}` (≈ 3 s); Fehler → `error: "discovery_failed"` |
 | `scan.jobs.create` | POST | `/api/x-scan/jobs/` | add | `{scanner, source?, duplex?, resolution?, color_mode?, title?}` | 201 Auftrag (s. u.); belegt 409 `{code: "busy"}`; nicht unterstützt 400 `{code: "unsupported"}`; Gerät 502 |
-| `scan.jobs.retrieve` | GET | `/api/x-scan/jobs/{id}/` | add + eigener Auftrag (SU: alle) | – | 200 Auftrag; fremd/unbekannt 404 |
-| `scan.jobs.cancel` | POST | `/api/x-scan/jobs/{id}/cancel/` | wie retrieve | – | 200 `{cancel_requested, job}` |
+| `scan.jobs.retrieve` | GET | `/api/x-scan/jobs/{id}/` | add + eigener Auftrag (SU: alle) | – | 200 Auftrag; fremd/unbekannt 404 `{"code": "job_unknown", "detail": "Scan job unknown. Scan jobs are kept in memory only; the server may have been restarted since the scan started."}` (gleicher Text für fremd und unbekannt) |
+| `scan.jobs.cancel` | POST | `/api/x-scan/jobs/{id}/cancel/` | wie retrieve | – | 200 `{cancel_requested, job}`; `cancel_requested: false`, wenn der Auftrag schon zu Ende ist oder gerade an die Pipeline übergeben wird (dann wird das Dokument eingelesen) |
 | `scan.devices.list` | GET | `/api/x-scan/devices/` | SU | – | 200 `{count, results: [Gerät], smtp: {enabled, listen, port, tls, require_tls, implicit_tls, max_mb, error}}` |
 | `scan.devices.create` | POST | `/api/x-scan/devices/` | SU | `{name, owner, allowed_ips?}` | 201 Gerät + `token` (Klartext, **nur hier**). `owner` muss aktiv sein und `add_document` haben, sonst 400 |
 | `scan.devices.revoke` | POST | `/api/x-scan/devices/{id}/revoke/` | SU | – | 200 `{revoked: true}`; unbekannt/schon widerrufen 404 |
@@ -47,7 +47,9 @@ Felder:
   Modus), 300 dpi (sonst nächstkleinere), Format JPEG (sonst PDF), Bereich = min(Gerät, A4).
 - Auftrag: `{id (uuid), scanner, source, state, pages, error: {code, message} | null, task_id, created}`,
   `state` ∈ `scanning`, `processing`, `done`, `failed`, `cancelled`. Fehlercodes: `unreachable`,
-  `busy`, `adf_empty`, `jam`, `cancelled`, `unsupported`, `protocol`, `too_large`, `pdf`, `intake`.
+  `busy`, `adf_empty`, `jam`, `cancelled`, `unsupported`, `protocol`, `too_large` (eine Seite > 200 MiB),
+  `too_many_pages` (mehr als 500 Seiten), `job_too_large` (alle Seiten zusammen über
+  `PAPERRUST_SCAN_MAX_JOB_MB`), `pdf`, `intake`.
 - Gerät: `{id, name, token_hint, owner_id, owner_username, allowed_ips, created, revoked_at,
   last_used, last_ip, documents_received}` – nie `token_hash`.
 
@@ -70,9 +72,19 @@ Quelle: Mopria eSCL Scan Technical Specification 2.x, Verhalten wie sane-airscan
    Nach `404` mit Seiten: Status prüfen (AdfJam / Auftrag `Aborted` mit `*Jam*`) → `jam`, die
    Seiten werden verworfen. Ohne Seite: Status → `jam` / `adf_empty` / `protocol`. Andere Codes →
    Status → `jam` / `cancelled` / `protocol`, danach `DELETE {job}`.
-4. Abbruch: vor jeder Anfrage geprüft → `DELETE {job}` → `cancelled`.
-5. Höchstens 500 Seiten je Auftrag; je Scanner ein laufender Auftrag (sonst 409 ohne Gerätezugriff).
-   Aufträge leben im Speicher, eine Stunde nach dem Ende entfernt.
+4. Abbruch: vor jeder Anfrage geprüft → `DELETE {job}` → `cancelled`. Danach (`job::execute`)
+   noch einmal vor dem PDF-Bau und unmittelbar vor der Übergabe an die Pipeline → Seiten/PDF
+   verworfen, `cancelled`. Die Übergabe ist der Festlegepunkt: Abbruch und Übergabe entscheiden
+   unter derselben Sperre (`ScanJob::cancel`/`commit`), ein danach eintreffender Abbruch wird mit
+   `cancel_requested: false` abgelehnt – ein bestätigter Abbruch endet nie mit einem Dokument.
+5. Grenzen je Auftrag (`job::Limits`): höchstens 500 Seiten – liefert das Gerät eine 501. Seite,
+   `DELETE {job}` und Fehler `too_many_pages` (kein abgeschnittener Stapel; genau 500 Seiten sind in
+   Ordnung). Alle Seiten zusammen höchstens `PAPERRUST_SCAN_MAX_JOB_MB` MiB (Standard 1024,
+   erlaubt 1–65536, gelesen über `pl_core::config::var` bei jedem Auftragsstart; ungültig →
+   Warnung im Log, Standard gilt), weil die Seiten bis zum PDF-Bau im Speicher liegen; eine Seite
+   wird höchstens bis zum Rest des Budgets gelesen; Überschreitung → `DELETE {job}`, `job_too_large`.
+   Je Scanner ein laufender Auftrag (sonst 409 ohne Gerätezugriff).
+   Aufträge leben im Speicher des Prozesses, der sie gestartet hat, eine Stunde nach dem Ende entfernt.
 
 PDF (`pdf.rs`): JPEG-Seiten unverändert eingebettet (`DCTDecode`, Farbraum aus dem SOF-Segment,
 Seitengröße = Pixel / angeforderte dpi · 72 pt). PDF-Seiten über `pl_pdfops::PdfMerger`, andere
@@ -157,7 +169,7 @@ Empfang eingeschaltet ist (docs/DESKTOP.md §4).
 | Test | Inhalt | Läuft |
 |---|---|---|
 | Unit (`src/**`) | Token, XML, eSCL-Fähigkeiten/Status/ScanSettings, mDNS-Pakete (auch kaputte), JPEG→PDF, gemischte Seiten, IP-Listen, SMTP-Konfiguration/Grenzen/Typerkennung, Übergabe-kwargs | immer |
-| `tests/escl_flow.rs` | Test-Scanner (`tests/support`): Einzug mehrseitig mit 503-Pausen, beidseitig, Vorlagenglas, Stau, belegt (POST/Status), Einzug leer, Abbruch (DELETE), zweiter Auftrag belegt, fremde Location, unerreichbar | immer |
+| `tests/escl_flow.rs` | Test-Scanner (`tests/support`): Einzug mehrseitig mit 503-Pausen, beidseitig, Vorlagenglas, Stau, belegt (POST/Status), Einzug leer, Abbruch (DELETE), zweiter Auftrag belegt, fremde Location, unerreichbar; Seitengrenze überschritten → `too_many_pages` + DELETE, genau an der Grenze ok, Byte-Budget → `job_too_large`, Abbruch während der letzten `NextDocument`-Anfrage → `cancelled` ohne Dokument, Abbruch während der Übergabe → abgelehnt, Dokument kommt | immer |
 | `tests/smtp_flow.rs` | lokaler SMTP-Client: AUTH PLAIN/LOGIN, Token als Empfänger, falsches/widerrufenes Token, kein Relay, zu groß (SIZE und DATA), Nicht-PDF, mehrere Anhänge + Pfad-Tricks, Sperre, Mengengrenze, IP-Listen, STARTTLS + Pflicht, Einschleusung nach STARTTLS, direktes TLS | immer |
 | `tests/api_db.rs` | HTTP-API mit echter DB (Wegwerf-Kopie von `paperless_snapshot`): Rechte, Scanner eintragen, Scannen → `consume_file` (Besitzer, Quelle, 4-seitiges PDF), Gerät/Token (nur Hash), SMTP mit `PgDevices`, Widerruf sofort, inaktiver Besitzer | `#[ignore]`, braucht `PAPERRUST_SCAN_TEST_ADMIN_URL` |
 
@@ -193,7 +205,18 @@ wer keine Dokumente hinzufügen darf, wird erst beim Speichern abgelehnt (400 mi
 - mDNS nur IPv4 und nur über die Standard-Schnittstelle; in Docker-Bridge-Netzen keine Treffer.
 - `https`-Scanner: Zertifikat wird nicht geprüft (Drucker haben selbst ausgestellte Zertifikate);
   übertragen werden nur Scan-Ergebnisse vom Drucker zu PaperRust.
-- Scan-Aufträge nur im Speicher: Neustart während eines Scans → Auftrag weg (Gerät bricht ab).
+- Scan-Aufträge und die Sperre „ein Auftrag je Scanner“ nur im Speicher des HTTP-Prozesses, der
+  den Scan gestartet hat (bewusst, keine DB-Tabelle): Neustart → Auftrag weg (Gerät bricht ab bzw.
+  läuft leer), `GET`/`cancel` danach 404 `job_unknown` mit Hinweis auf einen Neustart. Im
+  Normalbetrieb gibt es genau einen HTTP-Prozess (`paperrust serve`, ein Listener; getrennte
+  Worker-Prozesse bedienen keine `/api/x-scan/`-Routen), daher reicht das. Wer mehrere
+  HTTP-Prozesse hinter einem Lastverteiler betreibt, braucht für `/api/x-scan/jobs/` feste
+  Zuordnung (sticky sessions); sonst 404 bei Status/Abbruch und die Scanner-Sperre wirkt nur je
+  Prozess (das Gerät selbst antwortet dann `503`/`409` → `busy`).
+- Grenzen 500 Seiten bzw. `PAPERRUST_SCAN_MAX_JOB_MB` werden **nicht** stillschweigend gekappt:
+  der ganze Auftrag schlägt fehl, der Nutzer scannt in kleineren Stapeln neu.
+- Die Seiten liegen bis zum PDF-Bau im Speicher (kein Auslagern in eine Datei); begrenzt durch
+  `PAPERRUST_SCAN_MAX_JOB_MB`.
 - SMTP: keine Weiterleitung, keine Zustellberichte (DSN), kein `PIPELINING`, kein `CHUNKING`.
   Ohne Zertifikat Token im Klartext → nur LAN. Im Docker-Bridge-Netz sieht PaperRust oft die
   Gateway-IP statt der Drucker-IP (IP-Listen wirken dann nicht wie gedacht).

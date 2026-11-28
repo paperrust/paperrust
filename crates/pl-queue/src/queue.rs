@@ -177,6 +177,20 @@ pub trait TaskQueue: Send + Sync {
         opts: EnqueueOptions,
     ) -> BoxFuture<'a, Result<Uuid, QueueError>>;
 
+    /// Enqueue inside the caller's PostgreSQL transaction (atomic with the caller's changes, e.g.
+    /// the beat's "last run" record). Default: `Unsupported`; callers then fall back to
+    /// [`Self::enqueue`].
+    fn enqueue_in_conn<'a>(
+        &'a self,
+        conn: &'a mut sqlx::PgConnection,
+        task_name: &'a str,
+        kwargs: Map<String, Value>,
+        opts: EnqueueOptions,
+    ) -> BoxFuture<'a, Result<Uuid, QueueError>> {
+        let _ = (conn, task_name, kwargs, opts);
+        Box::pin(async { Err(QueueError::Unsupported("enqueue in transaction".into())) })
+    }
+
     /// State (None = unknown).
     fn status(&self, task_id: Uuid) -> BoxFuture<'_, Result<Option<TaskInfo>, QueueError>>;
 

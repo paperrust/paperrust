@@ -7,13 +7,18 @@
 //!    done after the first page (like sane-airscan). Other responses → read the status
 //!    (jam / aborted by the device) → error.
 //! 4. Cancel by the user: checked before every request → `DELETE` on the job.
+//! 5. Limits ([`Limits`]): more than `max_pages` pages or more than `max_job_bytes` in total →
+//!    `DELETE` on the job and an error; a truncated batch is never imported.
 //!
-//! Afterwards ([`ScanJob::spawn`]): pages → PDF → hand-over to the pipeline (owner = user).
-//! Jobs live only in memory (removed one hour after the end); per scanner at most
-//! one runs.
+//! Afterwards ([`execute`]): pages → PDF → hand-over to the pipeline (owner = user). The cancel
+//! signal is checked again before the PDF is built and right before the hand-over; the hand-over
+//! itself is the commit point (a cancel after it is refused, see [`ScanJob::cancel`]).
+//! Jobs live only in memory of the process that started them (removed one hour after the end);
+//! per scanner at most one runs (also only per process, see the contract "Known differences").
 
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
@@ -29,8 +34,57 @@ use crate::intake::{Intake, IntakeDoc};
 pub const RETRY_DELAY: Duration = Duration::from_millis(500);
 /// At most this many `503` in a row (≈ 5 min at 500 ms).
 pub const MAX_NOT_READY: u32 = 600;
-/// At most this many pages per job.
+/// At most this many pages per job (more = the job fails with `too_many_pages`).
 pub const MAX_PAGES: usize = 500;
+/// Setting: total size of all pages of one job in MiB (they are held in memory until the PDF
+/// is built).
+pub const SETTING_MAX_JOB_MB: &str = "PAPERRUST_SCAN_MAX_JOB_MB";
+/// Default for [`SETTING_MAX_JOB_MB`]: 1 GiB.
+pub const DEFAULT_MAX_JOB_MB: u64 = 1024;
+/// Allowed range for [`SETTING_MAX_JOB_MB`].
+const MAX_JOB_MB_RANGE: std::ops::RangeInclusive<u64> = 1..=65536;
+
+/// Limits of one scan job.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Limits {
+    /// Pages per job; one page more fails the job.
+    pub max_pages: usize,
+    /// Sum of all page sizes per job in bytes.
+    pub max_job_bytes: u64,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Limits { max_pages: MAX_PAGES, max_job_bytes: DEFAULT_MAX_JOB_MB * 1024 * 1024 }
+    }
+}
+
+impl Limits {
+    /// Limits from a variable lookup (`pl_core::config::var` in production). Empty = default;
+    /// an invalid value is an error (the caller decides how to report it).
+    pub fn from_lookup(get: impl Fn(&str) -> Option<String>) -> Result<Limits, String> {
+        let mut l = Limits::default();
+        if let Some(v) = get(SETTING_MAX_JOB_MB).filter(|v| !v.trim().is_empty()) {
+            let mb = v
+                .trim()
+                .parse::<u64>()
+                .ok()
+                .filter(|mb| MAX_JOB_MB_RANGE.contains(mb))
+                .ok_or_else(|| format!("{SETTING_MAX_JOB_MB}: expected 1–65536 (MiB)"))?;
+            l.max_job_bytes = mb * 1024 * 1024;
+        }
+        Ok(l)
+    }
+
+    /// Limits from the environment / saved settings; an invalid value is logged and the default
+    /// is used (scanning stays possible, the limit stays conservative).
+    pub fn from_env() -> Limits {
+        Limits::from_lookup(pl_core::config::var).unwrap_or_else(|e| {
+            tracing::warn!(target: "paperrust.scan", "invalid scan setting, using the default: {e}");
+            Limits::default()
+        })
+    }
+}
 
 /// Progress while scanning.
 pub trait Progress: Send + Sync {
@@ -59,6 +113,7 @@ async fn status_error(client: &Client, job: &Url, code: u16) -> ScanError {
 pub async fn run_scan(
     client: &Client,
     settings: &ScanSettings,
+    limits: &Limits,
     cancel: &watch::Receiver<bool>,
     progress: &dyn Progress,
 ) -> Result<Vec<Page>, ScanError> {
@@ -83,6 +138,7 @@ pub async fn run_scan(
     // 2. Job
     let job = client.create_job(settings).await?;
     let mut pages: Vec<Page> = Vec::new();
+    let mut total_bytes: u64 = 0;
     let mut not_ready = 0u32;
     // 3. Pages
     loop {
@@ -90,18 +146,34 @@ pub async fn run_scan(
             client.cancel(&job).await;
             return Err(ScanError::Cancelled);
         }
-        match client.next_document(&job).await {
+        // Never read more than the rest of the job budget (+1 byte to detect the overflow).
+        let remaining = limits.max_job_bytes.saturating_sub(total_bytes).saturating_add(1);
+        let page_limit = usize::try_from(remaining).unwrap_or(usize::MAX).min(crate::escl::MAX_PAGE_BYTES);
+        match client.next_document_limited(&job, page_limit).await {
             Ok(Next::Page(p)) => {
                 not_ready = 0;
+                // One page more than allowed: the device still has paper → fail instead of
+                // importing a truncated batch.
+                if pages.len() >= limits.max_pages {
+                    client.cancel(&job).await;
+                    return Err(ScanError::TooManyPages(limits.max_pages));
+                }
+                total_bytes = total_bytes.saturating_add(p.data.len() as u64);
+                if total_bytes > limits.max_job_bytes {
+                    client.cancel(&job).await;
+                    return Err(ScanError::JobTooLarge(limits.max_job_bytes));
+                }
                 pages.push(p);
                 progress.page(pages.len());
                 if settings.source == Source::Flatbed {
                     break;
                 }
-                if pages.len() >= MAX_PAGES {
-                    client.cancel(&job).await;
-                    break;
-                }
+            }
+            // The page did not fit into the rest of the job budget (a single page above
+            // MAX_PAGE_BYTES stays `too_large`).
+            Err(ScanError::TooLarge) if page_limit < crate::escl::MAX_PAGE_BYTES => {
+                client.cancel(&job).await;
+                return Err(ScanError::JobTooLarge(limits.max_job_bytes));
             }
             Ok(Next::NotReady) => {
                 not_ready += 1;
@@ -184,6 +256,9 @@ pub struct ScanJob {
     pub user_id: i64,
     view: Mutex<JobView>,
     cancel: watch::Sender<bool>,
+    /// Set (under the `view` lock) right before the hand-over to the pipeline; from then on a
+    /// cancel is refused, because the document may already be queued.
+    committed: AtomicBool,
     finished: Mutex<Option<Instant>>,
 }
 
@@ -216,12 +291,36 @@ impl ScanJob {
         matches!(self.view().state, JobState::Scanning | JobState::Processing)
     }
 
-    /// Request cancellation. `false` if the job has already ended.
+    /// Request cancellation. `false` if the job has already ended or is being handed over to
+    /// the pipeline (then the document will be imported). Decided under the `view` lock, like
+    /// [`ScanJob::commit`], so a confirmed cancel never ends with an imported document.
     pub fn cancel(&self) -> bool {
-        if !self.is_running() {
+        let guard = match self.view.lock() {
+            Ok(v) => v,
+            Err(p) => p.into_inner(),
+        };
+        if !matches!(guard.state, JobState::Scanning | JobState::Processing) || self.committed.load(Ordering::SeqCst) {
             return false;
         }
         let _ = self.cancel.send(true);
+        true
+    }
+
+    fn cancel_requested(&self) -> bool {
+        *self.cancel.borrow()
+    }
+
+    /// Commit point before the hand-over: `false` if a cancel came first, otherwise later
+    /// cancels are refused.
+    fn commit(&self) -> bool {
+        let _guard = match self.view.lock() {
+            Ok(v) => v,
+            Err(p) => p.into_inner(),
+        };
+        if self.cancel_requested() {
+            return false;
+        }
+        self.committed.store(true, Ordering::SeqCst);
         true
     }
 }
@@ -235,6 +334,8 @@ pub struct JobSpec {
     pub title: Option<String>,
     pub scratch: PathBuf,
     pub intake: Arc<dyn Intake>,
+    /// Page and size limits ([`Limits::from_env`] in production).
+    pub limits: Limits,
 }
 
 #[derive(Default)]
@@ -279,6 +380,7 @@ impl Registry {
                 created: chrono::Utc::now(),
             }),
             cancel: tx,
+            committed: AtomicBool::new(false),
             finished: Mutex::new(None),
         });
         {
@@ -298,7 +400,7 @@ impl Registry {
 async fn execute(job: Arc<ScanJob>, spec: JobSpec, rx: watch::Receiver<bool>) {
     let j2 = job.clone();
     let progress = move |n: usize| j2.update(|v| v.pages = n);
-    let pages = match run_scan(&spec.client, &spec.settings, &rx, &progress).await {
+    let pages = match run_scan(&spec.client, &spec.settings, &spec.limits, &rx, &progress).await {
         Ok(p) => p,
         Err(ScanError::Cancelled) => return job.finish(JobState::Cancelled, Some(ScanError::Cancelled)),
         Err(e) => {
@@ -307,6 +409,11 @@ async fn execute(job: Arc<ScanJob>, spec: JobSpec, rx: watch::Receiver<bool>) {
         }
     };
     job.update(|v| v.state = JobState::Processing);
+    // A cancel can arrive while the last NextDocument request is running (the scan loop checks
+    // only before each request).
+    if job.cancel_requested() {
+        return job.finish(JobState::Cancelled, Some(ScanError::Cancelled));
+    }
     let name = format!("scan-{}.pdf", chrono::Local::now().format("%Y-%m-%d_%H-%M-%S"));
     let dir = match crate::intake::spool_dir(&spec.scratch) {
         Ok(d) => d,
@@ -327,6 +434,11 @@ async fn execute(job: Arc<ScanJob>, spec: JobSpec, rx: watch::Receiver<bool>) {
             return job.finish(JobState::Failed, Some(ScanError::Pdf(e.to_string())));
         }
     }
+    // Last chance to cancel: the hand-over is the commit point.
+    if !job.commit() {
+        let _ = std::fs::remove_dir_all(&dir);
+        return job.finish(JobState::Cancelled, Some(ScanError::Cancelled));
+    }
     let doc = IntakeDoc {
         path: path.clone(),
         filename: name,
@@ -344,5 +456,33 @@ async fn execute(job: Arc<ScanJob>, spec: JobSpec, rx: watch::Receiver<bool>) {
             crate::intake::discard(&path);
             job.finish(JobState::Failed, Some(ScanError::Intake(e)));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn get<'a>(pairs: &'a [(&'a str, &'a str)]) -> impl Fn(&str) -> Option<String> + 'a {
+        move |k| pairs.iter().find(|(n, _)| *n == k).map(|(_, v)| v.to_string())
+    }
+
+    #[test]
+    fn limits_from_lookup() {
+        let d = Limits::from_lookup(get(&[])).unwrap();
+        assert_eq!(d, Limits { max_pages: 500, max_job_bytes: 1024 * 1024 * 1024 });
+        assert_eq!(Limits::from_lookup(get(&[(SETTING_MAX_JOB_MB, " ")])).unwrap(), d);
+        assert_eq!(Limits::from_lookup(get(&[(SETTING_MAX_JOB_MB, "256")])).unwrap().max_job_bytes, 256 * 1024 * 1024);
+        for bad in ["0", "-1", "abc", "65537", "1.5"] {
+            assert!(Limits::from_lookup(get(&[(SETTING_MAX_JOB_MB, bad)])).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn limit_errors_have_own_codes() {
+        assert_eq!(ScanError::TooManyPages(500).code(), "too_many_pages");
+        assert_eq!(ScanError::JobTooLarge(1024 * 1024 * 1024).code(), "job_too_large");
+        assert_eq!(ScanError::JobTooLarge(1024 * 1024 * 1024).to_string(), "scan is larger than 1024 MiB in total; nothing was imported");
+        assert_eq!(ScanError::JobTooLarge(10).to_string(), "scan is larger than 1 MiB in total; nothing was imported");
     }
 }

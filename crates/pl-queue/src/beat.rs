@@ -105,6 +105,10 @@ pub fn parse_beat_schedule(env: &Env) -> Result<Vec<BeatEntry>, ConfigError> {
     Ok(out)
 }
 
+/// Result of [`BeatStore::run_due`]: (`None` = not due, else the enqueue result; seconds until
+/// the next run).
+pub type RunDue = (Option<Result<uuid::Uuid, crate::QueueError>>, f64);
+
 /// Store for `last_run_at`.
 pub trait BeatStore: Send + Sync {
     /// Checks under lock whether `entry` is due and reserves the run (`last_run_at = now`).
@@ -117,6 +121,22 @@ pub trait BeatStore: Send + Sync {
     ) -> futures::future::BoxFuture<'a, Result<(bool, f64), crate::QueueError>>;
     /// Remove entries that are no longer in the schedule (`merge_inplace`).
     fn retain<'a>(&'a self, names: &'a [String]) -> futures::future::BoxFuture<'a, Result<(), crate::QueueError>>;
+    /// Checks under lock whether `entry` is due and, if so, enqueues it via `queue`; the run
+    /// (`last_run_at`, `total_run_count`) is recorded ONLY together with a successful enqueue.
+    /// After an enqueue error nothing is recorded, so the next tick tries again. Returns
+    /// (`None` = not due, else the enqueue result; seconds until the next run).
+    fn run_due<'a>(
+        &'a self,
+        entry: &'a BeatEntry,
+        now: DateTime<Utc>,
+        tz: Tz,
+        queue: &'a dyn TaskQueue,
+    ) -> futures::future::BoxFuture<'a, Result<RunDue, crate::QueueError>>;
+}
+
+/// Enqueue options of a scheduled run (`apply_entry`).
+fn entry_opts(entry: &BeatEntry) -> EnqueueOptions {
+    EnqueueOptions { expires: Some(entry.expires), headers: entry.headers.clone(), ..Default::default() }
 }
 
 /// Store in PostgreSQL (`paperrust_beat_state`).
@@ -145,6 +165,55 @@ pub fn initial_last_run(entry: &BeatEntry, now: DateTime<Utc>) -> DateTime<Utc> 
     if CATCH_UP_ON_FIRST_START.contains(&entry.task.as_str()) { now - chrono::Duration::days(400) } else { now }
 }
 
+/// Creates the state row if missing, locks it (`FOR UPDATE`, held until the caller's commit) and
+/// returns `last_run_at`; a changed time zone resets the state. Shared by `reserve` and `run_due`
+/// so each SQL text exists once (sqlx statement cache by SQL text, FINDINGS B3).
+async fn lock_state(
+    conn: &mut sqlx::PgConnection,
+    entry: &BeatEntry,
+    now: DateTime<Utc>,
+    tz: Tz,
+) -> Result<DateTime<Utc>, crate::QueueError> {
+    // New entry: last_run_at = now (ScheduleEntry.default_now) → first run at the
+    // next matching time; exception CATCH_UP_ON_FIRST_START.
+    sqlx::query("INSERT INTO paperrust_beat_state (name, task, last_run_at, tz) VALUES ($1, $2, $3, $4) ON CONFLICT (name) DO NOTHING")
+        .bind(&entry.name)
+        .bind(&entry.task)
+        .bind(initial_last_run(entry, now))
+        .bind(tz.name())
+        .execute(&mut *conn)
+        .await?;
+    let row = sqlx::query("SELECT last_run_at, tz FROM paperrust_beat_state WHERE name = $1 FOR UPDATE")
+        .bind(&entry.name)
+        .fetch_one(&mut *conn)
+        .await?;
+    let last: DateTime<Utc> = row.try_get("last_run_at")?;
+    let stored_tz: String = row.try_get("tz")?;
+    if stored_tz == tz.name() {
+        return Ok(last);
+    }
+    // "Reset: Timezone changed" → discard state
+    tracing::warn!("Reset: Timezone changed from {stored_tz:?} to {:?}", tz.name());
+    sqlx::query("UPDATE paperrust_beat_state SET last_run_at = $1, tz = $2, total_run_count = 0 WHERE name = $3")
+        .bind(now)
+        .bind(tz.name())
+        .bind(&entry.name)
+        .execute(&mut *conn)
+        .await?;
+    Ok(now)
+}
+
+/// Records a run of `entry` at `now` on the caller's transaction (row locked by [`lock_state`]).
+async fn record_run(conn: &mut sqlx::PgConnection, entry: &BeatEntry, now: DateTime<Utc>) -> Result<(), crate::QueueError> {
+    sqlx::query("UPDATE paperrust_beat_state SET last_run_at = $1, task = $2, total_run_count = total_run_count + 1 WHERE name = $3")
+        .bind(now)
+        .bind(&entry.task)
+        .bind(&entry.name)
+        .execute(&mut *conn)
+        .await?;
+    Ok(())
+}
+
 impl BeatStore for PgBeatStore {
     fn reserve<'a>(
         &'a self,
@@ -154,44 +223,10 @@ impl BeatStore for PgBeatStore {
     ) -> futures::future::BoxFuture<'a, Result<(bool, f64), crate::QueueError>> {
         Box::pin(async move {
             let mut tx = self.pool.begin().await?;
-            // New entry: last_run_at = now (ScheduleEntry.default_now) → first run at the
-            // next matching time; exception CATCH_UP_ON_FIRST_START.
-            sqlx::query(
-                "INSERT INTO paperrust_beat_state (name, task, last_run_at, tz) VALUES ($1, $2, $3, $4) ON CONFLICT (name) DO NOTHING",
-            )
-            .bind(&entry.name)
-            .bind(&entry.task)
-            .bind(initial_last_run(entry, now))
-            .bind(tz.name())
-            .execute(&mut *tx)
-            .await?;
-            let row = sqlx::query("SELECT last_run_at, tz FROM paperrust_beat_state WHERE name = $1 FOR UPDATE")
-                .bind(&entry.name)
-                .fetch_one(&mut *tx)
-                .await?;
-            let mut last: DateTime<Utc> = row.try_get("last_run_at")?;
-            let stored_tz: String = row.try_get("tz")?;
-            if stored_tz != tz.name() {
-                // "Reset: Timezone changed" → discard state
-                tracing::warn!("Reset: Timezone changed from {stored_tz:?} to {:?}", tz.name());
-                last = now;
-                sqlx::query("UPDATE paperrust_beat_state SET last_run_at = $1, tz = $2, total_run_count = 0 WHERE name = $3")
-                    .bind(now)
-                    .bind(tz.name())
-                    .bind(&entry.name)
-                    .execute(&mut *tx)
-                    .await?;
-            }
+            let last = lock_state(&mut tx, entry, now, tz).await?;
             let (due, rem) = entry.schedule.is_due(last, now, tz);
             if due {
-                sqlx::query(
-                    "UPDATE paperrust_beat_state SET last_run_at = $1, task = $2, total_run_count = total_run_count + 1 WHERE name = $3",
-                )
-                .bind(now)
-                .bind(&entry.task)
-                .bind(&entry.name)
-                .execute(&mut *tx)
-                .await?;
+                record_run(&mut tx, entry, now).await?;
             }
             tx.commit().await?;
             Ok((due, rem))
@@ -202,6 +237,39 @@ impl BeatStore for PgBeatStore {
         Box::pin(async move {
             sqlx::query("DELETE FROM paperrust_beat_state WHERE NOT (name = ANY($1))").bind(names).execute(&self.pool).await?;
             Ok(())
+        })
+    }
+
+    fn run_due<'a>(
+        &'a self,
+        entry: &'a BeatEntry,
+        now: DateTime<Utc>,
+        tz: Tz,
+        queue: &'a dyn TaskQueue,
+    ) -> futures::future::BoxFuture<'a, Result<RunDue, crate::QueueError>> {
+        Box::pin(async move {
+            let mut tx = self.pool.begin().await?;
+            let last = lock_state(&mut tx, entry, now, tz).await?;
+            let (due, rem) = entry.schedule.is_due(last, now, tz);
+            if !due {
+                tx.commit().await?;
+                return Ok((None, rem));
+            }
+            // Same transaction as the record (row lock held): either both or neither. A queue
+            // without transactional enqueue is sent separately while the lock is held; then a
+            // crash between its commit and ours repeats the run (never loses it).
+            let sent = match queue.enqueue_in_conn(&mut tx, &entry.task, Map::new(), entry_opts(entry)).await {
+                Err(crate::QueueError::Unsupported(_)) => queue.enqueue(&entry.task, Map::new(), entry_opts(entry)).await,
+                r => r,
+            };
+            if sent.is_err() {
+                // nothing recorded: due again on the next tick
+                let _ = tx.rollback().await;
+                return Ok((Some(sent), rem));
+            }
+            record_run(&mut tx, entry, now).await?;
+            tx.commit().await?;
+            Ok((Some(sent), rem))
         })
     }
 }
@@ -236,6 +304,31 @@ impl BeatStore for MemoryBeatStore {
             Ok(())
         })
     }
+
+    fn run_due<'a>(
+        &'a self,
+        entry: &'a BeatEntry,
+        now: DateTime<Utc>,
+        tz: Tz,
+        queue: &'a dyn TaskQueue,
+    ) -> futures::future::BoxFuture<'a, Result<RunDue, crate::QueueError>> {
+        Box::pin(async move {
+            // the lock is not held across the enqueue (single process: ticks run one after another)
+            let (due, rem) = {
+                let mut m = self.last.lock().unwrap_or_else(|p| p.into_inner());
+                let last = *m.entry(entry.name.clone()).or_insert_with(|| initial_last_run(entry, now));
+                entry.schedule.is_due(last, now, tz)
+            };
+            if !due {
+                return Ok((None, rem));
+            }
+            let sent = queue.enqueue(&entry.task, Map::new(), entry_opts(entry)).await;
+            if sent.is_ok() {
+                self.last.lock().unwrap_or_else(|p| p.into_inner()).insert(entry.name.clone(), now);
+            }
+            Ok((Some(sent), rem))
+        })
+    }
 }
 
 /// `celery beat` (`DEFAULT_MAX_INTERVAL = 300` s between two checks).
@@ -265,17 +358,17 @@ impl Beat {
         let mut next = self.max_interval.as_secs_f64();
         let mut first_err = None;
         for e in &self.entries {
-            match self.store.reserve(e, now, self.tz).await {
-                Ok((due, rem)) => {
-                    if due {
-                        tracing::info!("Scheduler: Sending due task {} ({})", e.name, e.task);
-                        let opts = EnqueueOptions { expires: Some(e.expires), headers: e.headers.clone(), ..Default::default() };
-                        // apply_entry: only log errors, the run stays reserved (like Celery)
-                        if let Err(err) = self.queue.enqueue(&e.task, Map::new(), opts).await {
-                            tracing::error!(error = %err, "Message Error: Couldn't apply scheduled task {}", e.name);
-                        }
-                    }
+            match self.store.run_due(e, now, self.tz, self.queue.as_ref()).await {
+                Ok((None, rem)) => next = next.min(rem),
+                Ok((Some(Ok(_)), rem)) => {
+                    tracing::info!("Scheduler: Sending due task {} ({})", e.name, e.task);
                     next = next.min(rem);
+                }
+                // PaperRust (Known difference): Celery keeps the run reserved and only logs; here
+                // nothing is recorded and the next tick (after the backoff in `run`) retries.
+                Ok((Some(Err(err)), _)) => {
+                    tracing::error!(error = %err, "Message Error: Couldn't apply scheduled task {}", e.name);
+                    first_err.get_or_insert((e.name.clone(), err));
                 }
                 Err(err) => {
                     first_err.get_or_insert((e.name.clone(), err));
@@ -409,6 +502,53 @@ mod tests {
         // three missed runs → exactly one catch-up
         beat.tick(t("2024-01-01T13:30:00Z")).await;
         assert_eq!(q.0.lock().unwrap().len(), 2);
+    }
+
+    /// Queue whose first `fail` enqueues fail.
+    struct FlakyQueue {
+        fail: std::sync::Mutex<usize>,
+        sent: std::sync::Mutex<Vec<String>>,
+    }
+    impl TaskQueue for FlakyQueue {
+        fn enqueue<'a>(&'a self, n: &'a str, _k: Map<String, Value>, _o: EnqueueOptions) -> BoxFuture<'a, Result<Uuid, QueueError>> {
+            let failing = {
+                let mut f = self.fail.lock().unwrap();
+                let failing = *f > 0;
+                *f = f.saturating_sub(1);
+                failing
+            };
+            if !failing {
+                self.sent.lock().unwrap().push(n.to_string());
+            }
+            Box::pin(async move { if failing { Err(QueueError::Invalid("queue down".into())) } else { Ok(Uuid::new_v4()) } })
+        }
+        fn status(&self, _id: Uuid) -> BoxFuture<'_, Result<Option<TaskInfo>, QueueError>> {
+            Box::pin(async { Ok(None) })
+        }
+    }
+
+    /// Regression: an enqueue error must not consume the scheduled run; the next tick retries it
+    /// and the error is reported to `run` (backoff) instead of only being logged.
+    #[tokio::test]
+    async fn failed_enqueue_is_retried_not_lost() {
+        let q = Arc::new(FlakyQueue { fail: std::sync::Mutex::new(1), sent: Default::default() });
+        let entries = vec![BeatEntry {
+            name: "Train".into(),
+            task: "documents.tasks.train_classifier".into(),
+            schedule: Crontab::from_paperless("5 */1 * * *").unwrap(),
+            expires: 3540.0,
+            headers: Map::new(),
+        }];
+        let beat = Beat::new(entries, Arc::new(MemoryBeatStore::default()), q.clone(), "UTC".parse().unwrap());
+        let t = |s: &str| DateTime::parse_from_rfc3339(s).unwrap().with_timezone(&Utc);
+        beat.tick(t("2024-01-01T10:00:00Z")).await;
+        let (_, err) = beat.tick_report(t("2024-01-01T10:05:00Z")).await;
+        assert!(err.is_some(), "enqueue error is reported");
+        assert!(q.sent.lock().unwrap().is_empty());
+        // next tick (same slot): still due, now sent exactly once
+        beat.tick(t("2024-01-01T10:05:02Z")).await;
+        beat.tick(t("2024-01-01T10:05:30Z")).await;
+        assert_eq!(*q.sent.lock().unwrap(), vec!["documents.tasks.train_classifier".to_string()]);
     }
 
     /// "Empty trash" does NOT run immediately on first start (after a takeover old

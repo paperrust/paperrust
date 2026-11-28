@@ -220,12 +220,14 @@ async fn update_one(conn: &mut PgConnection, cfg: &MediaCfg, doc_id: i64) -> Res
         // Without a move upstream returns with `return` in the try block → no versions.
         let moved = move_under_lock(&mut tx, cfg, &inst).await;
         let moved = match moved {
-            Ok(m) => {
-                // A failure while moving was logged and rolled back by move_under_lock; if
+            Ok((m, moves)) => {
+                // A failure while moving was logged and rolled back by move_under_lock. If
                 // committing fails, sqlx rolls back the savepoint (caller transaction remains
-                // usable) – only log, as upstream.
-                if let Err(e) = tx.commit().await {
-                    tracing::warn!(target: "paperless.handlers", "Exception during file handling: {e}");
+                // usable) – the files already moved are moved back (review finding 2026-11-27,
+                // otherwise the row points to the old, now empty path); only logged, as upstream.
+                if !commit_or_undo(tx.commit(), &moves).await {
+                    drop(lock);
+                    return Ok(());
                 }
                 m
             }
@@ -251,8 +253,63 @@ async fn update_one(conn: &mut PgConnection, cfg: &MediaCfg, doc_id: i64) -> Res
     Ok(())
 }
 
-/// `Ok(false)` = early `return` (nothing to move), `Ok(true)` = end of the function reached.
-async fn move_under_lock(conn: &mut PgConnection, cfg: &MediaCfg, inst: &DocRow) -> Result<bool, ApiError> {
+/// A file moved on disk whose database row is not committed yet.
+#[derive(Debug, Clone)]
+struct FileMove {
+    from: PathBuf,
+    to: PathBuf,
+    root: PathBuf,
+}
+
+/// Move files back after the transaction that recorded their new names did not commit (newest
+/// move first). Never overwrites: if the old path is taken or the new file is gone, it only logs.
+fn undo_moves(moves: &[FileMove]) {
+    for m in moves.iter().rev() {
+        if !m.to.is_file() || m.from.exists() {
+            tracing::error!(
+                target: "paperless.handlers",
+                "Cannot restore {} to {} after a failed commit: the database still points to the old path; fix by hand.",
+                m.to.display(),
+                m.from.display()
+            );
+            continue;
+        }
+        let r = pl_templating::create_source_path_directory(&m.from)
+            .map_err(|e| e.to_string())
+            .and_then(|_| shutil_move(&m.to, &m.from).map_err(|e| e.to_string()));
+        match r {
+            Ok(()) => {
+                tracing::info!(target: "paperless.handlers", "Restored {} after a failed commit", m.from.display());
+                if let Some(parent) = m.to.parent() {
+                    pl_templating::delete_empty_directories(parent, &m.root);
+                }
+            }
+            Err(e) => tracing::error!(
+                target: "paperless.handlers",
+                "Cannot restore {} to {} after a failed commit ({e}): the database still points to the old path; fix by hand.",
+                m.to.display(),
+                m.from.display()
+            ),
+        }
+    }
+}
+
+/// Commit the transaction that recorded the moves; on failure move the files back. `true` =
+/// committed. (Seam: the commit is any future, so the restore path is testable without a DB.)
+async fn commit_or_undo<E: std::fmt::Display>(commit: impl std::future::Future<Output = Result<(), E>>, moves: &[FileMove]) -> bool {
+    match commit.await {
+        Ok(()) => true,
+        Err(e) => {
+            tracing::warn!(target: "paperless.handlers", "Exception during file handling: {e}");
+            undo_moves(moves);
+            false
+        }
+    }
+}
+
+/// `Ok((false, _))` = early `return` (nothing to move), `Ok((true, moves))` = end of the function
+/// reached; `moves` = files moved on disk (to be moved back if the transaction does not commit).
+async fn move_under_lock(conn: &mut PgConnection, cfg: &MediaCfg, inst: &DocRow) -> Result<(bool, Vec<FileMove>), ApiError> {
     let ctx = pl_consumer::templating::document_context(conn, inst).await?;
     let old_filename = inst.filename.clone().unwrap_or_default();
     let old_source_path = cfg.source_path(inst);
@@ -264,6 +321,7 @@ async fn move_under_lock(conn: &mut PgConnection, cfg: &MediaCfg, inst: &DocRow)
     let mut move_archive = false;
     let mut new_filename = old_filename.clone();
     let mut new_archive_filename = old_archive_filename.clone();
+    let mut done: Vec<FileMove> = Vec::new();
 
     let attempt: Result<(), MoveFailed> = async {
         let candidate =
@@ -348,7 +406,7 @@ async fn move_under_lock(conn: &mut PgConnection, cfg: &MediaCfg, inst: &DocRow)
             .execute(&mut *conn)
             .await;
             match r {
-                Ok(_) => return Ok(false),
+                Ok(_) => return Ok((false, Vec::new())),
                 Err(e) => Err(MoveFailed(e.to_string())),
             }
         }
@@ -360,11 +418,13 @@ async fn move_under_lock(conn: &mut PgConnection, cfg: &MediaCfg, inst: &DocRow)
                     validate_move(&old_source_path, &new_source_path, &cfg.originals_dir)?;
                     pl_templating::create_source_path_directory(&new_source_path).map_err(|e| MoveFailed(e.to_string()))?;
                     shutil_move(&old_source_path, &new_source_path).map_err(|e| MoveFailed(e.to_string()))?;
+                    done.push(FileMove { from: old_source_path.clone(), to: new_source_path.clone(), root: cfg.originals_dir.clone() });
                 }
                 if move_archive && let (Some(o), Some(n)) = (old_archive_path.as_ref(), new_archive_path.as_ref()) {
                     validate_move(o, n, &cfg.archive_dir)?;
                     pl_templating::create_source_path_directory(n).map_err(|e| MoveFailed(e.to_string()))?;
                     shutil_move(o, n).map_err(|e| MoveFailed(e.to_string()))?;
+                    done.push(FileMove { from: o.clone(), to: n.clone(), root: cfg.archive_dir.clone() });
                 }
                 sqlx::query("UPDATE documents_document SET filename = $2, archive_filename = $3, modified = $4 WHERE id = $1")
                     .bind(inst.id as i32)
@@ -390,6 +450,7 @@ async fn move_under_lock(conn: &mut PgConnection, cfg: &MediaCfg, inst: &DocRow)
                     tracing::info!(target: "paperless.handlers", "Restoring previous archive path");
                     let _ = shutil_move(n, o);
                 }
+                done.clear();
             }
             r
         }
@@ -410,7 +471,7 @@ async fn move_under_lock(conn: &mut PgConnection, cfg: &MediaCfg, inst: &DocRow)
     {
         pl_templating::delete_empty_directories(parent, &cfg.archive_dir);
     }
-    Ok(true)
+    Ok((true, done))
 }
 
 use pl_core::safepath::same_rel;
@@ -591,6 +652,53 @@ mod tests {
         assert!(m.checked_archive_path(&doc("a.pdf", Some("../originals/x.pdf"))).is_err());
         assert!(m.checked_source_path(&doc("sub/a.pdf", Some("a.pdf"))).is_ok());
         assert!(m.checked_archive_path(&doc("a.pdf", Some("a.pdf"))).unwrap().is_some());
+    }
+
+    /// Review finding 2026-11-27: original and archive were moved before the transaction
+    /// committed; on a failed commit they stayed at the new path while the row kept the old one.
+    #[tokio::test]
+    async fn failed_commit_moves_files_back() {
+        let t = tempfile::tempdir().unwrap();
+        let m = media(t.path());
+        let (old_o, new_o) = (m.originals_dir.join("old/a.pdf"), m.originals_dir.join("new/sub/a.pdf"));
+        let (old_a, new_a) = (m.archive_dir.join("old/a.pdf"), m.archive_dir.join("new/a.pdf"));
+        // state after move_under_lock: files at the new paths, old (now empty) folders removed
+        for (p, body) in [(&new_o, b"orig".as_slice()), (&new_a, b"arch".as_slice())] {
+            std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+            std::fs::write(p, body).unwrap();
+        }
+        let moves = vec![
+            FileMove { from: old_o.clone(), to: new_o.clone(), root: m.originals_dir.clone() },
+            FileMove { from: old_a.clone(), to: new_a.clone(), root: m.archive_dir.clone() },
+        ];
+        let committed = commit_or_undo(async { Err::<(), _>("connection reset") }, &moves).await;
+        assert!(!committed);
+        assert_eq!(std::fs::read(&old_o).unwrap(), b"orig");
+        assert_eq!(std::fs::read(&old_a).unwrap(), b"arch");
+        assert!(!new_o.exists() && !new_a.exists());
+        // the new, now empty folders are removed again
+        assert!(!m.originals_dir.join("new").exists() && !m.archive_dir.join("new").exists());
+        // successful commit: nothing is moved
+        std::fs::create_dir_all(new_o.parent().unwrap()).unwrap();
+        std::fs::rename(&old_o, &new_o).unwrap();
+        let one = [FileMove { from: old_o.clone(), to: new_o.clone(), root: m.originals_dir.clone() }];
+        assert!(commit_or_undo(async { Ok::<(), String>(()) }, &one).await);
+        assert!(new_o.is_file() && !old_o.exists());
+    }
+
+    /// Moving back never overwrites a file that took the old path meanwhile.
+    #[tokio::test]
+    async fn failed_commit_never_overwrites_old_path() {
+        let t = tempfile::tempdir().unwrap();
+        let m = media(t.path());
+        std::fs::create_dir_all(&m.originals_dir).unwrap();
+        let (old, new) = (m.originals_dir.join("a.pdf"), m.originals_dir.join("b.pdf"));
+        std::fs::write(&old, b"other").unwrap();
+        std::fs::write(&new, b"ours").unwrap();
+        let moves = [FileMove { from: old.clone(), to: new.clone(), root: m.originals_dir.clone() }];
+        assert!(!commit_or_undo(async { Err::<(), _>("x") }, &moves).await);
+        assert_eq!(std::fs::read(&old).unwrap(), b"other");
+        assert_eq!(std::fs::read(&new).unwrap(), b"ours");
     }
 
     /// Review H1, path 3 (deleting when emptying the trash): foreign files remain.

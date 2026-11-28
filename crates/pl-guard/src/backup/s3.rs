@@ -212,6 +212,28 @@ impl Client {
         Self::check(r).await.map(|_| ())
     }
 
+    /// Upload a file without holding it in memory: one streaming pass computes SHA-256 and
+    /// MD5 (both must be known before the request), a second pass streams the body with an
+    /// explicit `Content-Length`. Single PUT, so the S3 limit of 5 GiB per object applies.
+    pub async fn put_file(&self, key: &str, src: &std::path::Path, until: Option<DateTime<Utc>>) -> Result<(), S3Error> {
+        let fail = |m: String| S3Error { status: None, code: String::new(), message: m };
+        let p = src.to_path_buf();
+        let (sha, md5, len) = tokio::task::spawn_blocking(move || file_digests(&p))
+            .await
+            .map_err(|e| fail(e.to_string()))?
+            .map_err(|e| fail(format!("{}: {e}", src.display())))?;
+        let mut extra = vec![
+            ("content-md5".to_string(), md5),
+            ("content-type".to_string(), "application/octet-stream".to_string()),
+            ("content-length".to_string(), len.to_string()),
+        ];
+        extra.extend(self.lock_headers(until));
+        let f = tokio::fs::File::open(src).await.map_err(|e| fail(format!("{}: {e}", src.display())))?;
+        let body = reqwest::Body::wrap_stream(tokio_util::io::ReaderStream::with_capacity(f, 256 * 1024));
+        let r = self.send(reqwest::Method::PUT, Some(key), Vec::new(), extra, body, &sha).await?;
+        Self::check(r).await.map(|_| ())
+    }
+
     pub async fn get(&self, key: &str) -> Result<Option<Vec<u8>>, S3Error> {
         let r = self.send(reqwest::Method::GET, Some(key), Vec::new(), Vec::new(), reqwest::Body::from(Vec::new()), EMPTY_SHA256).await?;
         if r.status().as_u16() == 404 {
@@ -219,6 +241,25 @@ impl Client {
         }
         let r = Self::check(r).await?;
         r.bytes().await.map(|b| Some(b.to_vec())).map_err(|e| S3Error { status: None, code: String::new(), message: e.to_string() })
+    }
+
+    /// Download an object into `dest` chunk by chunk (no full copy in memory).
+    /// `Ok(false)` if the object does not exist.
+    pub async fn get_to_file(&self, key: &str, dest: &std::path::Path) -> Result<bool, S3Error> {
+        use tokio::io::AsyncWriteExt;
+        let fail = |m: String| S3Error { status: None, code: String::new(), message: m };
+        let r = self.send(reqwest::Method::GET, Some(key), Vec::new(), Vec::new(), reqwest::Body::from(Vec::new()), EMPTY_SHA256).await?;
+        if r.status().as_u16() == 404 {
+            return Ok(false);
+        }
+        let mut r = Self::check(r).await?;
+        let f = tokio::fs::File::create(dest).await.map_err(|e| fail(format!("{}: {e}", dest.display())))?;
+        let mut w = tokio::io::BufWriter::new(f);
+        while let Some(chunk) = r.chunk().await.map_err(|e| fail(e.to_string()))? {
+            w.write_all(&chunk).await.map_err(|e| fail(format!("{}: {e}", dest.display())))?;
+        }
+        w.flush().await.map_err(|e| fail(format!("{}: {e}", dest.display())))?;
+        Ok(true)
     }
 
     pub async fn exists(&self, key: &str) -> Result<bool, S3Error> {
@@ -271,6 +312,13 @@ impl Client {
 
     /// All keys under `prefix` (relative to the target's prefix).
     pub async fn list(&self, prefix: &str) -> Result<Vec<String>, S3Error> {
+        Ok(self.list_sized(prefix).await?.into_iter().map(|(k, _)| k).collect())
+    }
+
+    /// All keys under `prefix` with their sizes. A truncated page without a continuation
+    /// token is an error: a partial listing must never look complete (prune would then
+    /// delete objects of the missing snapshots).
+    pub async fn list_sized(&self, prefix: &str) -> Result<Vec<(String, u64)>, S3Error> {
         let mut out = Vec::new();
         let mut token: Option<String> = None;
         let base = self.full_key("");
@@ -282,25 +330,66 @@ impl Client {
             let r = self.send(reqwest::Method::GET, None, q, Vec::new(), reqwest::Body::from(Vec::new()), EMPTY_SHA256).await?;
             let body =
                 Self::check(r).await?.text().await.map_err(|e| S3Error { status: None, code: String::new(), message: e.to_string() })?;
-            let mut rest = body.as_str();
-            while let Some(i) = rest.find("<Key>") {
-                let after = &rest[i + 5..];
-                let Some(j) = after.find("</Key>") else { break };
-                let k = xml_unescape(&after[..j]);
-                out.push(k.strip_prefix(&base).unwrap_or(&k).to_string());
-                rest = &after[j..];
-            }
-            if xml_tag(&body, "IsTruncated").as_deref() == Some("true") {
-                token = xml_tag(&body, "NextContinuationToken");
-                if token.is_none() {
-                    break;
-                }
-            } else {
-                break;
+            let (keys, next) = parse_list_page(&body, &base)?;
+            out.extend(keys);
+            match next {
+                Some(t) => token = Some(t),
+                None => break,
             }
         }
         Ok(out)
     }
+}
+
+/// SHA-256 (hex), MD5 (base64) and length of a file, read in one streaming pass.
+fn file_digests(p: &std::path::Path) -> std::io::Result<(String, String, u64)> {
+    use std::io::Read;
+    let mut f = std::fs::File::open(p)?;
+    let mut sha = Sha256::new();
+    let mut md5 = md5::Md5::new();
+    let mut buf = vec![0u8; 256 * 1024];
+    let mut len = 0u64;
+    loop {
+        let n = f.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        sha.update(&buf[..n]);
+        md5::Digest::update(&mut md5, &buf[..n]);
+        len += n as u64;
+    }
+    Ok((crate::guard::hex(&sha.finalize()), base64::engine::general_purpose::STANDARD.encode(md5.finalize()), len))
+}
+
+/// Keys with sizes of one listing page and the continuation token, if any.
+pub type ListPage = (Vec<(String, u64)>, Option<String>);
+
+/// One ListObjectsV2 page: (key relative to `base`, size) and the continuation token if the
+/// listing continues. `IsTruncated=true` without `NextContinuationToken` is an error.
+pub fn parse_list_page(body: &str, base: &str) -> Result<ListPage, S3Error> {
+    let mut out = Vec::new();
+    let mut rest = body;
+    while let Some(i) = rest.find("<Contents>") {
+        let after = &rest[i + "<Contents>".len()..];
+        let end = after.find("</Contents>").unwrap_or(after.len());
+        let item = &after[..end];
+        if let Some(k) = xml_tag(item, "Key") {
+            let size = xml_tag(item, "Size").and_then(|s| s.trim().parse::<u64>().ok()).unwrap_or(0);
+            out.push((k.strip_prefix(base).unwrap_or(&k).to_string(), size));
+        }
+        rest = &after[end..];
+    }
+    if xml_tag(body, "IsTruncated").as_deref() == Some("true") {
+        return match xml_tag(body, "NextContinuationToken").filter(|t| !t.is_empty()) {
+            Some(t) => Ok((out, Some(t))),
+            None => Err(S3Error {
+                status: None,
+                code: "IncompleteListing".into(),
+                message: "the S3 listing is truncated but has no continuation token; refusing to work with a partial list".into(),
+            }),
+        };
+    }
+    Ok((out, None))
 }
 
 #[cfg(test)]
@@ -337,5 +426,24 @@ mod tests {
     fn query_encoding() {
         assert_eq!(canonical_query(&[("prefix".into(), "a b/c".into()), ("list-type".into(), "2".into())]), "list-type=2&prefix=a%20b%2Fc");
         assert_eq!(canonical_query(&[("retention".into(), String::new())]), "retention=");
+    }
+
+    /// Regression: a truncated page without a continuation token used to end the listing
+    /// with `Ok` and a partial list (prune then deleted objects of the missing snapshots).
+    #[test]
+    fn truncated_listing_without_token_is_an_error() {
+        let body = "<ListBucketResult><Contents><Key>p/snapshots/a.age</Key><Size>12</Size></Contents>\
+                    <IsTruncated>true</IsTruncated></ListBucketResult>";
+        let e = parse_list_page(body, "p/").unwrap_err();
+        assert_eq!(e.code, "IncompleteListing");
+        let ok = "<ListBucketResult><Contents><Key>p/objects/ab/x&amp;y</Key><LastModified>t</LastModified><Size>7</Size></Contents>\
+                  <Contents><Key>p/objects/cd/z</Key><Size>3</Size></Contents>\
+                  <IsTruncated>true</IsTruncated><NextContinuationToken>tok</NextContinuationToken></ListBucketResult>";
+        let (keys, next) = parse_list_page(ok, "p/").unwrap();
+        assert_eq!(keys, vec![("objects/ab/x&y".to_string(), 7), ("objects/cd/z".to_string(), 3)]);
+        assert_eq!(next.as_deref(), Some("tok"));
+        let last = "<ListBucketResult><IsTruncated>false</IsTruncated></ListBucketResult>";
+        let (k, n) = parse_list_page(last, "p/").unwrap();
+        assert!(k.is_empty() && n.is_none());
     }
 }

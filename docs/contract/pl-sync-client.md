@@ -30,16 +30,35 @@ Gegenstellen: PaperRust über API v2 (docs/contract/pl-api-v2.md, docs/api/v2.ya
    Vollabgleich. `perm_epoch` geändert oder letzter Vollabgleich > 24 h → Vollabgleich.
 3. Dokument-Änderungen im Feed: lokal vorhandene werden aus dem eingebetteten Objekt aktualisiert
    (`has_detail=0` bei neuem `rev` → Inhalt/Notizen werden per `batch` nachgeladen, Dateien bei
-   neuer Prüfsumme); `delete` (Löschen, Papierkorb, Rechteentzug) entfernt Zeile + Dateien.
+   neuer Prüfsumme); `delete` (Löschen, Papierkorb, Rechteentzug) entfernt **erst die Dateien, dann
+   die Zeilen** (`FileCache::purge_document`). Lässt sich eine Datei nicht löschen (z. B. unter Windows
+   von einem Betrachter gesperrt), verschwinden Metadaten und Dateizeile trotzdem, der Pfad bleibt aber
+   als `pending_delete` vermerkt (zählt weiter zur Cachegröße); das Dokument zählt dann nicht als
+   `documents_removed`, sondern als `documents_pending_delete`. Gleiches gilt für Vollabgleich,
+   `batch.missing`, Abwählen, nicht mehr gewünschte Varianten und LRU-Verdrängung.
    Enthält die Auswahl Tags/Ansichten, löst jede Dokument-/Tag-/Ansichtsänderung ein neues
    `resolve` aus (gedrosselt ≤ 1×/30 s; der Long-Poll wartet dann nur bis zum Ablauf der Drossel).
 4. `resolve` je Auswahleintrag (Einzeldokumente gemeinsam in einer Anfrage) → Plan (Vereinigung,
    Dateiwünsche je Dokument) → über der Grenze: Fehler `limit_exceeded`, nichts geändert.
+   Antwortet der Server für eine gespeicherte Ansicht mit `501` (Volltextregel, unbekannte Regelart),
+   wird **nur dieser Eintrag** übersprungen: `Plan.skipped` (`[{item, reason}]`, auch in der Antwort
+   von `PUT /local/selection`) und `SyncReport.skipped_entries`; der Rest der Auswahl wird abgeglichen
+   (früher brach der ganze Abgleich ab). Dokumente, die nur über diese Ansicht kamen, gelten als
+   abgewählt. Das Antwortfeld `skipped_saved_views` (neuere Server; fehlt es, gilt `[]`) wird
+   gelesen: nennt es die angefragte Ansicht, wird sie genauso übersprungen; sonst nur Warnung im Log.
    Abgewählte Dokumente: `in_selection=0` (Metadaten 7 Tage), Dateien sofort weg.
 5. `objects/batch` mit `include=content,notes` in Blöcken à 500 für neue/geänderte Dokumente.
 6. Dateien (4 parallel): Varianten nach Plan + Vorschaubild; vorhandene mit gleicher Prüfsumme bzw.
-   gleichem Vorschau-ETag ohne Anfrage; `files.thumbnail.etag = null` → keine Anfrage.
+   gleichem Vorschau-ETag ohne Anfrage; `files.thumbnail.etag = null` → keine Anfrage, ein lokales
+   Vorschaubild (Zeile + Datei) wird gelöscht (`Fetched::Removed`). Cachegrenze: jeder Download
+   reserviert die angekündigten Bytes (`Content-Length`) unter einer gemeinsamen Sperre im Speicher
+   (`Reservation`); schreibt er mehr (Länge fehlt oder falsch), wächst die Reservierung (≥ 256 KiB je
+   Schritt) oder er bricht mit `CacheFull` ab und die `.part`-Datei wird entfernt. Verdrängt werden
+   nur vollständige, nicht ausgewählte Dateien.
 7. Vollabgleich: `sync/ids` je Art → lokal Überzähliges löschen, abweichende `rev` per `batch`.
+8. Aufräumen nach jedem Lauf: abgewählte Dokumente nach 7 Tagen (Dateien zuerst), erneuter Versuch
+   aller `pending_delete`, Waisen-Suche im Cacheordner (`<root>/<shard>/<datei>` ohne Dateizeile und
+   ohne Vermerk → löschen; höchstens 1×/h, `set_orphan_sweep_interval`).
 
 **Abfragemodus:** Meldet der Server kein `sync`-Feature (Feed nicht eingehängt, `/sync/changes`
 → 501), arbeitet der Kern ohne Feed: Metadaten über `ids`+`batch`, Dokumente über `resolve`+`batch`,
@@ -53,7 +72,18 @@ alle 60 s (`Status.mode = "polling"`).
   als Spalten, `names` wird bei Umbenennung der Objekte neu berechnet;
 - zusätzlich `remote.device_uuid/last_contact/me_json/ui_settings`, `setting` (Grenzen),
   `file.state/checksum/pinned`, `document.added/storage_path/owner/mime_type/original_filename/
-  notes_json/has_detail/left_selection`; `outbox` (3b) schon angelegt.
+  notes_json/has_detail/left_selection`; `outbox` (3b) schon angelegt;
+- Migration 0004: Antwort-Cache je Konto – Schlüssel `<user_name><pfad?query>`; Antworten
+  werden vor dem Speichern von Zugangsdaten befreit (`auth_token`, `token`, `access_token`,
+  `refresh_token`, `password`, `secret`, `totp_secret`, `api_key`, rekursiv; Nicht-JSON mit solchem
+  Feld wird nicht gespeichert); die Migration löscht alle älteren (kontolosen) Einträge.
+- **Kontowechsel im selben Profil:** meldet sich ein anderes Konto an als das, dem das Replikat
+  gehört (`remote.user_name`; anderer Server → `server_uuid`, siehe Ablauf 1), werden vor dem
+  Freischalten (`logged_in`) Dokumente, Metadaten, Dateien, Auswahl, Antwort-Cache, `me_json`,
+  `ui_settings` und ngx-Zustand verworfen (`SyncClient::switch_owner`, unter der Abgleichsperre);
+  Grenzen bleiben. Gleiches Konto erneut → Daten bleiben.
+- Migration 0003: `pending_delete(path, doc, size, since, attempts)` – Cachedateien, deren Löschen
+  fehlschlug; `cache_bytes` = Summe `file.size` + `pending_delete.size`.
 
 ## `prapi://` für die Light-UI (S9 und 2b) – was die UI nutzen kann
 
@@ -208,7 +238,9 @@ Lokaler Testserver `paperrust serve` (Debug, Feed eingehängt) auf der Kopie `pl
 2. `added`/`modified`-Grenzen werden offline auf dem UTC-Datum verglichen (Server: Zeitzone).
 3. Tags im `DocQuery` exakt (wie `pl_docfilter`), Auflösung von Tag-Auswahlen mit Unter-Tags macht
    der Server (`resolve`).
-4. Thumbnails zählen nicht zur Bytes-Grenze (Größe unbekannt); Cachegrenze = `max_bytes` + 256 MiB.
+4. Thumbnails zählen nicht zur Bytes-Grenze der Auswahl (Größe unbekannt); Cachegrenze = `max_bytes`
+   + 256 MiB, dort zählen sie (Reservierung beim Download). Während eine Datei ersetzt wird, zählt die
+   alte Fassung bis zum Umbenennen nicht mit (kurzzeitig bis zu einer Dateigröße über der Grenze).
 5. Schlüsselbund nur Windows; macOS/Linux: Token nur im Speicher (Neuanmeldung je Start), bis
    `keyring`/Secret Service eingebunden ist.
 6. ≤ 4 Long-Polls je Token (SYNC.md §8) ist Server-Sache (noch offen in pl-api-v2).

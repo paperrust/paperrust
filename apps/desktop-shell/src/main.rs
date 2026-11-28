@@ -949,7 +949,16 @@ fn profile_logout(id: String, app: AppHandle, shared: tauri::State<'_, Arc<Share
     // P5: device token from the keychain (revocation on the server: UI via prapi /local/logout)
     sync::forget(&app, &id);
     if !is_active_running(&shared, &id) {
-        let _ = std::fs::remove_dir_all(dir.join("webview"));
+        // Inactive profile: delete now. If that fails (e.g. a file still locked), keep a logout
+        // marker so the next start retries, and tell the user instead of claiming success.
+        if let Err(e) = remove_webview_data(&dir) {
+            tracing::warn!(profile = %id, error = %e, "Abmelden: WebView-Daten nicht gelöscht, erneuter Versuch beim nächsten Start");
+            paperrust_desktop::perms::create_private_dir(&dir).map_err(|e| e.to_string())?;
+            std::fs::write(dir.join(LOGOUT_MARKER), b"logout").map_err(|e| e.to_string())?;
+            return Err(format!(
+                "Abgemeldet, aber die gespeicherten Anmeldedaten konnten nicht gelöscht werden ({e}). Sie werden beim nächsten Start erneut gelöscht."
+            ));
+        }
         tracing::info!(profile = %id, "abgemeldet (WebView-Daten gelöscht)");
         return Ok(());
     }
@@ -1725,9 +1734,35 @@ fn cleanup_profiles(paths: &AppPaths, cfg: &AppConfig) {
             tracing::info!(profile = %name, "verwaisten Profilordner entfernt");
             let _ = std::fs::remove_dir_all(&dir);
         } else if dir.join(LOGOUT_MARKER).exists() {
-            let r = std::fs::remove_dir_all(dir.join("webview"));
-            tracing::info!(profile = %name, ok = r.is_ok() || !dir.join("webview").exists(), "Abmelden: WebView-Daten gelöscht");
-            let _ = std::fs::remove_file(dir.join(LOGOUT_MARKER));
+            apply_logout_marker(&name, &dir);
+        }
+    }
+}
+
+/// Deletes the profile's WebView data; a missing folder counts as deleted.
+fn remove_webview_data(profile_dir: &std::path::Path) -> std::io::Result<()> {
+    match std::fs::remove_dir_all(profile_dir.join("webview")) {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e),
+        _ => Ok(()),
+    }
+}
+
+/// Executes a pending logout: the marker is removed only after the WebView data is really gone,
+/// otherwise it stays and the next start tries again. Returns whether the logout completed.
+fn apply_logout_marker(name: &str, dir: &std::path::Path) -> bool {
+    match remove_webview_data(dir) {
+        Ok(()) => {
+            tracing::info!(profile = %name, "Abmelden: WebView-Daten gelöscht");
+            if let Err(e) = std::fs::remove_file(dir.join(LOGOUT_MARKER))
+                && e.kind() != std::io::ErrorKind::NotFound
+            {
+                tracing::warn!(profile = %name, error = %e, "Abmelde-Markierung nicht entfernt");
+            }
+            true
+        }
+        Err(e) => {
+            tracing::warn!(profile = %name, error = %e, "Abmelden: WebView-Daten nicht gelöscht, erneuter Versuch beim nächsten Start");
+            false
         }
     }
 }
@@ -2716,6 +2751,29 @@ mod tests {
         assert!(keep.join("webview").is_dir());
         assert!(out.is_dir() && !out.join("webview").exists() && !out.join(LOGOUT_MARKER).exists());
         assert!(!orphan.exists());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn logout_marker_stays_until_webview_data_is_gone() {
+        // Regression: the marker was removed even when deleting the WebView data failed, so
+        // locked files stayed behind without a retry.
+        let dir = std::env::temp_dir().join(format!("p1-logout-retry-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        // a *file* named "webview" makes remove_dir_all fail on every platform
+        std::fs::write(dir.join("webview"), "not a directory").unwrap();
+        std::fs::write(dir.join(LOGOUT_MARKER), "x").unwrap();
+        assert!(remove_webview_data(&dir).is_err());
+        assert!(!apply_logout_marker("p", &dir));
+        assert!(dir.join(LOGOUT_MARKER).exists(), "marker kept for the next start");
+        // next start: deletion works now → marker removed
+        std::fs::remove_file(dir.join("webview")).unwrap();
+        std::fs::create_dir_all(dir.join("webview").join("EBWebView")).unwrap();
+        assert!(apply_logout_marker("p", &dir));
+        assert!(!dir.join("webview").exists() && !dir.join(LOGOUT_MARKER).exists());
+        // already gone counts as done
+        assert!(remove_webview_data(&dir).is_ok());
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

@@ -557,13 +557,7 @@ pub async fn merge_as_versions(
     // select_for_update().filter(id__in=…).order_by("id"). Since data model stage 1
     // (docs/DATAMODEL-V2.md §6) documents_document is a view with outer joins, on which
     // FOR UPDATE does not work → lock the rows of the native table.
-    let native: bool = sqlx::query_scalar(
-        "SELECT EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace           WHERE n.nspname = current_schema() AND c.relname = 'paperrust_document' AND c.relkind = 'r')",
-    )
-    .fetch_one(&mut *tx)
-    .await
-    .map_err(|e| e.to_string())?;
-    let table = if native { "paperrust_document" } else { "documents_document" };
+    let table = pl_authz::grants::document_lock_table(&mut tx).await.map_err(|e| e.to_string())?;
     let locked: Vec<i32> =
         sqlx::query_scalar(&format!("SELECT id FROM {table} WHERE id = ANY($1) AND deleted_at IS NULL ORDER BY id FOR UPDATE"))
             .bind(&ids32)

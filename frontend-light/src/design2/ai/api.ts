@@ -92,7 +92,13 @@ export interface AiOptions {
   custom_fields: number[]
   vision_enabled: boolean
   vision_model: string
+  /** Legacy (before 0.1.4); only used while `vision_mode` is empty. */
   vision_when: 'off' | 'difficult' | 'always'
+  /** KI-Abschrift mode; '' = derived from `vision_when`. */
+  vision_mode: '' | 'off' | 'uncertain_lines' | 'uncertain_pages' | 'always'
+  vision_sensitivity: 'sparing' | 'normal' | 'thorough'
+  /** Long side of whole-page images in pixels (512–4096, default 1540). */
+  vision_max_side: number
   vision_limits: VisionLimits
   tag_after: TagAfter
   backfill_per_minute: number
@@ -104,8 +110,16 @@ export interface FieldInfo {
   data_type: string
   supported: boolean
 }
-export const getOptions = () => api.get<{ options: AiOptions; custom_fields: FieldInfo[] }>('/api/x-ai/options/')
-export const patchOptions = (values: Partial<AiOptions>) => api.request<{ options: AiOptions; custom_fields: FieldInfo[] }>('PATCH', '/api/x-ai/options/', values)
+export interface OptionsResponse {
+  options: AiOptions
+  custom_fields: FieldInfo[]
+  /** Mode actually in effect (also when `options.vision_mode` is empty). */
+  vision_mode_effective?: Exclude<AiOptions['vision_mode'], ''>
+  /** The LLM endpoint is not on the local network (page images would leave the house); null = unknown. */
+  vision_remote?: boolean | null
+}
+export const getOptions = () => api.get<OptionsResponse>('/api/x-ai/options/')
+export const patchOptions = (values: Partial<AiOptions>) => api.request<OptionsResponse>('PATCH', '/api/x-ai/options/', values)
 
 export interface ConnectionCheck {
   ok: boolean

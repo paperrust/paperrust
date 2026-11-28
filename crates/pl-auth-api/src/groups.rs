@@ -237,6 +237,9 @@ async fn update_impl(state: AppState, raw_id: String, req: Request, partial: boo
     let data = r.data().await?;
     let input = validate_group(db, &data, partial, Some(id)).await?;
     let mut tx = db.begin().await?;
+    // Group permissions and memberships change under the group row lock (see pl-api-v2 folders
+    // `fresh_caller`, which locks the caller's groups FOR SHARE).
+    lock_group_row(&mut tx, id).await?;
     if let Some(name) = input.name {
         let (sql, values) = Query::update()
             .table(a("auth_group"))
@@ -289,6 +292,9 @@ pub async fn destroy(State(state): State<AppState>, Path(id): Path<String>, req:
         let db = state.db();
         let id = get_object_id(db, &id).await?;
         let mut tx = db.begin().await?;
+        // Group permissions and memberships change under the group row lock (see pl-api-v2 folders
+        // `fresh_caller`, which locks the caller's groups FOR SHARE).
+        lock_group_row(&mut tx, id).await?;
         for table in GROUP_REFERENCES {
             let (sql, values) = Query::delete()
                 .from_table(a(table))
@@ -330,6 +336,12 @@ pub async fn destroy(State(state): State<AppState>, Path(id): Path<String>, req:
         Ok(pl_core::json::drf_no_content())
     }
     .await)
+}
+
+/// Row lock taken by every writer of this group's rights (see pl-api-v2 folders `fresh_caller`).
+async fn lock_group_row(tx: &mut sqlx::PgConnection, id: i64) -> Result<(), sqlx::Error> {
+    sqlx::query("SELECT 1 FROM auth_group WHERE id = $1::int8 FOR UPDATE").bind(id).execute(&mut *tx).await?;
+    Ok(())
 }
 
 #[cfg(test)]

@@ -109,6 +109,23 @@ pub fn document_row_table() -> &'static str {
     if native() { "paperrust_document" } else { "documents_document" }
 }
 
+/// Table for row locks on documents (`SELECT … FOR SHARE / FOR NO KEY UPDATE`). From data model stage 1
+/// `documents_document` is a view with an outer join, on which PostgreSQL refuses row locks
+/// ("cannot be applied to the nullable side of an outer join"), so locks must go to the base table
+/// `paperrust_document`. [`document_row_table`] still names the view while the refresher has not seen
+/// stage 4 (right after start, or stages 1-3 only); then the catalog decides (one cheap lookup).
+pub async fn document_lock_table(conn: &mut sqlx::PgConnection) -> Result<&'static str, sqlx::Error> {
+    if native() {
+        return Ok("paperrust_document");
+    }
+    let base: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace          WHERE n.nspname = current_schema() AND c.relname = 'paperrust_document' AND c.relkind = 'r')",
+    )
+    .fetch_one(&mut *conn)
+    .await?;
+    Ok(if base { "paperrust_document" } else { "documents_document" })
+}
+
 /// (kind, bit) of a permission in the native grid (`paperrust_grant_perm`), `None` outside it.
 fn native_kind_bit(model: &ObjectModel, perm: &str) -> Option<(i16, i16)> {
     let kind = native_kind(model)?;

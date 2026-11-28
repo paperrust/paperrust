@@ -744,6 +744,16 @@ impl TaskQueue for PgQueue {
         })
     }
 
+    fn enqueue_in_conn<'a>(
+        &'a self,
+        conn: &'a mut PgConnection,
+        task_name: &'a str,
+        kwargs: Map<String, Value>,
+        opts: EnqueueOptions,
+    ) -> BoxFuture<'a, Result<Uuid, QueueError>> {
+        Box::pin(self.enqueue_in(conn, task_name, kwargs, opts))
+    }
+
     fn status(&self, task_id: Uuid) -> BoxFuture<'_, Result<Option<TaskInfo>, QueueError>> {
         Box::pin(self.status_impl(task_id))
     }

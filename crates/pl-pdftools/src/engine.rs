@@ -57,12 +57,18 @@ fn save(doc: &Document, object_streams: bool) -> R<Vec<u8>> {
 /// Run a job.
 pub fn run(op: Op) -> Reply {
     let r = match op {
-        Op::Redact { input, output, areas, terms, remove_metadata } => {
-            redact(&input, &output, &areas, &terms, remove_metadata).map(Reply::Redacted)
+        Op::Redact { input, output, areas, terms, remove_metadata, ocr_input } => {
+            redact(&input, &output, &areas, &terms, remove_metadata, ocr_input.as_deref()).map(Reply::Redacted)
         }
-        Op::Search { input, terms, max_hits } => read_input(&input)
+        Op::Search { input, terms, max_hits, ocr_input } => read_input(&input)
             .and_then(open)
-            .and_then(|doc| search(&doc, &terms, max_hits))
+            .and_then(|doc| {
+                let ocr = match ocr_input.as_deref() {
+                    Some(p) => Some(open(read_input(p)?)?),
+                    None => None,
+                };
+                search_with_ocr(&doc, ocr.as_ref(), &terms, max_hits)
+            })
             .map(|(hits, truncated)| Reply::Hits { hits, truncated }),
         Op::Shrink { input, output, preset } => shrink(&input, &output, preset).map(Reply::Shrunk),
         Op::Repair { input, output } => repair(&input, &output).map(Reply::Repaired),
@@ -83,8 +89,8 @@ pub fn run(op: Op) -> Reply {
 
 // ------------------------------------------------------------------ Search
 
-/// Search terms on all pages. Matches within one line (terms across a
-/// line break are not found).
+/// Search terms on all pages of the text layer, per page across line breaks (see
+/// [`matching::page_matches`]: whitespace, terms split over lines, line-end hyphenation).
 pub fn search(doc: &Document, terms: &[String], max_hits: usize) -> R<(Vec<Hit>, bool)> {
     let terms: Vec<&str> = terms.iter().map(|t| t.trim()).filter(|t| !t.is_empty()).collect();
     let mut hits = Vec::new();
@@ -94,22 +100,56 @@ pub fn search(doc: &Document, terms: &[String], max_hits: usize) -> R<(Vec<Hit>,
     let pages = pdfcraft_model::pages(doc).len();
     for page in 0..pages {
         let lines = pdfcraft_edit::text_lines(doc, page).map_err(|e| EngineError(format!("page {} can't be read: {e}", page + 1)))?;
-        for line in &lines {
-            for term in &terms {
-                for range in matching::find_ranges(&line.text, term) {
-                    if hits.len() >= max_hits {
-                        return Ok((hits, true));
-                    }
-                    let rects = matching::rects_for(&line.text, line.rect, &line.ink, range)
-                        .into_iter()
-                        .map(|r| matching::padded(r, 0.5))
-                        .collect();
-                    hits.push(Hit { page, term: (*term).to_string(), context: line.text.chars().take(200).collect(), rects });
-                }
+        let refs: Vec<matching::Line<'_>> = lines.iter().map(|l| matching::Line { text: &l.text, rect: l.rect, ink: &l.ink }).collect();
+        for m in matching::page_matches(&refs, &terms) {
+            if hits.len() >= max_hits {
+                return Ok((hits, true));
             }
+            let term = terms.get(m.term).copied().unwrap_or_default().to_string();
+            hits.push(Hit { page, term, context: m.context, rects: m.rects, from_ocr: false });
         }
     }
     Ok((hits, false))
+}
+
+fn geoms(doc: &Document) -> Vec<matching::PageGeom> {
+    pdfcraft_model::pages(doc).iter().map(|p| matching::PageGeom { view: p.view_matrix(doc), size: p.display_size(doc) }).collect()
+}
+
+const OCR_MISMATCH: &str = "The OCR text layer (archive PDF) does not match the pages of the original; nothing was changed.";
+
+/// Map rectangles of page `page` between two documents' geometries (fail-closed).
+fn map_rects(rects: &[[f64; 4]], page: usize, from: &[matching::PageGeom], to: &[matching::PageGeom]) -> R<Vec<[f64; 4]>> {
+    let (Some(f), Some(t)) = (from.get(page), to.get(page)) else { return Err(EngineError(OCR_MISMATCH.into())) };
+    rects.iter().map(|r| matching::map_rect(*r, f, t).ok_or_else(|| EngineError(OCR_MISMATCH.into()))).collect()
+}
+
+/// Hits in the OCR text layer, rectangles mapped onto the original's pages. The page count must
+/// be the same, and every page with a hit must show the same picture (aspect ratio).
+fn ocr_hits(doc: &Document, ocr: &Document, terms: &[String], max_hits: usize) -> R<(Vec<Hit>, bool)> {
+    let (go, ga) = (geoms(doc), geoms(ocr));
+    if go.len() != ga.len() {
+        return Err(EngineError(OCR_MISMATCH.into()));
+    }
+    let (mut hits, truncated) = search(ocr, terms, max_hits)?;
+    for h in &mut hits {
+        h.rects = map_rects(&h.rects, h.page, &ga, &go)?;
+        h.from_ocr = true;
+    }
+    Ok((hits, truncated))
+}
+
+/// Search in the original and – if given – in the OCR text layer of the same pages (archive PDF):
+/// **per page both**, so a document with text pages and scanned pages gets the hits of both kinds.
+/// Archive hits that coincide with an original hit are reported once.
+pub fn search_with_ocr(doc: &Document, ocr: Option<&Document>, terms: &[String], max_hits: usize) -> R<(Vec<Hit>, bool)> {
+    let (hits, truncated) = search(doc, terms, max_hits)?;
+    let Some(ocr) = ocr else { return Ok((hits, truncated)) };
+    let (from_ocr, t2) = ocr_hits(doc, ocr, terms, max_hits)?;
+    let mut merged = matching::merge_hits(hits, from_ocr);
+    let truncated = truncated || t2 || merged.len() > max_hits;
+    merged.truncate(max_hits);
+    Ok((merged, truncated))
 }
 
 // ------------------------------------------------------------------ Redaction
@@ -122,9 +162,24 @@ fn add_mark(doc: &mut Document, page: usize, rects: &[[f64; 4]]) -> R<()> {
     Ok(())
 }
 
-/// Redact areas and terms. Fail-closed: if the verification afterwards still finds a term,
-/// nothing is written.
-pub fn redact(input: &str, output: &str, areas: &[Area], terms: &[String], remove_metadata: bool) -> R<RedactReport> {
+const NOT_VERIFIED: &str = "The redaction could not be verified (a search term is still readable); nothing was changed.";
+
+/// Internal hit limit of a redaction (above: error, nothing changed).
+const REDACT_MAX_HITS: usize = 10_000;
+
+/// Redact areas and terms. Terms are searched per page in the original's text layer **and** in the
+/// OCR text layer (`ocr_input`, archive PDF), every hit of both is redacted on the original (on a
+/// scanned page that is the image area under the OCR word boxes). Fail-closed: the written result
+/// is searched again (across line breaks), and the same marks are applied to a copy of the OCR text
+/// layer which must not contain a term any more either; otherwise nothing is written.
+pub fn redact(
+    input: &str,
+    output: &str,
+    areas: &[Area],
+    terms: &[String],
+    remove_metadata: bool,
+    ocr_input: Option<&str>,
+) -> R<RedactReport> {
     let mut doc = open(read_input(input)?)?;
     let pages = pdfcraft_model::pages(&doc).len();
     let mut report = RedactReport::default();
@@ -142,14 +197,26 @@ pub fn redact(input: &str, output: &str, areas: &[Area], terms: &[String], remov
         }
         by_page.entry(a.page).or_default().push(matching::padded(a.rect, 0.0));
     }
-    let (hits, truncated) = search(&doc, terms, 10_000)?;
-    if truncated {
+    // OCR text layer only matters for terms
+    let ocr_bytes = match ocr_input {
+        Some(p) if terms.iter().any(|t| !t.trim().is_empty()) => Some(read_input(p)?),
+        _ => None,
+    };
+    let ocr = ocr_bytes.as_ref().map(|b| open(b.clone())).transpose()?;
+    let (hits, truncated) = search(&doc, terms, REDACT_MAX_HITS)?;
+    let (from_ocr, t2) = match &ocr {
+        Some(o) => ocr_hits(&doc, o, terms, REDACT_MAX_HITS)?,
+        None => (Vec::new(), false),
+    };
+    if truncated || t2 {
         return Err(EngineError("Too many matches for the search terms; nothing was changed.".into()));
     }
-    report.term_hits = hits.len();
-    for h in &hits {
+    // every rectangle of both kinds is marked (also duplicates: a slightly different OCR box
+    // must not be dropped); the report counts each occurrence once
+    for h in hits.iter().chain(&from_ocr) {
         by_page.entry(h.page).or_default().extend(h.rects.iter().copied());
     }
+    report.term_hits = matching::merge_hits(hits, from_ocr).len();
     if by_page.is_empty() && !remove_metadata {
         return Err(EngineError("There is nothing to redact (no areas and no matches).".into()));
     }
@@ -184,18 +251,49 @@ pub fn redact(input: &str, output: &str, areas: &[Area], terms: &[String], remov
         }
     }
     let bytes = save(&doc, true)?;
-    // Verification on the written result: no search term may be findable any more.
+    // Verification 1 on the written result: no search term may be findable any more (also not
+    // across line breaks).
     if !terms.is_empty() {
         let check = open(bytes.clone())?;
         let (left, _) = search(&check, terms, 1)?;
         if !left.is_empty() {
-            return Err(EngineError("The redaction could not be verified (a search term is still readable); nothing was changed.".into()));
+            return Err(EngineError(NOT_VERIFIED.into()));
         }
+    }
+    // Verification 2 for scanned pages (no text layer in the result): the same marks, mapped onto
+    // the OCR text layer, must remove every OCR occurrence there.
+    if let (Some(b), Some(o)) = (ocr_bytes, &ocr) {
+        verify_ocr(b, &geoms(&doc), &geoms(o), &by_page, terms)?;
     }
     write_output(output, &bytes)?;
     Ok(report)
 }
 
+/// Apply `by_page` (original coordinates) to a fresh copy of the OCR text layer and search it again.
+fn verify_ocr(
+    ocr_bytes: Vec<u8>,
+    g_orig: &[matching::PageGeom],
+    g_ocr: &[matching::PageGeom],
+    by_page: &std::collections::BTreeMap<usize, Vec<[f64; 4]>>,
+    terms: &[String],
+) -> R<()> {
+    let mut copy = open(ocr_bytes)?;
+    if !pdfcraft_redact::marks(&copy).is_empty() {
+        pdfcraft_redact::clear_marks(&mut copy, None)?;
+    }
+    for (page, rects) in by_page {
+        add_mark(&mut copy, *page, &map_rects(rects, *page, g_orig, g_ocr)?)?;
+    }
+    if !by_page.is_empty() {
+        pdfcraft_redact::apply(&mut copy, None).map_err(|_| EngineError(NOT_VERIFIED.into()))?;
+    }
+    let check = open(save(&copy, false)?)?;
+    let (left, _) = search(&check, terms, 1)?;
+    if !left.is_empty() {
+        return Err(EngineError(NOT_VERIFIED.into()));
+    }
+    Ok(())
+}
 // ------------------------------------------------------------------ Shrinking
 
 fn settings_for(preset: ShrinkPreset) -> pdfcraft_optimize::Settings {

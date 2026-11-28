@@ -33,6 +33,9 @@ pub fn paperrust_migrations() -> Vec<(&'static str, &'static str)> {
     // tests/chaos C6: without 0003, paperrust_ai_prompt/_option/_job were missing after `manage migrate` (only the
     // server start created them) – a restore via document_importer lost their content.
     v.push(("pl_ai.0003_paperrust_ai_prompts_jobs", include_str!("../../pl-ai/migrations/0003_paperrust_ai_prompts_jobs.sql")));
+    // KI-Abschrift transcripts (docs/OCR-NEXT.md 2.8); the foreign key picks paperrust_document after the conversion.
+    v.push(("pl_ai.0004_paperrust_ai_transcript", include_str!("../../pl-ai/migrations/0004_paperrust_ai_transcript.sql")));
+    v.push(("pl_ai.0005_paperrust_ai_job_lease", include_str!("../../pl-ai/migrations/0005_paperrust_ai_job_lease.sql")));
     // Sync change capture (P2, docs/SYNC.md §2): side tables + AFTER triggers.
     v.extend_from_slice(pl_sync::migrations::ALL);
     // Device tokens (P3b, pl-authz): paperrust_device_token.
@@ -721,19 +724,56 @@ pub async fn showmigrations(argv: Vec<String>) -> CliResult {
         }
     }
     if filter.is_empty() {
-        let pending = pending_paperrust(&mut conn).await.unwrap_or_default();
-        println!("paperrust");
-        for (n, _) in paperrust_migrations() {
-            let x = if pending.iter().any(|p| p == n) { " " } else { "X" };
-            println!(" [{x}] {n}");
+        for l in paperrust_show_lines(pending_paperrust(&mut conn).await)? {
+            println!("{l}");
         }
     }
     Ok(())
 }
 
+/// The `paperrust` block of `showmigrations`. A failed query for the pending migrations is an
+/// error (review finding 8): showing every migration as applied would hide a broken state.
+fn paperrust_show_lines(pending: CliResult<Vec<String>>) -> CliResult<Vec<String>> {
+    let pending = pending?;
+    let mut out = vec!["paperrust".to_string()];
+    for (n, _) in paperrust_migrations() {
+        let x = if pending.iter().any(|p| p == n) { " " } else { "X" };
+        out.push(format!(" [{x}] {n}"));
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Regression (2026-11-25): pl-ai 0004 was only applied by the server start, i.e. after the
+    /// data model stages, and failed there ("documents_document" is a view). Every AI migration the
+    /// server applies must also run in `manage migrate`, with the same SQL.
+    #[cfg(feature = "ai")]
+    #[test]
+    fn every_ai_migration_is_part_of_manage_migrate() {
+        let ours = paperrust_migrations();
+        for (name, sql) in pl_ai::server::migrations::ALL {
+            let want = format!("pl_ai.{name}");
+            let found = ours.iter().find(|(n, _)| *n == want);
+            assert!(found.is_some(), "{want} missing in paperrust_migrations()");
+            assert_eq!(found.map(|(_, s)| *s), Some(*sql), "{want}: different SQL");
+        }
+    }
+
+    /// Review finding 8: a failed pending query must not print every migration as `[X]` and exit
+    /// successfully.
+    #[test]
+    fn showmigrations_propagates_pending_query_error() {
+        let r = paperrust_show_lines(Err(CliError::Other("relation paperrust_migrations: permission denied".into())));
+        assert!(r.is_err(), "error swallowed: {r:?}");
+        let all: Vec<String> = paperrust_migrations().into_iter().map(|(n, _)| n.to_string()).collect();
+        let lines = paperrust_show_lines(Ok(all[..1].to_vec())).unwrap();
+        assert_eq!(lines[0], "paperrust");
+        assert_eq!(lines[1], format!(" [ ] {}", all[0]));
+        assert!(lines[2..].iter().all(|l| l.starts_with(" [X] ")));
+    }
 
     fn present_all() -> BTreeSet<(String, String)> {
         baseline::migrations_applied().into_iter().collect()

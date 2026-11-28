@@ -89,7 +89,9 @@ pub async fn lock_documents_sorted(conn: &mut PgConnection, ids: &[i64]) -> Resu
     if ids32.is_empty() {
         return Ok(());
     }
-    let sql = format!("SELECT id FROM {} WHERE id = ANY($1) ORDER BY id FOR NO KEY UPDATE", pl_authz::grants::document_row_table());
+    // not `document_row_table()`: before the refresher has seen stage 4 that is the view, which refuses row locks
+    let table = pl_authz::grants::document_lock_table(&mut *conn).await?;
+    let sql = format!("SELECT id FROM {table} WHERE id = ANY($1) ORDER BY id FOR NO KEY UPDATE");
     sqlx::query(&sql).bind(&ids32).execute(&mut *conn).await?;
     Ok(())
 }

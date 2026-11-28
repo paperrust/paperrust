@@ -5,10 +5,11 @@
 //! src/documents/bulk_download.py@v3.4.2 (`OriginalsOnlyStrategy`, `ArchiveOnlyStrategy`,
 //! `_filename_only`), src/documents/models.py@v3.4.2 (`ShareLinkBundle.remove_file`).
 //!
-//! Flow as upstream: remove old file, status `processing` + clear fields, write documents
-//! (`bundle.documents.all()` = without deleted, ordered by pk) into a ZIP_DEFLATED file in
-//! `SCRATCH_DIR` (`tmp….zip`), move to `SHARE_LINK_BUNDLE_DIR/<slug>.zip`,
-//! status `ready`. Error → status `failed`, `last_error` = `{bundle_id, exception_type,
+//! Flow as upstream, except that the old file is kept until the new one replaces it: status
+//! `processing` + clear fields (not `file_path`), write documents (`bundle.documents.all()` =
+//! without deleted, ordered by pk) into a ZIP_DEFLATED file in `SCRATCH_DIR` (`tmp….zip`), move
+//! it atomically over `SHARE_LINK_BUNDLE_DIR/<slug>.zip`, status `ready`. Error → old file
+//! removed, `file_path` cleared, status `failed`, `last_error` = `{bundle_id, exception_type,
 //! message, timestamp}`, task fails (`raise`).
 
 use std::collections::HashSet;
@@ -137,16 +138,32 @@ async fn build(state: &AppState, slug: &str, docs: &[DocRow], archive_strategy: 
     std::fs::create_dir_all(out_dir).map_err(|e| io_failure(&e, out_dir))?;
     let file_name = format!("{slug}.zip");
     let final_path = out_dir.join(&file_name);
-    if final_path.exists() {
-        std::fs::remove_file(&final_path).map_err(|e| io_failure(&e, &final_path))?;
-    }
-    // shutil.move: rename, across file systems copy + unlink
-    if std::fs::rename(tmp, &final_path).is_err() {
-        std::fs::copy(tmp, &final_path).map_err(|e| io_failure(&e, tmp))?;
-        let _ = std::fs::remove_file(tmp);
-    }
+    install_zip(tmp, &final_path)?;
     let size = std::fs::metadata(&final_path).map_err(|e| io_failure(&e, &final_path))?.len();
     Ok((file_name, size as i64))
+}
+
+/// Puts the finished ZIP at `final_path`, replacing an existing file atomically (rename over
+/// it), so the previous ZIP stays intact until the new one is complete. Upstream unlinks the old
+/// file first and then `shutil.move`s (a window without a file; on a failed copy the share is
+/// gone). Across file systems the ZIP is first copied next to the target, then renamed.
+fn install_zip(tmp: &Path, final_path: &Path) -> Result<(), TaskFailure> {
+    if std::fs::rename(tmp, final_path).is_ok() {
+        return Ok(());
+    }
+    let dir = final_path.parent().unwrap_or_else(|| Path::new("."));
+    let name = final_path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let part = dir.join(format!(".{name}.part-{}", &uuid::Uuid::new_v4().simple().to_string()[..8]));
+    if let Err(e) = std::fs::copy(tmp, &part) {
+        let _ = std::fs::remove_file(&part);
+        return Err(io_failure(&e, tmp));
+    }
+    if let Err(e) = std::fs::rename(&part, final_path) {
+        let _ = std::fs::remove_file(&part);
+        return Err(io_failure(&e, final_path));
+    }
+    let _ = std::fs::remove_file(tmp);
+    Ok(())
 }
 
 /// `build_share_link_bundle(bundle_id)`. `Ok(())` also if the bundle no longer exists
@@ -162,10 +179,11 @@ pub async fn build_share_link_bundle(state: &AppState, bundle_id: i64) -> Result
         tracing::warn!(target: "paperless.tasks", "Share link bundle {bundle_id} no longer exists.");
         return Ok(());
     };
-    crate::bundles::remove_file(&state.config().share_link_bundle_dir, &file_path);
+    // PaperRust: the old ZIP (and `file_path`) stay until the new one replaces it (upstream
+    // removes it here); the share answers 202 while `processing` anyway.
     sqlx::query(
         "UPDATE documents_sharelinkbundle SET status = 'processing', last_error = NULL, size_bytes = NULL, \
-         built_at = NULL, file_path = '' WHERE id = $1::int8",
+         built_at = NULL WHERE id = $1::int8",
     )
     .bind(bundle_id)
     .execute(db)
@@ -201,6 +219,9 @@ pub async fn build_share_link_bundle(state: &AppState, bundle_id: i64) -> Result
             .bind(Utc::now())
             .execute(db)
             .await?;
+            if !file_path.is_empty() && file_path != file_name {
+                crate::bundles::remove_file(&state.config().share_link_bundle_dir, &file_path);
+            }
             tracing::info!(target: "paperless.tasks", "Built share link bundle {bundle_id}");
             Ok(())
         }
@@ -213,7 +234,9 @@ pub async fn build_share_link_bundle(state: &AppState, bundle_id: i64) -> Result
                 "message": f.message,
                 "timestamp": pl_core::datetime::python_isoformat(&Utc::now()),
             });
-            sqlx::query("UPDATE documents_sharelinkbundle SET status = 'failed', last_error = $2 WHERE id = $1::int8")
+            // End state as upstream: a failed bundle has no file.
+            crate::bundles::remove_file(&state.config().share_link_bundle_dir, &file_path);
+            sqlx::query("UPDATE documents_sharelinkbundle SET status = 'failed', last_error = $2, file_path = '' WHERE id = $1::int8")
                 .bind(bundle_id)
                 .bind(&last_error)
                 .execute(db)
@@ -243,6 +266,28 @@ mod tests {
         let f = io_failure(&e, Path::new("/m/o/1.pdf"));
         assert_eq!(f.exception_type, "FileNotFoundError");
         assert_eq!(f.message, "[Errno 2] No such file or directory: '/m/o/1.pdf'");
+    }
+
+    /// Review: the old ZIP was deleted before the new one was in place; a failed move left no
+    /// file at all. Now a failed install keeps the old ZIP, a successful one replaces it.
+    #[test]
+    fn install_zip_keeps_old_file_on_failure_and_replaces_on_success() {
+        let dir = std::env::temp_dir().join(format!("pl-fv-install-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let final_path = dir.join("slug.zip");
+        std::fs::write(&final_path, b"old").unwrap();
+        let missing = dir.join("does-not-exist.zip");
+        assert!(install_zip(&missing, &final_path).is_err());
+        assert_eq!(std::fs::read(&final_path).unwrap(), b"old");
+        let tmp = dir.join("tmp1.zip");
+        std::fs::write(&tmp, b"new").unwrap();
+        install_zip(&tmp, &final_path).unwrap();
+        assert_eq!(std::fs::read(&final_path).unwrap(), b"new");
+        assert!(!tmp.exists());
+        let names: Vec<_> = std::fs::read_dir(&dir).unwrap().map(|e| e.unwrap().file_name()).collect();
+        assert_eq!(names, vec![std::ffi::OsString::from("slug.zip")], "no leftover part files");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

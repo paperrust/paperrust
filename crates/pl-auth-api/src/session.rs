@@ -20,7 +20,9 @@ use sqlx::PgPool;
 
 use pl_core::AppState;
 
-use crate::http::{HResult, server_error};
+use pl_core::ApiError;
+
+use crate::http::{HErr, HResult, server_error};
 
 /// `cached_db.KEY_PREFIX`.
 pub const CACHE_KEY_PREFIX: &str = "django.contrib.sessions.cached_db";
@@ -32,10 +34,17 @@ fn random_key() -> String {
     (0..32).map(|_| CHARS[rng.gen_range(0..CHARS.len())] as char).collect()
 }
 
-/// `get_expiry_age()` (no `_session_expiry` → `SESSION_COOKIE_AGE`).
+/// `get_expiry_age()`: no `_session_expiry` **or a falsy one** (`None`, `0`: "until the
+/// browser closes", `set_expiry(0)`) → `SESSION_COOKIE_AGE` (`if not expiry: return
+/// self.get_session_cookie_age()`). Only the cookie becomes a session cookie for `0`
+/// ([`expire_at_browser_close`]); the DB row keeps the normal server-side lifetime.
 pub fn expiry_age(data: &Map<String, Value>, cookie_age: i64, now: DateTime<Utc>) -> i64 {
     match data.get("_session_expiry") {
-        Some(Value::Number(n)) => n.as_i64().unwrap_or(cookie_age),
+        Some(Value::Number(n)) => match n.as_i64() {
+            Some(0) | None => cookie_age,
+            Some(secs) => secs,
+        },
+        Some(Value::String(iso)) if iso.is_empty() => cookie_age,
         Some(Value::String(iso)) => {
             DateTime::parse_from_rfc3339(iso).map(|d| (d.with_timezone(&Utc) - now).num_seconds().max(0)).unwrap_or(cookie_age)
         }
@@ -58,6 +67,43 @@ pub fn session_cookie(name: &str, key: &str, age: i64, at_browser_close: bool, n
     } else {
         let expires = (now + Duration::seconds(age)).format("%a, %d %b %Y %H:%M:%S GMT");
         format!("{name}={key}; expires={expires}; HttpOnly; Max-Age={age}; Path=/; SameSite=Lax")
+    }
+}
+
+/// Saving an **existing** session: `db.SessionStore.save(must_create=False)` =
+/// `obj.save(force_update=True)`. UPDATE only, never an upsert: if the row was deleted
+/// meanwhile (logout/flush in a concurrent request), the old key must not be resurrected
+/// with the old login data.
+pub const UPDATE_SESSION_SQL: &str = "UPDATE django_session SET session_data = $2, expire_date = $3 WHERE session_key = $1";
+
+/// Creating a session under a fresh key: `create()` = `save(must_create=True)` (force_insert;
+/// on a key collision retry with a new key).
+pub const CREATE_SESSION_SQL: &str =
+    "INSERT INTO django_session (session_key, session_data, expire_date) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING";
+
+/// Outcome of [`save_row`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Saved {
+    /// Row written under this key.
+    Key(String),
+    /// The existing row is gone (`UpdateError`); nothing was written.
+    Interrupted,
+}
+
+/// Write the session row: `key = Some(k)` → UPDATE of the existing row only
+/// ([`UPDATE_SESSION_SQL`]), `None` → new random key ([`CREATE_SESSION_SQL`]).
+/// A new key is never created implicitly for a vanished existing session.
+pub async fn save_row(db: &PgPool, key: Option<&str>, encoded: &str, expire: DateTime<Utc>) -> Result<Saved, sqlx::Error> {
+    if let Some(k) = key {
+        let r = sqlx::query(UPDATE_SESSION_SQL).bind(k).bind(encoded).bind(expire).execute(db).await?;
+        return Ok(if r.rows_affected() == 1 { Saved::Key(k.to_string()) } else { Saved::Interrupted });
+    }
+    loop {
+        let k = random_key();
+        let r = sqlx::query(CREATE_SESSION_SQL).bind(&k).bind(encoded).bind(expire).execute(db).await?;
+        if r.rows_affected() == 1 {
+            return Ok(Saved::Key(k));
+        }
     }
 }
 
@@ -96,35 +142,12 @@ pub async fn set_session_value(state: &AppState, headers: &HeaderMap, key: &str,
     let json = pl_authz::signing::python_json_dumps(&Value::Object(data.clone()));
     let encoded = pl_authz::signing::encode_session(&json, &cfg.secret_key, now.timestamp());
     let expire = now + Duration::seconds(age);
-    let saved_key = match session_key {
-        Some(k) => {
-            sqlx::query(
-                "INSERT INTO django_session (session_key, session_data, expire_date) VALUES ($1, $2, $3) \
-                 ON CONFLICT (session_key) DO UPDATE SET session_data = EXCLUDED.session_data, expire_date = EXCLUDED.expire_date",
-            )
-            .bind(&k)
-            .bind(&encoded)
-            .bind(expire)
-            .execute(db)
-            .await?;
-            k
-        }
-        None => loop {
-            let k = random_key();
-            let r = sqlx::query(
-                "INSERT INTO django_session (session_key, session_data, expire_date) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
-            )
-            .bind(&k)
-            .bind(&encoded)
-            .bind(expire)
-            .execute(db)
-            .await?;
-            if r.rows_affected() == 1 {
-                break k;
-            }
-        },
+    let saved_key = match save_row(db, session_key.as_deref(), &encoded, expire).await? {
+        Saved::Key(k) => k,
+        // SessionMiddleware: `UpdateError` -> `SessionInterrupted` (a `BadRequest`) -> 400 page.
+        Saved::Interrupted => return Err(HErr::Api(ApiError::django_bad_request())),
     };
-    // cached_db: `cache.delete(cache_key)` (lokal: Prozess-Cache; `PAPERRUST_CACHE=postgres`: gemeinsame Tabelle)
+    // cached_db: `cache.delete(cache_key)` (local: process cache; `PAPERRUST_CACHE=postgres`: shared table)
     state.cache().delete(&format!("{CACHE_KEY_PREFIX}{saved_key}")).await.map_err(|e| server_error(format!("session cache: {e:?}")))?;
     let at_close = expire_at_browser_close(&data, cfg.session_expire_at_browser_close);
     Ok(session_cookie(&cfg.session_cookie_name, &saved_key, age, at_close, now))
@@ -159,7 +182,22 @@ mod tests {
         assert_eq!(expiry_age(&d, 100, now), 100);
         assert!(!expire_at_browser_close(&d, false));
         d.insert("_session_expiry".into(), Value::from(0));
-        assert_eq!(expiry_age(&d, 100, now), 0);
+        // Django `get_expiry_age`: `if not expiry` → SESSION_COOKIE_AGE (DB row stays valid);
+        // only the cookie is a browser-session cookie.
+        assert_eq!(expiry_age(&d, 100, now), 100);
         assert!(expire_at_browser_close(&d, false));
+        d.insert("_session_expiry".into(), Value::Null);
+        assert_eq!(expiry_age(&d, 100, now), 100);
+        d.insert("_session_expiry".into(), Value::from(42));
+        assert_eq!(expiry_age(&d, 100, now), 42);
+        assert!(!expire_at_browser_close(&d, false));
+    }
+
+    /// Review finding (logout race): saving an existing session must never insert/upsert.
+    #[test]
+    fn existing_session_is_saved_with_update_only() {
+        let sql = UPDATE_SESSION_SQL.to_ascii_uppercase();
+        assert!(sql.starts_with("UPDATE "), "{sql}");
+        assert!(!sql.contains("INSERT") && !sql.contains("ON CONFLICT"), "{sql}");
     }
 }

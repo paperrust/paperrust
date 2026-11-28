@@ -877,11 +877,26 @@ pub async fn import(c: &Ctx, o: &ImportOptions) -> CliResult {
         let _ = tx.rollback().await;
         return Err(e);
     }
-    tx.commit().await?;
 
+    // PaperRust (Known difference): copy the files BEFORE the commit, still inside the transaction
+    // (upstream commits first, so a failed copy - disk full, unreadable export - leaves documents
+    // without files). On a copy or commit failure the files this run created are removed again.
+    let mut created: Vec<PathBuf> = Vec::new();
     if !o.data_only {
-        import_files(c, &dir, &paths).await?;
-    } else {
+        let copied = import_files(c, &mut tx, &dir, &paths, &mut created).await;
+        if let Err(e) = copied {
+            println!("Copying the files failed; the database import was rolled back");
+            let _ = tx.rollback().await;
+            report_cleanup(&remove_created(&created));
+            return Err(e);
+        }
+    }
+    if let Err(e) = tx.commit().await {
+        println!("Database commit failed");
+        report_cleanup(&remove_created(&created));
+        return Err(e.into());
+    }
+    if o.data_only {
         println!("Data only import completed");
     }
 
@@ -1031,14 +1046,71 @@ fn decrypt_record(f: &Fernet, rec: &mut Value) -> CliResult {
     Ok(())
 }
 
-async fn import_files(c: &Ctx, dir: &Path, paths: &[PathBuf]) -> CliResult {
+/// Copies `src` to `dst`; `dst` is recorded in `created` when it did not exist before, so that a
+/// later rollback removes only files of this run (never a file that was already there).
+fn copy_tracked(src: &Path, dst: &Path, created: &mut Vec<PathBuf>) -> std::io::Result<()> {
+    let existed = dst.exists();
+    let r = copy_file_with_basic_stats(src, dst);
+    if !existed && dst.exists() && !created.iter().any(|p| p == dst) {
+        // also after a partial copy (disk full): the fragment belongs to this run
+        created.push(dst.to_path_buf());
+    }
+    r
+}
+
+/// Removes the files of a failed import run. Returns the paths that could not be removed.
+fn remove_created(created: &[PathBuf]) -> Vec<(PathBuf, std::io::Error)> {
+    let mut failed = Vec::new();
+    for p in created.iter().rev() {
+        match std::fs::remove_file(p) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => failed.push((p.clone(), e)),
+        }
+    }
+    failed
+}
+
+fn report_cleanup(failed: &[(PathBuf, std::io::Error)]) {
+    if failed.is_empty() {
+        println!("Copied files were removed again");
+    } else {
+        println!("Could not remove {} copied file(s); please delete them manually:", failed.len());
+        for (p, e) in failed {
+            println!("  {}: {e}", p.display());
+        }
+    }
+}
+
+/// `ApplicationConfiguration.objects.first()` on the import transaction (the imported row is
+/// not yet visible to other connections); same columns as `pl_files::db::app_config`.
+async fn app_config_in(conn: &mut PgConnection) -> Result<Option<pl_files::db::AppConfigRow>, sqlx::Error> {
+    let row = sqlx::query(
+        "SELECT app_logo, remote_ocr_engine, remote_ocr_api_key, remote_ocr_endpoint \
+         FROM paperless_applicationconfiguration ORDER BY id ASC LIMIT 1",
+    )
+    .fetch_optional(&mut *conn)
+    .await?;
+    match row {
+        None => Ok(None),
+        Some(r) => Ok(Some(pl_files::db::AppConfigRow {
+            app_logo: r.try_get("app_logo")?,
+            remote_ocr_engine: r.try_get("remote_ocr_engine")?,
+            remote_ocr_api_key: r.try_get("remote_ocr_api_key")?,
+            remote_ocr_endpoint: r.try_get("remote_ocr_endpoint")?,
+        })),
+    }
+}
+
+/// `_import_files_from_manifest`, run on the (uncommitted) import transaction `conn`. Every file
+/// it creates is recorded in `created` (see [`copy_tracked`]).
+async fn import_files(c: &Ctx, conn: &mut PgConnection, dir: &Path, paths: &[PathBuf], created: &mut Vec<PathBuf>) -> CliResult {
     for d in [&c.cfg.originals_dir, &c.cfg.thumbnail_dir, &c.cfg.archive_dir, &c.cfg.share_link_bundle_dir] {
         std::fs::create_dir_all(d)?;
     }
     println!("Copy files into PaperRust...");
-    let app_cfg = pl_files::db::app_config(&c.pool).await?;
+    let app_cfg = app_config_in(conn).await?;
     let remote_tiff = pl_files::db::remote_ocr_active(app_cfg.as_ref(), &c.cfg);
-    let mut conn = c.pool.acquire().await?;
     let mut bundles: Vec<(i64, String)> = Vec::new();
     let mut by_pk: HashMap<i64, ()> = HashMap::new();
     for p in paths {
@@ -1056,7 +1128,7 @@ async fn import_files(c: &Ctx, dir: &Path, paths: &[PathBuf]) -> CliResult {
                 continue;
             }
             by_pk.insert(pk, ());
-            let Some(doc) = pl_consumer::db::load_document(&mut conn, pk).await? else {
+            let Some(doc) = pl_consumer::db::load_document(&mut *conn, pk).await? else {
                 return Err(CliError::Command(format!("Document matching query does not exist. (pk={pk})")));
             };
             let doc_file = rec.get(EXPORTER_FILE_NAME).and_then(Value::as_str).unwrap_or_default();
@@ -1075,9 +1147,9 @@ async fn import_files(c: &Ctx, dir: &Path, paths: &[PathBuf]) -> CliResult {
             if let Some(parent) = source_path.parent() {
                 std::fs::create_dir_all(parent)?;
             }
-            copy_file_with_basic_stats(&safepath::existing_source_in(dir, doc_file)?, &source_path)?;
+            copy_tracked(&safepath::existing_source_in(dir, doc_file)?, &source_path, created)?;
             if let Some(t) = thumb {
-                copy_file_with_basic_stats(&safepath::existing_source_in(dir, t)?, &c.thumbnail_path(pk))?;
+                copy_tracked(&safepath::existing_source_in(dir, t)?, &c.thumbnail_path(pk), created)?;
             }
             if let Some(a) = archive {
                 let Some(af) = doc.archive_filename.as_deref() else {
@@ -1087,7 +1159,7 @@ async fn import_files(c: &Ctx, dir: &Path, paths: &[PathBuf]) -> CliResult {
                 if let Some(parent) = ap.parent() {
                     std::fs::create_dir_all(parent)?;
                 }
-                copy_file_with_basic_stats(&safepath::existing_source_in(dir, a)?, &ap)?;
+                copy_tracked(&safepath::existing_source_in(dir, a)?, &ap, created)?;
             }
         }
     }
@@ -1107,7 +1179,7 @@ async fn import_files(c: &Ctx, dir: &Path, paths: &[PathBuf]) -> CliResult {
         if let Some(parent) = target.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        copy_file_with_basic_stats(&safepath::existing_source_in(dir, &arc)?, &target)?;
+        copy_tracked(&safepath::existing_source_in(dir, &arc)?, &target, created)?;
     }
     Ok(())
 }
@@ -1143,6 +1215,29 @@ mod tests {
         assert_eq!(ManifestIter::open(&p).unwrap().count(), 0);
         std::fs::write(&p, "[{\"a\": 1}").unwrap();
         assert!(ManifestIter::open(&p).unwrap().any(|r| r.is_err()));
+    }
+
+    /// Regression (copy before commit): only files this run created are tracked and removed on a
+    /// failed import; a file that already existed stays.
+    #[test]
+    fn failed_import_removes_only_own_copies() {
+        let d = tempfile::tempdir().unwrap();
+        let src = d.path().join("src.pdf");
+        std::fs::write(&src, b"%PDF-1.4").unwrap();
+        let mut created = Vec::new();
+        let new = d.path().join("originals/0000001.pdf");
+        std::fs::create_dir_all(new.parent().unwrap()).unwrap();
+        copy_tracked(&src, &new, &mut created).unwrap();
+        let existing = d.path().join("thumb.webp");
+        std::fs::write(&existing, b"old").unwrap();
+        copy_tracked(&src, &existing, &mut created).unwrap();
+        // a failed copy (missing source) creates nothing and records nothing
+        assert!(copy_tracked(&d.path().join("missing.pdf"), &d.path().join("x.pdf"), &mut created).is_err());
+        assert_eq!(created, vec![new.clone()]);
+        assert!(remove_created(&created).is_empty());
+        assert!(!new.exists());
+        assert!(existing.exists(), "pre-existing file is never removed");
+        assert!(src.exists());
     }
 
     /// Export directory with one document record (fields/export names freely selectable).

@@ -11,7 +11,6 @@
 //! the cache entry so that Django loads the DB version on the next access.
 
 use chrono::{DateTime, Duration, Utc};
-use rand::Rng;
 use serde_json::{Map, Value};
 use sqlx::PgPool;
 
@@ -42,18 +41,15 @@ pub struct Session {
 pub enum SessionError {
     Db(sqlx::Error),
     Cache(String),
+    /// `SessionInterrupted`: the session row was deleted (e.g. logout in a concurrent request)
+    /// before this request could save its changes. Django answers 400.
+    Interrupted,
 }
 
 impl From<sqlx::Error> for SessionError {
     fn from(e: sqlx::Error) -> Self {
         SessionError::Db(e)
     }
-}
-
-fn random_key() -> String {
-    const CHARS: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
-    let mut rng = rand::thread_rng();
-    (0..32).map(|_| CHARS[rng.gen_range(0..CHARS.len())] as char).collect()
 }
 
 impl Session {
@@ -130,15 +126,11 @@ impl Session {
         self.set("_session_expiry", Value::from(seconds));
     }
 
-    /// `get_expiry_age()`.
+    /// `get_expiry_age()`: a falsy `_session_expiry` (missing, `None`, `0` = "until the browser
+    /// closes") gives `SESSION_COOKIE_AGE`, so the DB row keeps its normal lifetime and only the
+    /// cookie becomes a browser-session cookie.
     pub fn expiry_age(&self, s: &Settings) -> i64 {
-        match self.data.get("_session_expiry") {
-            Some(Value::Number(n)) => n.as_i64().unwrap_or(s.session_cookie_age),
-            Some(Value::String(iso)) => DateTime::parse_from_rfc3339(iso)
-                .map(|d| (d.with_timezone(&Utc) - Utc::now()).num_seconds().max(0))
-                .unwrap_or(s.session_cookie_age),
-            _ => s.session_cookie_age,
-        }
+        pl_auth_api::session::expiry_age(&self.data, s.session_cookie_age, Utc::now())
     }
 
     /// `get_expire_at_browser_close()`.
@@ -168,33 +160,16 @@ impl Session {
         let now = Utc::now();
         let encoded = pl_authz::signing::encode_session(&json, &s.secret_key, now.timestamp());
         let expire = now + Duration::seconds(age);
-        let key = match self.key.clone() {
-            Some(k) => {
-                sqlx::query(
-                    "INSERT INTO django_session (session_key, session_data, expire_date) VALUES ($1, $2, $3) \
-                     ON CONFLICT (session_key) DO UPDATE SET session_data = EXCLUDED.session_data, expire_date = EXCLUDED.expire_date",
-                )
-                .bind(&k)
-                .bind(&encoded)
-                .bind(expire)
-                .execute(db)
-                .await?;
-                k
+        // db.SessionStore.save(must_create=False) for an existing key is an UPDATE only (never
+        // resurrect a key deleted by a concurrent logout); a new key only via create/cycle_key.
+        let key = match pl_auth_api::session::save_row(db, self.key.as_deref(), &encoded, expire).await? {
+            pl_auth_api::session::Saved::Key(k) => k,
+            pl_auth_api::session::Saved::Interrupted => {
+                // SessionMiddleware: UpdateError -> SessionInterrupted (400). The session is lost.
+                self.key = None;
+                self.data.clear();
+                return Err(SessionError::Interrupted);
             }
-            None => loop {
-                let k = random_key();
-                let r = sqlx::query(
-                    "INSERT INTO django_session (session_key, session_data, expire_date) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
-                )
-                .bind(&k)
-                .bind(&encoded)
-                .bind(expire)
-                .execute(db)
-                .await?;
-                if r.rows_affected() == 1 {
-                    break k;
-                }
-            },
         };
         cache.delete(&format!("{CACHE_KEY_PREFIX}{key}")).await.map_err(|e| SessionError::Cache(e.0))?;
         self.key = Some(key.clone());
@@ -270,10 +245,25 @@ mod tests {
 
     #[test]
     fn keys_and_dates() {
-        let k = random_key();
-        assert_eq!(k.len(), 32);
-        assert!(k.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit()));
+        // key shape: pl_auth_api::session::tests::new_key_shape (shared save_row)
         let t = DateTime::parse_from_rfc3339("2026-11-29T06:56:19Z").unwrap().with_timezone(&Utc);
         assert_eq!(http_date(t), "Sun, 29 Nov 2026 06:56:19 GMT");
+    }
+
+    /// Review finding: "until the browser closes" (`set_expiry(0)`) must keep the server-side
+    /// expiry at SESSION_COOKIE_AGE (Django `get_expiry_age`), not 0 seconds.
+    #[test]
+    fn browser_close_keeps_server_side_age() {
+        let env = pl_core::config::Env::from_pairs([("PAPERLESS_SECRET_KEY", "unit-test-only-secret-key-0123456789abcdef".to_string())]);
+        let mut s = Settings::from_core(&pl_core::Config::from_env_map(env).expect("config"));
+        s.session_cookie_age = 1_209_600;
+        s.session_expire_at_browser_close = false;
+        let mut sess = Session::default();
+        sess.set_expiry(0);
+        assert!(sess.expire_at_browser_close(&s));
+        assert_eq!(sess.expiry_age(&s), 1_209_600);
+        sess.set_expiry(30);
+        assert!(!sess.expire_at_browser_close(&s));
+        assert_eq!(sess.expiry_age(&s), 30);
     }
 }

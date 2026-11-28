@@ -367,7 +367,8 @@ Backend produktiv: **`ApiBackend`** – ruft die REST-API von paperless (über p
 `PAPERLESS_RS_AI_API_BASE`, Standard `http://127.0.0.1:$PAPERLESS_PORT|8000`) **mit dem Token des Agenten** auf.
 Damit gelten dieselben Rechte, Validierungen, Signale, django-auditlog-Einträge, Celery-Aufgaben und der Tag-Baum
 wie in der UI; keine Querabhängigkeit zu pl-objects/pl-documents-write. Aliase/Audit: `PgSideStore`
-(`plrs_taxonomy_alias`, `plrs_ai_audit`; ohne Tabelle Audit → Log `pl_ai::audit`).
+(`plrs_taxonomy_alias`, `plrs_ai_audit`; ohne Tabelle Audit → Log `pl_ai::audit`; seit 2026-11-27 nur Objekt-id, Aktion, Kanal und Feldnamen,
+nie Werte – `pg::audit_log_summary`, Tests `pg::tests::*`).
 LLM in MCP-Pfaden **mit** System-Prompt (`LLM_SYSTEM_PROMPT`). Der LLM-Client wird je `suggest_metadata`-Aufruf
 aus `AIConfig()` (Umgebung + `ApplicationConfiguration`) gebaut (`McpService::with_llm_source`, Security Welle 3
 AI-N1): KI in der UI abschalten oder umstellen wirkt sofort. Antworten der API (`ApiBackend`) höchstens 16 MiB.
@@ -390,7 +391,9 @@ Werkzeugs → `isError` („not available …“). Ressourcen/Prompts brauchen `
 JSON-RPC `-32603` (fail-closed); fehlende Tabelle → kein Eintrag. Scopes erweitern nie die Nutzerrechte.
 Verwaltung `GET|POST /api/x-ai/mcp-scopes/`, `DELETE /api/x-ai/mcp-scopes/{id}/` (aktive Superuser;
 POST `{"token"|"user_id", "scopes":[…], "label"?}` → 201, Antwort ohne Token, nur 8 Zeichen des Hashes;
-Audit `channel='ui'`, `mcp_scope_set`/`mcp_scope_delete`). Route-ids `ai.mcp_scopes.list|create|delete`.
+Audit `channel='ui'`, `mcp_scope_set`/`mcp_scope_delete`, in derselben Transaktion wie die Änderung: Audit
+nicht schreibbar → Änderung zurückgerollt, 500/503 statt Erfolg (externe Prüfung 2026-11-27, Befund 9)).
+Route-ids `ai.mcp_scopes.list|create|delete`.
 
 | Werkzeug | Gruppe | Recht | Verhalten |
 |---|---|---|---|
@@ -434,9 +437,20 @@ gilt zusätzlich das Body-Gate (2.5 MiB, größere Körper → Djangos 400-Seite
 * **Übernahme aus der Prüfliste** (AI-N2): zugewiesene bestehende Objekte müssen für den Übernehmenden sichtbar
   sein (`view_<model>` owner-aware, sonst 403); neue Objekte gehören dem Übernehmenden.
 * **Audit**: jede Übernahme `paperrust_ai_audit(action='update_document', before, after, run_id,
-  confidence=min)`; Rückgängig `action='undo'`, `undone_by_id`. Ohne Tabelle → Log `pl_ai::audit`.
+  confidence=min)`; Rückgängig `action='undo'`, `undone_by_id`. **Eine Transaktion** (externe Prüfung
+  2026-11-27, Befund 5): Dokumentfelder, Tags, Benutzerfelder, neue Objekte, Audit-Eintrag und Prüflisten-Eintrag
+  werden zusammen geschrieben, wenn der Schreiber Transaktionen kann (`DocWriter::supports_transaction`,
+  `*_tx`-Methoden, Arbeit nach dem Commit in `after_commit`; `SqlDocWriter` kann es). Audit nicht schreibbar →
+  Fehler, alles zurückgerollt (vorher: Änderung blieb, Audit nur im Log). Schreiber ohne Transaktion (derzeit
+  pl-server `ConsumerDocWriter`, Known differences 24): nach dem ersten erfolgreichen Schreibschritt stellt ein
+  Fehler den vorherigen Stand wieder her (bestmöglich) und wird gemeldet. Log bei Audit-Fehler nur mit
+  Dokument-id, Aktion und Feldnamen (`title`, `custom_fields.<id>`), **nie Werte** (Befund 7).
 * **Rückgängig**: nur wenn die betroffenen Felder noch dem `after`-Stand entsprechen, sonst
-  **409** `{"detail": "...", "fields": [...]}`; Tags: nur die hinzugefügten werden entfernt.
+  **409** `{"detail": "...", "fields": [...]}`; Tags: nur die hinzugefügten werden entfernt. Jede
+  Teil-Übernahme hängt ihre Audit-id an `paperrust_ai_review.audit_ids` an (`audit` = letzte, wie bisher);
+  Rückgängig prüft und kehrt **alle** noch nicht rückgängig gemachten Einträge um, neueste zuerst (simuliert:
+  jeder `after` muss zum Stand nach Umkehr der neueren passen), schreibt je Eintrag ein `undo`-Audit mit
+  `undone_by_id`, alles in einer Transaktion (Befund 6; vorher nur der letzte Eintrag, Eintrag trotzdem `undone`).
 * **Auslöser**: manuell `POST /api/x-ai/run/`, Tag (`server::review::process_trigger_tag(state)`, im Worker
   als `paperrust.ai.process_trigger_tag` mit Beat-Eintrag „PaperRust: process AI trigger tag“, nur mit
   `PAPERLESS_RS_AI_AUTO_TRIGGER_TAG` und Modus ≠ off, Zeitplan `PAPERRUST_AI_TRIGGER_TAG_CRON`, Standard
@@ -459,7 +473,8 @@ Schreiben `change_document` global **und** owner-aware am Dokument):
 | `ai.run` | `POST /api/x-ai/run/` `{"documents": [ids], "mode": "suggest" oder "apply"}` | `{"run_id", "mode", "results": [{document, review, status, applied, pending, error}], "skipped"}`; fehlendes Recht an einem Dokument → 403; `PAPERLESS_RS_AI_AUTO_MODE=off` → 403, `=suggest` und `mode=apply` → 403; mehr als 10 Dokumente → 400; Kontingent je Nutzer/Stunde erschöpft → 429 |
 
 Eintrag: `id, document, created, run_id, trigger, mode, status, suggestions, changes[{field, existing_id,
-new_name, value, confidence, apply, why, applied}], audit, decided_by, decided_at`. Ohne Migration → 503.
+new_name, value, confidence, apply, why, applied}], audit, audits, decided_by, decided_at` (`audits` = alle
+Audit-ids der Übernahmen, neu 2026-11-27). Ohne Migration → 503.
 Tabellen: Migration `crates/pl-ai/migrations/0001_paperrust_ai.sql` (expand-only, idempotent; umbenannt
 von `0001_plrs_ai.sql`, Präfix `paperrust_`; ab W10 von pl-server beim Start eingespielt
 (`pl_ai::server::migrations::apply`, bei Feature `ai` und PgQueue oder aktiver `ai.*`-Route; getestet in der
@@ -517,13 +532,19 @@ Eingesetzte Werte werden nicht erneut nach Platzhaltern durchsucht (Dokumentinha
 `AiOptions` (Tabelle `paperrust_ai_option`, Schlüssel = Feldname; Vorgabe aus `PAPERRUST_AI_VISION_ENABLED`,
 `…_VISION_MODEL`, `…_VISION_WHEN`, `…_VISION_MAX_PAGES`, `…_VISION_MAX_PAGES_PER_DAY`, `PAPERRUST_AI_CUSTOM_FIELDS_ENABLED`):
 `custom_fields_enabled` (false), `custom_fields` ([]), `vision_enabled` (false), `vision_model` (""), `vision_when`
-(`off`|`difficult`|`always`, Standard `difficult`), `vision_limits {max_pages 10, max_image_bytes 8 MiB,
+(`off`|`difficult`|`always`, Standard `difficult`; alt), `vision_mode` ("" = aus `vision_when`),
+`vision_sensitivity` (`normal`), `vision_max_side` (1540), `vision_limits {max_pages 10, max_image_bytes 8 MiB,
 max_pages_per_day 500, max_tokens_per_page 4096}`, `tag_after` (`{"action": "remove"}` | `{"action": "replace",
 "tag"}` | `{"action": "keep"}`), `backfill_per_minute` (6, 1…120), `backfill_max_documents` (2000).
 
 **Auslöser-Tag** (`process_trigger_tag`): `tag_after` – `remove` (bisher), `replace` (Ersatz-Tag, global ohne
 Eigentümer, bei Bedarf angelegt; nur bei Erfolg gesetzt), `keep` (Tag bleibt; Dokumente mit vorhandenem
-Prüflisten-Eintrag werden übersprungen). Der Auslöser-Tag wird auch bei Fehlern entfernt (kein endloses Wiederholen).
+Prüflisten-Eintrag werden übersprungen). Der Auslöser-Tag wird auch bei Verarbeitungsfehlern entfernt (kein
+endloses Wiederholen). Entfernen des Auslöser-Tags und Setzen des Ersatz-Tags sind eine Einheit (Befund 8):
+transaktionsfähiger Schreiber → eine Transaktion; sonst zuerst Ersatz-Tag, dann Auslöser-Tag entfernen. Schlägt
+das fehl, bleibt der Auslöser-Tag und die Aufgabe endet mit Fehler (vorher: Fehler verworfen, beide Tags weg).
+Kann der Ersatz-Tag nicht angelegt werden, bleiben alle Auslöser-Tags und die Aufgabe meldet den Fehler (die
+Dokumente werden beim nächsten Lauf erneut verarbeitet).
 
 **Archiv nachbearbeiten** (`server::jobs`, Tabelle `paperrust_ai_job`): Filter `JobFilter {tags (eines davon),
 without_correspondent, without_document_type, without_tags, created_from, created_to, only_unprocessed (kein
@@ -533,25 +554,74 @@ Modus-Regel wie `/api/x-ai/run/` (M1, 403); schon ein Auftrag aktiv → 409; son
 created_by, run_id, mode, filter, status, total, processed, applied, suggested, errors, cancel_requested, heartbeat,
 finished, message}`. Ausführung je Dokument `process_document(…, "manual", Auftraggeber, run_id)`, danach Pause
 `60 s / backfill_per_minute`, Herzschlag ≤ 30 s. Abbruch über `cancel_requested` (nächster Durchlauf), KI aus →
-`cancelled`. Herzschlag > 2 min → `interrupted` (beim Lesen markiert); `resume` setzt ab `last_document_id` fort.
-Auftraggeber kein aktiver Superuser mehr → `failed`.
+`cancelled`. `resume` setzt ab `last_document_id` fort. Auftraggeber kein aktiver Superuser mehr → `failed`.
+Externe Prüfung 2026-11-27 (Migration `0005_paperrust_ai_job_lease.sql`, liegt vorerst in `src/server/`):
+* **Lease** (Befund 2): der Worker übernimmt den Auftrag atomar (`queued` → `running` mit zufälliger
+  `lease_owner`) und erneuert `heartbeat` alle 30 s, **auch während ein einzelnes Dokument lange dauert**.
+  `interrupted` erst, wenn die Lease abgelaufen ist (120 s ohne Herzschlag); dabei wird `lease_owner` geleert.
+  Alle Schreibzugriffe des Workers sind auf seine Lease beschränkt; verliert er sie, hört er nach dem
+  laufenden Dokument auf. Höchstens ein Auftrag `queued`/`running`: eindeutiger Teilindex
+  `paperrust_ai_job_one_active` (Anlegen/Fortsetzen parallel → 409 statt zwei Läufe); `resume` setzt nur
+  `interrupted` atomar zurück.
+* **Je Dokument neu geprüft** (Befund 1): Auftraggeber noch aktiver Superuser (sonst `failed`), KI-Schalter
+  (sonst `cancelled`), wirksamer Modus: `apply` nur solange `PAPERRUST_AI_AUTO_MODE=apply`, sonst weiter nur als
+  Vorschlag (`mode` → `suggest`, `message` „switched to suggestions only (server setting)“).
+* **Budget neuer Objekte** (Befund 3) wird in `new_objects_used` gespeichert und gilt nach `resume` weiter
+  (Antwortfeld `new_objects_used`, neu).
+* **Unlesbarer gespeicherter Filter** (Befund 4) → Auftrag `failed` mit „stored job filter is unreadable; the job
+  was not run“ (vorher: leerer Standardfilter = alle änderbaren Dokumente).
 
-**KI-Texterkennung** (`vision`, `server::assist::{vision_ocr, vision_wanted}`): Seitenbilder (PNG/JPEG/WebP) je
-Seite an das Bildmodell (`vision_model`, sonst Textmodell). Ollama `POST /api/chat` mit `messages[0].images =
-[base64]`, `options.temperature 0`; OpenAI `POST /chat/completions` mit `content: [text, image_url(data:…)]`,
-`max_tokens`. Antwort ohne `<think>`/Code-Zaun; Seiten mit Leerzeile verbunden. Grenzen: Seiten je Dokument (Rest
-`skipped_pages`), Bildgröße, Seiten je Tag und Prozess. Entscheidung `vision_decision(enabled, when, requested,
-ocr_chars, pages)`: gewählt → ja; `always` → ja; `difficult` → weniger als 50 Zeichen je Seite aus der normalen
-Erkennung. **Verdrahtung (2026-11-18):** pl-core `vision::VisionOcr` (`plan`, `recognize`), Umsetzung
-pl-server `worker::AiVisionOcr` (= `vision_wanted` + `vision_ocr`, Seitenzahl aus `vision_limits.max_pages`),
-eingehängt in pl-consumer `Consumer::vision`. Nach der normalen Erkennung (Einlesen und
-`update_document_content_maybe_archive_file`) rendert `Consumer::apply_vision` höchstens so viele Seiten
-(pl-ocr `vision_pages`: PDF über PDFium bei 170 dpi, ≤ 6 MP, PNG bzw. JPEG ≤ 8 MiB; PNG/JPEG/WebP direkt;
-andere Bilder bzw. Office über das Archiv-PDF) und ersetzt den Inhalt durch nicht leeren KI-Text; Fehler →
-Warnung, normaler Text bleibt. Datum wird neu erkannt, wenn es aus dem Text stammte. `requested` = Feld
-`ai_ocr` beim Hochladen (`POST /api/documents/post_document/`, Boolean, optional) bzw. `ai_ocr` in
-`POST /api/documents/reprocess/` und `bulk_edit` `reprocess` (an die Aufgabe nur gesetzt weitergereicht).
-Die Textebene des Archiv-PDFs bleibt von Tesseract.
+**KI-Abschrift / KI-Texterkennung** (`vision`, `vision_guard`, `server::vision::{plan, transcribe, record}`;
+Ausbau 2026-11-25 nach docs/OCR-NEXT.md 2.7/2.8). Grundsatz: die klassische Erkennung läuft immer, das LLM liest
+nur gezielt dazu; die markierbare Textebene des Archiv-PDFs bleibt immer aus der klassischen Erkennung.
+
+* **Modus** `vision_mode` (`off` Aus | `uncertain_lines` Nur unsichere Stellen | `uncertain_pages` Ganze Seite,
+  wenn unsicher | `always` Immer), leer = aus dem alten `vision_when` abgeleitet (`off`→`off`, `always`→`always`,
+  `difficult`→`uncertain_pages`; Standard bleibt damit „Ganze Seite, wenn unsicher“). `vision_sensitivity`
+  (`sparing`|`normal`|`thorough`) für die „unsicher“-Modi. `requested` („Mit KI neu lesen“: `ai_ocr` beim Hochladen,
+  `reprocess`, `bulk_edit reprocess`) → `always` für dieses Dokument, auch bei Modus `off`.
+  `GET /api/x-ai/options/` liefert zusätzlich `vision_mode_effective` und `vision_remote` (LLM-Adresse nicht im
+  lokalen Netz → Warnhinweis in den Einstellungen; Prüfung ohne DNS: IP-Klasse, `localhost`, `*.local`, `*.lan`,
+  `*.internal`, `*.home.arpa`, Namen ohne Punkt).
+* **Auswahl** (pl-ocr `uncertain::select`): aus den Zeilendaten der klassischen OCR (`ocr-lines.json` im
+  Parser-Arbeitsordner: Text, Box, zeichengewichtete Konfidenz je Zeile, Seitentext). Zeile unsicher = Konfidenz
+  unter der Schwelle der Erkennung (Tabelle `uncertain::thresholds` je Engine und Empfindlichkeit: Tesseract
+  40/55/70, PP-OCR 65/78/88 auf 0–100 normiert; TODO kalibrieren). Seite unsicher = < 50 Zeichen (alte Regel) oder
+  Anteil der Zeichen in unsicheren Zeilen > 50/30/15 %. „Nur unsichere Stellen“: Zeilenausschnitte (höchstens
+  60 je Dokument); Seite mit < 50 Zeichen oder > max(12, 60 %) unsicheren Zeilen → ganze Seite. Ohne Zeilendaten
+  gilt für beide „unsicher“-Modi die alte Dokumentregel (< 50 Zeichen je Seite → alle Seiten).
+* **Bilder**: ganze Seiten bei 170 dpi gerendert und auf `vision_max_side` (Standard 1540 px, 512–4096) verkleinert;
+  Ausschnitte bevorzugt aus dem Archiv-PDF (Drehung/Begradigung wie bei der OCR), Box mit Rand, mindestens 48 px
+  hoch; passt das Seitenverhältnis nicht (andere Drehung), entfällt der Ausschnitt.
+* **Aufruf** (`vision::recognize_items`): Seiten mit dem Prompt `vision_ocr`, Ausschnitte mit
+  `DEFAULT_CROP_PROMPT` und höchstens 256 Ausgabe-Tokens. Ollama bekommt `num_predict` = Token-Grenze. Jede
+  Antwort durch den **Schleifenschutz** (`vision_guard::assess`): gleiche Zeile ≥ 5× hintereinander (kurze Zeilen
+  ≥ 8×), wiederholte Wortgruppe (1–60 Wörter, 12…4 Wiederholungen), Zeichenmuster in einer Zeile (`4.0.0.0…`) →
+  abgeschnitten, Status `loop`; Abbruch an der Token-Grenze (`finish_reason`/`done_reason = length`) →
+  `token_limit`; unplausibel lang gegenüber der OCR (Seite > max(3×, +3000 Zeichen), Ausschnitt > 3× + 40) →
+  `too_long`; leer → `empty`. Nur `accepted` geht in den Inhalt, sonst bleibt der klassische Text.
+* **Tageslimit**: ganze Seite = 1 Einheit; Ausschnitte zählen anteilig nach Fläche (mindestens 2 % je
+  Ausschnitt), aufsummiert zu ganzen Einheiten. Seitenlimit je Dokument wie bisher (`max_pages`).
+* **Inhalt** (pl-consumer `apply_vision`/`merge_vision_result`): ganze Seite → KI-Text als Seiteninhalt;
+  Ausschnitt → KI-Text ersetzt die OCR-Zeile an ihrer Stelle; Seiten mit Leerzeile verbunden, bereinigt wie der
+  Sidecar-Text. Ohne Zeilendaten ersetzt KI-Text den Inhalt nur, wenn jede Seite angenommen wurde.
+* **Kennzeichnung** (`record`, nach dem Speichern, vor der Indexierung): Tabelle `paperrust_ai_transcript`
+  (Migration 0004; je Seite/Zeile Modell, Modus, Box, ursprünglicher OCR-Text, KI-Text, Status; ein neuer Lauf
+  ersetzt die Zeilen) und – wenn KI-Text in den Inhalt ging – eine System-Notiz (`user_id NULL`, eine je Dokument,
+  wird aktualisiert) „KI-Abschrift (AI transcript, Modell …): Seite 2 ganz; Seite 1: 2 Zeilen. …“. Begründung: eine
+  Notiz ist ngx-kompatibel (bleibt bei Export/Rückweg sichtbar), der Inhalt bleibt frei von Markierungen.
+* Verdrahtung: pl-core `vision::VisionOcr` (`plan(requested)`, `recognize(VisionRequest)`, `record`), Umsetzung
+  pl-server `worker::AiVisionOcr`, eingehängt in pl-consumer `Consumer::vision` (Einlesen und
+  `update_document_content_maybe_archive_file`). Fehler → Warnung, normaler Text bleibt; Datum wird neu erkannt,
+  wenn es aus dem Text stammte.
+
+Known differences / offen (KI-Abschrift):
+* Die OCR-Pipeline (pl-ocr `native.rs`) schreibt `ocr-lines.json` noch nicht (Haken: nach dem Sidecar
+  `uncertain::write_for_sidecar(sidecar, engine, &pages)`); bis dahin wirken nur die Dokumentregel und „Immer“.
+* „Mit KI neu lesen“ je Seite und eine Workflow-Aktion „KI-Abschrift“ fehlen noch (siehe docs/OCR-NEXT.md 2.8).
+* Die Notiz wird ohne Audit-Log-Eintrag geschrieben (Systemaktion); kein Lese-Endpunkt für
+  `paperrust_ai_transcript` (Vergleich/Rückweg nur in der DB).
+* DE·HTR als Vorstufe vor dem LLM (2.8 „Stufenfolge“) ist nicht umgesetzt.
 
 **KI-Bedingung / Workflow-Entwurf** (`workflow_assist`, `server::assist`): `ai_verdict(state, doc_id, user) ->
 Result<AiVerdict, String>` (Klassifikation + Abgleich im Modus „vorschlagen“, ändert nichts, kein Prüflisten-Eintrag;
@@ -702,6 +772,13 @@ Schalter „KI-Texterkennung“ in der Oberfläche (API-Feld `ai_ocr` vorhanden)
     (Sicherheitsprüfung 2026-11-19 F11; `.no_proxy()` wie die Webhook-Clients). Sonst löst der Proxy selbst
     auf und die Adressprüfung mit festgenagelter IP wäre wirkungslos. upstream (httpx, `trust_env`) nutzt den
     Proxy. Test: `tests/proxy_bypass.rs`.
+24. Atomare KI-Änderungen (5.3, externe Prüfung 2026-11-27): voll transaktional nur mit einem Schreiber, der
+    `DocWriter::supports_transaction` meldet. Seit 2026-11-27 tut das auch pl-server `ConsumerDocWriter`
+    (Server und Worker; `*_tx` über `pl_consumer::docops` und pl-documents-write `cfi::update_or_create_deferred`/`cfi::soft_delete_deferred`, Dateiumbenennung in
+    `after_commit`, siehe docs/contract/pl-server.md Known differences 23). Der Ausgleich (vorherigen Stand
+    wiederherstellen) gilt nur noch für Schreiber ohne `supports_transaction`. Die Migration `0005_paperrust_ai_job_lease.sql` liegt
+    in `crates/pl-ai/src/server/` (wird über `pl_ai::server::migrations::ALL` beim Start eingespielt);
+    `paperrust manage migrate` (pl-cli) kennt sie noch nicht.
 
 ## Upstream-Fixes nach v3.4.2 (paperless-ngx `dev`, Ergänzung)
 

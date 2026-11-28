@@ -14,6 +14,8 @@ pl-core.workspace = true
 # E14: text extraction with reading order like `pdftotext -layout` (pl-parsers `pdftext`); pl-parsers
 # depends on no pl-* crate, so no cycle.
 pl-parsers.workspace = true
+# PP-OCR engine and page orientation model (docs/OCR-NEXT.md); ONNX Runtime is loaded at run time.
+pl-ppocr = { workspace = true, features = ["ort"] }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

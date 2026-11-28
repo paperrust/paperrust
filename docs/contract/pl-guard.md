@@ -65,13 +65,20 @@ Bewertung einer Datei nach `grace_secs` (60 s) – höchstens ein Fund je Datei:
 | Dokument mit Prüfsumme | vorhanden, SHA-256 gleich | – |
 | Dokument mit Prüfsumme | vorhanden, SHA-256 anders | `encrypted` (Kopf passt nicht, Entropie ≥ 7,5) sonst `modified` |
 | Vorschaubild eines Dokuments | vorhanden | Kopf-/Entropieprüfung → `encrypted`/`bad_magic` |
+| Dokument | vorhanden, nicht lesbar (gesperrt, keine Rechte …) | `modified` („file could not be read“) – seit 2026-11-27; vorher kein Fund |
 | Dokument | fehlt | `deleted` |
 | kein Dokument | vorhanden | Name: `ransom_note`/`suspicious_extension`/`unknown_extension`, sonst Inhalt `encrypted`/`bad_magic`, sonst nichts (verwaiste Datei: meldet die Integritätsprüfung) |
 | kein Dokument | fehlt | – (PaperRust hat umbenannt/gelöscht) |
 
 Systemdateien (`Thumbs.db`, `.DS_Store`, `@eaDir`, `#recycle`, `media.lock`, `._*`, `*.paperrust-tmp`)
 und alles außerhalb von `documents/originals|archive|thumbnails` werden ignoriert. Dieselbe Datei mit
-demselben Grund wird höchstens alle 24 h gemeldet.
+demselben Grund wird höchstens alle 24 h gemeldet – gezählt ab dem **erfolgreichen** Speichern des
+Funds; scheitert das Speichern (DB nicht erreichbar), wird er nach 5 min erneut gemeldet und
+gespeichert (vorher: 24 h unterdrückt, obwohl nie gespeichert). Scheitert die Bewertung selbst
+(Katalog-/DB-Fehler, Datei verschwindet während des Lesens), bleibt der Pfad auf der Warteliste und
+wird nach `max(grace_secs, 5 s)` erneut bewertet (höchstens 10 Versuche, dann Fehler im Log); vorher
+war er bereits von der Warteliste entfernt. Die Stichprobe gibt auch nicht lesbare Dateien (nicht nur
+fehlende) an die Bewertung weiter.
 
 Schwelle: `threshold` Funde innerhalb von `window_minutes` (gleitend, im Speicher) → `Reporter::trigger`
 = Ereignis anlegen (freie Funde der letzten `window_minutes` daran hängen), Nur-Lese-Modus, Alarm
@@ -97,23 +104,46 @@ Lauf (`backup::run`, Aufgabe `paperrust.guard.backup`, Zeitplan `PAPERRUST_BACKU
 3. DB-Abzug (`dbdump`: alle Tabellen in `public`, `COPY … TO STDOUT` in einer
    `REPEATABLE READ READ ONLY`-Transaktion, gzip) → Objekt.
 4. Alle Dateien unter `MEDIA_ROOT` außer Systemdateien; Prüfsumme aus `paperrust_backup_filecache`
-   (Pfad, Größe, mtime gleich) oder neu gehasht; unbekannte Objekte (`paperrust_backup_object`, zusätzlich
-   `HEAD`/Datei-Existenz am Ziel) verschlüsselt hochladen; beim Verschlüsseln wird erneut gehasht –
-   weicht der Inhalt ab, bricht der Lauf ab statt ein falsch benanntes Objekt abzulegen.
+   (Pfad, Größe, mtime gleich) oder neu gehasht. **Einmal je Lauf** wird `objects/` am Ziel aufgelistet;
+   hochgeladen wird jedes Objekt, das nicht in `paperrust_backup_object` steht **oder** in der Liste fehlt
+   (lokal bekannt, am Ziel verschwunden → erneut hochgeladen, Warnung mit Anzahl). Beim Verschlüsseln
+   wird erneut gehasht – weicht der Inhalt ab, bricht der Lauf ab statt ein falsch benanntes Objekt
+   abzulegen.
+   Durchlauf des Medienordners (`walk_media`): nicht lesbarer `MEDIA_ROOT`, nicht lesbarer Unterordner
+   oder abgebrochene Ordnerliste → **Fehler, Lauf bricht ab, kein Verzeichnis, kein Aufräumen**.
+   Ordner-Links (Symlinks, Windows-Junctions) werden verfolgt (Link auf einen eigenen Elternordner =
+   Schleife → übersprungen mit Warnung), Datei-Links als normale Dateien gesichert, tote Links und
+   während des Laufs verschwundene Einträge → Warnung. NAS-Ordner (`@eaDir`, `#recycle`, `.snapshot`)
+   werden nicht betreten (ihre Dateien wurden schon vorher nicht gesichert).
 5. Object Lock: neue Objekte mit Sperrfrist `lock_days`; benutzte Objekte, deren Sperre in weniger als
    `lock_days/2` abläuft, per `PutObjectRetention` verlängern.
 6. Verzeichnis schreiben (Ziel + Klartext-Kopie `DATA_DIR/backup/snapshots/<id>.gz`).
-7. Aufräumen (nicht im Nur-Lese-Modus): Aufbewahrung 7/4/12 (jüngster Stand je Tag/ISO-Woche/Monat,
-   neuester immer); gesperrte Verzeichnisse bleiben bis zum nächsten Versuch; danach nicht mehr
-   referenzierte Objekte löschen – nur wenn für alle verbleibenden Stände lokale Kopien vorliegen
-   und die gespeicherte Sperrfrist abgelaufen ist.
+7. Aufräumen (nicht im Nur-Lese-Modus; **nicht**, wenn der neue Stand 0 Dateien hat, der vorige
+   (neueste lokale Kopie) aber Dateien hatte – Warnung): Aufbewahrung 7/4/12 (jüngster Stand je
+   Tag/ISO-Woche/Monat, neuester immer) über alle bekannten Stände (Auflistung ∪ lokale Kopien ∪
+   aktueller Stand); löschbar sind nur aufgelistete Stände, der aktuelle nie; Stände mit lokaler
+   Kopie, die in der Auflistung fehlen, gelten als referenziert. Gesperrte Verzeichnisse bleiben bis
+   zum nächsten Versuch; danach nicht mehr referenzierte Objekte löschen – nur wenn für alle
+   verbleibenden Stände lokale Kopien vorliegen und die gespeicherte Sperrfrist abgelaufen ist.
+   Auflistungen sind vollständig oder ein Fehler: S3 `IsTruncated=true` ohne
+   `NextContinuationToken` → Fehler; lokal: nicht lesbarer Ordner unterhalb des Präfixes → Fehler.
 
 Wiederherstellen (`backup::restore`, `manage backup restore`): Passphrase → Schlüssel; Verzeichnis
-laden; jede Datei entschlüsseln, SHA-256 prüfen, atomar umbenennen; unsichere Pfade (`..`, `\`, `:`)
-→ Abbruch; vorhandene abweichende Dateien nur mit `--overwrite`. DB: `manage migrate`, dann
-`dbdump::restore` (eine Transaktion: `SET CONSTRAINTS ALL DEFERRED`, `TRUNCATE` aller Tabellen in
-`public` mit `RESTART IDENTITY`, je Tabelle `DISABLE TRIGGER USER` + `COPY … FROM STDIN` +
-`ENABLE TRIGGER USER`, Sequenzen auf max+1).
+laden; jedes Objekt in eine temporäre Datei im Zielordner laden (Streaming, nie ganz im Speicher),
+entschlüsseln, SHA-256 prüfen, atomar umbenennen; unsichere Pfade (`..`, `.`, `\`, `:`) → Abbruch;
+**jeder vorhandene Pfadteil unterhalb des Wiederherstellungsordners wird mit `symlink_metadata`
+geprüft: Symlink/Junction → Abbruch** (der Ordner selbst darf ein Link sein); vorhandene abweichende
+Dateien nur mit `--overwrite`. DB: `manage migrate`, dann `dbdump::restore` (eine Transaktion:
+vorab Tabellenliste des Abzugs gegen das Ziel-Schema – **fehlende Tabellen → Abbruch vor jeder
+Änderung mit ihren Namen**, außer mit `--allow-missing-tables`, dann übersprungen und namentlich
+ausgegeben; `SET CONSTRAINTS ALL DEFERRED`, `TRUNCATE` aller Tabellen in `public` mit
+`RESTART IDENTITY`, je Tabelle `DISABLE TRIGGER USER` + `COPY … FROM STDIN` + `ENABLE TRIGGER USER`,
+Sequenzen auf max+1).
+
+Prüfen (`backup::check`, `manage backup check`): alle Objekte des Stands in **einer** Auflistung mit
+Größen; fehlend oder gespeicherte Größe passt nicht zur Klartextgröße (age-Format: Kopf ≥ 168 Byte +
+16 Byte Nonce + 16 Byte je 64-KiB-Block, Spielraum 1024 Byte für die zufällig lange „grease“-Kopfzeile der age-Bibliothek) → Fehler. Die Größenprüfung findet daher nur deutliche Abweichungen (z. B. halb abgeschnitten); kleine Kürzungen findet `--deep`.
+`--deep`: jedes Objekt laden (temporäre Datei), entschlüsseln und SHA-256 mit dem Namen vergleichen.
 
 S3: eigener Client (`backup::s3`) mit AWS Signature V4, Pfad-Adressierung, `x-amz-content-sha256` =
 SHA-256 der Nutzlast, bei Object Lock `Content-MD5` + `x-amz-object-lock-mode` +
@@ -130,8 +160,8 @@ SHA-256 der Nutzlast, bei Object Lock `Content-MD5` + `x-amz-object-lock-mode` +
 | `manage backup init [--show-key] [--passphrase-file F]` | Ziel einrichten (Passphrase ≥ 12 Zeichen aus `PAPERRUST_BACKUP_PASSPHRASE` oder Datei) |
 | `manage backup run` | Lauf wie geplant (`trig = manage`) |
 | `manage backup list` | Verzeichnisse, neueste zuerst |
-| `manage backup check [--snapshot ID] [--key-file F]` | alle Objekte eines Stands vorhanden? |
-| `manage backup restore [--snapshot ID] [--media DIR] [--database] [--overwrite] [--key-file F]` | wiederherstellen, alle Prüfsummen geprüft |
+| `manage backup check [--snapshot ID] [--deep] [--key-file F]` | alle Objekte eines Stands vorhanden, Größe plausibel; `--deep`: zusätzlich entschlüsselt und Prüfsumme verglichen; Exit 1 bei fehlenden/falsch großen/beschädigten Objekten |
+| `manage backup restore [--snapshot ID] [--media DIR] [--database] [--allow-missing-tables] [--overwrite] [--key-file F]` | wiederherstellen, alle Prüfsummen geprüft; übersprungene Tabellen werden namentlich ausgegeben |
 
 ## 7. Einstellungen
 
@@ -146,6 +176,7 @@ SHA-256 der Nutzlast, bei Object Lock `Content-MD5` + `x-amz-object-lock-mode` +
 | Test | Was | Läuft |
 |---|---|---|
 | Unit (22) | Erkennung, Entropie, Konfiguration, Aufbewahrung, Verzeichnis-Format, age, SigV4 gegen das AWS-Beispiel, lokales Ziel, Zeitplan-Eintrag | immer |
+| Unit, Regression Sicherung (2026-11-27) | `walk_media`: fehlender Medienordner = Fehler, Ordner-Links verfolgt + Schleife übersprungen (Windows: Junction), nicht lesbarer Unterordner = Fehler (nur Unix); leerer Stand blockiert Aufräumen; lokal bekannt + am Ziel fehlend → erneut hochladen; Aufräumen behält aktuellen + lokal bekannte Stände; S3-Auflistung abgeschnitten ohne Token = Fehler; fehlende Tabellen → Abbruch außer `allow`; `safe_dest` + Wiederherstellen verweigern Links; Wiederherstellen gestreamt (lokales Ziel, ohne DB); age-Größenmodell; `check` findet gekürzte (Größe) und ersetzte (`--deep`) Objekte; Wächter: nicht lesbare erwartete Datei = Fund, gescheitertes Speichern unterdrückt nicht 24 h, gescheiterte Bewertung bleibt auf der Warteliste; S3-Nachbau: `put_file` gestreamt mit Object Lock, `get_to_file` | immer |
 | `tests/simulated_attack.rs` | simulierter Angriff auf einen Temp-Medienordner: laufender Wächter mit echten Dateisystem-Ereignissen löst genau einmal aus; Durchsicht allein erkennt `.locked`/Notiz; normale PaperRust-Vorgänge lösen nichts aus; stille Verschlüsselung (gleiche Größe, mtime zurückgesetzt) findet die Stichprobe; `guard scan` | immer |
 | `tests/s3_store.rs` | S3-Nachbau (`tests/support/s3mock.rs`): Signatur geprüft, Object Lock verhindert Löschen/Überschreiben, Auflisten über Seiten, Sperrfrist verlängern, `init`/Passphrase | immer |
 | `tests/backup_roundtrip.rs` | Sicherung → Wiederherstellung in zweite DB + neuen Medienordner, Vergleich aller Tabellen (md5) und Dateien (SHA-256), Deduplizierung (2. Lauf 0 neu, 3. Lauf 1 neu), älterer Stand, kein Klartext am Ziel; dasselbe gegen den S3-Nachbau mit Object Lock | `#[ignore]`, braucht `PAPERRUST_GUARD_TEST_DATABASE_URL` + `_TARGET_DATABASE_URL` (Wegwerf-DBs aus `paperless_snapshot`) |
@@ -157,10 +188,23 @@ SHA-256 der Nutzlast, bei Object Lock `Content-MD5` + `x-amz-object-lock-mode` +
 - **Kein upstream-Gegenstück**, daher keine Parität; neue Tabellen nur `paperrust_*`, expand-only.
 - **S3 nur gegen den Nachbau geprüft**, nicht gegen AWS/MinIO/Synology C2: kein Download eines
   Testservers in dieser Umgebung. Die Signatur stimmt mit dem AWS-Dokumentationsbeispiel überein.
-  Nicht umgesetzt: Multipart-Upload (Objekte werden ganz in den Speicher gelesen – bei sehr großen
-  Einzeldateien entsprechend RAM), virtuelle-Host-Adressierung, Versionierung (bei Object Lock
-  erzeugt ein Überschreiben auf echtem S3 eine neue Version; wir überschreiben nie, Namen sind
-  inhaltsadressiert).
+  Hochladen und Laden laufen gestreamt (Upload: ein Durchgang für SHA-256 + MD5, dann der Körper
+  direkt aus der Datei mit `Content-Length`; Download chunkweise in eine Datei). Nicht umgesetzt:
+  Multipart-Upload (ein einzelnes PUT, daher Grenze **5 GiB je Objekt** bei S3), virtuelle-Host-
+  Adressierung, Versionierung (bei Object Lock erzeugt ein Überschreiben auf echtem S3 eine neue
+  Version; wir überschreiben nie, Namen sind inhaltsadressiert). Das Verzeichnis eines Stands
+  (`snapshots/*.age`) und die Objektliste eines Laufs liegen weiterhin ganz im Speicher
+  (bei 1 Mio. Dateien grob 100–200 MB).
+- **Ordner-Links im Medienordner** werden beim Sichern verfolgt und beim Wiederherstellen als normale
+  Ordner/Dateien angelegt (die Link-Struktur selbst wird nicht gesichert). Die Link-Prüfung beim
+  Wiederherstellen ist eine Prüfung vor dem Schreiben (kein `openat`/`O_NOFOLLOW`): wer während der
+  Wiederherstellung gleichzeitig Links im Zielordner anlegt, wird nicht sicher abgewehrt.
+- **Lokale Kopie eines Stands ohne Gegenstück am Ziel** (z. B. dort von Hand gelöscht) hält dessen
+  Objekte dauerhaft fest, bis die Datei in `DATA_DIR/backup/snapshots/` entfernt wird – bewusst
+  vorsichtig, weil eine unvollständige Auflistung genauso aussieht.
+- **Größenprüfung bei `check`** nutzt die beim Sichern gemessene Klartextgröße; ändert sich eine Datei
+  genau zwischen Auflisten und Hashen, meldet `check` dieses Objekt als „falsche Größe“ (Fehlalarm,
+  `--deep` klärt es).
 - **Objektnamen = SHA-256 des Klartexts** (wie in der Aufgabe erlaubt): wer das Ziel lesen kann, kann
   prüfen, ob eine ihm bekannte Datei enthalten ist.
 - **Datenbank-Abzug ohne Schema:** Wiederherstellen setzt `manage migrate` derselben Version voraus;

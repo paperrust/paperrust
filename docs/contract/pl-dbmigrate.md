@@ -336,7 +336,26 @@ KI-Vektorindex.
    bei `value_monetary_amount` wegen anderer Regex-/Cast-Semantik abweichende Werte gespeichert
    haben – auf PostgreSQL gilt dann der PostgreSQL-Wert, wie bei upstream).
 
-6. **Suchindex nach dem Umstieg neu aufbauen** (2026-11-21): nach erfolgreichem `switch` (Ergebnis nicht FAIL) legt das Werkzeug die Rebuild-Markierung `.rebuilding` in den Indexordner (`PAPERRUST_/PAPERLESS_INDEX_DIR`, sonst `<DATA_DIR>/index`, sonst Docker-Standard), sofern er auf diesem Rechner existiert; der nächste Start baut den Index aus der neuen Datenbank auf.
+6. **Suchindex nach dem Umstieg neu aufbauen** (2026-11-21): nach erfolgreichem `switch` (Ergebnis nicht FAIL) legt das Werkzeug die Rebuild-Markierung `.rebuilding` in den Indexordner (`PAPERRUST_/PAPERLESS_INDEX_DIR`, sonst `<DATA_DIR>/index`, sonst Docker-Standard), sofern er auf diesem Rechner existiert; der nächste Start baut den Index aus der neuen Datenbank auf. Lässt sich die Markierung nicht schreiben (2026-11-27, Review-Befund 9), wird das nicht mehr verschluckt: Schritt WARN „Suchindex“ mit Fehler und Hinweis auf `paperrust manage document_index reindex`, das Urteil wird neu berechnet (mindestens WARN). Test `switch::tests::index_marker_failure_is_reported`.
+
+7. **Medienordner kopieren** (2026-11-27, Review-Befunde 3/4): Ziel innerhalb der Quelle (kanonisch
+   geprüft, auch noch nicht existierende Ziele und `..`) wird abgelehnt – im Schritt „Platz“ als FAIL
+   vor jeder Änderung und zusätzlich in `assist::copy_tree_progress` selbst (sonst kopierte sich das Ziel
+   in sich selbst). Jede Datei wird erst als `.<name>.paperrust-part` im Zielordner geschrieben und dann
+   umbenannt; ein abgebrochener Lauf hinterlässt also keine halbe Datei unter dem echten Namen. Beim
+   erneuten Lauf bleibt eine vorhandene Zieldatei nur bei **gleicher Größe** stehen; bei anderer Größe
+   (Rest eines älteren, abgebrochenen Laufs) wird sie ersetzt und als „ersetzt“ gezählt. Prüfsummen
+   kennt die Kopie nicht; sie prüft danach der Schritt „Dateien des Ziels“ (jede Original-/Archivdatei
+   gegen die Datenbank). Tests `assist::tests::copy_refuses_target_inside_source`,
+   `copy_repairs_partial_file_on_retry`.
+8. **Urteil strenger** (2026-11-27, Review-Befunde 5–7): (a) Datei fehlt im Ziel → immer FAIL, auch
+   wenn sie in der Quelle schon eine falsche Prüfsumme hatte; „bereits in der Quelle so“ (WARN) gilt
+   nur noch, wenn das Ziel nicht schlechter ist (fehlte die Datei schon in der Quelle, bleibt es WARN).
+   (b) Das Urteil zählt alle Befunde (`findings_total`), nicht nur die höchstens 2000 gespeicherten
+   Detailzeilen. (c) Tabelle fehlt im Ziel, Quelle hat Zeilen → FAIL in Anzahl-Vergleich und Schritt
+   „Vergleich“ (vorher INFO); im Probelauf (Ziel nicht gelesen) wie bisher ohne Urteil. Tests
+   `verify::tests::source_mismatch_but_missing_in_target_is_fail`,
+   `verdict_counts_findings_beyond_the_detail_limit`, `missing_target_table_with_source_rows_is_fail`.
 
 ## CORE-REQUEST
 

@@ -99,6 +99,20 @@ pub struct SizeOut {
     pub archive: Option<u64>,
 }
 
+/// A selection entry the server could not resolve (skipped, the rest of the selection is used).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SkippedEntry {
+    pub item: SelectionItem,
+    pub reason: String,
+}
+
+impl SkippedEntry {
+    /// `type key: reason` (for reports/logs).
+    pub fn describe(&self) -> String {
+        format!("{} {}: {}", self.item.kind, self.item.key, self.reason)
+    }
+}
+
 /// Result of the resolution + check against the limits.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Plan {
@@ -112,6 +126,9 @@ pub struct Plan {
     #[serde(skip)]
     pub docs: BTreeMap<String, PlannedDoc>,
     pub as_of_seq: Option<i64>,
+    /// Entries the server could not resolve (e.g. saved view with a full-text rule); they
+    /// contribute nothing.
+    pub skipped: Vec<SkippedEntry>,
 }
 
 fn human(bytes: u64) -> String {
@@ -159,7 +176,7 @@ pub fn plan(resolved: Vec<(SelectionItem, Vec<ResolvedDoc>)>, limits: Limits, as
         }
         parts.join(" ")
     });
-    Plan { entries, total_documents, total_bytes, limits, within_limits, message, docs, as_of_seq }
+    Plan { entries, total_documents, total_bytes, limits, within_limits, message, docs, as_of_seq, skipped: Vec::new() }
 }
 
 #[cfg(test)]

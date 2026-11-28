@@ -103,19 +103,39 @@ pub fn path_check(var: &str, directory: &Path) -> Vec<Issue> {
                 .hint(format!("Create a directory at {}", directory.display())),
         ];
     }
-    let test_file = directory.join(format!("__paperless_write_test_{}__", std::process::id()));
     let mut out = Vec::new();
-    if std::fs::File::create(&test_file).is_err() {
+    if !write_probe(directory) {
         let mode = file_mode(directory);
         out.push(Issue::new(Level::Error, format!("{var} is not writeable")).hint(format!(
             "Set the permissions of {} to be writeable by the user running the Paperless services",
             format_args!("\n{mode}   {}\n", directory.display())
         )));
     }
-    if test_file.is_file() {
-        let _ = std::fs::remove_file(&test_file);
-    }
     out
+}
+
+/// Writability probe of `path_check`. PaperRust (Known difference): upstream opens
+/// `__paperless_write_test_<pid>__` with mode "w" (truncating a file of that name) and deletes it
+/// afterwards; here the probe file is created exclusively (`create_new`), an existing name is never
+/// touched (another name is tried instead) and only the file this check created is deleted.
+fn write_probe(directory: &Path) -> bool {
+    let pid = std::process::id();
+    for attempt in 0..16u32 {
+        let name =
+            if attempt == 0 { format!("__paperless_write_test_{pid}__") } else { format!("__paperless_write_test_{pid}_{attempt}__") };
+        let test_file = directory.join(name);
+        match std::fs::OpenOptions::new().write(true).create_new(true).open(&test_file) {
+            Ok(f) => {
+                drop(f);
+                let _ = std::fs::remove_file(&test_file);
+                return true;
+            }
+            // name taken (also by a directory or a foreign file): never touch it, try another
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(_) => return false,
+        }
+    }
+    false
 }
 
 /// `stat.filemode(st_mode)` (Unix only; otherwise `?`).
@@ -489,6 +509,18 @@ mod tests {
         assert_eq!(v[0].hint.as_deref(), Some(format!("Create a directory at {}", missing.display()).as_str()));
         // no test file is left behind
         assert_eq!(std::fs::read_dir(t.path()).unwrap().count(), 0);
+    }
+
+    /// Regression: an existing file with the probe name is neither truncated nor deleted.
+    #[test]
+    fn path_check_keeps_existing_probe_name() {
+        let t = tempfile::tempdir().unwrap();
+        let name = t.path().join(format!("__paperless_write_test_{}__", std::process::id()));
+        std::fs::write(&name, b"keep me").unwrap();
+        assert!(path_check("PAPERLESS_DATA_DIR", t.path()).is_empty(), "directory is writeable");
+        assert_eq!(std::fs::read(&name).unwrap(), b"keep me");
+        // only the foreign file remains, the probe itself was removed
+        assert_eq!(std::fs::read_dir(t.path()).unwrap().count(), 1);
     }
 
     #[test]

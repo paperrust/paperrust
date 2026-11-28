@@ -220,10 +220,11 @@ impl OcrBackend for Mock {
             None => Ok(()),
         }
     }
-    fn extract_text(&self, sidecar: Option<&Path>, _: &Path, _: Mode) -> Option<String> {
+    fn extract_text_report(&self, sidecar: Option<&Path>, _: &Path, _: Mode) -> pl_parsers::pdf::PdfText {
         self.extract_calls.borrow_mut().push(sidecar.map(|p| p.to_string_lossy().into_owned()));
         let mut t = self.texts.borrow_mut();
-        if t.len() > 1 { t.remove(0) } else { t.first().cloned().flatten() }
+        let text = if t.len() > 1 { t.remove(0) } else { t.first().cloned().flatten() };
+        pl_parsers::pdf::PdfText { text, truncated: None }
     }
 }
 

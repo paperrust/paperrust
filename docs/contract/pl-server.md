@@ -296,6 +296,11 @@ Workspace-Abhängigkeiten, `Config::bind` = `127.0.0.1:8080`. Historie:
    entfernen oder auf `127.0.0.1:8080` angleichen. Die Django-Settings (Hosts, CORS,
    Cookie-Präfix, Kompression) übernimmt `pl-server` in `main.rs` aus `pl_core::Config`
    (`DjangoSettings::from_core`; Test `agrees_with_pl_core` sichert Gleichheit mit dem eigenen Parser).
+6. ~~pl-documents-write `cfi` without file move~~ done (2026-11-28): pl-documents-write offers
+   `cfi::update_or_create_deferred(conn, ctx, doc_id, field, value)` and
+   `cfi::soft_delete_deferred(conn, ctx, c, transaction_id)` (same DB/auditlog part as
+   `update_or_create` / `soft_delete(then_full_save=false)`, without `after_custom_field_saved`); the local
+   mirror `src/ai_cfi_tx.rs` is gone.
 
 ## Frontend und Betrieb ohne Django (W22, 2026-11-08, `src/frontend/`, `src/shutdown.rs`)
 
@@ -670,6 +675,20 @@ als `json.dumps(event)` (`WsPayload::to_ws_text`), `status_update`/`document_upd
     Route hat, antwortet 404; Form/Multipart auf JSON-Routen 404; Bodies > 2,5 MiB auf gepufferten Routen
     Djangos 400-Seite. Zugriffslog ohne `upstream_ms`, `via` nur `rust`/`internal`. Mehrprozessbetrieb
     braucht `PAPERRUST_CACHE=postgres` (Warnung sonst).
+23. **Atomic AI writes** (2026-11-27, pl-ai Known differences 24): `worker::ConsumerDocWriter` reports
+    `supports_transaction() = true`. Its `*_tx` methods write on the caller's connection and never
+    begin/commit: `save_tx`/`add_nested_tags_tx`/`remove_tags_tx` via `pl_consumer::docops` (auditlog
+    `LogEntry` as before), `get_or_create_tx` via `pl_ai::server::workflow::sql_get_or_create`, custom
+    fields via pl-documents-write `cfi::update_or_create_deferred` / `cfi::soft_delete_deferred` (same
+    auditlog entries as `cfi::update_or_create` / `cfi::soft_delete(then_full_save=false)`, **without**
+    `after_custom_field_saved`). `update_filename_and_move_files` (pl-consumer `files`) runs only in
+    `after_commit`, in its own transaction after the caller committed – so a rollback (e.g. the AI audit
+    insert fails) never leaves files moved while the row keeps the old name. Difference to the pool path:
+    after a custom-field-only change the file name check always runs (upstream only if the template uses
+    `custom_fields`; same result, one extra template render). The pool methods (`save`,
+    `set_custom_field`, …) are unchanged. See CORE-REQUEST 6 (done).
+    Tests: `tests/ai_writer_tx.rs` (`consumer_writer_is_transactional`; DB `tx_writes_roll_back_completely`
+    `#[ignore]`, needs `PAPERRUST_CONSUMER_TEST_DATABASE_URL` = copy `pl_consumer_test*`).
 
 ## Parität Proxy vs. Django (Geschichte: manuell, 2026-11-08, Referenz granian :8000, paperless-rs :8080 ohne Rust-Route; Proxy seit 2026-11-14 entfernt)
 

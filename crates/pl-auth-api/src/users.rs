@@ -510,6 +510,9 @@ async fn update_impl(state: AppState, raw_id: String, req: Request, partial: boo
     set!("is_active", input.is_active);
     set!("is_superuser", input.is_superuser);
     let mut tx = db.begin().await?;
+    // Group membership, flags and direct permissions change under the user row lock, so rights checks
+    // that lock this row (pl-api-v2 folders `fresh_caller`) see the change or finish before it.
+    lock_user_row(&mut tx, id).await?;
     if any {
         let (sql, values) = q.build_sqlx(PostgresQueryBuilder);
         sqlx::query_with(&sql, values)
@@ -523,13 +526,13 @@ async fn update_impl(state: AppState, raw_id: String, req: Request, partial: boo
     if let Some(p) = input.user_permissions {
         set_m2m(&mut tx, "auth_user_user_permissions", "user_id", id, "permission_id", &p).await?;
     }
-    tx.commit().await?;
     if password_changed {
-        // PaperRust: revoke the user's device tokens (`prt_…`); DRF token stays as upstream
-        // (security review 2026-11-19 F13). After the commit: if the table is missing, no
-        // running transaction is aborted.
-        pl_authz::device::revoke_all_for_user(db, id).await?;
+        // PaperRust: revoke the user's device tokens (`prt_…`) in the same transaction as the
+        // password UPDATE; DRF token stays as upstream (security review 2026-11-19 F13). A missing
+        // table is handled in a savepoint, so it does not abort this transaction.
+        pl_authz::device::revoke_all_for_user_tx(&mut tx, id).await?;
     }
+    tx.commit().await?;
     let body = users_repr(db, state.tz(), &[id]).await?.pop().ok_or_else(|| server_error("user vanished"))?;
     Ok(Drf::ok(body).into_response())
 }
@@ -650,6 +653,9 @@ pub async fn destroy(State(state): State<AppState>, Path(id): Path<String>, req:
             return Err(django_text(StatusCode::FORBIDDEN, "Superusers can only be deleted by other superusers"));
         }
         let mut tx = db.begin().await?;
+        // Group membership, flags and direct permissions change under the user row lock, so rights checks
+        // that lock this row (pl-api-v2 folders `fresh_caller`) see the change or finish before it.
+        lock_user_row(&mut tx, id).await?;
         let names: Vec<String> = USER_CASCADE
             .iter()
             .chain(USER_SET_NULL)
@@ -729,6 +735,12 @@ pub async fn destroy(State(state): State<AppState>, Path(id): Path<String>, req:
         Ok(pl_core::json::drf_no_content())
     }
     .await)
+}
+
+/// Row lock taken by every writer of this user's rights (see pl-api-v2 folders `fresh_caller`).
+async fn lock_user_row(tx: &mut sqlx::PgConnection, id: i64) -> Result<(), sqlx::Error> {
+    sqlx::query("SELECT 1 FROM auth_user WHERE id = $1::int8 FOR UPDATE").bind(id).execute(&mut *tx).await?;
+    Ok(())
 }
 
 #[cfg(test)]

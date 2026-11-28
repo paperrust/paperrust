@@ -349,12 +349,7 @@ async fn create_inner(st: &AppState, ctx: &Ctx, body: &[u8]) -> ApiResult<Respon
     let data = require_object(parse_body(&ctx.headers, body)?)?;
     let mut errs = Errors::default();
     // Field order: expiration_days, file_version, document_ids
-    let expiration_days =
-        match int_field(&data, "expiration_days", IntOpts { required: false, allow_null: true, min: Some(1), max: None }, false, &mut errs)
-        {
-            F::Val(v) => v,
-            _ => None,
-        };
+    let expiration_days = validate_expiration_days(&data, &mut errs);
     let file_version = match choice_str(
         &data,
         "file_version",
@@ -397,42 +392,111 @@ async fn create_inner(st: &AppState, ctx: &Ctx, body: &[u8]) -> ApiResult<Respon
     }
 
     let now = Utc::now();
-    let expiration = match expiration_days {
-        Some(d) if d != 0 => Some(now + chrono::Duration::days(d)),
+    let expiration = expiration_for(now, expiration_days)?;
+    let new = NewBundle { created: now, expiration, slug: get_random_string(50), owner_id: ctx.user.id, file_version };
+    let id = create_flow(db, &new, &ids, |id| enqueue_build_share_link_bundle(st, id)).await?;
+    let b = reload(db, id).await?;
+    Ok(json_response(StatusCode::CREATED, &single_json(db, &b, Some(ids.len() as i64)).await?))
+}
+
+/// Upper bound for `expiration_days` (PaperRust, about 100 years). Upstream has none: a huge
+/// value makes `timezone.now() + timedelta(days=…)` raise `OverflowError` (500). See contract
+/// "Known differences".
+pub const MAX_EXPIRATION_DAYS: i64 = 36_500;
+
+/// `expiration_days`: IntegerField(required=False, allow_null=True, min_value=1) plus the
+/// PaperRust upper bound [`MAX_EXPIRATION_DAYS`] (DRF message "Ensure this value is less than or
+/// equal to 36500.").
+fn validate_expiration_days(data: &Map<String, Value>, errs: &mut Errors) -> Option<i64> {
+    match int_field(
+        data,
+        "expiration_days",
+        IntOpts { required: false, allow_null: true, min: Some(1), max: Some(MAX_EXPIRATION_DAYS) },
+        false,
+        errs,
+    ) {
+        F::Val(v) => v,
         _ => None,
-    };
-    let slug = get_random_string(50);
+    }
+}
+
+/// `timezone.now() + timedelta(days=expiration_days)`; never panics (checked arithmetic). An
+/// out-of-range value is reported like the serializer's bound instead of a 500.
+fn expiration_for(now: DateTime<Utc>, days: Option<i64>) -> ApiResult<Option<DateTime<Utc>>> {
+    match days {
+        Some(d) if d != 0 => chrono::TimeDelta::try_days(d).and_then(|t| now.checked_add_signed(t)).map(Some).ok_or_else(|| {
+            ApiError::bad_request(json!({
+                "expiration_days": [format!("Ensure this value is less than or equal to {MAX_EXPIRATION_DAYS}.")]
+            }))
+        }),
+        _ => Ok(None),
+    }
+}
+
+/// Values of a new bundle row (status fields start as `pending` / empty).
+struct NewBundle {
+    created: DateTime<Utc>,
+    expiration: Option<DateTime<Utc>>,
+    slug: String,
+    owner_id: i64,
+    file_version: String,
+}
+
+/// `serializer.save(owner=…, documents=…)` + the view's status reset, in one transaction (the
+/// reset of upstream's second `save()` is folded into the insert: no file exists yet).
+async fn insert_bundle(db: &PgPool, new: &NewBundle, ids: &[i64]) -> ApiResult<i64> {
+    let mut tx = db.begin().await?;
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO documents_sharelinkbundle \
          (created, expiration, slug, owner_id, file_version, status, size_bytes, last_error, file_path, built_at) \
          VALUES ($1, $2, $3, $4::int8, $5, 'pending', NULL, NULL, '', NULL) RETURNING id::int8",
     )
-    .bind(now)
-    .bind(expiration)
-    .bind(&slug)
-    .bind(ctx.user.id)
-    .bind(&file_version)
-    .fetch_one(db)
+    .bind(new.created)
+    .bind(new.expiration)
+    .bind(&new.slug)
+    .bind(new.owner_id)
+    .bind(&new.file_version)
+    .fetch_one(&mut *tx)
     .await?;
     sqlx::query(
         "INSERT INTO documents_sharelinkbundle_documents (sharelinkbundle_id, document_id) \
          SELECT $1::int8, d FROM unnest($2::int8[]) d ON CONFLICT DO NOTHING",
     )
     .bind(id)
-    .bind(&ids)
-    .execute(db)
+    .bind(ids)
+    .execute(&mut *tx)
     .await?;
-    // View: remove_file() + reset status fields (file does not exist yet)
-    sqlx::query(
-        "UPDATE documents_sharelinkbundle SET status = 'pending', last_error = NULL, \
-         size_bytes = NULL, built_at = NULL, file_path = '' WHERE id = $1::int8",
-    )
-    .bind(id)
-    .execute(db)
-    .await?;
-    enqueue_build_share_link_bundle(st, id).await?;
-    let b = reload(db, id).await?;
-    Ok(json_response(StatusCode::CREATED, &single_json(db, &b, Some(ids.len() as i64)).await?))
+    tx.commit().await?;
+    Ok(id)
+}
+
+/// Deletes a bundle row and its document links (compensation when the build task could not be
+/// queued after the insert).
+async fn delete_bundle_rows(db: &PgPool, id: i64) -> Result<(), sqlx::Error> {
+    let mut tx = db.begin().await?;
+    sqlx::query("DELETE FROM documents_sharelinkbundle_documents WHERE sharelinkbundle_id = $1::int8").bind(id).execute(&mut *tx).await?;
+    sqlx::query("DELETE FROM documents_sharelinkbundle WHERE id = $1::int8").bind(id).execute(&mut *tx).await?;
+    tx.commit().await
+}
+
+/// Create: insert the bundle, then queue `build_share_link_bundle`. If queueing fails, the new
+/// bundle is removed again and the error is returned, so no bundle stays `pending` without a
+/// task that would ever build it. (The task must see the committed row, so the insert cannot
+/// wait for the enqueue.)
+async fn create_flow<F, Fut>(db: &PgPool, new: &NewBundle, ids: &[i64], enqueue: F) -> ApiResult<i64>
+where
+    F: FnOnce(i64) -> Fut,
+    Fut: std::future::Future<Output = ApiResult<()>>,
+{
+    let id = insert_bundle(db, new, ids).await?;
+    if let Err(e) = enqueue(id).await {
+        tracing::error!(bundle_id = id, "build task for share link bundle could not be queued; bundle removed again");
+        if let Err(de) = delete_bundle_rows(db, id).await {
+            tracing::error!(bundle_id = id, error = %de, "removing the unqueued share link bundle failed");
+        }
+        return Err(e);
+    }
+    Ok(id)
 }
 
 // ---------------------------------------------------------------------------
@@ -450,24 +514,97 @@ async fn rebuild_inner(st: &AppState, ctx: &Ctx, pk: &str) -> ApiResult<Response
     if b.status == "processing" {
         return Err(ApiError::detail(StatusCode::BAD_REQUEST, "Bundle is already being processed."));
     }
-    remove_file(&ctx.share_link_bundle_dir, &b.file_path);
-    sqlx::query(
-        "UPDATE documents_sharelinkbundle SET status = 'pending', last_error = NULL, \
-         size_bytes = NULL, built_at = NULL, file_path = '' WHERE id = $1::int8",
+    rebuild_flow(db, b.id, || enqueue_build_share_link_bundle(st, b.id)).await?;
+    // `file_path` stays internal (not serialized); the old ZIP is replaced by the task.
+    let nb = Bundle { status: "pending".into(), last_error: Value::Null, size_bytes: None, built_at: None, ..b.clone() };
+    Ok(json_response(StatusCode::OK, &single_json(db, &nb, None).await?))
+}
+
+/// Build columns a rebuild resets; kept to restore them if the task cannot be queued.
+#[derive(Debug, Clone, PartialEq)]
+struct BuildState {
+    status: String,
+    last_error: Option<Value>,
+    size_bytes: Option<i64>,
+    built_at: Option<DateTime<Utc>>,
+}
+
+enum MarkPending {
+    Marked(BuildState),
+    Processing,
+    Gone,
+}
+
+/// Status `pending` + cleared build fields under the row lock (`SELECT … FOR UPDATE`), so the
+/// `processing` check and the previous values are consistent with the update. `file_path` and
+/// the ZIP itself are left alone: the build task replaces the file atomically, and the share
+/// download answers 202 while the bundle is `pending`/`processing` anyway.
+async fn mark_pending(db: &PgPool, id: i64) -> ApiResult<MarkPending> {
+    let mut tx = db.begin().await?;
+    let row = sqlx::query(
+        "SELECT status, last_error, size_bytes::int8 AS size_bytes, built_at FROM documents_sharelinkbundle \
+         WHERE id = $1::int8 FOR UPDATE",
     )
-    .bind(b.id)
+    .bind(id)
+    .fetch_optional(&mut *tx)
+    .await?;
+    let Some(row) = row else { return Ok(MarkPending::Gone) };
+    let prev = BuildState {
+        status: row.try_get("status")?,
+        last_error: row.try_get::<Option<sqlx::types::Json<Value>>, _>("last_error")?.map(|j| j.0),
+        size_bytes: row.try_get("size_bytes")?,
+        built_at: row.try_get("built_at")?,
+    };
+    if prev.status == "processing" {
+        return Ok(MarkPending::Processing);
+    }
+    sqlx::query(
+        "UPDATE documents_sharelinkbundle SET status = 'pending', last_error = NULL, size_bytes = NULL, built_at = NULL \
+         WHERE id = $1::int8",
+    )
+    .bind(id)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(MarkPending::Marked(prev))
+}
+
+/// Undo [`mark_pending`] (only while the row is still `pending`, i.e. nobody picked it up).
+async fn restore_build_state(db: &PgPool, id: i64, prev: &BuildState) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE documents_sharelinkbundle SET status = $2, last_error = $3, size_bytes = $4, built_at = $5 \
+         WHERE id = $1::int8 AND status = 'pending'",
+    )
+    .bind(id)
+    .bind(&prev.status)
+    .bind(prev.last_error.clone().map(sqlx::types::Json))
+    .bind(prev.size_bytes)
+    .bind(prev.built_at)
     .execute(db)
     .await?;
-    enqueue_build_share_link_bundle(st, b.id).await?;
-    let nb = Bundle {
-        status: "pending".into(),
-        last_error: Value::Null,
-        size_bytes: None,
-        built_at: None,
-        file_path: String::new(),
-        ..b.clone()
+    Ok(())
+}
+
+/// Rebuild: mark `pending`, then queue the task; if queueing fails, the previous status (e.g.
+/// `ready` with its ZIP) is restored and the error returned. Nothing is deleted here.
+async fn rebuild_flow<F, Fut>(db: &PgPool, id: i64, enqueue: F) -> ApiResult<()>
+where
+    F: FnOnce() -> Fut,
+    Fut: std::future::Future<Output = ApiResult<()>>,
+{
+    let prev = match mark_pending(db, id).await? {
+        MarkPending::Marked(p) => p,
+        MarkPending::Processing => return Err(ApiError::detail(StatusCode::BAD_REQUEST, "Bundle is already being processed.")),
+        MarkPending::Gone => return Err(ApiError::not_found(LABEL)),
     };
-    Ok(json_response(StatusCode::OK, &single_json(db, &nb, None).await?))
+    if let Err(e) = enqueue().await {
+        tracing::error!(bundle_id = id, "build task for share link bundle could not be queued; previous state restored");
+        if let Err(re) = restore_build_state(db, id, &prev).await {
+            tracing::error!(bundle_id = id, error = %re, "restoring the share link bundle state failed");
+        }
+        return Err(e);
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -516,6 +653,157 @@ mod tests {
         let mut e = Errors::default();
         validate_document_ids(&m(json!({})), &mut e);
         assert_eq!(e.0["document_ids"], json!(["This field is required."]));
+    }
+
+    /// Review: a huge `expiration_days` passed the serializer (lower bound only) and then
+    /// panicked in `chrono::Duration::days`. Now a DRF-style validation error.
+    #[test]
+    fn expiration_days_upper_bound() {
+        let mut e = Errors::default();
+        assert_eq!(validate_expiration_days(&m(json!({"expiration_days": 36500})), &mut e), Some(36500));
+        assert!(e.0.is_empty());
+        for big in [json!(36501), json!(i64::MAX), json!(9_000_000_000_000_000i64)] {
+            let mut e = Errors::default();
+            assert_eq!(validate_expiration_days(&m(json!({"expiration_days": big})), &mut e), None);
+            assert_eq!(e.0["expiration_days"], json!(["Ensure this value is less than or equal to 36500."]));
+        }
+        let mut e = Errors::default();
+        validate_expiration_days(&m(json!({"expiration_days": 0})), &mut e);
+        assert_eq!(e.0["expiration_days"], json!(["Ensure this value is greater than or equal to 1."]));
+        let mut e = Errors::default();
+        assert_eq!(validate_expiration_days(&m(json!({"expiration_days": null})), &mut e), None);
+        assert!(e.0.is_empty());
+    }
+
+    #[test]
+    fn expiration_arithmetic_never_panics() {
+        let now = Utc::now();
+        assert_eq!(expiration_for(now, None).ok(), Some(None));
+        assert_eq!(expiration_for(now, Some(2)).ok(), Some(Some(now + chrono::TimeDelta::days(2))));
+        assert!(expiration_for(now, Some(i64::MAX)).is_err());
+        assert!(expiration_for(now, Some(100_000_000_000)).is_err());
+    }
+
+    /// DB tests of the create/rebuild flows against a throwaway schema on a local PostgreSQL
+    /// (`PAPERRUST_TEST_PG=postgres://user:pw@127.0.0.1:5432/db`); ignored without one.
+    mod db {
+        use super::super::*;
+        use sqlx::Executor;
+        use sqlx::postgres::PgPoolOptions;
+
+        async fn schema_pool(name: &str) -> Option<(PgPool, PgPool, String)> {
+            let url = std::env::var("PAPERRUST_TEST_PG").ok()?;
+            assert!(url.contains("127.0.0.1") || url.contains("localhost"), "local servers only");
+            let schema = format!("pl_fv_bundle_{name}_{}", std::process::id());
+            let admin = PgPool::connect(&url).await.expect("connect");
+            admin.execute(format!("DROP SCHEMA IF EXISTS {schema} CASCADE; CREATE SCHEMA {schema}").as_str()).await.expect("schema");
+            let s = schema.clone();
+            let pool = PgPoolOptions::new()
+                .max_connections(2)
+                .after_connect(move |c, _| {
+                    let s = s.clone();
+                    Box::pin(async move {
+                        c.execute(format!("SET search_path TO {s}").as_str()).await?;
+                        Ok(())
+                    })
+                })
+                .connect(&url)
+                .await
+                .expect("pool");
+            pool.execute(
+                "CREATE TABLE documents_sharelinkbundle (id integer GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, \
+                 created timestamptz NOT NULL, expiration timestamptz, slug varchar(50) NOT NULL UNIQUE, \
+                 file_version varchar(50) NOT NULL, status varchar(50) NOT NULL, size_bytes integer CHECK (size_bytes >= 0), \
+                 last_error jsonb, file_path varchar(512) NOT NULL, built_at timestamptz, owner_id integer); \
+                 CREATE TABLE documents_sharelinkbundle_documents (id integer GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, \
+                 sharelinkbundle_id integer NOT NULL REFERENCES documents_sharelinkbundle(id), document_id integer NOT NULL, \
+                 UNIQUE (sharelinkbundle_id, document_id));",
+            )
+            .await
+            .expect("tables");
+            Some((admin, pool, schema))
+        }
+
+        async fn drop_schema(admin: PgPool, pool: PgPool, schema: &str) {
+            pool.close().await;
+            let _ = admin.execute(format!("DROP SCHEMA IF EXISTS {schema} CASCADE").as_str()).await;
+            admin.close().await;
+        }
+
+        fn failing() -> ApiError {
+            ApiError::Core(pl_core::ApiError::internal("queue down"))
+        }
+
+        /// Review: on create a bundle could stay `pending` without any build task.
+        #[tokio::test]
+        #[ignore = "needs a local PostgreSQL (PAPERRUST_TEST_PG)"]
+        async fn create_enqueue_failure_leaves_no_bundle() {
+            let Some((admin, pool, schema)) = schema_pool("create").await else { return };
+            let new = NewBundle {
+                created: Utc::now(),
+                expiration: None,
+                slug: get_random_string(50),
+                owner_id: 1,
+                file_version: "archive".into(),
+            };
+            let r = create_flow(&pool, &new, &[3, 4], |_| async { Err(failing()) }).await;
+            assert!(r.is_err());
+            let n: i64 = sqlx::query_scalar("SELECT count(*) FROM documents_sharelinkbundle").fetch_one(&pool).await.unwrap();
+            let l: i64 = sqlx::query_scalar("SELECT count(*) FROM documents_sharelinkbundle_documents").fetch_one(&pool).await.unwrap();
+            assert_eq!((n, l), (0, 0), "no orphaned pending bundle");
+            let new = NewBundle { slug: get_random_string(50), ..new };
+            let id = create_flow(&pool, &new, &[3, 4], |_| async { Ok(()) }).await.unwrap();
+            let st: String = sqlx::query_scalar("SELECT status FROM documents_sharelinkbundle WHERE id = $1::int8")
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+            assert_eq!(st, "pending");
+            drop_schema(admin, pool, &schema).await;
+        }
+
+        /// Review: rebuild deleted the ZIP and set `pending` before queueing; a failed enqueue
+        /// destroyed a working share. Now the previous state is restored and the file untouched.
+        #[tokio::test]
+        #[ignore = "needs a local PostgreSQL (PAPERRUST_TEST_PG)"]
+        async fn rebuild_enqueue_failure_restores_ready_bundle() {
+            let Some((admin, pool, schema)) = schema_pool("rebuild").await else { return };
+            let built = Utc::now();
+            let id: i64 = sqlx::query_scalar(
+                "INSERT INTO documents_sharelinkbundle (created, slug, file_version, status, size_bytes, file_path, built_at) \
+                 VALUES (now(), 'abc', 'archive', 'ready', 123, 'abc.zip', $1) RETURNING id::int8",
+            )
+            .bind(built)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            let r = rebuild_flow(&pool, id, || async { Err(failing()) }).await;
+            assert!(r.is_err());
+            let (st, size, path): (String, Option<i32>, String) =
+                sqlx::query_as("SELECT status, size_bytes, file_path FROM documents_sharelinkbundle WHERE id = $1::int8")
+                    .bind(id)
+                    .fetch_one(&pool)
+                    .await
+                    .unwrap();
+            assert_eq!((st.as_str(), size, path.as_str()), ("ready", Some(123), "abc.zip"));
+            // success: pending, file_path kept for the task's atomic replace
+            rebuild_flow(&pool, id, || async { Ok(()) }).await.unwrap();
+            let (st, path): (String, String) =
+                sqlx::query_as("SELECT status, file_path FROM documents_sharelinkbundle WHERE id = $1::int8")
+                    .bind(id)
+                    .fetch_one(&pool)
+                    .await
+                    .unwrap();
+            assert_eq!((st.as_str(), path.as_str()), ("pending", "abc.zip"));
+            // processing → 400, nothing changed
+            sqlx::query("UPDATE documents_sharelinkbundle SET status = 'processing' WHERE id = $1::int8")
+                .bind(id)
+                .execute(&pool)
+                .await
+                .unwrap();
+            assert!(rebuild_flow(&pool, id, || async { Ok(()) }).await.is_err());
+            drop_schema(admin, pool, &schema).await;
+        }
     }
 
     #[test]

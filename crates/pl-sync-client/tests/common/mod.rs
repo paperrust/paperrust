@@ -19,6 +19,9 @@ use tokio::sync::Notify;
 
 pub const USER: &str = "alice";
 pub const PASS: &str = "alice-pass";
+/// Second account on the same server (account switch in one profile).
+pub const USER2: &str = "bob";
+pub const PASS2: &str = "bob-pass";
 
 pub fn sha(b: &[u8]) -> String {
     Sha256::digest(b).iter().map(|x| format!("{x:02x}")).collect()
@@ -56,6 +59,10 @@ pub struct MockState {
     pub tokens: HashSet<String>,
     pub devices: HashMap<String, String>,
     pub views: HashMap<String, Vec<String>>,
+    /// Saved views the server cannot evaluate (full-text rule → 501 when resolved alone).
+    pub unsupported_views: HashSet<String>,
+    /// Files without `Content-Length` (chunked transfer).
+    pub chunked: bool,
     /// Protokoll: (Methode, Pfad+Query, Authorization vorhanden)
     pub log: Vec<(String, String, bool)>,
     pub auth_headers: Vec<String>,
@@ -242,7 +249,8 @@ async fn server(State(m): State<M>, h: HeaderMap) -> Response {
 }
 
 async fn create_device(State(m): State<M>, axum::Json(b): axum::Json<Value>) -> Response {
-    if b["username"] != USER || b["password"] != PASS {
+    let known = (b["username"] == USER && b["password"] == PASS) || (b["username"] == USER2 && b["password"] == PASS2);
+    if !known {
         return (
             StatusCode::BAD_REQUEST,
             axum::Json(json!({"error": {"code": "invalid", "message": "Unable to log in with provided credentials."}})),
@@ -360,6 +368,17 @@ async fn resolve(State(m): State<M>, h: HeaderMap, axum::Json(b): axum::Json<Val
         b[k].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default()
     };
     let (docs, tags, views) = (strs("documents"), strs("tags"), strs("saved_views"));
+    // like pl-store: unsupported views are skipped, only a request of nothing but those → 501
+    let (skipped, views): (Vec<String>, Vec<String>) = views.into_iter().partition(|v| s.unsupported_views.contains(v));
+    if views.is_empty() && docs.is_empty() && tags.is_empty() && !strs("saved_views").is_empty() {
+        return (
+            StatusCode::NOT_IMPLEMENTED,
+            axum::Json(
+                json!({"error": {"code": "not_implemented", "message": "saved view uses full-text rule 20 which cannot be resolved yet"}}),
+            ),
+        )
+            .into_response();
+    }
     let mut out = Vec::new();
     for o in live(&s, "document") {
         let otags: Vec<&str> = o.json["tags"].as_array().map(|a| a.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
@@ -372,7 +391,7 @@ async fn resolve(State(m): State<M>, h: HeaderMap, axum::Json(b): axum::Json<Val
         }
     }
     let as_of = if s.feed { json!(s.next_seq - 1) } else { Value::Null };
-    axum::Json(json!({"documents": out, "as_of_seq": as_of})).into_response()
+    axum::Json(json!({"documents": out, "as_of_seq": as_of, "skipped_saved_views": skipped})).into_response()
 }
 
 async fn batch(State(m): State<M>, h: HeaderMap, axum::Json(b): axum::Json<Value>) -> Response {
@@ -445,6 +464,10 @@ async fn file(State(m): State<M>, h: HeaderMap, Path((u, variant)): Path<(String
             )
                 .into_response();
         }
+    }
+    if m.st.lock().unwrap().chunked {
+        let chunks: Vec<Result<bytes::Bytes, std::io::Error>> = data.chunks(512).map(|c| Ok(bytes::Bytes::copy_from_slice(c))).collect();
+        return (StatusCode::OK, [(header::ETAG, etag)], Body::from_stream(futures::stream::iter(chunks))).into_response();
     }
     (StatusCode::OK, [(header::ETAG, etag), (header::ACCEPT_RANGES, "bytes".into())], data).into_response()
 }

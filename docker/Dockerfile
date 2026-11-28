@@ -39,6 +39,51 @@ ADD --checksum=sha256:042de247138f96341534cccf24ed21c2550a7245b936bb4a60d2340120
 FROM pdfium-${TARGETARCH} AS pdfium
 
 # ------------------------------------------------------------------------------------------------
+# OCR base package (docs/OCR-NEXT.md §2.2, docs/OCR-PPOCR.md): page orientation (PP-LCNet), PP-OCRv6
+# small (detection + recognition) and DE·HTR v2 (later handwriting second pass); fixed sources and
+# checksums as in crates/pl-ppocr/src/models.rs. Bigger/rare models (medium, other scripts) are only
+# downloaded at run time on explicit setting (PAPERRUST_OCR_MODEL_DOWNLOAD).
+# ------------------------------------------------------------------------------------------------
+FROM scratch AS ocr-models
+ADD --checksum=sha256:bbcd6c2b43ab15d2e605455aef2cd280ab87b570824522d24a69e9298875a1ac \
+    https://github.com/GreatV/oar-ocr/releases/download/v0.3.0/pp-lcnet_x1_0_doc_ori.onnx /models/pp-lcnet_x1_0_doc_ori.onnx
+ADD --checksum=sha256:090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f \
+    https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.10.0/onnx/PP-OCRv6/det/PP-OCRv6_det_small.onnx /models/PP-OCRv6_det_small.onnx
+ADD --checksum=sha256:6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884 \
+    https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.10.0/onnx/PP-OCRv6/rec/PP-OCRv6_rec_small.onnx /models/PP-OCRv6_rec_small.onnx
+ADD --checksum=sha256:b576a0a1281b9be46b2574028b75575e041b7d7cb650f063886e733467cc1499 \
+    https://huggingface.co/naeyn/de-htr-web-v2/resolve/6241c1ff0fd42725e0dc46fcd3217469cac851bb/model.onnx /models/de-htr-web-v2.onnx
+# Tiny recognizer for PAPERRUST_PPOCR_MODEL=fast (small devices, 4.5 MB): offline like the rest.
+ADD --checksum=sha256:e16e242de5937ad92609223f19bc2aff3727ee40b095f996907c24749bad251b \
+    https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.10.0/onnx/PP-OCRv6/rec/PP-OCRv6_rec_tiny.onnx /models/PP-OCRv6_rec_tiny.onnx
+
+# ONNX Runtime 1.32.0 (MIT): libonnxruntime.so from the official PyPI wheel (fixed URL + SHA-256 from
+# the PyPI JSON API); PaperRust loads it at run time (like PDFium).
+FROM scratch AS onnxruntime-amd64
+ADD --checksum=sha256:99e1074c4b2197accd5073052a465361be17b89c093b8ffb6e6bd8f986c52df8 \
+    https://files.pythonhosted.org/packages/a3/81/55845186c20cba59f614991f4065dea148e48eeb9749893768c85ce64327/onnxruntime-1.32.0-cp312-cp312-manylinux_2_28_x86_64.whl /ort.whl
+
+FROM scratch AS onnxruntime-arm64
+ADD --checksum=sha256:e36c187006e7a7c8b8d6d57f1a209dd63f52430dca6c282b177718ad6b841054 \
+    https://files.pythonhosted.org/packages/4a/8f/1e43fb994513c7c7a9c6965272ef89d963c1bd4080993a6267bf913701d1/onnxruntime-1.32.0-cp312-cp312-manylinux_2_28_aarch64.whl /ort.whl
+
+FROM onnxruntime-${TARGETARCH} AS onnxruntime-wheel
+
+FROM ${RUNTIME_IMAGE} AS onnxruntime
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install --yes --no-install-recommends unzip && rm -rf /var/lib/apt/lists/*
+RUN --mount=type=bind,from=onnxruntime-wheel,target=/mnt/ort \
+    set -eux; \
+    tmp="$(mktemp -d)"; \
+    unzip -q /mnt/ort/ort.whl 'onnxruntime/capi/libonnxruntime.so.1.32.0' 'onnxruntime/LICENSE' 'onnxruntime/ThirdPartyNotices.txt' -d "$tmp"; \
+    mkdir -p /out/lib /out/licenses; \
+    cp "$tmp/onnxruntime/capi/libonnxruntime.so.1.32.0" /out/lib/; \
+    ln -s libonnxruntime.so.1.32.0 /out/lib/libonnxruntime.so.1; \
+    cp "$tmp/onnxruntime/LICENSE" "$tmp/onnxruntime/ThirdPartyNotices.txt" /out/licenses/; \
+    rm -rf "$tmp"
+
+# ------------------------------------------------------------------------------------------------
 # Server-Statics (STATIC_ROOT, scripts/build-static.sh): Login-CSS, Favicon, Swagger-UI/DRF.
 # Die Angular-Oberfläche ist seit 2026-11-13 abgelöst (docs/FRONTEND-PARITY.md).
 # Architekturunabhängig, darum auf der Build-Plattform.
@@ -199,6 +244,20 @@ RUN --mount=type=bind,from=pdfium,target=/mnt/pdfium \
     if grep 'not found' /tmp/ldd.txt; then exit 1; fi; \
     rm -f /tmp/ldd.txt
 
+# OCR base package + ONNX Runtime (PAPERRUST_OCR_ENGINE=ppocr, page orientation PAPERRUST_OCR_ORIENTATION).
+# Own model folder: PAPERRUST_OCR_MODEL_DIR (then only that one is searched).
+# ADD from a URL creates files with mode 0600 (root); the server runs as an unprivileged user.
+COPY --chmod=0644 --from=ocr-models /models/ /usr/local/share/paperrust/ocr-models/
+COPY --from=onnxruntime /out/lib/ /opt/onnxruntime/lib/
+COPY --from=onnxruntime /out/licenses/ /usr/share/licenses/paperrust/onnxruntime/
+RUN set -eux; \
+    ldd /opt/onnxruntime/lib/libonnxruntime.so.1.32.0 >/tmp/ldd.txt; \
+    if grep 'not found' /tmp/ldd.txt; then exit 1; fi; \
+    rm -f /tmp/ldd.txt; \
+    chmod 0755 /usr/local/share/paperrust /usr/local/share/paperrust/ocr-models; \
+    ls -l /usr/local/share/paperrust/ocr-models/; \
+    su -s /bin/sh nobody -c 'cat /usr/local/share/paperrust/ocr-models/*.onnx > /dev/null'
+
 RUN set -eux; \
     groupadd --gid "${PAPERRUST_GID}" paperrust; \
     useradd --uid "${PAPERRUST_UID}" --gid "${PAPERRUST_GID}" --no-create-home \
@@ -242,6 +301,7 @@ RUN set -eux; \
 ENV PAPERRUST_BASE_DIR=/usr/src/paperless \
     PAPERRUST_ROUTES=/usr/src/paperless/routes.toml \
     PAPERRUST_PDFIUM_PATH=/opt/pdfium/lib/libpdfium.so \
+    PAPERRUST_ONNXRUNTIME_PATH=/opt/onnxruntime/lib/libonnxruntime.so.1.32.0 \
     NO_COLOR=1 \
     PNGX_CONTAINERIZED=1
 

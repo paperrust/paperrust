@@ -22,13 +22,14 @@ const REL_NOTES: &str = "http://schemas.openxmlformats.org/officeDocument/2006/r
 pub fn extract(data: &[u8], mime_type: &str, limits: &Limits, deadline: Deadline) -> Result<OfficeContent> {
     let zip = ZipArchive::open(data, limits)?;
     let mut out = TextSink::new(limits.max_text_chars);
-    match mime_type {
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => docx_text(&zip, limits, deadline, &mut out)?,
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => xlsx_text(&zip, limits, deadline, &mut out)?,
-        _ => pptx_text(&zip, limits, deadline, &mut out)?,
-    }
+    let r = match mime_type {
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => docx_text(&zip, limits, deadline, &mut out),
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => xlsx_text(&zip, limits, deadline, &mut out),
+        _ => pptx_text(&zip, limits, deadline, &mut out),
+    };
+    let truncated = out.truncation(r)?;
     let (metadata, created) = core_metadata(&zip, mime_type, limits)?;
-    Ok(OfficeContent { text: out.buf, metadata, created })
+    Ok(OfficeContent { text: out.buf, metadata, created, truncated })
 }
 
 /// Resolve a path relative to a part (`xl/workbook.xml` + `worksheets/s1.xml`).

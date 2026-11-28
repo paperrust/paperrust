@@ -3,7 +3,7 @@
 //! Supports what imaplib/imap_tools and pl-mail send on fetch: CAPABILITY, LOGIN,
 //! AUTHENTICATE PLAIN/XOAUTH2, SELECT, STATUS, LIST, UID SEARCH (subset of the criteria),
 //! UID FETCH (BODY[]/BODY.PEEK[], UID, FLAGS, RFC822.SIZE), UID STORE ±FLAGS / +X-GM-LABELS,
-//! UID COPY, UID MOVE, EXPUNGE, NOOP, LOGOUT. Every command is recorded (without tag).
+//! UID COPY, UID MOVE, UID EXPUNGE, EXPUNGE, NOOP, LOGOUT. Every command is recorded (without tag).
 
 #![allow(dead_code)]
 
@@ -42,11 +42,21 @@ pub struct Config {
     pub capabilities: String,
     pub user: String,
     pub pass: String,
+    /// Capabilities announced in the tagged LOGIN reply (OK [CAPABILITY ...]), if any.
+    pub login_capabilities: Option<String>,
+    /// Answer UID STORE ... +X-GM-LABELS with NO (label rejected).
+    pub reject_gmail_labels: bool,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Self { capabilities: "IMAP4rev1 AUTH=PLAIN MOVE".into(), user: "user".into(), pass: "pass".into() }
+        Self {
+            capabilities: "IMAP4rev1 AUTH=PLAIN MOVE".into(),
+            user: "user".into(),
+            pass: "pass".into(),
+            login_capabilities: None,
+            reject_gmail_labels: false,
+        }
     }
 }
 
@@ -304,7 +314,10 @@ async fn serve(sock: tokio::net::TcpStream, st: Shared, cfg: Config, conn_no: us
             "LOGIN" => {
                 let t = tokens(args);
                 if t.len() == 2 && unquote(&t[0]) == cfg.user && unquote(&t[1]) == cfg.pass {
-                    ok(&mut out, "LOGIN completed");
+                    match &cfg.login_capabilities {
+                        Some(caps) => ok(&mut out, &format!("[CAPABILITY {caps}] LOGIN completed")),
+                        None => ok(&mut out, "LOGIN completed"),
+                    }
                 } else {
                     out.push_str(&format!("{tag} NO [AUTHENTICATIONFAILED] Invalid credentials\r\n"));
                 }
@@ -453,6 +466,17 @@ async fn serve(sock: tokio::net::TcpStream, st: Shared, cfg: Config, conn_no: us
                             "{tag} BAD Missing arguments
 "
                         ));
+                    }
+                    "STORE" if cfg.reject_gmail_labels && tokens(sargs)[1].eq_ignore_ascii_case("+X-GM-LABELS") => {
+                        out.push_str(&format!("{tag} NO [CANNOT] label rejected\r\n"));
+                    }
+                    "EXPUNGE" => {
+                        let uids = uid_set(sargs.trim());
+                        let mut s = st.lock().unwrap();
+                        if let Some(fo) = s.folders.get_mut(&folder) {
+                            fo.msgs.retain(|m| !(uids.contains(&m.uid) && m.flags.contains("\\Deleted")));
+                        }
+                        ok(&mut out, "UID EXPUNGE completed");
                     }
                     "STORE" => {
                         let t = tokens(sargs);

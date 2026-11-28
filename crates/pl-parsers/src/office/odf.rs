@@ -21,12 +21,13 @@ pub fn extract(data: &[u8], mime_type: &str, limits: &Limits, deadline: Deadline
     let content = zip.read("content.xml")?;
     let mut out = TextSink::new(limits.max_text_chars);
     let spreadsheet = mime_type == "application/vnd.oasis.opendocument.spreadsheet";
-    content_text(&content, spreadsheet, limits, deadline, &mut out)?;
+    let r = content_text(&content, spreadsheet, limits, deadline, &mut out);
+    let truncated = out.truncation(r)?;
     let (metadata, created) = match zip.read_opt("meta.xml")? {
         Some(m) => meta(&m, mime_type, limits)?,
         None => (vec![("Content-Type".to_owned(), mime_type.to_owned())], None),
     };
-    Ok(OfficeContent { text: out.buf, metadata, created })
+    Ok(OfficeContent { text: out.buf, metadata, created, truncated })
 }
 
 struct Cell {

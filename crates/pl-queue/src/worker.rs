@@ -135,9 +135,13 @@ impl Handlers {
     }
 }
 
-/// `Duration` from seconds without panicking on NaN/negative/huge values (falls back to `min`).
+/// `Duration` from seconds without panicking: NaN/negative → `min`, huge values are capped at
+/// [`crate::config::MAX_DURATION_SECS`] (before, a huge value fell back to `min`, e.g. a time
+/// limit of 1e300 s aborted the task at once).
 fn secs_or(v: f64, min: f64) -> StdDuration {
-    StdDuration::try_from_secs_f64(v.max(min)).unwrap_or(StdDuration::from_secs_f64(min))
+    let max = crate::config::MAX_DURATION_SECS;
+    let v = if v.is_nan() { min } else { v.max(min).min(max) };
+    StdDuration::try_from_secs_f64(v).unwrap_or(StdDuration::ZERO)
 }
 
 /// Lease timing of one running job (pure; `Instant`s are passed in so it is unit-testable).
@@ -169,8 +173,9 @@ impl LeaseTiming {
         }
     }
     /// When the runner must stop at the latest.
+    /// On `Instant` overflow the fence is `last_ok` itself (stop: the safe side).
     fn fence_at(&self, last_ok: Instant) -> Instant {
-        last_ok + self.fence
+        last_ok.checked_add(self.fence).unwrap_or(last_ok)
     }
     /// The lease is provably valid (with margin) at `now`.
     fn valid(&self, last_ok: Instant, now: Instant) -> bool {
@@ -182,11 +187,11 @@ impl LeaseTiming {
     }
     /// Next heartbeat after a successful lease write sent at `sent`.
     fn next_after_ok(&self, sent: Instant) -> Instant {
-        sent + self.every
+        sent.checked_add(self.every).unwrap_or(sent)
     }
     /// Next heartbeat after a failed attempt that returned at `now`.
     fn next_after_fail(&self, now: Instant) -> Instant {
-        now + self.retry
+        now.checked_add(self.retry).unwrap_or(now)
     }
 }
 
@@ -236,9 +241,12 @@ impl Worker {
                 None
             }
         };
-        let poll = StdDuration::from_secs_f64(self.cfg.poll_interval_secs);
-        let reap_every = StdDuration::from_secs_f64((self.cfg.visibility_timeout_secs / 2.0).max(0.5));
-        let mut last_reap = tokio::time::Instant::now() - reap_every;
+        let poll = secs_or(self.cfg.poll_interval_secs, 0.01);
+        let reap_every = secs_or(self.cfg.visibility_timeout_secs / 2.0, 0.5);
+        // "reap at once" is a flag: `now - reap_every` may not exist as an Instant (the monotonic
+        // clock starts at boot) and would panic.
+        let mut last_reap = tokio::time::Instant::now();
+        let mut force_reap = true;
         let mut last_purge = tokio::time::Instant::now();
         tracing::info!(worker = %self.cfg.worker_name, concurrency = self.cfg.concurrency, "worker started");
         // E2E 2026-11-08: with a missing table the loop ran ~1000×/s without a pause.
@@ -249,7 +257,8 @@ impl Worker {
             }
             while running.try_join_next().is_some() {}
             let mut first_err: Option<(&'static str, crate::QueueError)> = None;
-            if last_reap.elapsed() >= reap_every {
+            if force_reap || last_reap.elapsed() >= reap_every {
+                force_reap = false;
                 last_reap = tokio::time::Instant::now();
                 if let Err(e) = self.queue.reap_expired_leases().await {
                     first_err.get_or_insert(("reaping expired leases failed", e));
@@ -292,7 +301,7 @@ impl Worker {
                     _ = tokio::time::sleep(step.delay) => {}
                 }
                 // Catch up aborted reap/purge runs on the next pass.
-                last_reap = tokio::time::Instant::now() - reap_every;
+                force_reap = true;
                 continue;
             }
             let recovered = db_backoff.succeed();
@@ -361,7 +370,7 @@ impl Worker {
             }
         }
         tracing::info!(running = running.len(), "worker shutting down");
-        let grace = tokio::time::sleep(StdDuration::from_secs_f64(self.cfg.shutdown_grace_secs));
+        let grace = tokio::time::sleep(secs_or(self.cfg.shutdown_grace_secs, 0.0));
         tokio::pin!(grace);
         loop {
             tokio::select! {
@@ -592,6 +601,25 @@ mod tests {
             let t = LeaseTiming::new(v);
             assert!(t.fence > StdDuration::ZERO && t.every > StdDuration::ZERO && t.retry > StdDuration::ZERO, "{v}");
         }
+    }
+
+    /// Regression: huge seconds are capped (not reset to the minimum) and never panic; Instant
+    /// arithmetic never overflows.
+    #[test]
+    fn huge_durations_are_capped_and_never_panic() {
+        let max = StdDuration::from_secs_f64(crate::config::MAX_DURATION_SECS);
+        assert_eq!(secs_or(1e300, 0.0), max, "a huge time limit must not become 0 s");
+        assert_eq!(secs_or(f64::INFINITY, 0.5), max);
+        assert_eq!(secs_or(f64::NAN, 0.5), StdDuration::from_millis(500));
+        assert_eq!(secs_or(-3.0, 0.0), StdDuration::ZERO);
+        let t = LeaseTiming { fence: StdDuration::MAX, every: StdDuration::MAX, retry: StdDuration::MAX };
+        let now = Instant::now();
+        assert_eq!(t.fence_at(now), now, "overflow: fence at once (safe side)");
+        assert!(!t.valid(now, now));
+        assert_eq!(t.next_after_ok(now), now);
+        assert_eq!(t.next_after_fail(now), now);
+        let big = LeaseTiming::new(1e300);
+        assert!(big.fence_at(now) > now);
     }
 
     #[test]

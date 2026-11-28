@@ -59,10 +59,11 @@ pub(crate) async fn ids(store: &Store, p: &Principal, kind: Kind) -> DomainResul
 }
 
 /// Selection → visible documents with `rev` and file sizes.
-pub(crate) async fn resolve(store: &Store, p: &Principal, sel: &Selection) -> DomainResult<Vec<ResolvedDoc>> {
+pub(crate) async fn resolve(store: &Store, p: &Principal, sel: &Selection) -> DomainResult<Resolution> {
     let user = auth::user(p)?;
     perm::require(user, "documents.view_document")?;
     let mut ids: BTreeSet<i64> = BTreeSet::new();
+    let mut skipped_saved_views: Vec<Uuid> = Vec::new();
 
     if !sel.documents.is_empty() {
         let map = ident::resolve(&store.db, Kind::Document, &sel.documents).await?;
@@ -71,13 +72,7 @@ pub(crate) async fn resolve(store: &Store, p: &Principal, sel: &Selection) -> Do
     }
     if !sel.tags.is_empty() {
         let map = ident::resolve(&store.db, Kind::Tag, &sel.tags).await?;
-        let tag_ids: Vec<i64> = sel.tags.iter().filter_map(|u| map.get(u).map(|(id, _)| *id)).collect();
-        let key = match sel.tag_mode.as_deref().unwrap_or("any") {
-            "any" => "tags__id__in",
-            "all" => "tags__id__all",
-            other => return Err(DomainError::field("tag_mode", format!("Unknown tag_mode \"{other}\" (any, all)."))),
-        };
-        if !tag_ids.is_empty() {
+        if let Some((key, tag_ids)) = tag_rule(&sel.tags, &map, sel.tag_mode.as_deref())? {
             ids.extend(select(store, user, &[(key.into(), join(&tag_ids))]).await?);
         }
     }
@@ -86,12 +81,19 @@ pub(crate) async fn resolve(store: &Store, p: &Principal, sel: &Selection) -> Do
         let sv_ids: Vec<i64> = sel.saved_views.iter().filter_map(|u| map.get(u).map(|(id, _)| *id)).collect();
         // only visible views (like v1); invisible ones contribute nothing
         let visible = objects::by_legacy_ids(store, p, Kind::SavedView, &sv_ids).await?;
-        for (_, o) in visible {
-            if let Some(Object::SavedView(v)) = o {
-                let params = rules::to_params(&v.filter_rules)?;
-                ids.extend(select(store, user, &params).await?);
-            }
+        let rules: Vec<(i64, Vec<FilterRule>)> = visible
+            .into_iter()
+            .filter_map(|(id, o)| match o {
+                Some(Object::SavedView(v)) => Some((id, v.filter_rules)),
+                _ => None,
+            })
+            .collect();
+        let other_parts = !sel.documents.is_empty() || !sel.tags.is_empty();
+        let (params_list, skipped) = view_params(&rules, other_parts)?;
+        for params in params_list {
+            ids.extend(select(store, user, &params).await?);
         }
+        skipped_saved_views = skipped_uuids(&sel.saved_views, &map, &skipped);
     }
 
     let ids: Vec<i64> = ids.into_iter().collect();
@@ -112,7 +114,65 @@ pub(crate) async fn resolve(store: &Store, p: &Principal, sel: &Selection) -> Do
         };
         out.push(ResolvedDoc { uuid: idn.uuid, rev: idn.rev, size });
     }
-    Ok(out)
+    Ok(Resolution { documents: out, skipped_saved_views })
+}
+
+/// Skipped view ids → the UUIDs the request used, in request order, without duplicates.
+fn skipped_uuids(requested: &[Uuid], map: &std::collections::HashMap<Uuid, (i64, i64)>, skipped: &[i64]) -> Vec<Uuid> {
+    let mut seen = BTreeSet::new();
+    requested.iter().filter(|u| map.get(u).is_some_and(|(id, _)| skipped.contains(id))).filter(|u| seen.insert(**u)).copied().collect()
+}
+
+/// Tag part of the selection → filter key + tag ids, or `None` when the part matches nothing.
+///
+/// `any`: unknown/deleted UUIDs are ignored (like unknown document UUIDs). `all`: every tag has to
+/// be present on the document, and an unknown/deleted tag can never be present, so a single unknown
+/// UUID makes the part match nothing (dropping it would widen the result to too many documents).
+fn tag_rule(
+    tags: &[Uuid],
+    map: &std::collections::HashMap<Uuid, (i64, i64)>,
+    mode: Option<&str>,
+) -> DomainResult<Option<(&'static str, Vec<i64>)>> {
+    let key = match mode.unwrap_or("any") {
+        "any" => "tags__id__in",
+        "all" => "tags__id__all",
+        other => return Err(DomainError::field("tag_mode", format!("Unknown tag_mode \"{other}\" (any, all)."))),
+    };
+    let known: Vec<i64> = tags.iter().filter_map(|u| map.get(u).map(|(id, _)| *id)).collect();
+    if known.is_empty() || (key == "tags__id__all" && known.len() != tags.len()) {
+        return Ok(None);
+    }
+    Ok(Some((key, known)))
+}
+
+/// v1 parameters of one view.
+type ViewParams = Vec<(String, String)>;
+
+/// v1 parameters of the visible saved views plus the ids of the skipped views. A view whose rules
+/// cannot be evaluated here (full-text rules, unknown rule types → `NotImplemented`) is skipped with
+/// a warning so it does not abort the rest of the selection; the caller reports it in
+/// `skipped_saved_views`. Only when nothing else was requested (`other_parts == false`) and every
+/// view is unsupported, the first error is returned (501) – a selection consisting only of such
+/// views would otherwise silently resolve to nothing.
+fn view_params(views: &[(i64, Vec<FilterRule>)], other_parts: bool) -> DomainResult<(Vec<ViewParams>, Vec<i64>)> {
+    let mut out = Vec::with_capacity(views.len());
+    let mut skipped = Vec::new();
+    let mut first_skip: Option<DomainError> = None;
+    for (id, rules) in views {
+        match rules::to_params(rules) {
+            Ok(p) => out.push(p),
+            Err(e @ DomainError::NotImplemented(_)) => {
+                tracing::warn!(saved_view = *id, "sync/resolve: skipping saved view: {e}");
+                skipped.push(*id);
+                first_skip.get_or_insert(e);
+            }
+            Err(e) => return Err(e),
+        }
+    }
+    match first_skip {
+        Some(e) if out.is_empty() && !other_parts => Err(e),
+        _ => Ok((out, skipped)),
+    }
 }
 
 fn join(ids: &[i64]) -> String {
@@ -135,4 +195,63 @@ async fn select(store: &Store, user: &pl_authz::User, params: &[(String, String)
     let (sql, values) = q.build_sqlx(PostgresQueryBuilder);
     let v: Vec<i32> = sqlx::query_scalar_with(&sql, values).fetch_all(&store.db).await.map_err(db_err)?;
     Ok(v.into_iter().map(i64::from).collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::*;
+
+    fn u(n: u128) -> Uuid {
+        Uuid::from_u128(n)
+    }
+
+    #[test]
+    fn tag_rule_all_with_unknown_uuid_matches_nothing() {
+        let map: HashMap<Uuid, (i64, i64)> = [(u(1), (10, 1)), (u(2), (20, 1))].into_iter().collect();
+        // all known → tags__id__all with every id
+        assert_eq!(tag_rule(&[u(1), u(2)], &map, Some("all")).unwrap(), Some(("tags__id__all", vec![10, 20])));
+        // one unknown/deleted → no document can carry it → nothing (was: tags__id__all=10 → too many)
+        assert_eq!(tag_rule(&[u(1), u(3)], &map, Some("all")).unwrap(), None);
+        assert_eq!(tag_rule(&[u(3)], &map, Some("all")).unwrap(), None);
+        // any: unknown ones are ignored
+        assert_eq!(tag_rule(&[u(1), u(3)], &map, None).unwrap(), Some(("tags__id__in", vec![10])));
+        assert_eq!(tag_rule(&[u(3)], &map, Some("any")).unwrap(), None);
+        assert!(tag_rule(&[u(1)], &map, Some("some")).is_err());
+    }
+
+    fn r(t: i64, v: Option<&str>) -> FilterRule {
+        FilterRule { rule_type: t, value: v.map(str::to_string) }
+    }
+
+    #[test]
+    fn unsupported_view_is_skipped_not_fatal() {
+        let fulltext = (1, vec![r(20, Some("invoice"))]);
+        let normal = (2, vec![r(3, Some("7"))]);
+        // one full-text view does not abort the other view
+        let (p, skipped) = view_params(&[fulltext.clone(), normal.clone()], false).unwrap();
+        assert_eq!(p, vec![vec![("correspondent__id".to_string(), "7".to_string())]]);
+        assert_eq!(skipped, vec![1]);
+        // nor documents/tags requested alongside
+        let (p, skipped) = view_params(std::slice::from_ref(&fulltext), true).unwrap();
+        assert!(p.is_empty());
+        assert_eq!(skipped, vec![1]);
+        // only unsupported views requested → 501 as before (client reports the entry)
+        assert!(matches!(view_params(&[fulltext], false), Err(DomainError::NotImplemented(_))));
+        // unknown rule type is skipped the same way
+        let (_, skipped) = view_params(&[(3, vec![r(999, None)]), normal.clone()], false).unwrap();
+        assert_eq!(skipped, vec![3]);
+        // nothing skipped → empty list
+        assert!(view_params(&[normal], false).unwrap().1.is_empty());
+    }
+
+    #[test]
+    fn skipped_uuids_follow_request_order_without_duplicates() {
+        let map: HashMap<Uuid, (i64, i64)> = [(u(1), (10, 1)), (u(2), (20, 1)), (u(3), (30, 1))].into_iter().collect();
+        // u(9) unknown, u(2) not skipped, u(3) requested twice
+        let got = skipped_uuids(&[u(3), u(9), u(2), u(1), u(3)], &map, &[10, 30]);
+        assert_eq!(got, vec![u(3), u(1)]);
+        assert!(skipped_uuids(&[u(1)], &map, &[]).is_empty());
+    }
 }

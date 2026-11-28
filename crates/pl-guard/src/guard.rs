@@ -227,6 +227,11 @@ fn verdict_finding(path: &str, v: &ContentVerdict) -> Option<Finding> {
 }
 
 /// Evaluate a file (without waiting time). At most one finding per file.
+///
+/// A file the database expects that cannot be read is a finding (`modified`, "could not be
+/// read"): ransomware may hold or lock files, and "no finding" would hide that. If it vanished
+/// between the existence check and reading (`NotFound`), `Err` is returned so the caller keeps
+/// the path pending and evaluates it again (then as `deleted` if it stays gone).
 pub async fn evaluate(media_root: &Path, cfg: &GuardConfig, catalog: &dyn Catalog, rel: &str) -> Result<Option<Finding>, String> {
     if detect::is_system_file(rel) {
         return Ok(None);
@@ -271,9 +276,15 @@ pub async fn evaluate(media_root: &Path, cfg: &GuardConfig, catalog: &dyn Catalo
                 Ok((v, sha))
             })
             .await
-            .map_err(|e| e.to_string())?
-            .map_err(|e| e.to_string())
+            .map_err(std::io::Error::other)?
         }
+    };
+    let unreadable = |doc_id: i64, e: std::io::Error| -> Result<Option<Finding>, String> {
+        if e.kind() == std::io::ErrorKind::NotFound {
+            // just renamed/deleted: the caller evaluates it again
+            return Err(format!("{rel}: vanished while reading ({e})"));
+        }
+        Ok(Some(Finding { path: rel.into(), reason: Reason::Modified, detail: format!("document {doc_id}: file could not be read ({e})") }))
     };
     let found = match (expected, exists) {
         (Some(exp), true) => match &exp.checksum {
@@ -292,12 +303,11 @@ pub async fn evaluate(media_root: &Path, cfg: &GuardConfig, catalog: &dyn Catalo
                     })
                 }
                 Ok(_) => None,
-                // just renamed/deleted: evaluate again on the next event
-                Err(_) => None,
+                Err(e) => return unreadable(exp.doc_id, e),
             },
             None => match content(false).await {
                 Ok((v, _)) => verdict_finding(rel, &v),
-                Err(_) => None,
+                Err(e) => return unreadable(exp.doc_id, e),
             },
         },
         (Some(exp), false) => {
@@ -316,6 +326,15 @@ pub async fn evaluate(media_root: &Path, cfg: &GuardConfig, catalog: &dyn Catalo
     Ok(found)
 }
 
+/// A stored finding is not reported again for this long.
+const REPORT_SUPPRESS: Duration = Duration::from_secs(24 * 3600);
+/// A finding whose storing failed is reported (and stored) again after this time.
+const REPORT_RETRY: Duration = Duration::from_secs(300);
+/// Failed evaluations of one pending path before it is dropped (with an error log).
+const MAX_EVAL_ATTEMPTS: u32 = 10;
+/// Minimum delay before a failed evaluation is retried.
+const RETRY_MIN_SECS: u64 = 5;
+
 /// Guard with state (waiting list, time window, review, sampling).
 pub struct Engine {
     pub media_root: PathBuf,
@@ -324,8 +343,11 @@ pub struct Engine {
     reporter: Arc<dyn Reporter>,
     pending: HashMap<String, Instant>,
     window: VecDeque<Instant>,
-    /// last reported (path, reason) → time; do not report the same file continuously
+    /// (path, reason) → suppressed until; do not report the same file continuously. Set to
+    /// 24 h only after the finding was stored; a failed store suppresses it only briefly.
     reported: HashMap<(String, Reason), Instant>,
+    /// failed evaluations per pending path (retried up to `MAX_EVAL_ATTEMPTS`)
+    attempts: HashMap<String, u32>,
     snapshot: Snapshot,
     scanned_once: bool,
     sample_cursor: i64,
@@ -349,6 +371,7 @@ impl Engine {
             pending: HashMap::new(),
             window: VecDeque::new(),
             reported: HashMap::new(),
+            attempts: HashMap::new(),
             snapshot: Snapshot::default(),
             scanned_once: false,
             sample_cursor: 0,
@@ -376,12 +399,29 @@ impl Engine {
             step.evaluated += 1;
             match evaluate(&self.media_root, &self.cfg, self.catalog.as_ref(), &rel).await {
                 Ok(Some(f)) => {
+                    self.attempts.remove(&rel);
                     let s = self.record(f, now).await;
                     step.findings += s.findings;
                     step.triggered |= s.triggered;
                 }
-                Ok(None) => {}
-                Err(e) => tracing::warn!(target: "paperless.guard", path = %rel, error = %e, "could not evaluate change"),
+                Ok(None) => {
+                    self.attempts.remove(&rel);
+                }
+                Err(e) => {
+                    // keep the path pending (database briefly unavailable, file vanished while
+                    // reading …) instead of silently dropping it
+                    let n = self.attempts.entry(rel.clone()).or_insert(0);
+                    *n += 1;
+                    if *n >= MAX_EVAL_ATTEMPTS {
+                        self.attempts.remove(&rel);
+                        tracing::error!(target: "paperless.guard", path = %rel, error = %e, "could not evaluate change, giving up");
+                    } else {
+                        tracing::warn!(target: "paperless.guard", path = %rel, error = %e, "could not evaluate change, retrying");
+                        if !self.pending.contains_key(&rel) {
+                            self.pending.insert(rel, now + Duration::from_secs(self.cfg.grace_secs.max(RETRY_MIN_SECS)));
+                        }
+                    }
+                }
             }
         }
         step
@@ -390,16 +430,24 @@ impl Engine {
     /// Report a finding, maintain the time window, trigger the alarm if needed.
     pub async fn record(&mut self, f: Finding, now: Instant) -> Step {
         let key = (f.path.clone(), f.reason);
-        if self.reported.get(&key).is_some_and(|t| now.duration_since(*t) < Duration::from_secs(24 * 3600)) {
+        if self.reported.get(&key).is_some_and(|until| *until > now) {
             return Step::default();
         }
         if self.reported.len() > 200_000 {
-            self.reported.retain(|_, t| now.duration_since(*t) < Duration::from_secs(3600));
+            // keep only what was reported within the last hour
+            let recent = now + REPORT_SUPPRESS - Duration::from_secs(3600);
+            self.reported.retain(|_, until| *until > recent);
         }
-        self.reported.insert(key, now);
         tracing::warn!(target: "paperless.guard", path = %f.path, reason = f.reason.as_str(), detail = %f.detail, "suspicious change in media folder");
-        if let Err(e) = self.reporter.finding(&f).await {
-            tracing::error!(target: "paperless.guard", error = %e, "could not store guard finding");
+        // suppress repeats for 24 h only once the finding is stored; otherwise retry soon
+        match self.reporter.finding(&f).await {
+            Ok(()) => {
+                self.reported.insert(key, now + REPORT_SUPPRESS);
+            }
+            Err(e) => {
+                tracing::error!(target: "paperless.guard", error = %e, "could not store guard finding");
+                self.reported.insert(key, now + REPORT_RETRY);
+            }
         }
         let window = Duration::from_secs(self.cfg.window_minutes.max(1) as u64 * 60);
         self.window.push_back(now);
@@ -468,7 +516,8 @@ impl Engine {
                 let sha = tokio::task::spawn_blocking(move || sha256_file(&abs)).await;
                 let bad = match sha {
                     Ok(Ok(s)) => !s.eq_ignore_ascii_case(&want),
-                    Ok(Err(e)) => e.kind() == std::io::ErrorKind::NotFound,
+                    // missing or unreadable: evaluate() decides (deleted / could not be read)
+                    Ok(Err(_)) => true,
                     Err(_) => false,
                 };
                 if bad {
@@ -656,6 +705,137 @@ mod tests {
         r.changed.sort();
         assert_eq!(r.changed, vec!["documents/originals/a.pdf", "documents/originals/c.pdf.locked"]);
         assert_eq!(r.removed, 1);
+    }
+
+    fn cfg() -> GuardConfig {
+        GuardConfig { grace_secs: 0, ..GuardConfig::from_lookup(|_| None) }
+    }
+
+    /// Reporter whose first `fail` stores fail.
+    #[derive(Default)]
+    struct FlakyReporter {
+        fail: std::sync::atomic::AtomicUsize,
+        stored: std::sync::Mutex<Vec<Finding>>,
+    }
+
+    impl Reporter for FlakyReporter {
+        fn finding<'a>(&'a self, f: &'a Finding) -> BoxFuture<'a, Result<(), String>> {
+            let failing = self
+                .fail
+                .try_update(std::sync::atomic::Ordering::SeqCst, std::sync::atomic::Ordering::SeqCst, |n| n.checked_sub(1))
+                .is_ok();
+            if !failing && let Ok(mut g) = self.stored.lock() {
+                g.push(f.clone());
+            }
+            Box::pin(async move { if failing { Err("database unavailable".to_string()) } else { Ok(()) } })
+        }
+        fn trigger(&self, _files: usize, _window: i64) -> BoxFuture<'_, Result<(), String>> {
+            Box::pin(async { Ok(()) })
+        }
+        fn is_triggered(&self) -> bool {
+            false
+        }
+    }
+
+    /// Regression: the finding was marked as reported before it was stored; after a failed
+    /// store it stayed suppressed for 24 h. Now only a stored finding is suppressed that long.
+    #[tokio::test]
+    async fn failed_store_does_not_suppress_the_finding_for_a_day() {
+        let rep = Arc::new(FlakyReporter::default());
+        rep.fail.store(1, std::sync::atomic::Ordering::SeqCst);
+        let mut e = Engine::new(PathBuf::from("."), cfg(), Arc::new(MemoryCatalog::default()), rep.clone());
+        let f = Finding { path: "documents/originals/a.pdf".into(), reason: Reason::Modified, detail: "x".into() };
+        let t0 = Instant::now();
+        e.record(f.clone(), t0).await;
+        assert!(rep.stored.lock().unwrap().is_empty());
+        // retried after the short delay, then stored
+        e.record(f.clone(), t0 + Duration::from_secs(301)).await;
+        assert_eq!(rep.stored.lock().unwrap().len(), 1);
+        // stored: suppressed now
+        let s = e.record(f.clone(), t0 + Duration::from_secs(3600)).await;
+        assert_eq!(s.findings, 0);
+        assert_eq!(rep.stored.lock().unwrap().len(), 1);
+    }
+
+    /// Hold a file so that reading it fails (Windows: no sharing; Unix: no permissions).
+    /// Returns `None` if that is not possible here (e.g. running as root).
+    fn lock_file(p: &Path) -> Option<Box<dyn std::any::Any>> {
+        #[cfg(windows)]
+        {
+            use std::os::windows::fs::OpenOptionsExt;
+            let f = std::fs::OpenOptions::new().read(true).share_mode(0).open(p).ok()?;
+            Some(Box::new(f))
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(p, std::fs::Permissions::from_mode(0o000)).ok()?;
+            if std::fs::File::open(p).is_ok() {
+                return None;
+            }
+            Some(Box::new(()))
+        }
+    }
+
+    /// Regression: a read error on a file the database expects was "no finding" and the path
+    /// had already left the waiting list.
+    #[tokio::test]
+    async fn unreadable_expected_file_is_a_finding() {
+        let t = tempfile::tempdir().unwrap();
+        let o = t.path().join("documents/originals");
+        std::fs::create_dir_all(&o).unwrap();
+        std::fs::write(o.join("a.pdf"), b"%PDF-1.7 test").unwrap();
+        let cat = Arc::new(MemoryCatalog::default());
+        cat.originals.lock().unwrap().insert("a.pdf".into(), Expected { doc_id: 7, checksum: Some("00".repeat(32)) });
+        let rep = Arc::new(MemoryReporter::default());
+        let mut e = Engine::new(t.path().to_path_buf(), cfg(), cat, rep.clone());
+        let Some(guard) = lock_file(&o.join("a.pdf")) else {
+            eprintln!("cannot make the file unreadable here; test skipped");
+            return;
+        };
+        let now = Instant::now();
+        e.note_change("documents/originals/a.pdf".into(), now);
+        let s = e.process_due(now).await;
+        drop(guard);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(o.join("a.pdf"), std::fs::Permissions::from_mode(0o644)).unwrap();
+        }
+        assert_eq!(s.findings, 1);
+        let g = rep.findings.lock().unwrap();
+        assert_eq!(g[0].reason, Reason::Modified);
+        assert!(g[0].detail.contains("could not be read"), "{}", g[0].detail);
+    }
+
+    /// Catalog that fails a number of times (database briefly unavailable).
+    struct FailingCatalog(std::sync::atomic::AtomicUsize);
+
+    impl Catalog for FailingCatalog {
+        fn lookup<'a>(&'a self, _area: Area, _rel: &'a str) -> BoxFuture<'a, Result<Option<Expected>, String>> {
+            let fail =
+                self.0.try_update(std::sync::atomic::Ordering::SeqCst, std::sync::atomic::Ordering::SeqCst, |n| n.checked_sub(1)).is_ok();
+            Box::pin(async move { if fail { Err("db down".to_string()) } else { Ok(Some(Expected { doc_id: 3, checksum: None })) } })
+        }
+        fn sample(&self, _after: i64, _n: i64) -> BoxFuture<'_, Result<Vec<SampleDoc>, String>> {
+            Box::pin(async { Ok(Vec::new()) })
+        }
+    }
+
+    /// A failed evaluation keeps the path pending; the retry then finds the missing file.
+    #[tokio::test]
+    async fn failed_evaluation_stays_pending() {
+        let t = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(t.path().join("documents/originals")).unwrap();
+        let rep = Arc::new(MemoryReporter::default());
+        let mut e = Engine::new(t.path().to_path_buf(), cfg(), Arc::new(FailingCatalog(1.into())), rep.clone());
+        let now = Instant::now();
+        e.note_change("documents/originals/gone.pdf".into(), now);
+        let s = e.process_due(now).await;
+        assert_eq!((s.findings, e.pending()), (0, 1));
+        let s = e.process_due(now + Duration::from_secs(RETRY_MIN_SECS)).await;
+        assert_eq!((s.findings, e.pending()), (1, 0));
+        assert_eq!(rep.findings.lock().unwrap()[0].reason, Reason::Deleted);
     }
 
     #[test]

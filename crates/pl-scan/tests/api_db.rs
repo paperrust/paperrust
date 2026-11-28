@@ -260,6 +260,11 @@ async fn run(url: String) {
     // a different user does not see the job, a superuser does
     assert_eq!(call(&r, "GET", &format!("/api/x-scan/jobs/{jid}/"), Some(VIEWER), None).await.0, StatusCode::FORBIDDEN);
     assert_eq!(call(&r, "GET", &format!("/api/x-scan/jobs/{jid}/"), Some(SU), None).await.0, StatusCode::OK);
+    // unknown job (e.g. after a restart): 404 with a clear message
+    let (st, v) = call(&r, "GET", "/api/x-scan/jobs/00000000-0000-4000-8000-000000000000/", Some(ADDER), None).await;
+    assert_eq!(st, StatusCode::NOT_FOUND);
+    assert_eq!(v["code"], "job_unknown", "{v}");
+    assert_eq!(v["detail"], pl_scan::api::JOB_UNKNOWN_DETAIL);
     {
         let calls = queue.calls.lock().unwrap();
         assert_eq!(calls.len(), 1);

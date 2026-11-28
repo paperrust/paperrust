@@ -25,6 +25,13 @@
 // warning, no match). The helper itself is bounded by a backtrack budget scaled to the
 // timeout, so an abandoned search always ends. Patterns the linear `regex` crate accepts
 // run inline (linear time, no timeout needed).
+//
+// Remaining limitation: fancy-regex has no cancellation hook, so a helper the caller gave up
+// on keeps running until it finishes or exhausts its backtrack budget (about the timeout at
+// ~50 M steps/s, longer on a slow CPU). To keep such runaways from piling up under load, at
+// most `HELPER_LIMIT` helpers exist at once; when all are busy (typically with abandoned
+// searches) the search runs inline on the caller's thread, bounded by the same budget. That is
+// backpressure instead of unbounded thread growth.
 
 use crate::pyre::shorten;
 
@@ -241,27 +248,84 @@ enum Run<T> {
     TimedOut,
 }
 
+/// Counter of live helper threads with a fixed upper bound.
+struct HelperPool {
+    in_flight: std::sync::atomic::AtomicUsize,
+    max: usize,
+}
+
+impl HelperPool {
+    const fn new(max: usize) -> Self {
+        Self { in_flight: std::sync::atomic::AtomicUsize::new(0), max }
+    }
+
+    /// Reserve a helper slot; `None` when all `max` slots are taken.
+    fn try_acquire(&'static self) -> Option<HelperSlot> {
+        use std::sync::atomic::Ordering;
+        let mut n = self.in_flight.load(Ordering::Acquire);
+        while n < self.max {
+            match self.in_flight.compare_exchange_weak(n, n + 1, Ordering::AcqRel, Ordering::Acquire) {
+                Ok(_) => return Some(HelperSlot(self)),
+                Err(cur) => n = cur,
+            }
+        }
+        None
+    }
+
+    #[cfg(test)]
+    fn in_flight(&self) -> usize {
+        self.in_flight.load(std::sync::atomic::Ordering::Acquire)
+    }
+}
+
+/// Releases its slot when the helper thread ends (also on panic).
+struct HelperSlot(&'static HelperPool);
+
+impl Drop for HelperSlot {
+    fn drop(&mut self) {
+        self.0.in_flight.fetch_sub(1, std::sync::atomic::Ordering::AcqRel);
+    }
+}
+
+/// At most this many regex helper threads at once (process-wide).
+const HELPER_LIMIT: usize = 8;
+
+static HELPERS: HelperPool = HelperPool::new(HELPER_LIMIT);
+
 /// `compiled.search(text, timeout=...)`: inline for linear patterns, otherwise on a helper thread
 /// with a wall-clock limit. `Err` from fancy-regex (budget exhausted) counts as timeout.
 fn run_bounded<T: Send + 'static>(c: &std::sync::Arc<Compiled>, text: &str, f: fn(&fancy_regex::Regex, &str) -> Result<T, ()>) -> Run<T> {
-    let timeout = timeout_seconds();
+    run_bounded_in(&HELPERS, timeout_seconds(), c, text, f)
+}
+
+fn run_bounded_in<T: Send + 'static>(
+    pool: &'static HelperPool,
+    timeout: f64,
+    c: &std::sync::Arc<Compiled>,
+    text: &str,
+    f: fn(&fancy_regex::Regex, &str) -> Result<T, ()>,
+) -> Run<T> {
+    let inline = |c: &Compiled| match f(&c.re, text) {
+        Ok(v) => Run::Done(v),
+        Err(_) => Run::TimedOut,
+    };
     if c.linear || timeout <= 0.0 {
-        return match f(&c.re, text) {
-            Ok(v) => Run::Done(v),
-            Err(_) => Run::TimedOut,
-        };
+        return inline(c);
     }
+    // all helpers busy (e.g. with abandoned runaway searches): run here, bounded by the budget
+    let Some(slot) = pool.try_acquire() else {
+        tracing::debug!(target: "paperless.regex", "all regex helper threads busy, matching inline");
+        return inline(c);
+    };
     let (tx, rx) = std::sync::mpsc::sync_channel(1);
     let (c2, owned) = (std::sync::Arc::clone(c), text.to_string());
     let spawned = std::thread::Builder::new().name("pl-regex".into()).spawn(move || {
+        let _slot = slot;
         let _ = tx.send(f(&c2.re, &owned));
     });
     if spawned.is_err() {
         // no thread available: run here (bounded by the backtrack budget)
-        return match f(&c.re, text) {
-            Ok(v) => Run::Done(v),
-            Err(_) => Run::TimedOut,
-        };
+        return inline(c);
     }
     match rx.recv_timeout(std::time::Duration::from_secs_f64(timeout)) {
         Ok(Ok(v)) => Run::Done(v),
@@ -503,5 +567,35 @@ mod tests {
         assert_eq!(translate_replacement(r"\1 month"), "${1} month");
         assert_eq!(translate_replacement(r"\g<n>$"), "${n}$$");
         assert_eq!(safe_regex_sub(r"(\d+)h", r"\1:00", "5h", false).as_deref(), Some("5:00"));
+    }
+
+    /// Stand-in for a runaway backtracking search: takes 400 ms, then reports "no match".
+    fn slow_find(_: &fancy_regex::Regex, _: &str) -> Result<Option<RegexMatch>, ()> {
+        std::thread::sleep(std::time::Duration::from_millis(400));
+        Ok(None)
+    }
+
+    #[test]
+    fn abandoned_helpers_cannot_pile_up() {
+        // Regression: every timed-out search left its helper thread running and the next search
+        // spawned another one, so runaway threads accumulated without bound under load.
+        static POOL: HelperPool = HelperPool::new(1);
+        let c = compile_cached(r"(a)\1", false).unwrap();
+        assert!(!c.linear);
+        // first search times out after 20 ms; its helper keeps running (holds the only slot)
+        assert!(matches!(run_bounded_in(&POOL, 0.02, &c, "aa", slow_find), Run::TimedOut));
+        assert_eq!(POOL.in_flight(), 1);
+        // second search: no second helper, it runs inline and therefore completes
+        let t0 = std::time::Instant::now();
+        assert!(matches!(run_bounded_in(&POOL, 0.02, &c, "aa", slow_find), Run::Done(None)));
+        assert!(t0.elapsed() >= std::time::Duration::from_millis(300), "ran inline, not on a helper");
+        assert!(POOL.in_flight() <= 1);
+        // the abandoned helper ends and frees its slot; then helpers are used again
+        let t0 = std::time::Instant::now();
+        while POOL.in_flight() > 0 && t0.elapsed() < std::time::Duration::from_secs(5) {
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        assert_eq!(POOL.in_flight(), 0);
+        assert!(matches!(run_bounded_in(&POOL, 2.0, &c, "aa", find_owned), Run::Done(Some(_))));
     }
 }

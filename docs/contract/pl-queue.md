@@ -398,6 +398,28 @@ zusammen neu starten (ein alter Worker erhöht `fence_token` nicht).
     hat, wird nicht ausgeführt und nichts geschrieben; der Aufräumer stellt ihn neu zu (höchstens
     einmal gleichzeitig, mindestens einmal insgesamt). Celery kennt keine Lease.
 
+18. **Obergrenze für Zeitangaben** (2026-11-27): `PAPERRUST_QUEUE_VISIBILITY_TIMEOUT`,
+    `…_POLL_INTERVAL`, `…_SHUTDOWN_GRACE`, `…_RESULT_EXPIRES` und `PAPERLESS_WORKER_TIMEOUT` dürfen
+    höchstens 31 536 000 s (1 Jahr, `config::MAX_DURATION_SECS`) sein; größere Werte brechen den Start
+    mit „<KEY> must be at most 31536000 seconds (1 year)“ ab (vorher: Panik in
+    `Duration::from_secs_f64` bzw. Überlauf von `Instant`). Im Worker werden Sekunden über
+    `secs_or` begrenzt (riesiges `time_limit` einer Aufgabe → 1 Jahr statt sofortigem Abbruch) und
+    `Instant`-Rechnungen mit `checked_add` (Überlauf → Fence sofort, sichere Seite); „sofort
+    aufräumen“ ist ein Merker statt `now − reap_every`. upstream (`get_int_from_env`) hat keine Grenze.
+    Tests: `config::tests::duration_settings_are_bounded`, `worker::tests::huge_durations_are_capped_and_never_panic`.
+19. **Beat zeichnet einen Lauf nur mit erfolgreichem Einreihen auf** (2026-11-27,
+    `BeatStore::run_due`): Celery (`Scheduler.reserve` vor `apply_async`, `apply_entry` loggt Sendefehler
+    nur) verliert den Lauf bei Sendefehler oder Absturz dazwischen; bis 2026-11-27 tat PaperRust das
+    ebenso (`reserve` committete `last_run_at`/`total_run_count` vor dem Einreihen). Jetzt: Fälligkeit
+    prüfen (Zeilensperre `FOR UPDATE`), einreihen und `last_run_at`/`total_run_count` schreiben in
+    **einer** Transaktion (`TaskQueue::enqueue_in_conn`, von `PgQueue` umgesetzt). Scheitert das
+    Einreihen, wird zurückgerollt: nichts aufgezeichnet, der nächste Durchlauf (Backoff von `Beat::run`,
+    der Fehler zählt als Zustandsfehler) versucht es erneut. Kann eine Warteschlange nicht in der
+    Transaktion einreihen, wird unter gehaltener Sperre separat eingereiht (Absturz zwischen beiden
+    Commits → Lauf doppelt, nie verloren). `MemoryBeatStore` merkt den Lauf ebenfalls erst nach
+    erfolgreichem Einreihen. `reserve` bleibt für Tests/Kompatibilität. Tests:
+    `beat::tests::failed_enqueue_is_retried_not_lost`, DB (`#[ignore]`): `beat_records_run_only_with_enqueue`.
+
 ## Ergänzung 2026-11-18: Wartungsaufgaben (A1)
 
 `maintenance::cleanup_expired_share_link_bundles(pool, SHARE_LINK_BUNDLE_DIR)` =
@@ -408,6 +430,13 @@ Fehler → Warnung `Failed to delete expired share link bundle <id>: …`), am E
 `Deleted <n> expired share link bundle(s)`. Registriert in pl-server `register_document_handlers`;
 damit läuft auch der Beat-Eintrag (`SHARE_LINK_BUNDLE_CLEANUP_CRON`). DB-Test `#[ignore]` (braucht eine
 beschreibbare paperless-DB, `PAPERRUST_TEST_DATABASE_URL`).
+
+*Known difference (2026-11-27):* upstream ignoriert Löschfehler der ZIP-Datei und löscht die Zeile trotzdem;
+so konnte ein abgelaufenes ZIP mit Dokumentinhalten ohne Verweis liegen bleiben. PaperRust löscht die Zeile
+nur, wenn die Datei weg ist (gelöscht, nicht vorhanden oder außerhalb des Bündelordners); sonst Warnung
+`Failed to delete the file of expired share link bundle <id>, keeping it for the next run: …` und das Bündel
+bleibt für den nächsten Lauf. Schlusszeile `Deleted <n> of <m> expired share link bundle(s)`, Rückgabe = wirklich
+gelöschte Bündel. Test: `maintenance::tests::remove_file_reports_failure`.
 
 ## Last-Befunde B2/B7 (2026-11-18)
 

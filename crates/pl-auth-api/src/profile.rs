@@ -171,14 +171,10 @@ pub async fn patch_profile(State(state): State<AppState>, req: Request) -> Respo
                     any = true;
                 }
             }
+            // PaperRust: on a password change the device tokens (`prt_…`) are revoked in the same
+            // transaction as the UPDATE; DRF token stays as upstream (security review 2026-11-19 F13).
             if any {
-                let (sql, values) = q.build_sqlx(PostgresQueryBuilder);
-                sqlx::query_with(&sql, values).execute(state.db()).await?;
-            }
-            if password_changed {
-                // PaperRust: revoke device token (`prt_…`); DRF token stays as upstream
-                // (security review 2026-11-19 F13).
-                pl_authz::device::revoke_all_for_user(state.db(), user.id).await?;
+                db::update_user_and_revoke(state.db(), Some(&q), password_changed.then_some(user.id)).await?;
             }
             let body = profile_repr(&state, user.id).await?;
             Ok(Drf::ok(body).into_response())
@@ -298,16 +294,12 @@ pub async fn totp_post(State(state): State<AppState>, req: Request) -> Response 
             let valid = totp::validate_totp_code(&secret, &code).map_err(|_| server_error("binascii.Error: invalid base32 secret"))?;
             let mut recovery: Value = Value::Null;
             if valid {
-                let db = state.db();
-                db::insert_authenticator(db, user_id, "totp", json!({ "secret": secret }))
+                // TOTP.activate + auto_generate_recovery_codes in one transaction (all or nothing).
+                let seed = totp::generate_recovery_seed();
+                let created = db::activate_totp(state.db(), user_id, &secret, &seed)
                     .await
                     .map_err(|e| if db::is_unique_violation(&e) { server_error("IntegrityError: TOTP exists") } else { HErr::from(e) })?;
-                // auto_generate_recovery_codes
-                let has_rc = !db::authenticators(db, user_id, Some("recovery_codes")).await?.is_empty();
-                if !has_rc {
-                    let seed = totp::generate_recovery_seed();
-                    let rc_data = json!({ "seed": seed, "used_mask": 0 });
-                    db::insert_authenticator(db, user_id, "recovery_codes", rc_data.clone()).await?;
+                if let Some(rc_data) = created {
                     recovery = Value::Array(totp::unused_recovery_codes(&rc_data).into_iter().map(Value::String).collect());
                 }
             }

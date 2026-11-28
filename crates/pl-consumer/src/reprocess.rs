@@ -177,7 +177,10 @@ impl Consumer {
         };
         let mut text_opt = parsed.text.clone();
         // PaperRust: AI text recognition (chosen, "always" or little text); page count as stored
-        self.apply_vision(ai_ocr, source, &mime_type, parsed.archive_path.as_deref(), &mut text_opt, document.page_count).await;
+        let ptmp = work.path.join("parser");
+        let transcript = self
+            .apply_vision(ai_ocr, source, &mime_type, parsed.archive_path.as_deref(), Some(&ptmp), &mut text_opt, document.page_count)
+            .await;
         let text = text_opt.unwrap_or_default();
         let archive = parsed.archive_path.clone().filter(|p| p.is_file());
         let audit = AuditLog { enabled: self.settings.audit_log_enabled, actor_id: None };
@@ -257,7 +260,14 @@ impl Consumer {
             }
             move_file(&thumbnail, &thumb_target)?;
         }
+        // PaperRust: incomplete-text note follows the new text (set, or removed when now complete)
+        match parsed.truncation.as_deref() {
+            Some(m) => crate::system_note::set_truncation(&mut tx, document.id, m).await?,
+            None => crate::system_note::clear_truncation(&mut tx, document.id).await?,
+        }
         tx.commit().await?;
+        // PaperRust: AI transcript and "KI-Abschrift" note before the index update (notes are indexed).
+        self.record_vision(document.id, transcript).await;
 
         // document.refresh_from_db()
         let mut conn = self.pool.acquire().await?;

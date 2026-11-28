@@ -164,11 +164,19 @@ pub struct AccountRun<'a> {
     uid_validity: Option<String>,
     /// IMAP commands of this run (diagnostics/parity).
     pub transcript: Vec<String>,
+    /// Account-level error that `handle_mail_account` logged and swallowed like upstream
+    /// (connection, mailbox, every enabled rule failed). Read by `process_mail_accounts`.
+    failure: Option<String>,
 }
 
 impl<'a> AccountRun<'a> {
     pub fn new(worker: &'a MailWorker) -> Self {
-        Self { worker, consumed: HashSet::new(), uid_validity: None, transcript: Vec::new() }
+        Self { worker, consumed: HashSet::new(), uid_validity: None, transcript: Vec::new(), failure: None }
+    }
+
+    /// Error of the account that did not surface as `MailError` (see `failure`).
+    pub fn failure(&self) -> Option<&str> {
+        self.failure.as_deref()
     }
 
     /// `handle_mail_account(account)`: number of files put into the queue.
@@ -181,6 +189,7 @@ impl<'a> AccountRun<'a> {
             Err(ImapError::Mail(m)) => return Err(MailError(m)),
             Err(e) => {
                 tracing::error!(target: "paperless_mail", "Error while retrieving mailbox {}: {e}", account.name);
+                self.failure = Some(format!("Error while retrieving mailbox: {e}"));
                 return Ok(0);
             }
         };
@@ -196,6 +205,7 @@ impl<'a> AccountRun<'a> {
             Err(HandleError::Mail(m)) if logged_out => Err(MailError(m)),
             Err(e) => {
                 tracing::error!(target: "paperless_mail", "Error while retrieving mailbox {}: {e}", account.name);
+                self.failure = Some(format!("Error while retrieving mailbox: {e}"));
                 Ok(0)
             }
         }
@@ -212,7 +222,10 @@ impl<'a> AccountRun<'a> {
             };
             match crate::oauth::refresh_account_oauth_token(&w.pool, &stored, &w.config.mail).await {
                 Ok(Some(_)) => db::reload_account(&w.pool, account).await?,
-                Ok(None) => return Ok(total),
+                Ok(None) => {
+                    self.failure = Some("Unable to refresh oauth token".into());
+                    return Ok(total);
+                }
                 Err(e) => return Err(HandleError::Other(format!("KeyError: {e:?}"))),
             }
         }
@@ -223,11 +236,14 @@ impl<'a> AccountRun<'a> {
         mb.login(&account.username, &account.password, account.is_token).await?;
         let rules = db::rules_of(&w.pool, account.id).await?;
         tracing::debug!(target: "paperless_mail", "Account {}: Processing {} rule(s)", account.name, rules.len());
+        let mut tried = 0usize;
+        let mut rule_errors: Vec<String> = Vec::new();
         for rule in rules {
             if !rule.enabled {
                 tracing::debug!(target: "paperless_mail", "Rule {}: Skipping disabled rule", rule.display());
                 continue;
             }
+            tried += 1;
             match self.handle_mail_rule(mb, &rule, account, supports_gmail_labels).await {
                 Ok(n) => {
                     total += n;
@@ -238,9 +254,13 @@ impl<'a> AccountRun<'a> {
                 }
                 Err(e) => {
                     tracing::error!(target: "paperless_mail", "Rule {}: Error while processing rule: {e}", rule.display());
+                    rule_errors.push(e.to_string());
                     // connection broken (imaplib abort): all further commands fail as well
                 }
             }
+        }
+        if tried > 0 && rule_errors.len() == tried {
+            self.failure = Some(format!("all {tried} enabled rule(s) failed: {}", rule_errors.join("; ")));
         }
         Ok(total)
     }
@@ -395,13 +415,40 @@ impl<'a> AccountRun<'a> {
             message.from_(),
             atts.len()
         );
-        let w = self.worker;
-        let tag_ids = db::rule_tag_ids(&w.pool, rule.id).await?;
+        let tag_ids = db::rule_tag_ids(&self.worker.pool, rule.id).await?;
+        processed += self.consume_message(message, &atts, rule, &tag_ids).await?;
+        Ok(processed)
+    }
+
+    /// eml and attachment parts of `_handle_message`.
+    ///
+    /// upstream queues one chord per part (`_process_eml` and `_process_attachments` each call
+    /// `queue_consumption_tasks`), so with "process mail and attachments" the mail action runs
+    /// twice and may move/delete the mail while an attachment is still being consumed or after
+    /// it failed. PaperRust collects all consume tasks of the message into one chord: the action
+    /// runs once, only after every part succeeded (Known differences).
+    async fn consume_message(
+        &mut self,
+        message: &FetchedMessage,
+        atts: &[super::message::Attachment],
+        rule: &Rule,
+        tag_ids: &[i64],
+    ) -> Result<i64, HandleError> {
+        let mut processed = 0;
+        let mut consume_tasks = Vec::new();
         if rule.consumption_scope == SCOPE_EML_ONLY || rule.consumption_scope == SCOPE_EVERYTHING {
-            processed += self.process_eml(message, rule, &tag_ids).await?;
+            consume_tasks.push(self.process_eml(message, rule, tag_ids).await?);
+            processed += 1;
         }
         if rule.consumption_scope == SCOPE_ATTACHMENTS_ONLY || rule.consumption_scope == SCOPE_EVERYTHING {
-            processed += self.process_attachments(message, &atts, rule, &tag_ids).await?;
+            let mut att_tasks = self.process_attachments(message, atts, rule, tag_ids).await?;
+            processed += i64::try_from(att_tasks.len()).unwrap_or(i64::MAX);
+            consume_tasks.append(&mut att_tasks);
+        }
+        if consume_tasks.is_empty() {
+            self.record_processed_without_consumption(message, rule).await?;
+        } else {
+            self.queue_consumption_tasks(consume_tasks, rule, message).await?;
         }
         Ok(processed)
     }
@@ -455,9 +502,8 @@ impl<'a> AccountRun<'a> {
         atts: &[super::message::Attachment],
         rule: &Rule,
         tag_ids: &[i64],
-    ) -> Result<i64, HandleError> {
+    ) -> Result<Vec<pl_queue::Signature>, HandleError> {
         let w = self.worker;
-        let mut processed = 0;
         let mut consume_tasks = Vec::new();
         for att in atts {
             if att.content_disposition != "attachment" && rule.attachment_type == ATTACHMENT_TYPE_ATTACHMENTS_ONLY {
@@ -493,20 +539,14 @@ impl<'a> AccountRun<'a> {
                     ..Default::default()
                 };
                 consume_tasks.push(consume_signature(&input, &overrides)?);
-                processed += 1;
             } else {
                 tracing::debug!(target: "paperless_mail", "Rule {}: Skipping attachment {} since guessed mime type {mime_type} is not supported by PaperRust", rule.display(), att.filename);
             }
         }
-        if !consume_tasks.is_empty() {
-            self.queue_consumption_tasks(consume_tasks, rule, message).await?;
-        } else {
-            self.record_processed_without_consumption(message, rule).await?;
-        }
-        Ok(processed)
+        Ok(consume_tasks)
     }
 
-    async fn process_eml(&mut self, message: &FetchedMessage, rule: &Rule, tag_ids: &[i64]) -> Result<i64, HandleError> {
+    async fn process_eml(&mut self, message: &FetchedMessage, rule: &Rule, tag_ids: &[i64]) -> Result<pl_queue::Signature, HandleError> {
         let w = self.worker;
         let bytes = super::generator::eml_bytes(&message.mail.msg).map_err(|e| HandleError::Other(e.0))?;
         let temp_filename = mkstemp_eml(&w.config.scratch_dir, &bytes).map_err(|e| HandleError::Other(e.to_string()))?;
@@ -525,9 +565,7 @@ impl<'a> AccountRun<'a> {
             owner_id: rule.owner_id.map(i64::from),
             ..Default::default()
         };
-        let sig = consume_signature(&input, &overrides)?;
-        self.queue_consumption_tasks(vec![sig], rule, message).await?;
-        Ok(1)
+        consume_signature(&input, &overrides)
     }
 
     /// `queue_consumption_tasks`: `chord(consume_tasks, apply_mail_action.s(...)).on_error(error_callback.s(...))`.
@@ -544,6 +582,9 @@ impl<'a> AccountRun<'a> {
         // naive stays naive (apply_mail_action makes it aware); here already aware in TIME_ZONE
         kw.insert("message_date".into(), json!(py_isoformat(&message.date_aware(self.worker.config.time_zone))));
         kw.insert("uid_validity".into(), self.uid_validity.clone().map(Value::from).unwrap_or(Value::Null));
+        // PaperRust: where the UID was valid, checked by apply_mail_action before acting
+        kw.insert("folder".into(), json!(rule.folder));
+        kw.insert("account_id".into(), json!(rule.account_id));
         let body = pl_queue::Signature::new(TASK_APPLY_MAIL_ACTION, kw.clone());
         let on_error = pl_queue::Signature::new(TASK_ERROR_CALLBACK, kw);
         self.worker
@@ -654,6 +695,171 @@ mod tests {
         assert_eq!(py_isoformat(&d2), "1900-01-01T00:00:00+00:34:08");
         assert_eq!(parse_py_isoformat("1900-01-01T00:00:00+00:34:08"), Some(d2));
         assert_eq!(parse_py_isoformat("2025-01-06T08:00:00+01:00"), Some(d));
+    }
+
+    /// (header, body, on_error) of one chord.
+    type Chord = (Vec<pl_queue::Signature>, pl_queue::Signature, Option<pl_queue::Signature>);
+
+    /// Records every chord; refuses everything else.
+    #[derive(Default)]
+    struct ChordRecorder {
+        chords: std::sync::Mutex<Vec<Chord>>,
+    }
+
+    impl pl_queue::TaskQueue for ChordRecorder {
+        fn enqueue<'a>(
+            &'a self,
+            _task_name: &'a str,
+            _kwargs: Map<String, Value>,
+            _opts: pl_queue::EnqueueOptions,
+        ) -> futures::future::BoxFuture<'a, Result<uuid::Uuid, pl_queue::QueueError>> {
+            Box::pin(async { Err(pl_queue::QueueError::Unsupported("enqueue".into())) })
+        }
+
+        fn status(&self, _task_id: uuid::Uuid) -> futures::future::BoxFuture<'_, Result<Option<pl_queue::TaskInfo>, pl_queue::QueueError>> {
+            Box::pin(async { Ok(None) })
+        }
+
+        fn enqueue_chord(
+            &self,
+            header: Vec<pl_queue::Signature>,
+            body: pl_queue::Signature,
+            on_error: Option<pl_queue::Signature>,
+        ) -> futures::future::BoxFuture<'_, Result<uuid::Uuid, pl_queue::QueueError>> {
+            self.chords.lock().unwrap().push((header, body, on_error));
+            Box::pin(async { Ok(uuid::Uuid::nil()) })
+        }
+    }
+
+    fn test_worker(queue: Arc<ChordRecorder>, scratch: PathBuf) -> MailWorker {
+        // lazy pool, never connected: the tested path needs no database
+        let pool = sqlx::postgres::PgPoolOptions::new().connect_lazy("postgres://nobody:none@127.0.0.1:1/none").unwrap();
+        let tz: chrono_tz::Tz = "Europe/Berlin".parse().unwrap();
+        let connect = super::super::client::ConnectOptions {
+            allow_internal_hosts: true,
+            certificate_file: None,
+            timeout: std::time::Duration::from_secs(5),
+            extra_roots: Vec::new(),
+        };
+        let mail = crate::ctx::MailConfig {
+            time_zone: tz,
+            allow_internal_hosts: true,
+            certificate_file: None,
+            gmail_client_id: None,
+            gmail_client_secret: None,
+            outlook_client_id: None,
+            outlook_client_secret: None,
+            gmail_token_url: String::new(),
+            outlook_token_url: String::new(),
+            imap_timeout: std::time::Duration::from_secs(5),
+            proxy_ssl_header: None,
+        };
+        let config = super::super::MailWorkerConfig {
+            time_zone: tz,
+            scratch_dir: scratch,
+            connect,
+            mail,
+            audit_log_enabled: false,
+            gpg: Default::default(),
+        };
+        MailWorker::new(pool, queue, config)
+    }
+
+    fn test_rule(scope: i16) -> Rule {
+        Rule {
+            id: 10,
+            name: "everything".into(),
+            account_id: 1,
+            account_name: "fake".into(),
+            enabled: true,
+            folder: "INBOX".into(),
+            filter_from: None,
+            filter_to: None,
+            filter_subject: None,
+            filter_body: None,
+            filter_attachment_filename_include: None,
+            filter_attachment_filename_exclude: None,
+            maximum_age: 30,
+            action: criteria::ACTION_DELETE,
+            action_parameter: None,
+            assign_title_from: TITLE_FROM_SUBJECT,
+            assign_correspondent_from: CORRESPONDENT_FROM_NOTHING,
+            assign_correspondent_id: None,
+            assign_document_type_id: None,
+            assign_owner_from_rule: false,
+            order: 0,
+            attachment_type: ATTACHMENT_TYPE_ATTACHMENTS_ONLY,
+            consumption_scope: scope,
+            owner_id: None,
+            stop_processing: false,
+        }
+    }
+
+    const PDF: &[u8] = b"%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n";
+
+    fn message_with_pdf() -> FetchedMessage {
+        use base64::Engine;
+        let b64 = base64::engine::general_purpose::STANDARD.encode(PDF);
+        let raw = format!(
+            "From: a@example.org\r\nTo: b@example.org\r\nSubject: Invoice\r\nDate: Mon, 6 Jan 2025 08:00:00 +0100\r\n\
+             MIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"XX\"\r\n\r\n\
+             --XX\r\nContent-Type: text/plain\r\n\r\nsee attachment\r\n\
+             --XX\r\nContent-Type: application/pdf\r\nContent-Disposition: attachment; filename=\"a.pdf\"\r\n\
+             Content-Transfer-Encoding: base64\r\n\r\n{b64}\r\n--XX--\r\n"
+        );
+        let items = vec![
+            super::super::client::Item::Literal(b"1 (UID 42 BODY[] {0}".to_vec(), raw.into_bytes()),
+            super::super::client::Item::Line(b")".to_vec()),
+        ];
+        FetchedMessage::from_fetch_items(&items)
+    }
+
+    /// Review finding 3: "process mail and attachments" must queue the eml and all attachments in
+    /// ONE chord, so the mail action runs once, after every part succeeded.
+    #[tokio::test]
+    async fn everything_scope_queues_one_chord_for_eml_and_attachments() {
+        assert_eq!(pl_parsers::mime::detect_bytes(PDF), "application/pdf");
+        let scratch = std::env::temp_dir().join(format!("paperrust-mail-chord-{}", uuid::Uuid::new_v4().simple()));
+        let queue = Arc::new(ChordRecorder::default());
+        let w = test_worker(queue.clone(), scratch.clone());
+        let mut run = AccountRun::new(&w);
+        run.uid_validity = Some("7".into());
+        let message = message_with_pdf();
+        let atts = message.attachments();
+        assert_eq!(atts.len(), 1);
+        let rule = test_rule(SCOPE_EVERYTHING);
+        let n = run.consume_message(&message, &atts, &rule, &[]).await.unwrap();
+        assert_eq!(n, 2);
+        let chords = queue.chords.lock().unwrap();
+        assert_eq!(chords.len(), 1, "one chord for the whole message");
+        let (header, body, on_error) = &chords[0];
+        assert_eq!(header.len(), 2);
+        assert!(header.iter().all(|s| s.task == pl_consumer::task::TASK_NAME));
+        assert_eq!(body.task, TASK_APPLY_MAIL_ACTION);
+        assert_eq!(body.kwargs.get("message_uid"), Some(&json!("42")));
+        assert_eq!(body.kwargs.get("uid_validity"), Some(&json!("7")));
+        assert_eq!(body.kwargs.get("folder"), Some(&json!("INBOX")));
+        assert_eq!(body.kwargs.get("account_id"), Some(&json!(1)));
+        assert_eq!(on_error.as_ref().map(|s| s.task.as_str()), Some(TASK_ERROR_CALLBACK));
+        drop(chords);
+        let _ = std::fs::remove_dir_all(&scratch);
+    }
+
+    #[tokio::test]
+    async fn attachments_scope_queues_one_chord() {
+        let scratch = std::env::temp_dir().join(format!("paperrust-mail-chord-{}", uuid::Uuid::new_v4().simple()));
+        let queue = Arc::new(ChordRecorder::default());
+        let w = test_worker(queue.clone(), scratch.clone());
+        let mut run = AccountRun::new(&w);
+        let message = message_with_pdf();
+        let atts = message.attachments();
+        let n = run.consume_message(&message, &atts, &test_rule(SCOPE_ATTACHMENTS_ONLY), &[]).await.unwrap();
+        assert_eq!(n, 1);
+        let chords = queue.chords.lock().unwrap();
+        assert_eq!(chords.len(), 1);
+        assert_eq!(chords[0].0.len(), 1);
+        drop(chords);
+        let _ = std::fs::remove_dir_all(&scratch);
     }
 
     #[test]
