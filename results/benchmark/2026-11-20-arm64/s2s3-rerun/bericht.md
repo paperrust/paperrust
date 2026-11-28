@@ -1,4 +1,4 @@
-# Mehrbenutzer-Last S2/S3, Nachlauf (Jetson Orin Nano, 2026-11-20)
+# Mehrbenutzer-Last S2/S3, Nachlauf (arm64-Testgerät, 2026-11-20)
 
 Nachlauf, weil S2/S3 in der Messung vom 20.11. früh (`../bericht.md`) ohne Hochladen liefen (fehlende
 Zusatzdokumente im Messskript, alle Nutzer-Threads brachen ab). Jetzt mit 1 000 Zusatzdokumenten, Uploads

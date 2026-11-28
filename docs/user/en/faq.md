@@ -70,7 +70,7 @@ As in paperless-ngx 3.x: duplicates are consumed and marked by default; with
 
 ## How much memory does PaperRust need? Does it run on a Raspberry Pi?
 
-Measured on a small ARM computer (NVIDIA Jetson Orin Nano, 6 cores, 8 GB RAM, Docker): right after
+Measured on a small ARM computer (6 cores, 8 GB RAM, Docker): right after
 starting, about 100 MiB for PaperRust plus about 70 MiB for PostgreSQL. After consuming documents with
 text recognition, PaperRust held on to about 900 MiB in this measurement; this has been improved since
 (language models are freed after a period of inactivity), and a new measurement will follow. The

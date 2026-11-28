@@ -162,7 +162,7 @@ ix.optimize()                                                       // no-op wie
 
 ## Known differences
 
-0. **Frisch geleerter Index bleibt „neu aufzubauen“** (Jetson-Prüfung B1, 2026-11-19):
+0. **Frisch geleerter Index bleibt „neu aufzubauen“** (arm64-Prüfung B1, 2026-11-19):
    `open_or_rebuild_index` setzt nach dem Leeren (Einstellungen passen nicht / Index kaputt) zusätzlich
    die Neuaufbau-Marke. Upstream verlässt sich darauf, dass der Docker-Start `document_index reindex
    --if-needed` vor jedem anderen Öffnen ausführt; bei PaperRust öffnet der Server zuerst, und der

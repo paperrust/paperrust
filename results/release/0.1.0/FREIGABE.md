@@ -15,7 +15,7 @@ Legende: ✅ bestanden mit Nachweis · ⏳ läuft / folgt · ⚠️ teilweise ·
 | Klicktests klassische Oberfläche | ✅ 17/17, zweimal in Folge (6 Abläufe an die überarbeitete Oberfläche angepasst: Texte, Testdaten, Design-Vorgabe; kein Oberflächenfehler) | `results/e2e/light-flows/2026-11-20-r1`, `-r2` |
 | Parität zu paperless-ngx (Paritäts-Suiten gegen Django-Referenz) | ❌ in dieser Runde nicht gelaufen (Django-Referenz nicht gestartet) | – |
 | Lückenliste `docs/LUECKEN-NGX.md` | ✅ 50 geschlossen, 1 bewusst (C4) | `docs/LUECKEN-NGX.md` |
-| Alle Dateitypen mit echten Beispielen | ⚠️ Jetson-Messung (PDF digital/Scan, Fotos, Office); Fotos 20.11. wieder 3/3 gefunden | `results/benchmark/*` |
+| Alle Dateitypen mit echten Beispielen | ⚠️ arm64-Messung (PDF digital/Scan, Fotos, Office); Fotos 20.11. wieder 3/3 gefunden | `results/benchmark/*` |
 
 ## 2. Daten und Umstieg
 
@@ -24,7 +24,7 @@ Legende: ✅ bestanden mit Nachweis · ⏳ läuft / folgt · ⚠️ teilweise ·
 | Umstieg von ngx 3.4.2 / 2.20 / 1.17 | ✅ 3.4.2 ohne Abweichung; 2.20 erwartete Unterschiede; 1.x über 2.20 (Export aus 1.x wird klar abgelehnt) | `results/release/migration/BERICHT.md` |
 | Suche nach Umstieg (B1) | ✅ behoben + Test | Commit 9dbb039 |
 | Rückweg zu ngx (Export) | ⚠️ Format 3.4.2, in früheren Läufen geprüft; in dieser Runde nicht wiederholt | `docs/user/umstieg.md` |
-| Sicherung/Wiederherstellung | ✅ komplette Wiederherstellung auf frischem System (Jetson, bf77585): 40 Dokumente über drei Wege (Export/Import, pg_dump, `backup restore`), Dateien byte-gleich, Metadaten/Rechte/Suche/Anmeldung gleich; Hinweis zu Dateirechten in die Doku | `results/release/restore/2026-11-20.md` |
+| Sicherung/Wiederherstellung | ✅ komplette Wiederherstellung auf frischem System (Testgerät, bf77585): 40 Dokumente über drei Wege (Export/Import, pg_dump, `backup restore`), Dateien byte-gleich, Metadaten/Rechte/Suche/Anmeldung gleich; Hinweis zu Dateirechten in die Doku | `results/release/restore/2026-11-20.md` |
 | Konsistenzprüfung nach Last | ✅ nach 24 h sauber | `results/release/soak/2026-11-19-24h/` |
 
 ## 3. Last, Gleichzeitigkeit, Ausfälle
@@ -35,7 +35,7 @@ Legende: ✅ bestanden mit Nachweis · ⏳ läuft / folgt · ⚠️ teilweise ·
 | Dauerlauf 24 h | ✅ 0 Server-Fehler, Speicher stabil | `results/release/soak/2026-11-19-24h/AUSWERTUNG.md` |
 | Ausfälle (Chaos) | ✅ (18.11.) | `results/release/chaos/` |
 | Großes Archiv | ⚠️ 2 230 Dokumente gemessen; 100 000 / 1 Mio. nur DB-Stichprobe | `docs/PERF-SCALE.md` |
-| Leistungsvergleich gegen ngx (Release-Stand) | ✅ e546b8f: 230 Dok. in 106 s statt 1 796 s, Start 3,3 s statt 53 s, Leerlauf nach Einlesen 494 statt 751 MiB; Schwäche DB-RAM/-Größe benannt. S2/S3 (Mehrbenutzer, mit Uploads) im Nachlauf bf77585: Median 4–6 ms statt 68–84 ms bei ngx, 0 Fehler (`s2s3-rerun/bericht.md`) | `results/benchmark/2026-11-20-jetson/bericht.md` |
+| Leistungsvergleich gegen ngx (Release-Stand) | ✅ e546b8f: 230 Dok. in 106 s statt 1 796 s, Start 3,3 s statt 53 s, Leerlauf nach Einlesen 494 statt 751 MiB; Schwäche DB-RAM/-Größe benannt. S2/S3 (Mehrbenutzer, mit Uploads) im Nachlauf bf77585: Median 4–6 ms statt 68–84 ms bei ngx, 0 Fehler (`s2s3-rerun/bericht.md`) | `results/benchmark/2026-11-20-arm64/bericht.md` |
 | Plattenbedarf | ✅ nach Entscheidung des Besitzers (pro Dokument, Sockel erlaubt) | `results/release/2026-11-19-platte-und-start.md` |
 
 ## 4. Sicherheit
@@ -53,7 +53,7 @@ Legende: ✅ bestanden mit Nachweis · ⏳ läuft / folgt · ⚠️ teilweise ·
 | Punkt | Stand | Nachweis |
 |---|---|---|
 | Docker amd64 | ✅ gebaut + Rauchtest | `results/release/docker/2026-11-20-amd64.md` |
-| Docker arm64 | ✅ gebaut (Jetson, 20.11.) und gemessen | `results/benchmark/2026-11-20-jetson/` |
+| Docker arm64 | ✅ gebaut (Testgerät, 20.11.) und gemessen | `results/benchmark/2026-11-20-arm64/` |
 | Desktop Linux (x86_64) | ✅ Paket im Debian-12-Container gebaut (`apps/desktop/pack/linux-build.sh`, glibc ≥ 2.36), **Tesseract 5.3 + deu/eng/osd eingebaut**, 135 MB; frisches Ubuntu 24.04 und Debian 12 ohne System-Tesseract: Start, automatische Anmeldung, Scan mit Texterkennung ✅; Fenster (WebKitGTK) in WSL ✅. Funde behoben: Anmeldeschlüssel im Protokoll, unvollständige Lizenzliste | `results/desktop/linux/` (nicht versioniert) |
 | Desktop Windows: echte Installation/Update/Deinstallation | ✅ (Fehler „alte Dateien bleiben“ gefunden und behoben) | `results/release/desktop/2026-11-19-installtest.md` |
 | Desktop ohne Anmeldung | ✅ automatisch angemeldet (Protokoll), „Abmelden“ ausgeblendet; Sichtprüfung durch Besitzer OK (20.11.) | Commits 6b283c6, 43776d9 |
@@ -68,7 +68,7 @@ Legende: ✅ bestanden mit Nachweis · ⏳ läuft / folgt · ⚠️ teilweise ·
 | Punkt | Stand | Nachweis |
 |---|---|---|
 | Doku de/en | ✅ nachgeführt (Teilen/Schwärzen, Desktop-Anmeldung, Umstieg 1.x, Docker amd64) | `docs/user/` |
-| Release-Notizen | ✅ Stand 20.11.; Leistungsteil wird mit Jetson-Zahlen aktualisiert | `docs/RELEASE-NOTES-0.1.0*.md` |
+| Release-Notizen | ✅ Stand 20.11.; Leistungsteil wird mit arm64-Zahlen aktualisiert | `docs/RELEASE-NOTES-0.1.0*.md` |
 | Website | ✅ Benchmark-Bereich, Dauertest, Betriebsarten, Firmen ohne Planung (nicht hochgeladen) | Branch `claude/reverent-lalande-2a5f0c` |
 | GitHub-Vorbereitung | ✅ README/CONTRIBUTING/SECURITY/CoC (CoC mit offiziellem Text 2.1 verglichen: identisch), CI, Vorlagen; 👤 2FA, Repo anlegen | `docs/GITHUB-RELEASE-PREP.md` |
 | Downloads mit Prüfsummen | ❌ erst mit echtem Release | – |
@@ -99,7 +99,7 @@ das interne Publish-Skript, nicht das Programmverhalten.
 | Windows portabel `PaperRust-0.1.0-windows-x64.zip` (109 MB) | wie oben | wie oben | `SHA256SUMS` |
 | Linux `PaperRust-0.1.0-linux-x86_64.tar.gz` (142 MB) | WSL, Debian-12-Container (`linux-build.sh`) | Bau inkl. Tesseract-Selbstprüfung ✅ | `SHA256SUMS` |
 | Docker amd64 `prrel_paperrust:0.1.0-amd64` | WSL, Dockerfile-Standard (fat LTO) | `paperrust --version`, Tesseract 6 Sprachen ✅ | Image `9fe47e808ee4` |
-| Docker arm64 `prrel_paperrust:0.1.0-arm64` | Jetson, aus Gitea geklont, **thin LTO / 16 codegen-units** (fat LTO brauchte beim Linken mehr RAM, als der Jetson frei hat; mit thin LTO sind alle Jetson-Messungen gemacht) | `paperrust --version`, Tesseract 6 Sprachen ✅ | Image `476b16533b6f` |
+| Docker arm64 `prrel_paperrust:0.1.0-arm64` | Testgerät, aus Gitea geklont, **thin LTO / 16 codegen-units** (fat LTO brauchte beim Linken mehr RAM, als das Testgerät frei hat; mit thin LTO sind alle arm64-Messungen gemacht) | `paperrust --version`, Tesseract 6 Sprachen ✅ | Image `476b16533b6f` |
 
 Nicht wiederholt mit diesem Stand: volle Installations-/Update-Tests unter Windows und auf frischen Linux-Systemen
 (zuletzt mit dem Stand vom 19./20.11. bestanden; seither nur kleine Änderungen in pl-system und Tests).

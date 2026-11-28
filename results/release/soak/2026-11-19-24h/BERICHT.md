@@ -1,6 +1,6 @@
 # Dauerlauf PaperRust – Bericht
 
-Image `prrel_paperrust:5f5de7c`, Start 2026-11-18T23:05:29+01:00, geplant 24 h, Gerät Jetson Orin Nano (geteilt, ohne Stilllegung fremder Dienste – Rauschen möglich).
+Image `prrel_paperrust:5f5de7c`, Start 2026-11-18T23:05:29+01:00, geplant 24 h, Gerät arm64-Testgerät (geteilt, ohne Stilllegung fremder Dienste – Rauschen möglich).
 
 Last: 5 Nutzer im Alltag (Liste, Filter, Suche, Öffnen, Vorschau, Herunterladen, Bearbeiten, Notizen), 1 Such-Client (1/s), alle 10 min ein Stapel (3 Dateien Eingangsordner + 2 per API, jeder 3. Stapel mit Scan), alle 30 min Massenänderungen (200 Dokumente), alle 2 h Papierkorb (löschen/wiederherstellen/leeren).
 

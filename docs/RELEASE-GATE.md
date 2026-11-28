@@ -45,7 +45,7 @@ geprüft, nicht grob.** Firmen sollen PaperRust einsetzen können. Eine Version 
 - [ ] Last-Suite `tests/stress` ohne einen einzigen Fehler (5xx, Zeitüberschreitung, Inkonsistenz):
       Massenänderungen während der Verarbeitung, 10–30 Nutzer parallel, gleiches Dokument gleichzeitig,
       parallele Uploads, kaputte/riesige Dateien.
-- [ ] **Dauerlauf 24 h** mit gemischter Last (Jetson oder NAS-ähnlich): Speicher stabil, keine
+- [ ] **Dauerlauf 24 h** mit gemischter Last (arm64-Kleinrechner oder NAS-ähnlich): Speicher stabil, keine
       wachsenden Handles/Verbindungen, keine Fehler im Log.
 - [ ] Ausfälle: Server-Abbruch mitten im Einlesen, Datenbank weg/zurück, Platte voll, Netz weg beim
       Mail-Abruf, KI-Dienst nicht erreichbar → nichts verloren, nichts doppelt, klare Meldungen, Erholung

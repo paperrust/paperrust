@@ -1,6 +1,6 @@
 # Auswertung Dauerlauf 24 h (Koordinator, 2026-11-20)
 
-Image `prrel_paperrust:5f5de7c` (Stand vor den Korrekturen vom 19.11.), Jetson Orin Nano, geteilt.
+Image `prrel_paperrust:5f5de7c` (Stand vor den Korrekturen vom 19.11.), arm64-Testgerät, geteilt.
 
 **Ergebnis: bestanden** (mit zwei geklärten Auffälligkeiten).
 
@@ -19,4 +19,4 @@ Image `prrel_paperrust:5f5de7c` (Stand vor den Korrekturen vom 19.11.), Jetson O
 - 4xx stiegen von 117 auf ~1200/h mit der Dokumentzahl: Zugriffe des Lastprogramms auf Dokumente, die es
   selbst gelöscht/in den Papierkorb gelegt hatte (404 auf `/api/documents/<id>/`), gewollt.
 
-Offen: Wiederholung mit dem Release-Stand (alle Korrekturen vom 19.11.) – bei der nächsten Jetson-Runde.
+Offen: Wiederholung mit dem Release-Stand (alle Korrekturen vom 19.11.) – bei der nächsten arm64-Runde.

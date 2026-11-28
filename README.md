@@ -21,7 +21,7 @@ Website: <https://paperrust.org> · Documentation: [English](docs/user/en/README
 
 ## At a glance
 
-Measured against paperless-ngx 3.4.2 on the same small arm64 board (NVIDIA Jetson Orin Nano), same
+Measured against paperless-ngx 3.4.2 on the same small arm64 board, same
 documents, same database – details and limits below:
 
 - **17× faster consuming:** 230 documents in 1 min 46 s instead of 29 min 56 s.
@@ -29,7 +29,7 @@ documents, same database – details and limits below:
   time (100 instead of 1,253 CPU seconds) – [report](results/benchmark/2026-11-22-pi5/bericht.md) (German).
 - **16× faster first start** (3.3 s instead of 53 s); a restart answers after 0.6 s instead of 34 s.
 - **12–19× faster answers with several users at once** (median, 1–10 people, no errors) –
-  [report](results/benchmark/2026-11-20-jetson/s2s3-rerun/bericht.md) (German).
+  [report](results/benchmark/2026-11-20-arm64/s2s3-rerun/bericht.md) (German).
 - **One container instead of two, 0.65 GB instead of 3.5 GB** – no Python, Redis, Celery, Tika or
   Gotenberg. Starts with 74 MiB of memory (plus the database).
 - **Your data stays as it is:** same database, same files, same REST API. Apps for paperless-ngx keep
@@ -41,7 +41,7 @@ docker pull ghcr.io/paperrust/paperrust:0.1.1     # linux/amd64 + linux/arm64
 
 ## Why PaperRust?
 
-Measured on 20 November 2026 on an NVIDIA Jetson Orin Nano (arm64, 6 cores, 8 GB RAM) in Docker, one
+Measured on 20 November 2026 on a small arm64 board (6 cores, 8 GB RAM) in Docker, one
 run per setup, 255 made-up documents. PaperRust (commit `e546b8f`) against paperless-ngx 3.4.2 in
 its leanest setup (Valkey, no Tika/Gotenberg), both with PostgreSQL 17 and 4 cores each, both
 cleaning and deskewing scans:
@@ -65,8 +65,8 @@ while consuming (800 MiB) is only slightly below paperless-ngx (838 MiB). Only o
 test documents were measured in this table (Raspberry Pi 5: see above); do not over-interpret differences below about 10 %.
 
 Full report with method and limits (German):
-[results/benchmark/2026-11-20-jetson/bericht.md](results/benchmark/2026-11-20-jetson/bericht.md),
-all tables: [tabellen.md](results/benchmark/2026-11-20-jetson/tabellen.md). Summary in English:
+[results/benchmark/2026-11-20-arm64/bericht.md](results/benchmark/2026-11-20-arm64/bericht.md),
+all tables: [tabellen.md](results/benchmark/2026-11-20-arm64/tabellen.md). Summary in English:
 [release notes → Performance](docs/RELEASE-NOTES-0.1.0.en.md#performance).
 
 ## Features

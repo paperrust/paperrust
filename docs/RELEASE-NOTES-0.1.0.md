@@ -90,13 +90,13 @@ steht wie paperless-ngx unter der GPL-3.0.
 
 ## Leistung
 
-Gemessen am 20.11.2026 auf einem **NVIDIA Jetson Orin Nano** (arm64, 6 Kerne, 8 GB RAM, NVMe) in
+Gemessen am 20.11.2026 auf einem **kleinen arm64-Rechner** (6 Kerne, 8 GB RAM, NVMe) in
 Docker, je Aufstellung **ein Lauf**, mit **255 erfundenen Dokumenten**. Verglichen wurde PaperRust
 (Freigabestand `e546b8f`, Standard-Einstellungen) mit paperless-ngx 3.4.2 in der sparsamsten
 Aufstellung (Valkey, ohne Tika/Gotenberg, Standard-Einstellungen), beide mit PostgreSQL 17 und je
 4 Kernen. Beide säubern und begradigen Scans – also gleiche Arbeit. Bericht:
-[results/benchmark/2026-11-20-jetson/bericht.md](../results/benchmark/2026-11-20-jetson/bericht.md),
-alle Tabellen: [tabellen.md](../results/benchmark/2026-11-20-jetson/tabellen.md).
+[results/benchmark/2026-11-20-arm64/bericht.md](../results/benchmark/2026-11-20-arm64/bericht.md),
+alle Tabellen: [tabellen.md](../results/benchmark/2026-11-20-arm64/tabellen.md).
 
 | | paperless-ngx | PaperRust |
 |---|---:|---:|

@@ -88,13 +88,13 @@ licensed under the GPL-3.0.
 
 ## Performance
 
-Measured on 20 Nov 2026 on an **NVIDIA Jetson Orin Nano** (arm64, 6 cores, 8 GB RAM, NVMe) in Docker,
+Measured on 20 Nov 2026 on a **small arm64 board** (6 cores, 8 GB RAM, NVMe) in Docker,
 **one run** per setup, with **255 made-up documents**. PaperRust (release state `e546b8f`, default
 settings) was compared with paperless-ngx 3.4.2 in its leanest setup (Valkey, no Tika/Gotenberg,
 default settings), both with PostgreSQL 17 and 4 cores each. Both clean and deskew scans – so the
 same work. Report:
-[results/benchmark/2026-11-20-jetson/bericht.md](../results/benchmark/2026-11-20-jetson/bericht.md)
-(German), all tables: [tabellen.md](../results/benchmark/2026-11-20-jetson/tabellen.md).
+[results/benchmark/2026-11-20-arm64/bericht.md](../results/benchmark/2026-11-20-arm64/bericht.md)
+(German), all tables: [tabellen.md](../results/benchmark/2026-11-20-arm64/tabellen.md).
 
 | | paperless-ngx | PaperRust |
 |---|---:|---:|

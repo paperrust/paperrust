@@ -1,7 +1,7 @@
-# Leistungsmessung PaperRust e546b8f gegen paperless-ngx 3.4.2 (Jetson Orin Nano, 2026-11-20)
+# Leistungsmessung PaperRust e546b8f gegen paperless-ngx 3.4.2 (arm64-Testgerät, 2026-11-20)
 
-Gerät und Messprogramm wie am 18./19.11. (`../2026-11-18-jetson/bericht.md`, `../2026-11-19-jetson/bericht.md`):
-NVIDIA Jetson Orin Nano, 6 Kerne, 7,5 GB RAM, NVMe, Leistungsmodus `pmode:0002`, 55 °C; Container auf Kernen 0–3,
+Gerät und Messprogramm wie am 18./19.11. (`../2026-11-18-arm64/bericht.md`, `../2026-11-19-arm64/bericht.md`):
+arm64-Testgerät, 6 Kerne, 7,5 GB RAM, NVMe, 55 °C; Container auf Kernen 0–3,
 Messprogramm auf 4–5; deu+eng, Europe/Zurich, `THREADS_PER_WORKER=4`, PostgreSQL 17. Je **eine** Runde pro
 System – Streuung nicht belegt, Unterschiede unter etwa 10 % nicht überbewerten.
 Alle Tabellen: `tabellen.md`; PaperRust 19.11. gegen 20.11.: `vergleich_19_20.md`;
@@ -22,7 +22,7 @@ C zeigt ngx mit Word-Unterstützung (Tika/Gotenberg), aber ohne Säubern. ngx vo
 ## Wichtige Einschränkung: S2/S3 ohne Hochladen und verkürzt
 
 In den Bedien-Szenarien S2 (1 Person) und S3 (5 bzw. 10 Personen) ist der Upload-Teil bei **allen drei Systemen**
-gescheitert: der Ordner `~/prrel/docs/extra` fehlte auf dem Jetson. In `raw/log_1_rs.txt`, `log_1_ngxc.txt` und
+gescheitert: der Ordner `~/prrel/docs/extra` fehlte auf dem Testgerät. In `raw/log_1_rs.txt`, `log_1_ngxc.txt` und
 `log_1_ngxa.txt` steht je **15-mal** `FileNotFoundError: … ~/prrel/docs/extra/e000NN.pdf` (e00000–e00014:
 1 in S2, 5 in S3/5, 9 in S3/10; `uploads_used: 15` in jedem `run_1_*.json`). Der Fehler entstand **im Messprogramm
 beim Öffnen der Datei** – die Anfrage ging nie an den Server, deshalb „Fehler 0“.
@@ -121,7 +121,7 @@ ngx A 257 SUCCESS + 3 REVOKED, ngx C 258 SUCCESS + 1 REVOKED (wie am 19.11. ngx 
 
 ## Methode und Grenzen
 
-- Messprogramm `~/prrel/tools/bench.py` auf dem Jetson (ob seit 19.11. geändert, hier nicht geprüft; Ablauf laut
+- Messprogramm `~/prrel/tools/bench.py` auf dem Testgerät (ob seit 19.11. geändert, hier nicht geprüft; Ablauf laut
   Log S1 → S7 → S4 → S6 → S2 → S3/5 → S3/10 → 5 min Leerlauf am Ende). Jeder Lauf mit eigenem PostgreSQL 17 und frischen Volumes, Abfragen über
   die REST-API mit Token.
 - RAM: PSS aller Prozesse je Container alle 2 s; „Dienste“ = alles außer PostgreSQL. S6 „Leerlauf mit Dokumenten“:
@@ -138,7 +138,7 @@ Die Website nennt die Zahlen vom 19.11. (5f5de7c). Geänderte Werte alt → neu 
 geht). Nicht aufgeführte Zahlen bleiben gleich oder sollten bleiben.
 
 **Allgemein:** Messdatum „18./19. November“ → „20. November 2026“, Entwicklungsstand `5f5de7c` → `e546b8f`
-(Läufe 01:22–04:49 Uhr), Quelle `2026-11-19-jetson` → `2026-11-20-jetson`.
+(Läufe 01:22–04:49 Uhr), Quelle `2026-11-19-arm64` → `2026-11-20-arm64`.
 
 **Startseite (Fakten):**
 - Import 230 Dokumente: **1 min 50 s → 1 min 46 s** (ngx 25–30 min bleibt: 1 493 / 1 796 s).

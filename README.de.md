@@ -21,7 +21,7 @@ Website: <https://paperrust.org> · Dokumentation: [Deutsch](docs/user/README.md
 
 ## Auf einen Blick
 
-Gemessen gegen paperless-ngx 3.4.2 auf demselben kleinen arm64-Rechner (NVIDIA Jetson Orin Nano),
+Gemessen gegen paperless-ngx 3.4.2 auf demselben kleinen arm64-Rechner,
 gleiche Dokumente, gleiche Datenbank – Einzelheiten und Grenzen weiter unten:
 
 - **17-mal schneller beim Einlesen:** 230 Dokumente in 1 min 46 s statt 29 min 56 s.
@@ -30,7 +30,7 @@ gleiche Dokumente, gleiche Datenbank – Einzelheiten und Grenzen weiter unten:
 - **16-mal schnellerer erster Start** (3,3 s statt 53 s); nach einem Neustart antwortet es nach 0,6 s
   statt 34 s.
 - **12- bis 19-mal schnellere Antworten mit mehreren Nutzern gleichzeitig** (Median, 1–10 Personen,
-  keine Fehler) – [Bericht](results/benchmark/2026-11-20-jetson/s2s3-rerun/bericht.md).
+  keine Fehler) – [Bericht](results/benchmark/2026-11-20-arm64/s2s3-rerun/bericht.md).
 - **Ein Container statt zwei, 0,65 GB statt 3,5 GB** – ohne Python, Redis, Celery, Tika und
   Gotenberg. Startet mit 74 MiB Arbeitsspeicher (plus Datenbank).
 - **Ihre Daten bleiben, wie sie sind:** gleiche Datenbank, gleiche Dateien, gleiche REST-API. Apps für
@@ -43,7 +43,7 @@ docker pull ghcr.io/paperrust/paperrust:0.1.1     # linux/amd64 + linux/arm64
 
 ## Warum PaperRust?
 
-Gemessen am 20. November 2026 auf einem NVIDIA Jetson Orin Nano (arm64, 6 Kerne, 8 GB RAM) in Docker,
+Gemessen am 20. November 2026 auf einem kleinen arm64-Rechner (6 Kerne, 8 GB RAM) in Docker,
 je Aufstellung ein Lauf, 255 erfundene Dokumente. PaperRust (Commit `e546b8f`) gegen paperless-ngx
 3.4.2 in der sparsamsten Aufstellung (Valkey, ohne Tika/Gotenberg), beide mit PostgreSQL 17 und je
 4 Kernen, beide säubern und begradigen Scans:
@@ -67,8 +67,8 @@ Speicherspitze beim Einlesen (800 MiB) liegt nur knapp unter paperless-ngx (838 
 in dieser Tabelle nur ein Gerät (Raspberry Pi 5: siehe oben) und saubere Testdokumente; Unterschiede unter etwa 10 % nicht überbewerten.
 
 Vollständiger Bericht mit Methode und Grenzen:
-[results/benchmark/2026-11-20-jetson/bericht.md](results/benchmark/2026-11-20-jetson/bericht.md),
-alle Tabellen: [tabellen.md](results/benchmark/2026-11-20-jetson/tabellen.md), Zusammenfassung:
+[results/benchmark/2026-11-20-arm64/bericht.md](results/benchmark/2026-11-20-arm64/bericht.md),
+alle Tabellen: [tabellen.md](results/benchmark/2026-11-20-arm64/tabellen.md), Zusammenfassung:
 [Release-Notizen → Leistung](docs/RELEASE-NOTES-0.1.0.md#leistung).
 
 ## Funktionen
