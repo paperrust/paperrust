@@ -22,7 +22,7 @@
 //! **Release when idle** ([`idle_release_after`], `PAPERRUST_OCR_ENGINE_IDLE_SECS`, default 180 s):
 //! Every instance holds the loaded language models (LSTM network, dictionaries; with deu+eng with
 //! legacy data tens of MiB per instance). With 4 page workers plus OSD, ~850 MiB stayed resident after the first ingestion
-//! on the Jetson (benchmark 2026-11-18, `results/benchmark/2026-11-18-jetson`). A
+//! on a small arm64 board (benchmark 2026-11-18). A
 //! cleanup thread ([`start_reaper`]) therefore deletes instances that have been unused longer than the deadline
 //! in the pool, and then returns the memory to the operating system ([`release_to_os`]).
 //! During a batch an instance is reused every few seconds and is kept;

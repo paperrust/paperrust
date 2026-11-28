@@ -78,7 +78,7 @@ pub fn langdetect_to_tesseract(code: &str) -> Option<&'static str> {
     })
 }
 
-/// OCR language automatic (PaperRust, Jetson measurement 2026-11-21: a French page with
+/// OCR language automatic (PaperRust, arm64 measurement 2026-11-21: a French page with
 /// `deu+eng` 93.4 % of the words and 35 % slower, with `fra` 100 %): Tesseract language to
 /// recognize the document with once more, or `None` (keep the first result).
 /// Acts only on enough text, a confident detection, a language that is not configured

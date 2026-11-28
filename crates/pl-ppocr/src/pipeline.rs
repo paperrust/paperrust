@@ -147,7 +147,7 @@ fn htr_candidates(decoded: &[Decoded], h: &HtrPass<'_>) -> Vec<usize> {
 pub const RETRY_MAX_SIDE: usize = 2560;
 
 /// Default longest side (stage 3): 1920 px keeps the corpus recall (88.8 vs 88.9 % at 2560, CER
-/// 11.6 vs 13.1 %) and is 14 % faster on arm64 (Jetson Orin), 25 % on x86.
+/// 11.6 vs 13.1 %) and is 14 % faster on arm64, 25 % on x86.
 pub const DEFAULT_MAX_SIDE: usize = 1920;
 
 /// Detector + recognizer pair with its character set.

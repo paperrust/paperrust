@@ -684,7 +684,7 @@ def s1_bulk(api, env, a, fac):
     for r in fails[:10]:
         REC.finding("ingest", f"Import-Aufgabe {r.get('status')}: {str(r.get('result_data') or r.get('result'))[:200]}")
 
-    # Phase B: directly after the import – like the Jetson test (add/remove alternating, 30x serial)
+    # Phase B: directly after the import – like the arm64 test (add/remove alternating, 30x serial)
     log("S1: direkt nach dem Import: 'Tag an alle' add/remove abwechselnd 30x seriell")
     ids, _ = all_ids(api)
     c = api.clone(timeout=a.timeout)

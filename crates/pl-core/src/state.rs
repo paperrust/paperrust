@@ -41,7 +41,7 @@ pub const PING_IF_IDLE_FOR: Duration = Duration::from_secs(30);
 ///
 /// Every open connection is its own PostgreSQL process that keeps catalog/plan caches after work,
 /// prepared statements (sqlx: up to 100 per connection) and sort/hash buffers – on the
-/// Jetson together ~3× as much PostgreSQL RAM as paperless-ngx after ingestion (147 instead of 49 MiB,
+/// arm64 test device together ~3× as much PostgreSQL RAM as paperless-ngx after ingestion (147 instead of 49 MiB,
 /// benchmark 2026-11-18). Django closes its connection after every request (`CONN_MAX_AGE=0`).
 /// Until 2026-11-18 it was 600 s; with 60 s the connections opened during ingestion are dropped after
 /// one minute of idle time. Cost: after a pause of > 60 s one connection setup (a few ms).

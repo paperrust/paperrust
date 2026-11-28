@@ -1,5 +1,5 @@
 //! Image files (PNG/JPEG …) are recognized on our own grayscale image, like PDF pages
-//! (Jetson check 2026-11-21: a deskewed color phone photo lost the umlaut dots of one word when
+//! (photo check 2026-11-21: a deskewed color phone photo lost the umlaut dots of one word when
 //! Tesseract converted the color image itself; on gray input it was stable at every angle).
 //! The archive PDF keeps the color image.
 

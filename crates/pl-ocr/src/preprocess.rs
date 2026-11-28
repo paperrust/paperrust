@@ -351,7 +351,7 @@ fn rotate_n(r: &Raster, degrees: f64, threads: usize) -> Raster {
             sy += step_y;
         }
     };
-    // Rows are independent: distribute large pages across several cores (Jetson measurement 19.11.:
+    // Rows are independent: distribute large pages across several cores (arm64 measurement 19.11.:
     // scan per document 2.3 → 2.8 s after introducing straightening/cleaning; rotating is the largest
     // part). Result bit-identical to the single-core version.
     if threads <= 1 {
@@ -404,7 +404,7 @@ pub struct CleanReport {
 
 /// Brightness of the paper (median of the bright points) below which a page counts as a photo.
 /// Scanners deliver white paper (≈ 240–255); photographed pages are unevenly lit and
-/// gray (Jetson check L1: median 211). Cleaning is built for scans – on photos it erased
+/// gray (photo check L1: median 211). Cleaning is built for scans – on photos it erased
 /// i and umlaut dots as "specks" and broke the gray background into hard tiles (word rate
 /// fell from 6/6 to 0/6). Better to clean once too little than to destroy text.
 pub const PHOTO_PAPER_MEDIAN: u8 = 225;
@@ -1125,7 +1125,7 @@ mod tests {
         assert_eq!(r.data[201 * 400 + 201], 0);
     }
 
-    /// Jetson check L1: photographed page (gray-lit paper, dark table, small
+    /// photo check L1: photographed page (gray-lit paper, dark table, small
     /// i dots) is not cleaned; the same page on white paper is.
     #[test]
     fn clean_skips_photos_keeps_scans() {

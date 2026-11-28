@@ -183,7 +183,7 @@ pub fn open_or_rebuild_index(index_dir: &Path, language: Option<&str>) -> Result
         wipe_index(index_dir)?;
         open_or_create(index_dir, language)?;
         write_sentinels(index_dir, language)?;
-        // Known difference (Jetson check B1, 2026-11-19): the freshly emptied index is incomplete.
+        // Known difference (migration check B1, 2026-11-19): the freshly emptied index is incomplete.
         // Upstream relies on the Docker start calling `document_index reindex --if-needed`
         // before any process opens the index; with PaperRust the server opens first, and the
         // worker's rebuild would afterwards have reported "Search index is up to date." (search empty after
@@ -268,7 +268,7 @@ mod tests {
         assert_eq!(open_or_rebuild_index(&missing, Some("en")).unwrap(), OpenOutcome::Missing);
     }
 
-    /// Jetson check B1: switch from ngx 2.x (Whoosh files, no settings file). If the
+    /// migration check B1: switch from ngx 2.x (Whoosh files, no settings file). If the
     /// server opens the index before the rebuild, `needs_rebuild` must still be true afterwards.
     #[test]
     fn recreated_index_still_needs_rebuild_until_a_rebuild_finishes() {

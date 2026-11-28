@@ -52,7 +52,7 @@ geprüft, nicht grob.** Firmen sollen PaperRust einsetzen können. Eine Version 
       ohne Handarbeit.
 - [ ] Großes Archiv (≥ 100 000 Dokumente, Stichprobe 1 Mio.): Liste/Suche/Filter/Massenaktionen in den
       Zielzeiten (`docs/PERF-SCALE.md`).
-- [ ] **Leistungsvergleich gegen paperless-ngx** (`tools/bench-jetson`, gleiche Hardware, Release-Stand):
+- [ ] **Leistungsvergleich gegen paperless-ngx** (`tools/bench-arm`, gleiche Hardware, Release-Stand):
       Rangfolge des Besitzers: **1. Geschwindigkeit, 2. Speicher.** Geschwindigkeit in allen Szenarien besser
       als ngx (Start, Bedienung, Einlesen je Art, Last, viele Nutzer); Speicher im Leerlauf **mit** Dokumenten
       (Dienste + Datenbank) und Plattenbedarf **mindestens so gut wie ngx minimal**; keine Speicher-Optimierung,

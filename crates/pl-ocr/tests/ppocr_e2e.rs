@@ -82,7 +82,7 @@ fn ingestion_path_with_ppocr_text_layer() {
     assert_eq!(t.matches("multi page document").count(), 3, "{t:?}");
 }
 
-/// Regression (Jetson run 2026-11-26: AI transcription with PP-OCR sent nothing): the ingestion path
+/// Regression (test run 2026-11-26: AI transcription with PP-OCR sent nothing): the ingestion path
 /// must write `ocr-lines.json` with engine `ppocr` and usable per-line confidences, otherwise the
 /// uncertain-line selection silently never fires.
 #[test]

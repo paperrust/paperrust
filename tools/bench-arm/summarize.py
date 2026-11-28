@@ -150,7 +150,7 @@ SCEN["S4 Schwere Last (230 Dokumente auf einmal, dabei Liste/Suche jede Sekunde)
     ("RAM-Spitze Datenbank [MiB]", lambda r: r["s4"]["import_window"]["db_pss_max_mib"], 0, "low"),
     ("CPU-Spitze [Kerne, 10-s-Mittel, max. 4]", lambda r: r["s4"]["import_window"]["cpu_peak_cores_10s"], 2, "low"),
     ("CPU-Zeit Import, Dienste [CPU-s]", lambda r: r["s4"]["import_window"]["app_cpu_s"], 0, "low"),
-    ("Kleinster freier RAM des Jetson [MB]", lambda r: r["s4"]["import_window"]["min_avail_mb"], 0, "high"),
+    ("Kleinster freier RAM des Testgeräts [MB]", lambda r: r["s4"]["import_window"]["min_avail_mb"], 0, "high"),
     ("OCR-Wortquote der 30 Scans, Median [%]", lambda r: 100 * r["s4"]["scan_ocr_quality"]["median"], 1, "high"),
     ("Massenbearbeitung: Tag an alle, Median [ms]", lambda r: r["s4"]["bulk_select"]["bulk_edit_tag_all"]["median_ms"], 0, "low"),
     ("Massenbearbeitung: p95 [ms]", lambda r: r["s4"]["bulk_select"]["bulk_edit_tag_all"]["p95_ms"], 0, "low"),

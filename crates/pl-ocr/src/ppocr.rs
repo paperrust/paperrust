@@ -177,7 +177,7 @@ type SharedOcr = std::result::Result<Arc<PpOcr>, String>;
 
 /// `PAPERRUST_PPOCR_SESSIONS`: model sessions per process (default 1). More sessions let pages run
 /// concurrently (one session with all pool threads for a lone page, the others share the cores),
-/// but each costs ~0.3–0.6 GB; measured on the Jetson with 6 parallel pages: 1 session 6.27 s/page,
+/// but each costs ~0.3–0.6 GB; measured on an arm64 board with 6 parallel pages: 1 session 6.27 s/page,
 /// 3: 6.32, 4: 6.20, 7: 5.65 (5 GB) – the CPU is already saturated by one session.
 fn sessions() -> usize {
     env("PAPERRUST_PPOCR_SESSIONS").and_then(|v| v.trim().parse::<usize>().ok()).unwrap_or(1).clamp(1, 16)

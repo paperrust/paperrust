@@ -157,7 +157,7 @@ pub enum Verdict {
     Markup,
 }
 
-/// Markup that an OCR model emits instead of plain text (Jetson run 2026-11-27: a crop "raus." came back
+/// Markup that an OCR model emits instead of plain text (test run 2026-11-27: a crop "raus." came back
 /// as `$\text{Hakka.}$`, other crops as `<figure> ### Figure …`). Only checked for crops: whole pages may
 /// legitimately contain `$` or `#`.
 fn looks_like_markup(text: &str) -> bool {
@@ -308,7 +308,7 @@ Item {i}: the parties agree on clause {i}.
         assert_eq!(assess(&looped, true, None, false).0, Verdict::Loop);
     }
 
-    /// Regression (Jetson run 2026-11-27): markup answers for line crops were accepted.
+    /// Regression (test run 2026-11-27): markup answers for line crops were accepted.
     #[test]
     fn crop_markup_is_rejected() {
         assert_eq!(assess("$\\text{Hakka.}$", false, Some(5), true).0, Verdict::Markup);

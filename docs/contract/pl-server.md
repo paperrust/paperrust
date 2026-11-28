@@ -854,7 +854,7 @@ Bewusst behalten (Geschwindigkeit vor Speicher): übersetzte Sprachdaten je benu
 Dokument neu übersetzen, ~0,1–0,5 s), das zwischengespeicherte Klassifikator-Modell der Vorschläge, der
 Suchindex-Leser, geladene PDFium-Bibliothek. Nicht gemessen: Release-Build, Linux/Jetson (PSS), Tesseract
 (hier nicht installiert; wird nach `PAPERRUST_OCR_ENGINE_IDLE_SECS` freigegeben). Die Jetson-Zahl
-170–200 MiB ist mit einem Lauf von `tools/bench-jetson` auf dem neuen Stand nachzuprüfen.
+170–200 MiB ist mit einem Lauf von `tools/bench-arm` auf dem neuen Stand nachzuprüfen.
 
 ## Ausfall-Befund C1 (tests/chaos, 2026-11-18)
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Shared helpers: lock, memory check (Jetson is shared, see ~/jobs/REGELN.md)
+# Shared helpers: lock, memory check (the test machine is shared)
 LOCK=~/jobs/paperrust_bench.lock
 take_lock() {
   echo "$$ $(date -Is) PAPERRUST BENCHMARK $1" > "$LOCK"
